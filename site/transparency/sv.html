@@ -1,0 +1,321 @@
+<div class="lead">
+<h2 id="summary">Så läser du den här sidan</h2>
+<p>Vår <a href="/privacy/">integritetspolicy</a> säger vad vi gör med uppgifter. Den här sidan visar hur – i koden som gör det, hämtad direkt ur dopeIPTV %VERSION% och ur den här webbplatsens egen kod. Varje del berättar:</p>
+<ul>
+<li><strong>Löftet</strong>, i en mening.</li>
+<li><strong>Så fungerar det</strong>, med vanliga ord.</li>
+<li><strong>Det här skyddar det inte mot</strong> – för inget skydd täcker allt, och du ska veta var vårt tar slut.</li>
+</ul>
+<p>Och under <em>Vill du se hur det fungerar bakom kulisserna?</em> finns beviset: ett riktigt exempel, framtaget genom att köra koden själv, raderna som gör det – var och en med en länk till exakt de raderna på GitHub – och hur du kontrollerar det själv.</p>
+</div>
+
+<div class="callout tp-ai">
+<p><strong>Kontrollera det med valfri AI.</strong> Du behöver inte kunna läsa kod för att granska oss. Bakom kulisserna i varje del finns en knapp som kopierar koden tillsammans med en färdig fråga. Klistra in den i den AI-assistent du använder – vilken som helst – så får du en förklaring av vad koden verkligen gör, och var den brister. Frågan ber AI:n leta efter svagheter, inte hålla med oss.</p>
+<p>En AI kan ha fel. Den är en hjälp att förstå koden, inte beviset. Beviset är själva koden, och testerna som kontrollerar den varje gång appen byggs. Vill du vara säker på att koden du klistrar in är den riktiga, öppna länken till GitHub och kopiera den därifrån.</p>
+</div>
+
+<nav class="legal-toc" aria-label="Innehåll">
+<ol>
+<li><a href="#reports">Felrapporter och feedback</a></li>
+<li><a href="#sync">Synkronisering av inställningar</a></li>
+<li><a href="#together">Titta tillsammans</a></li>
+<li><a href="#private">Privat tittande</a></li>
+<li><a href="#updates">Sökning efter uppdateringar</a></li>
+<li><a href="#website">Webbplatsens statistik</a></li>
+<li><a href="#hosts">Allt som appen pratar med</a></li>
+<li><a href="#builds">Så vet du att appen kör den här koden</a></li>
+</ol>
+</nav>
+
+<h2 id="reports">1. Felrapporter och feedback</h2>
+<p class="tp-promise">Inget som pekar ut dig eller det du tittar på lämnar din dator i en felrapport – och ingenting lämnar den alls förrän du trycker på Skicka.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>Appen</b> skriver rapporten och rensar den på din dator.</li>
+<li><b>Du</b> läser hela, ändrar eller tar bort vad du vill och bestämmer om den ska skickas.</li>
+<li><b>Vår server</b> rensar den en gång till och sparar den utan din IP-adress.</li>
+</ol>
+<p>Rensningen sker på två sätt. Först letar den efter <em>mönster</em>: allt som ser ut som en webbadress, en IP- eller MAC-adress, en e-postadress, eller ett lösenord, en nyckel eller en inloggning skriven som <code>namn=värde</code>. Sedan tar den bort <em>det appen vet är ditt</em>: dina källors namn, servrar och inloggningar, dina kanalnamn, titlarna du har tittat på, ditt användarnamn och din hemkatalog. Allt ersätts med en platshållare som <code>&lt;private&gt;</code>, så att rapporten fortfarande säger oss något utan att säga vem du är.</p>
+<p>Ber du om svar gör appen en slumpad kod som stannar på din dator och skickar bara en hashsumma av den – ett envägsfingeravtryck som vi inte kan göra om till koden. Senare frågar appen om den hashsumman har fått ett svar. Inget i den säger vem du är.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Några rader ur appens logg, på Kalles dator:</p>
+<!--tp:ex reports before-->
+<p class="tp-ex-h">Samma rader i rapporten – allt vi kan se om Kalle skickar den:</p>
+<!--tp:ex reports after-->
+<p class="fine">Framtaget genom att köra appens egen rensning på den här påhittade loggen, med en källa som heter ”My IPTV” och är inloggad som <code>kalle77</code>.</p>
+<h3>Koden</h3>
+<p>Rensningen – mönstren, och sedan det appen vet är ditt:</p>
+<!--tp:code reports scrub-->
+<p>Exakt vad som skickas: de här fälten och inget annat. En ändrad kopia av appen skickar ingenting alls.</p>
+<!--tp:code reports send-->
+<p>Koden för svar – hashsumman görs här, själva koden lämnar aldrig datorn:</p>
+<!--tp:code reports answers-->
+<p>På vår server: den andra rensningen och det som sparas – titta efter det som <em>inte</em> finns där: ingen IP-adress, inga uppgifter om webbläsaren.</p>
+<!--tp:code reports server-->
+<p>Och testerna som kontrollerar allt det här varje gång appen byggs. En ändring som släppte igenom något skulle göra att de misslyckas:</p>
+<!--tp:tests reports-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="reports"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som skriver felrapporter och skickar dem. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: kan något som identifierar en person eller det hen tittar på – en IP-adress, en inloggning, ett namn, en e-postadress, en kanal eller en titel – ändå slinka igenom eller skickas någonstans? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy reports-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Rensningen känner till mönster och det appen vet är ditt. Ord du själv skriver i en feedback, eller ett namn den aldrig har sett – ett filnamn, en kanal ur en lista du har tagit bort – blir kvar som de är. Därför ser du hela rapporten innan något skickas.</li>
+<li>Vår servers andra rensning är enklare än appens: den känner inte till dina namn, och den letar inte efter IPv6-adresser. Den finns för en gammal app eller ett handgjort anrop; det är appens rensning som räknas.</li>
+<li>Som alla anrop på internet kommer rapporten från din IP-adress. Vår server använder den bara i minnet, högst ett dygn, för att begränsa hur många rapporter en adress kan skicka, och sparar den aldrig.</li>
+</ul>
+
+<h2 id="sync">2. Synkronisering av inställningar</h2>
+<p class="tp-promise">Det du synkar låses på din dator innan det skickas, med en nyckel vi aldrig ser – vi förvarar det, men vi kan inte läsa det eller se vems det är.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>Din dator</b> gör en slumpad synkkod – 256 bitar, visad som 13 grupper om fyra tecken.</li>
+<li><b>Ur koden</b> tas två värden fram som inte har med varandra att göra: en <em>plats</em> (där kopian förvaras) och en <em>nyckel</em> (som låser den).</li>
+<li><b>Vår server</b> får platsen och den låsta kopian. Aldrig koden, aldrig nyckeln.</li>
+</ol>
+<p>De två värdena tas fram ur koden med <strong>HKDF-SHA256</strong>, ett standardsätt att göra flera nycklar av en hemlighet: att känna till platsen säger ingenting om nyckeln. Kopian packas och krypteras sedan med <strong>ChaCha20-Poly1305</strong>, ett av chiffren som skyddar HTTPS-anslutningar på webben. Det märker också varje ändring: en kopia som någon har manipulerat går inte att öppna. Dina andra datorer får samma kod av dig – inskriven eller inklistrad – och tar därför fram samma plats och nyckel.</p>
+<p>Anropet innehåller appens namn och version, om det är en officiell version, platsen och den låsta kopian. Inget konto, ingen e-postadress, inget namn. Webbservern loggar inte synkanrop alls, och en kopia som ingen dator har läst eller skrivit på 180 dagar raderas.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Ett litet exempel på vad din dator synkar – en favoritkanal och en inställning:</p>
+<!--tp:ex sync inside-->
+<p class="tp-ex-h">Det vår server tar emot (den låsta kopian är förkortad här):</p>
+<!--tp:ex sync request-->
+<p class="fine">Framtaget genom att köra appens egen kod med en ny, slumpad synkkod. Kör den igen så ändras varenda tecken.</p>
+<h3>Koden</h3>
+<p>Synkkoden, platsen och nyckeln, och hur kopian låses:</p>
+<!--tp:code sync key-->
+<p>Det appen skickar med – sitt namn och sin version, inget om dig:</p>
+<!--tp:code sync send-->
+<p>På vår server: det som sparas för varje plats.</p>
+<!--tp:code sync server-->
+<p>Och webbserverns inställning som håller synk utanför loggarna (<code>access_log off</code>):</p>
+<!--tp:code sync nolog-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="sync"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som synkar inställningar mellan datorer via utvecklarens server. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: kan servern, eller någon som kommer åt det servern sparar, läsa uppgifterna eller se vems de är? Används krypteringen och nycklarna rätt? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy sync-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Den som har din synkkod kan läsa och ändra det du synkar. Förvara den som ett lösenord. Tappar du bort den kan vi inte hjälpa dig att få tillbaka den – vi har aldrig haft den.</li>
+<li>Vår server ser hur stor din kopia är och när den ändras, men inte vad den innehåller.</li>
+<li>Din IP-adress når vår server med varje anrop. Den används bara i minnet, för att begränsa anrop, och skrivs aldrig ned.</li>
+</ul>
+
+<h2 id="together">3. Titta tillsammans</h2>
+<p class="tp-promise">Vilka som är i rummet och vad ni tittar på går mellan era datorer låst – vår server skickar bara vidare meddelanden den inte kan öppna.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>Rummets kod</b> – åtta tecken du delar med dina vänner – stannar hos dem som är i rummet.</li>
+<li><b>Ur koden</b> tar varje dator fram samma rumsnamn och samma nyckel.</li>
+<li><b>Vår server</b> skickar de låsta meddelandena vidare, håller dem bara i minnet och glömmer rummet en timme efter det senaste anropet.</li>
+</ol>
+<p>Åtta tecken går fort att skriva, men ensamma skulle de gå fort att gissa. Därför sträcks koden först ut med <strong>PBKDF2</strong> – 120 000 varv SHA-256, vilket gör varje gissning långsam – och görs sedan om till ett rumsnamn och en nyckel med HKDF, som för synken. Varje meddelande – vem som kom in, vad som spelas, play, paus och spolning – krypteras med ChaCha20-Poly1305 och fylls ut till en av fyra fasta storlekar, så att längden säger lite om innehållet. Var och en får ett nytt slumpat nummer för varje rum.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Ett meddelande som Kalles dator skriver det – han startar ett avsnitt:</p>
+<!--tp:ex together inside-->
+<p class="tp-ex-h">Det vår server tar emot:</p>
+<!--tp:ex together request-->
+<p class="fine">Framtaget genom att köra appens egen kod med rummets kod <code>K7PQ-M2XD</code>. Titeln, namnet och positionen finns alla där – låsta.</p>
+<h3>Koden</h3>
+<p>Rumsnamnet och nyckeln ur koden, och hur ett meddelande fylls ut och låses:</p>
+<!--tp:code together key-->
+<p>På vår server: ett meddelande tas emot som byte och skickas vidare – inget öppnar det, inget skrivs till disk.</p>
+<!--tp:code together server-->
+<p>Och webbserverns inställning som håller Titta tillsammans utanför loggarna:</p>
+<!--tp:code together nolog-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="together"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som låter vänner titta i takt via en server hos utvecklaren. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: vad kan servern, eller någon som ser trafiken, få veta om vem som tittar på vad, och med vem? Är rummets kod tillräckligt stark, och används krypteringen och utfyllnaden rätt? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy together-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Den som får rummets kod kan gå in i rummet och se namnen och vad som spelas. Dela den bara med dem du tittar med. Ett rum tar högst åtta personer.</li>
+<li>De som är i rummet ser namnet du väljer och vad du tittar på – det är det som är meningen.</li>
+<li>Vår server ser rumsnamnet, ett slumpat nummer för var och en, hur stora meddelandena är och när de skickas – och, som alla servrar, IP-adressen de kommer från. Titta tillsammans går inte att använda medan privat tittande är på.</li>
+</ul>
+
+<h2 id="private">4. Privat tittande</h2>
+<p class="tp-promise">Medan privat tittande är på sparas inget av det du spelar på din dator och berättas inte för någon – tills du stänger appen.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>En enda brytare</b> i appens minne – sparas aldrig, så den är av igen när appen startar.</li>
+<li><b>Varje ställe som sparar något</b> – tittarhistoriken, var du slutade – frågar själv brytaren innan det skriver.</li>
+<li><b>Varje ställe som berättar</b> – Trakt, Simkl, Discord, din mediaserver, statistiken, loggen – frågar den också.</li>
+</ol>
+<p>Kontrollen sitter i själva lagringen, inte i knapparna som spelar något. Därför kan ingen del av appen glömma den: hur du än startar en film vägrar historiken att skriva in den. En uppspelning som började privat förblir privat till slutet – även om strömmen kopplar upp igen efter att du har stängt av privat tittande.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Det appens logg säger om det som spelas – privat tittande av, sedan på:</p>
+<!--tp:ex private lines-->
+<h3>Koden</h3>
+<p>Brytaren, och regeln att en privat uppspelning förblir privat:</p>
+<!--tp:code private switch-->
+<p>Där historiken och positionerna att fortsätta från vägrar att skriva:</p>
+<!--tp:code private stores-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="private"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – dess läge för privat tittande. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: finns det något sätt för det som spelas under privat tittande att ändå sparas eller rapporteras? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy private-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Din tv-leverantör ser fortfarande vad du spelar – den skickar strömmen till dig – och det kan alla som ser din nätverkstrafik också. Privat tittande handlar om vad din egen dator sparar och berättar, inte om att vara osynlig.</li>
+<li>En inspelning du startar sparas ändå – du bad om den filen.</li>
+</ul>
+
+<h2 id="updates">5. Sökning efter uppdateringar</h2>
+<p class="tp-promise">När appen letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
+<h3>Så fungerar det</h3>
+<p>En gång om dagen frågar appen dopeiptv.org vilken version som är den senaste (GitHub, om vi inte svarar). Anropet innehåller en user agent och en rad till som säger om det är en officiell version. Det är allt: inget id, inga inställningar, inget om vad du tittar på.</p>
+<p>En uppdatering används aldrig bara för att den har kommit fram. Varje version har en lista med sina filers kontrollsummor, signerad med vår egen releasenyckel. Appen kontrollerar signaturen och filens kontrollsumma innan den installerar något. Den som skulle kunna ändra en fil på GitHub, men inte har vår nyckel, kan inte få in en uppdatering i din app.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Varje rad som uppdateringskontrollen skickar om appen (den sista raden är ett av tre ord):</p>
+<!--tp:ex updates lines-->
+<h3>Koden</h3>
+<p>User agent och raden om versionen, och var de läggs på anropet:</p>
+<!--tp:code updates headers-->
+<p>Kontrollen av de signerade kontrollsummorna innan en uppdatering installeras:</p>
+<!--tp:code updates signed-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="updates"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som letar efter uppdateringar och kontrollerar dem innan de installeras. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: vad avslöjar anropet om personen eller hens dator, och skulle en manipulerad uppdatering kunna ta sig igenom kontrollen? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy updates-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Kontrollen kommer från din IP-adress, och vår webbservers logg sparar den i ungefär en vecka, som för varje besök (<a href="#website">del 6</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land – aldrig med adressen.</li>
+<li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
+</ul>
+
+<h2 id="website">6. Webbplatsens statistik</h2>
+<p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster och utan att spara din IP-adress i statistiken.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>Webbservern</b> skriver varje anrop i en logg – med IP-adressen. Loggen raderas efter ungefär en vecka.</li>
+<li><b>Var femtonde minut</b> läses loggen: adressen blir ett land (uppslaget på vår egen server) och ett besökar-id, och skrivs inte vidare.</li>
+<li><b>Efter 400 dagar</b> förlorar ett besök sitt id, klockslaget och skärmstorleken. Bara anonyma siffror finns kvar.</li>
+</ol>
+<p>Besökar-id:t är en <strong>hashsumma</strong>: IP-adressen och webbläsarens namn körs genom SHA-256 tillsammans med en hemlighet som bara finns på vår server, och kortas till tolv tecken. Samma besökare får samma id, så att vi kan räkna unika och återkommande besökare – men id:t går inte att göra om till adressen.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">En rad i webbserverns logg (en påhittad besökare, från IP-adresserna som är reserverade för dokumentation):</p>
+<!--tp:ex website log-->
+<p class="tp-ex-h">Det statistiken sparar av det besöket – ingen IP-adress:</p>
+<!--tp:ex website visit-->
+<p class="tp-ex-h">Samma besök efter 400 dagar:</p>
+<!--tp:ex website anon-->
+<p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad hemlighet.</p>
+<h3>Koden</h3>
+<p>Webbserverns loggformat – det enda stället där din IP-adress skrivs ned:</p>
+<!--tp:code website log-->
+<p>Besökar-id:t och besöket så som det sparas:</p>
+<!--tp:code website visitor-->
+<p>Det ett besök behåller efter 400 dagar:</p>
+<!--tp:code website anon-->
+<h3>Kontrollera det själv</h3>
+<p>Här kan du kontrollera mer än koden. Öppna webbläsarens utvecklarverktyg på valfri sida på webbplatsen:</p>
+<ul>
+<li><strong>Nätverk:</strong> allt sidan laddar kommer från dopeiptv.org – typsnitten också. Bara dricks laddar Stripes betalformulär – när du pekar på eller öppnar det.</li>
+<li><strong>Lagring (Application i Chrome):</strong> inga kakor, och i den lokala lagringen bara de få val som <a href="/privacy/#kakor">integritetspolicyn</a> räknar upp.</li>
+<li><strong>Sidans svarshuvuden:</strong> <code>Content-Security-Policy</code> listar varje ställe sidan får ladda något från, och webbläsaren ser till att det följs.</li>
+</ul>
+<blockquote class="tp-ask" data-for="website"><p>Här nedan finns kod från webbplatsen dopeiptv.org – hur den räknar besökare ur sin webbservers logg. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: vad sparar den om en besökare, kan en besökare identifieras ur det, och hur anonyma är siffrorna egentligen? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy website-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
+<li>Din IP-adress finns i webbserverns logg i ungefär en vecka, och i frontserverns driftloggar i högst 30 dagar.</li>
+<li>Besökar-id:t är pseudonymt, inte anonymt: med hemligheten ger samma adress och webbläsare samma id. Därför raderas de sista id:na efter 25 månader.</li>
+</ul>
+
+<h2 id="hosts">7. Allt som appen pratar med</h2>
+<p class="tp-promise">Varje adress som står i appens kod finns med här, med när appen använder den.</p>
+<p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk. De är dina, så de finns inte i koden.</p>
+<h3>Adresser som appen ansluter till</h3>
+<table class="tp-hosts">
+<thead><tr><th>Adress</th><th>Till vad, och när</th></tr></thead>
+<tbody>
+<tr><td><!--tp:hosts talks ours--></td><td>Vi: uppdateringskontrollen, felrapporter och feedback när du skickar dem, och synk och Titta tillsammans när du slår på dem.</td></tr>
+<tr><td><!--tp:hosts talks github--></td><td>GitHub: uppdateringskontrollen när dopeiptv.org inte svarar, testversioner, och yt-dlp när du ber om det.</td></tr>
+<tr><td><!--tp:hosts talks tmdb--></td><td>The Movie Database: affischer, beskrivningar och veckans populära titlar. Appen skickar titlar och årtal. Påslaget från början; du kan stänga av det.</td></tr>
+<tr><td><!--tp:hosts talks opensubtitles--></td><td>OpenSubtitles: när du söker undertexter.</td></tr>
+<tr><td><!--tp:hosts talks trakt--></td><td>Trakt: bara om du loggar in där.</td></tr>
+<tr><td><!--tp:hosts talks simkl--></td><td>Simkl: bara om du loggar in där.</td></tr>
+<tr><td><!--tp:hosts talks plex--></td><td>Plex: inloggningen, när du lägger till en Plex-server.</td></tr>
+<tr><td><!--tp:hosts talks radio--></td><td>radio-browser.info: stationslistorna, medan du använder Radio. Vilken station du spelar berättas bara om du slår på det.</td></tr>
+<tr><td><!--tp:hosts talks hdhomerun--></td><td>SiliconDust: tablån för en HDHomeRun-mottagare som du lägger till.</td></tr>
+<tr><td><!--tp:hosts talks itunes--></td><td>Apples iTunes Search: saknade omslagsbilder till din egen musik (artist och album). Du kan stänga av det.</td></tr>
+<tr><td><!--tp:hosts talks demo--></td><td>Mux, Apple och Bitmovin: demokanalerna, bara när du spelar dem.</td></tr>
+<tr><td><!--tp:hosts talks dns--></td><td>Cloudflare, Quad9 eller Google: bara om du slår på appens egen DNS (Nerd-inställningarna) och väljer någon av dem.</td></tr>
+</tbody>
+</table>
+<h3>Adresser som appen bara visar dig</h3>
+<p>Länkar du kan klicka på – de öppnas i din webbläsare, och appen ansluter inte själv till dem:</p>
+<table class="tp-hosts">
+<tbody>
+<tr><td><!--tp:hosts link ours--></td><td>Företaget bakom dopeIPTV, under Om.</td></tr>
+<tr><td><!--tp:hosts link tmdb--></td><td>En titels sida hos The Movie Database.</td></tr>
+<tr><td><!--tp:hosts link imdb--></td><td>En titels sida hos IMDb.</td></tr>
+<tr><td><!--tp:hosts link opensubtitles--></td><td>Där du skapar ett konto hos OpenSubtitles.</td></tr>
+<tr><td><!--tp:hosts link trakt--></td><td>Trakts inloggning och din sida hos Trakt.</td></tr>
+<tr><td><!--tp:hosts link simkl--></td><td>Simkls inloggning och din sida hos Simkl.</td></tr>
+<tr><td><!--tp:hosts link plex--></td><td>Plex sida för inloggning.</td></tr>
+<tr><td><!--tp:hosts link mpv--></td><td>Handboken till mpv, videospelaren inuti appen.</td></tr>
+</tbody>
+</table>
+<h3>Namn i koden som inte är anslutningar</h3>
+<ul>
+<li><!--tp:hosts name web--> – adresser som appen känner igen när <em>du</em> öppnar en, för att lämna den till yt-dlp.</li>
+<li><!--tp:hosts name xml--> – namn som DLNA:s XML-format kräver; inget hämtas från dem.</li>
+<li><!--tp:hosts name file--> – namnet på en fil i en Enigma2-box: dess lista över bouquets.</li>
+<li><!--tp:hosts name radio--> – en rubrik i appens inställningar.</li>
+<li><!--tp:hosts name suffix--> – slutet på ett hemnätverks namn (Tailscales) som appens hemserver godtar.</li>
+<li><!--tp:hosts name example--> – exempel: ett tablå-id i en kommentar, och en exempeladress som visas i ett tomt fält.</li>
+</ul>
+<p>En till som du hittar om du söker: <code>8.8.8.8</code> finns också i delen som castar till en tv. Där frågar den din egen dator vilket nätverkskort som leder ut på internet – ett knep som inte skickar någonting alls:</p>
+<!--tp:code hosts route-->
+<h3>Kontrollera det själv</h3>
+<p>Sök igenom koden själv. Den första sökningen hittar adresserna som är skrivna som webbadresser, den andra värdnamnen som står för sig själva – tillsammans listorna ovan, förutom påhittade exempel som <code>example.com</code>:</p>
+<pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
+cd dopeIPTV
+git checkout %REF%
+grep -rnoE --include='*.py' "https?://[A-Za-z0-9.-]+" dopeiptv | sort -t: -k3 -u
+grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|app)[\"']" dopeiptv | sort -t: -k3 -u</code></pre>
+<p>Eller se vad appen verkligen gör: en brandvägg för program visar varje anslutning när den sker – OpenSnitch på Linux, LuLu eller Little Snitch på en Mac, eller brandväggens logg i Windows.</p>
+
+<h2 id="builds">8. Så vet du att appen kör den här koden</h2>
+<p class="tp-promise">Appen du laddar ner är byggd av exakt den här koden, öppet, och den märker om den har ändrats.</p>
+<ul>
+<li><strong>Byggd öppet.</strong> Varje version byggs av GitHub Actions från versionens tagg i koden – inte på våra datorer. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">Byggets recept</a> finns i koden, och <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">loggen från varje bygge</a> är öppen för alla.</li>
+<li><strong>Signerad.</strong> Versionens filer listas med sina kontrollsummor, och listan är signerad med vår releasenyckel. Appen kontrollerar en uppdatering mot den, och den här webbplatsen kontrollerar också varje fil den lämnar ut mot den.</li>
+<li><strong>Den kontrollerar sig själv.</strong> Appen har med sig en signerad lista över sina egna filer och kontrollerar dem när den startar. En ändrad kopia vet att den är ändrad, och använder inte våra tjänster: den letar inte efter uppdateringar här och skickar inga rapporter till oss.</li>
+</ul>
+<!--tp:code builds allowed-->
+<p>Du kan också köra testerna själv, eller köra appen direkt från koden:</p>
+<pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
+cd dopeIPTV
+git checkout %REF%
+python3 -m pip install -r requirements.txt pytest
+QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
+<p>Är det något här som inte stämmer med vad koden gör? <a href="#feedback" data-feedback>Säg till</a> – eller skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>.</p>

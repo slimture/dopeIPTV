@@ -1561,8 +1561,9 @@ var iptvCurrency = (function () {
   }
 })();
 
-/* A copy button on each command in the help - on the help page and in the
-   install dialog on the front page (app.js calls this for what it opens). A
+/* A copy button on each command in the help - on the help page, in the
+   install dialog on the front page (app.js calls this for what it opens) and
+   under "Check it yourself" on /transparency/ (pre.tp-cmd). A
    command is there to be run, and selecting a line of it by hand on a
    trackpad is fiddly. An icon, so it is one size in every language; its
    name (the body's data-copy) is the label and the tooltip. Only where the
@@ -1586,7 +1587,7 @@ window.iptvCopyButtons = function (root) {
     });
     return s;
   }
-  [].forEach.call(root.querySelectorAll(".help-a pre"), function (pre) {
+  [].forEach.call(root.querySelectorAll(".help-a pre, pre.tp-cmd"), function (pre) {
     if (pre.parentNode.classList.contains("codebox")) { return; }
     var code = pre.querySelector("code") || pre;
     var box = document.createElement("div");

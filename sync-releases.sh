@@ -496,7 +496,7 @@ snapshot() {  # snapshot /name.ext: the copy's address, made if it is new
     if [ -f "$ASSETS/$name" ]; then rm -f "$tmp"; else mv -f "$tmp" "$ASSETS/$name"; fi
     printf '/assets/%s' "$name"
 }
-asset_urls=$(for p in /style.css /nav.js /app.js /help.js /features.js /events.js; do
+asset_urls=$(for p in /style.css /nav.js /app.js /help.js /features.js /events.js /transparency.js; do
     printf '%s\t%s\n' "$p" "$(snapshot "$p")"
 done | jq -R 'split("\t") | {key: .[0], value: .[1]}' | jq -cs from_entries)
 # The app's pictures, per language: public/screenshots/<lang>/<name>.webp,
@@ -524,6 +524,14 @@ counts=$COUNTS
 # site_screenshots.py measures it in the app): the spot the picture zooms to.
 spots=$SITE/spots.json
 [ -s "$spots" ] && jq -e 'type == "object"' "$spots" >/dev/null 2>&1 || spots=/dev/null
+# Privacy, behind the scenes (/transparency/): the code it shows
+# (site/transparency.json, tools/transparency.py) and the languages its words
+# are written in (site/transparency/<lang>.html; the English for the rest).
+tpfile=$SITE/transparency.json
+[ -s "$tpfile" ] && jq -e 'type == "object"' "$tpfile" >/dev/null 2>&1 || tpfile=/dev/null
+tplangs=$( (cd "$SITE/transparency" 2>/dev/null && for f in *.html; do
+    [ -f "$f" ] && echo "${f%.html}"
+done) | jq -R . | jq -cs .)
 
 # The support page's ways - the tip dialog (SUPPORT_TIPS=on) or a tip's
 # Payment Link, monthly support's Payment Link and GitHub Sponsors (all on
@@ -549,7 +557,7 @@ tip_hint=$(conf SUPPORT_TIP_HINT)
 monthly_price=$(conf SUPPORT_MONTHLY_PRICE)
 monthly_prices=$(conf SUPPORT_MONTHLY_PRICES)
 
-render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
+render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY [BODY_LANG]]
     mkdir -p "${4%/*}"
     tr=$SITE/lang/$2.json
     jq -n -j -f "$SITE/render.jq" \
@@ -565,6 +573,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY]
         --slurpfile fmt "$SITE/formats.json" --slurpfile legal "$SITE/legal.json" \
         --slurpfile en "$SITE/lang/en.json" --slurpfile tr "$tr" \
         --slurpfile rel "$rel" --slurpfile dl "$counts" --slurpfile spots "$spots" \
+        --slurpfile tpfile "$tpfile" --argjson tplangs "$tplangs" --arg blang "${6:-}" \
         --rawfile tpl "$3" --rawfile navtpl "$SITE/templates/nav.html" \
         --rawfile body "${5:-/dev/null}" > "$4"
 }
@@ -578,6 +587,12 @@ for c in $codes; do
     render help "$c" "$SITE/templates/help.html" "$OUT/i18n/$c/help/index.html"
     render features "$c" "$SITE/templates/features.html" "$OUT/i18n/$c/features/index.html"
     render 404 "$c" "$SITE/templates/404.html" "$OUT/i18n/$c/404.html"
+    if [ "$tpfile" != /dev/null ] && [ -f "$SITE/transparency/en.html" ]; then
+        b=en
+        [ -f "$SITE/transparency/$c.html" ] && b=$c
+        render transparency "$c" "$SITE/templates/transparency.html" \
+            "$OUT/i18n/$c/transparency/index.html" "$SITE/transparency/$b.html" "$b"
+    fi
     written=en
     for l in $legal_langs; do
         if [ "$l" = "$c" ]; then written=$c; fi

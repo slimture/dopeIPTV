@@ -227,6 +227,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | (if $home then "" else "/" end) as $base
     | (if $current == "help" then "/help/"
        elif $current == "features" then "/features/"
+       elif $current == "transparency" then "/transparency/"
        elif ($L.pages | index($current)) != null then "/\($current)/"
        else "/" end) as $self
     | [[$base + "#features", t("nav_features"), "features"],
@@ -320,7 +321,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         [["#feedback", t("foot_feedback"), " data-feedback"], ["/about/", t("foot_about")]]
         + (if $SUPPORT_ON then [["/support/", t("support_nav")]] else [] end))
     + foot_group(t("foot_h_legal");
-        [["/privacy/", t("foot_privacy")], ["/terms/", t("foot_terms")], ["/payments/", t("foot_payments")]])
+        [["/privacy/", t("foot_privacy")], ["/transparency/", t("foot_transparency")],
+         ["/terms/", t("foot_terms")], ["/payments/", t("foot_payments")]])
     + "      </nav>\n"
     + "    </div>\n"
     + "    <div class=\"foot-base\">\n"
@@ -886,6 +888,77 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          perks: (if $page == "support" then support_perks else "" end),
          money: (if $page == "support" then support_money else "" end)});
 
+# -- /transparency/: privacy, behind the scenes -----------------------------------
+# What the privacy policy promises, shown in the code that does it. The words
+# are the language's own (site/transparency/<lang>.html, the English where a
+# language has none yet: $body, in $ARGS.named.blang); the code, the examples
+# and the hosts are the same in all of them (site/transparency.json, made by
+# tools/transparency.py from the app and the site at one version). In the
+# words: <!--tp:code PART ID--> a block of code, <!--tp:ex PART KEY--> an
+# example, <!--tp:tests PART--> the tests that check it, <!--tp:copy PART-->
+# the button that copies the part's code with its question (.tp-ask),
+# <!--tp:hosts KIND GROUP--> hosts the app's code names, %VERSION% and %REF%
+# the version shown. A placeholder with nothing behind it stops the render.
+
+  def tp_lines($a; $b): if $a == $b then "\($a)" else "\($a)–\($b)" end;
+  def tp_code($TP; $sec; $id):
+    ([$TP.code[$sec][]? | select(.id == $id)] | first) as $blk
+    | if $blk == null then error("render.jq: no code \($sec) \($id) in transparency.json") else
+      "<details class=\"tp-code\">\n"
+      + "<summary><span class=\"tp-code-t\">\(t("tp_show_code") | h)</span> <span class=\"tp-code-f\" dir=\"ltr\">"
+      + ([$blk.parts[] | "<a href=\"\(.url | h)\" rel=\"noopener\" title=\"\(t("tp_on_github") | h)\">\(.path | split("/") | last | h) \(tp_lines(.start; .end))</a>"] | join(" · "))
+      + "</span></summary>\n"
+      + ([$blk.parts[]
+          | "<div class=\"tp-src\" data-for=\"\($sec | h)\" data-head=\"\(.path | h):\(tp_lines(.start; .end)) (dopeIPTV \($TP.version | h)) \(.url | h)\">\n"
+            + "<a class=\"tp-src-h\" href=\"\(.url | h)\" rel=\"noopener\" dir=\"ltr\"><bdi>\(.path | h)</bdi> · \(t("tp_lines") | h) \(tp_lines(.start; .end))</a>\n"
+            + "<pre><code>\(.code | h)</code></pre>\n</div>\n"] | add)
+      + "</details>" end;
+  def tp_ex($TP; $sec; $key):
+    ($TP.examples[$sec][$key] // null) as $x
+    | if $x == null then error("render.jq: no example \($sec) \($key) in transparency.json")
+      else "<pre class=\"tp-ex\" dir=\"ltr\"><code>\($x | h)</code></pre>" end;
+  def tp_tests($TP; $sec):
+    if ($TP.tests[$sec] // []) == [] then error("render.jq: no tests \($sec) in transparency.json") else
+      "<ul class=\"tp-tests\">\n"
+      + ([$TP.tests[$sec][] | "<li><a href=\"\(.url | h)\" rel=\"noopener\"><code>\(.name | h)</code></a></li>\n"] | add)
+      + "</ul>" end;
+  def tp_hosts($TP; $kind; $group):
+    [$TP.hosts[]? | select(.kind == $kind and .group == $group)] as $hs
+    | if $hs == [] then error("render.jq: no \($kind) hosts \($group) in transparency.json") else
+      [$hs[] | "<a class=\"tp-host\" href=\"\(.where[0].url | h)\" rel=\"noopener\" title=\"\(.where[0].path | h):\(.where[0].line)\"><code>\(.host | h)</code></a>"]
+      | join(if $kind == "name" then ", " else "\n" end) end;
+  def page_transparency:
+    ($ARGS.named.tpfile[0] // error("render.jq: no transparency.json")) as $TP
+    | ($ARGS.named.blang // "" | if . == "" then "en" else . end) as $bl
+    | ($ARGS.named.tplangs // ["en"]) as $TPL
+    | "/transparency/" as $path
+    | ($body
+       | gsub("%VERSION%"; $TP.version | h) | gsub("%REF%"; $TP.ref | h)
+       | gsub("<!--tp:code (?<s>[a-z]+) (?<i>[a-z]+)-->"; tp_code($TP; .s; .i))
+       | gsub("<!--tp:ex (?<s>[a-z]+) (?<k>[a-z]+)-->"; tp_ex($TP; .s; .k))
+       | gsub("<!--tp:tests (?<s>[a-z]+)-->"; tp_tests($TP; .s))
+       | gsub("<!--tp:hosts (?<k>[a-z]+) (?<g>[a-z]+)-->"; tp_hosts($TP; .k; .g))
+       | gsub("<!--tp:copy (?<s>[a-z]+)-->";
+           "<p class=\"tp-copy-row\"><button type=\"button\" class=\"btn primary tp-copy\" data-for=\"\(.s)\" data-done=\"\(t("tp_copied") | h)\" hidden>\(t("tp_copy") | h)</button></p>")
+       | legal_numbers | legal_toc(t("tp_toc"))) as $parts
+    | $tpl
+    | expand(common + {title: (t("tp_title") | h), desc: (t("tp_desc") | h), blang: ($bl | h),
+                       bdir: (if ($S.rtl | index($bl)) then "rtl" else "ltr" end),
+                       canonical: (url($path; $bl) | h), grid: $parts.grid,
+                       tpjs: ($asset_urls["/transparency.js"] // "/transparency.js" | h)};
+        {hreflang: (([$TPL[] as $c
+           | "<link rel=\"alternate\" hreflang=\"\($c | h)\" href=\"\(url($path; $c) | h)\">\n"] | add)
+           + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n"),
+         nav: nav("transparency"),
+         tabs: ([($L.tabs // $L.pages)[] as $p
+           | "        <a href=\"/\($p | h)/\"\(if $p == "transparency" then " aria-current=\"page\"" else "" end)>\(t("foot_\($p)") | h)</a>\n"]
+           | add),
+         note: (if $bl == $lang then "" else
+           "      <p class=\"legal-note\">\(t("tp_only_en") | h)</p>\n" end),
+         lede: "        <p class=\"legal-lede\">\(t("tp_lede") | h)</p>\n",
+         meta: (t("tp_meta") | h | gsub("%VERSION%"; $TP.version | h) | gsub("%DATE%"; fmt_date($TP.made) | h)),
+         toc: $parts.toc, body: $parts.body});
+
 # -- sitemap.php ------------------------------------------------------------------
 
   def page_sitemap:
@@ -911,6 +984,17 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                 | "    <xhtml:link rel=\"alternate\" hreflang=\"\($alt | h)\" href=\"\(url($path; $alt) | h)\"/>\n"] | add)
             + "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\"/>\n"
             + "  </url>\n"] | add)
+      # Privacy, behind the scenes, in the languages it is written in.
+      + (($ARGS.named.tpfile[0] // null) as $TP | ($ARGS.named.tplangs // []) as $TPL
+         | if $TP == null then "" else
+           ([$TPL[] as $code
+             | "  <url>\n"
+               + "    <loc>\(url("/transparency/"; $code) | h)</loc>\n"
+               + "    <lastmod>\($TP.made | h)</lastmod>\n"
+               + ([$TPL[] as $alt
+                   | "    <xhtml:link rel=\"alternate\" hreflang=\"\($alt | h)\" href=\"\(url("/transparency/"; $alt) | h)\"/>\n"] | add)
+               + "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + "/transparency/" | h)\"/>\n"
+               + "  </url>\n"] | add // "") end)
       + "</urlset>\n";
 
   if $page == "index" then page_index
@@ -918,5 +1002,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   elif $page == "features" then page_features
   elif $page == "404" then page_404
   elif $page == "sitemap" then page_sitemap
+  elif $page == "transparency" then page_transparency
   elif ($L.pages | index($page)) != null then page_legal
   else error("render.jq: unknown page \($page)") end

@@ -1038,6 +1038,10 @@ section.legal-main { padding: 30px 0 72px; }
   margin: 42px 0 10px; scroll-margin-top: 80px;
 }
 .legal h3 { font-size: 17.5px; line-height: 1.35; margin: 26px 0 6px; font-weight: 600; }
+/* A service of its own under an h3 (privacy: updates, reports, sync...). */
+.legal h4 { font-size: 16.5px; line-height: 1.4; margin: 22px 0 4px; font-weight: 600; color: var(--text); }
+.legal li > p { margin: 0 0 6px; }
+.legal li > ul { margin: 4px 0 8px; }
 .legal p { margin: 0 0 12px; }
 .legal ul, .legal ol { margin: 0 0 12px; padding-left: 22px; }
 .legal li { margin: 0 0 7px; }
@@ -1083,6 +1087,110 @@ section.legal-main { padding: 30px 0 72px; }
   .legal .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .legal .facts dt { font-size: 14px; }
   .legal .facts dd { margin: 0 0 10px; }
+}
+
+/* -- Privacy, behind the scenes (/transparency/) ----------------------------
+   The legal pages' document with the code it is about: the promise in a
+   panel, the steps in a row of three, the examples and the code in the
+   help's code boxes - the code folded until asked for - and the question
+   for an AI quoted over the button that copies it. Code reads left to right
+   in every language. */
+/* "Want to see how it works behind the scenes?": each part's proof folded,
+   as the support page's questions are; inside it the code boxes on the
+   page's own colour, so they stand out from the panel. */
+.legal .tp-proof { margin: 18px 0 22px; border-radius: 14px; background: var(--surface); scroll-margin-top: 80px; }
+.legal .tp-proof > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; border-radius: 14px; color: var(--accent); font-weight: 600; font-size: 16px; line-height: 1.4; }
+.legal .tp-proof > summary::-webkit-details-marker { display: none; }
+.legal .tp-proof > summary::after { content: "+"; flex: none; margin-inline-start: auto; width: 28px; height: 28px;
+  display: grid; place-items: center; color: var(--muted); font-size: 22px; font-weight: 300; line-height: 1;
+  transition: transform .2s ease; }
+.legal .tp-proof[open] > summary::after { transform: rotate(45deg); }
+.legal .tp-proof > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.legal .tp-proof > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legal .tp-proof-body { padding: 0 18px 18px; }
+.legal .tp-proof-body > h3:first-child { margin-top: 2px; }
+.legal .tp-proof pre.tp-ex, .legal .tp-proof pre.tp-cmd, .legal .tp-proof .tp-src pre,
+.legal .tp-proof blockquote.tp-ask { background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .legal .tp-proof > summary::after { transition: none; } }
+.legal .tp-promise {
+  margin: 0 0 20px; padding: 14px 18px; border-radius: 4px 16px 16px 4px;
+  border-inline-start: 3px solid var(--accent); background: var(--surface);
+  font-size: 17.5px; line-height: 1.5; font-weight: 600;
+}
+.legal ol.tp-flow { list-style: none; counter-reset: tp; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px; margin: 8px 0 16px; padding: 0; }
+.legal .tp-flow li { margin: 0; padding: 12px 14px 14px; border-radius: 14px; background: var(--surface);
+  font-size: 15px; line-height: 1.5; counter-increment: tp; }
+.legal .tp-flow li::before { content: counter(tp); display: grid; place-items: center; width: 24px; height: 24px; margin: 0 0 8px;
+  border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
+  font-size: 13px; font-weight: 700; }
+.legal .tp-flow li b { font-weight: 600; }
+.legal .tp-ex-h { margin: 14px 0 6px; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+/* The page's own column may not grow past the screen for a long line of
+   code: the code box scrolls sideways instead. */
+.legal-grid > .tp-doc { min-width: 0; width: 100%; }
+.legal pre.tp-ex, .legal pre.tp-cmd, .tp-src pre {
+  margin: 0 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
+  overflow-x: auto; direction: ltr; text-align: left; max-width: 100%;
+  font: 12.5px/1.6 var(--mono);
+}
+.legal pre code { background: none; border: 0; padding: 0; border-radius: 0; font: 12.5px/1.6 var(--mono);
+  white-space: pre; word-break: normal; color: var(--text); }
+.legal .codebox pre.tp-cmd { margin: 0; padding-right: 52px; }
+.legal .tp-code { margin: 0 0 16px; border: 1px solid var(--line); border-radius: 12px; }
+.legal .tp-code > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 2px 10px; padding: 10px 14px; border-radius: 12px; }
+.legal .tp-code > summary::-webkit-details-marker { display: none; }
+.legal .tp-code > summary::before { content: ""; width: 6px; height: 6px; align-self: center; margin-inline-end: 2px;
+  border-right: 1.8px solid var(--accent); border-bottom: 1.8px solid var(--accent); transform: rotate(-45deg);
+  transition: transform .2s ease; }
+[dir="rtl"] .legal .tp-code > summary::before { transform: rotate(135deg); }
+.legal .tp-code[open] > summary::before { transform: rotate(45deg); }
+.legal .tp-code > summary:hover .tp-code-t { text-decoration: underline; text-underline-offset: 3px; }
+.legal .tp-code > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legal .tp-code[open] > summary { border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; }
+.tp-code-t { color: var(--accent); font-weight: 600; font-size: 15px; }
+.tp-code-f { color: var(--faint); font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
+.legal .tp-code-f a { color: var(--muted); text-decoration: none; }
+.legal .tp-code-f a::after { content: " ↗"; }
+.legal .tp-code-f a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.tp-src { padding: 12px 14px 0; }
+.legal a.tp-src-h { display: inline-block; margin: 0 0 6px; font: 12px/1.5 var(--mono); text-decoration: none; overflow-wrap: anywhere; }
+.legal a.tp-src-h:hover { text-decoration: underline; }
+.legal a.tp-src-h::after { content: " ↗"; }
+.tp-src pre { max-height: 560px; }
+.legal ul.tp-tests { list-style: none; padding: 0; margin: 0 0 14px; }
+.legal .tp-tests li { margin: 0 0 6px; padding-inline-start: 24px; position: relative; }
+.legal .tp-tests li::before { content: "✓"; position: absolute; inset-inline-start: 2px; color: var(--accent); font-weight: 700; }
+.legal .tp-tests a { text-decoration: none; }
+.legal .tp-tests a:hover code { color: var(--accent); }
+.legal .tp-tests code { overflow-wrap: anywhere; word-break: normal; }
+.legal blockquote.tp-ask { margin: 0 0 12px; padding: 12px 16px; border-radius: 4px 12px 12px 4px;
+  border-inline-start: 2px solid var(--line-2); background: var(--surface); color: var(--muted); font-size: 15px; line-height: 1.6; }
+.legal .tp-ask p { margin: 0; }
+.legal .tp-copy-row { margin: 0 0 8px; }
+.legal .tp-copy.is-done { background: color-mix(in srgb, var(--btn) 75%, #000); }
+textarea.tp-copied { display: block; width: 100%; margin: 10px 0 0; padding: 10px 12px; font: 12px/1.5 var(--mono);
+  color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; resize: vertical; }
+.legal table.tp-hosts { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 15px; line-height: 1.5; }
+.legal .tp-hosts th, .legal .tp-hosts td { text-align: start; vertical-align: top; padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--line); }
+.legal .tp-hosts th { color: var(--muted); font-weight: 500; font-size: 13.5px; }
+.legal .tp-hosts td:first-child { width: 40%; }
+.legal a.tp-host { text-decoration: none; }
+.legal td a.tp-host { display: block; margin: 0 0 3px; }
+.legal a.tp-host:hover code { color: var(--accent); }
+.legal a.tp-host code { overflow-wrap: anywhere; word-break: normal; }
+@media (prefers-reduced-motion: reduce) { .legal .tp-code > summary::before { transition: none; } }
+@media (max-width: 760px) {
+  .legal ol.tp-flow { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .legal .tp-hosts thead { display: none; }
+  .legal .tp-hosts tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .legal .tp-hosts td { display: block; width: auto; padding: 0; border: 0; }
+  .legal .tp-hosts td:first-child { width: auto; margin: 0 0 4px; }
 }
 
 @media (max-width: 860px) {

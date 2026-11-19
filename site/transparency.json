@@ -1,0 +1,1185 @@
+{
+ "ref": "fd537ee",
+ "commit": "fd537ee4284db25202320ccc99483efd3925c640",
+ "version": "1.6.6",
+ "site_ref": "5c700e7b5b546e1711cdfea71cb42874c6294ad9",
+ "made": "2026-11-19",
+ "code": {
+  "reports": [
+   {
+    "id": "scrub",
+    "parts": [
+     {
+      "path": "dopeiptv/core/report.py",
+      "start": 38,
+      "end": 99,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/report.py#L38-L99",
+      "code": "_IPV4 = re.compile(r\"(?<![\\d.])(?:\\d{1,3}\\.){3}\\d{1,3}(?![\\d.])\")\n# IPv6 in full (six groups or more, so a time like 21:05:03 is left alone)\n# or shortened with \"::\" (fe80::1, ::1).\n_IPV6 = re.compile(r\"(?<![\\w:])(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}\"\n                   r\"|[0-9A-Fa-f:]{0,30}::[0-9A-Fa-f:]{0,30}[0-9A-Fa-f])(?![\\w:])\")\n_MAC = re.compile(r\"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])\")\n_EMAIL = re.compile(r\"[\\w.+-]{1,64}@[\\w-]{1,63}(?:\\.[\\w-]{1,63})+\")\n# A supporter key pasted into a report would be the one thing that could tie it to a donation.\n_SUPPORTER = re.compile(r\"(?i)\\bDS1-[A-Za-z0-9_-]{20,}\")\n_KEYVAL = re.compile(r\"(?i)\\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|apikey|secret|\"\n                     r\"auth|sid|session|mac|play_token|login)(\\s*[=:]\\s*)([^\\s&'\\\",;]+)\")\n\n\ndef _not_an_address(text: str) -> bool:\n    \"\"\"Loopback - or the app's own test build's version, which has four\n    numbers too (\"1.6.0.123\": the version and the build's run).\"\"\"\n    from .. import __version__\n    base = \".\".join(__version__.split(\".\")[:3])\n    return text.startswith(\"127.\") or text.startswith(base + \".\")\n\n\ndef scrub(text: str, personal: Iterable[str] = ()) -> str:\n    \"\"\"*text* without anything that identifies a stream or a person.\"\"\"\n    # Whole addresses first (a login or a name inside one goes with it),\n    # then the person's own values, longest first (a name inside another).\n    out = _URL.sub(lambda m: f\"{m.group(1)}://<address>\", text or \"\")\n    for value in sorted({v.strip() for v in personal if v and len(v.strip()) >= 3}, key=len, reverse=True):\n        out = re.sub(re.escape(value), \"<private>\", out, flags=re.IGNORECASE)\n    out = _SUPPORTER.sub(\"<supporter key>\", out)\n    out = _EMAIL.sub(\"<email>\", out)\n    out = _MAC.sub(\"<mac>\", out)\n    out = _IPV6.sub(\"<ip>\", out)\n    out = _IPV4.sub(lambda m: m.group(0) if _not_an_address(m.group(0)) else \"<ip>\", out)\n    out = _KEYVAL.sub(lambda m: f\"{m.group(1)}{m.group(2)}<hidden>\", out)\n    home = os.path.expanduser(\"~\")\n    if len(home) > 1:\n        out = out.replace(home, \"~\")\n    try:\n        user = getpass.getuser()\n    except Exception:\n        user = \"\"\n    if user and len(user) >= 3:\n        out = re.sub(rf\"(?<![\\w]){re.escape(user)}(?![\\w])\", \"<user>\", out)\n    return out\n\n\ndef personal_values(playlists: Iterable[dict], channels: Iterable[str] = (),\n                    titles: Iterable[str] = ()) -> list[str]:\n    \"\"\"What the app knows to be someone's: sources' names, servers, logins\n    and boxes; channel names; titles watched.\"\"\"\n    out: list[str] = []\n    for p in playlists or []:\n        for key in (\"name\", \"server\", \"username\", \"password\", \"mac\", \"epg_url\"):\n            v = str(p.get(key) or \"\")\n            if v:\n                out.append(v)\n                if key == \"server\":\n                    host = re.sub(r\"^[a-z]+://\", \"\", v).split(\"/\")[0].split(\"@\")[-1].split(\":\")[0]\n                    out.append(host)\n    out += [str(c) for c in channels if c]\n    out += [str(t) for t in titles if t]\n    return out",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/log.py",
+      "start": 59,
+      "end": 61,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/log.py#L59-L61",
+      "code": "#: An address inside free text - the pattern the error report takes whole\n#: addresses out by (core/report.py uses this one).\nURL_IN_TEXT = re.compile(r\"\\b([a-zA-Z][a-zA-Z0-9+.-]{1,15})://[^\\s'\\\"<>()\\[\\]]+\")",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "send",
+    "parts": [
+     {
+      "path": "dopeiptv/core/report.py",
+      "start": 206,
+      "end": 216,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/report.py#L206-L216",
+      "code": "def _post(url: str, body: bytes, timeout: float) -> tuple[int, bytes]:\n    \"\"\"POST JSON with requests, whose certificates (certifi) travel with the\n    app: urllib asks the system's OpenSSL for them, and a bundled Python on\n    macOS has none, so every report failed there.\"\"\"\n    from .. import __version__\n    from ._lazy_requests import requests\n    r = requests.post(url, data=body, timeout=timeout, headers={\n        \"Content-Type\": \"application/json; charset=utf-8\",\n        \"User-Agent\": f\"dopeIPTV/{__version__}\", \"X-Dopeiptv-Report\": \"1\",\n        **build_check.headers()})\n    return r.status_code, r.content",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/report.py",
+      "start": 232,
+      "end": 270,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/report.py#L232-L270",
+      "code": "def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,\n                extra: dict | None = None) -> int:\n    \"\"\"send(), with the site's answer: its HTTP status - 409 for a reply to\n    an answer whose thread is closed - or 0 when nothing reached it (never\n    from a modified build).\"\"\"\n    from .. import __version__\n    if not build_check.allowed():\n        log.info(\"report: not sent - not an official build\")\n        return 0\n    extra = extra or {}\n    fields = {\"kind\": kind if kind in (\"error\", \"crash\", \"feedback\") else \"feedback\",\n              \"version\": __version__, \"os\": platform.system(),\n              \"text\": (text or \"\")[:MAX_TEXT]}\n    # What feedback is about (a topic, an area, how often) and \"supporter\":\n    # \"yes\" from a supporter (read first): single words from a short list.\n    fields.update({k: v for k, v in extra.items()\n                   if k in (\"topic\", \"area\", \"often\", \"supporter\")\n                   and isinstance(v, str) and v.isalpha() and len(v) <= 12})\n    # The hash of the code this computer keeps to be told the answers - and\n    # for a reply to an answer, the same hash as the thread it belongs to.\n    for key in (\"reply\", \"thread\"):\n        if re.fullmatch(r\"[0-9a-f]{64}\", str(extra.get(key) or \"\")):\n            fields[key] = str(extra[key])\n    # UTF-8 as it is (an escaped \"å\" is six bytes), and cut to what the site\n    # takes - a long log once made the whole report too big to be kept.\n    body = json.dumps(fields, ensure_ascii=False).encode(\"utf-8\")\n    if len(body) > MAX_BODY:\n        fields[\"text\"] = _fit(fields[\"text\"], len(fields[\"text\"].encode(\"utf-8\")) - (len(body) - MAX_BODY) - 64)\n        body = json.dumps(fields, ensure_ascii=False).encode(\"utf-8\")\n    try:\n        status, _data = _post(endpoint or ENDPOINT, body, timeout)\n    except Exception as e:\n        log.info(\"report: not sent (%s)\", type(e).__name__)\n        return 0\n    if not 200 <= status < 300:\n        log.info(\"report: not sent (HTTP %s)\", status)\n        return status\n    log.info(\"report: sent (%s%s)\", kind, \", a reply\" if \"thread\" in fields else \"\")\n    return status",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "answers",
+    "parts": [
+     {
+      "path": "dopeiptv/core/report.py",
+      "start": 275,
+      "end": 286,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/report.py#L275-L286",
+      "code": "def new_code() -> tuple[str, str]:\n    \"\"\"(code, its SHA-256): the code stays on this computer, the hash goes\n    with the report - the one link between the two, naming nobody.\"\"\"\n    import hashlib\n    import secrets\n    code = secrets.token_urlsafe(24)\n    return code, hashlib.sha256(code.encode(\"ascii\")).hexdigest()\n\n\ndef code_hash(code: str) -> str:\n    import hashlib\n    return hashlib.sha256(code.encode(\"ascii\")).hexdigest()",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/report.py",
+      "start": 315,
+      "end": 330,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/report.py#L315-L330",
+      "code": "def fetch_replies(codes: list[str], timeout: float = 15.0, endpoint: str | None = None) -> dict | None:\n    \"\"\"{code: [answers]} for the codes whose reports were answered; None\n    when the site could not be asked (never from a modified build). Only\n    the hashes are sent.\"\"\"\n    if not build_check.allowed():\n        return None\n    by_hash = {code_hash(c): c for c in codes[:20]}\n    try:\n        status, data = _post(endpoint or REPLIES, json.dumps({\"codes\": list(by_hash)}).encode(\"utf-8\"), timeout)\n        if status != 200:\n            raise OSError(f\"HTTP {status}\")\n        got = json.loads(data or b\"{}\").get(\"replies\") or {}\n    except Exception as e:\n        log.info(\"report: answers not asked (%s)\", type(e).__name__)\n        return None\n    return {by_hash[h]: a for h, a in got.items() if h in by_hash and isinstance(a, list)}",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "server",
+    "parts": [
+     {
+      "path": "donate/feedback.py",
+      "start": 105,
+      "end": 109,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/feedback.py#L105-L109",
+      "code": "_URL = re.compile(r\"\\b([a-zA-Z][a-zA-Z0-9+.-]{1,15})://[^\\s'\\\"<>()\\[\\]]+\")\n_IPV4 = re.compile(r\"(?<![\\d.])(?:\\d{1,3}\\.){3}\\d{1,3}(?![\\d.])\")\n_EMAIL = re.compile(r\"[\\w.+-]{1,64}@[\\w-]{1,63}(?:\\.[\\w-]{1,63})+\")\n_MAC = re.compile(r\"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])\")\n_KEYVAL = re.compile(r\"(?i)\\b(user(?:name)?|pass(?:word)?|pwd|token|key|secret|auth|mac)(\\s*[=:]\\s*)([^\\s&'\\\",;]+)\")",
+      "repo": "site"
+     },
+     {
+      "path": "donate/feedback.py",
+      "start": 111,
+      "end": 120,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/feedback.py#L111-L120",
+      "code": "_SUPPORTER = re.compile(r\"(?i)\\bDS1-[A-Za-z0-9_-]{20,}\")\n\n\ndef scrub(text: str) -> str:\n    out = _URL.sub(lambda m: f\"{m.group(1)}://<address>\", text or \"\")\n    out = _SUPPORTER.sub(\"<supporter key>\", out)\n    out = _EMAIL.sub(\"<email>\", out)\n    out = _MAC.sub(\"<mac>\", out)\n    out = _IPV4.sub(lambda m: m.group(0) if m.group(0).startswith(\"127.\") else \"<ip>\", out)\n    return _KEYVAL.sub(lambda m: f\"{m.group(1)}{m.group(2)}<hidden>\", out)",
+      "repo": "site"
+     },
+     {
+      "path": "donate/feedback.py",
+      "start": 192,
+      "end": 277,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/feedback.py#L192-L277",
+      "code": "def accept(stats_dir: str, body: dict, build: str = \"unknown\") -> tuple[int, dict]:\n    \"\"\"One report from the app; (status, answer). *build*: what its\n    X-dopeIPTV-Build header said (official.kind), never the body's word. A\n    report already taken answers ok with \"duplicate\" (the app need not try\n    again), and is not kept twice.\n\n    With \"thread\" (a report's code hash) it is a follow-up to that report's\n    latest answer: taken only while that answer lets them reply and they\n    have not yet (409 \"closed\" otherwise, nothing kept); kept as a row of\n    its own, tied to the report by its id, never by the hash.\"\"\"\n    thread = str(body.get(\"thread\") or \"\")\n    if thread and not _HASH.match(thread):\n        return 400, {\"error\": \"thread\"}\n    kind = \"feedback\" if thread else str(body.get(\"kind\") or \"feedback\")\n    if kind not in KINDS:\n        kind = \"feedback\"\n    version = str(body.get(\"version\") or \"\")\n    if not _VERSION.match(version):\n        version = \"?\"\n    system = re.sub(r\"[^A-Za-z0-9 ._-]\", \"\", str(body.get(\"os\") or \"\"))[:24] or \"?\"\n    site = kind == \"feedback\" and not thread and body.get(\"from\") == \"site\"\n    text = _cut(scrub(str(body.get(\"text\") or \"\")).strip()[:THREAD_TEXT if thread else MAX_TEXT],\n                THREAD_BYTES if thread else SITE_BYTES if site else MAX_BYTES)\n    if not text:\n        return 400, {\"error\": \"empty\"}\n    now = time.time()\n    row = {\"id\": uuid.uuid4().hex[:12], \"t\": int(now), \"kind\": kind,\n           \"version\": version, \"os\": system, \"build\": build if build in BUILDS else \"unknown\",\n           \"sig\": \"\" if thread else signature(kind, text), \"text\": text}\n    if not thread and _HASH.match(str(body.get(\"reply\") or \"\")):\n        row[\"reply\"] = str(body[\"reply\"])\n    if body.get(\"supporter\") == \"yes\":\n        # From someone whose app holds a supporter key: read first. Only the\n        # word comes, never the key, so it names nobody.\n        row[\"sup\"] = 1\n    if kind == \"feedback\" and not thread:\n        row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})\n        if site:\n            row[\"from\"] = \"site\"\n    os.makedirs(stats_dir, exist_ok=True)\n    path, _state = _paths(stats_dir)\n    make_room(stats_dir)\n    with _LOCK:\n        try:\n            if os.path.getsize(path) >= MAX_FILE:\n                # Nothing could go (no report in it can be read): never past it.\n                return 503, {\"error\": \"full\"}\n        except OSError:\n            pass\n        mem = _memory(stats_dir, now)\n        rid = to = None\n        if thread:\n            rid, to = _thread_of(stats_dir, thread)\n            if rid is None:\n                return 409, {\"error\": \"closed\"}\n        same = _same(kind, text, rid or \"\")\n        if same in mem[\"hashes\"]:\n            return 200, {\"ok\": True, \"duplicate\": True}\n        if thread:\n            if to is None:\n                return 409, {\"error\": \"closed\"}\n            row.update(thread_of=rid, to=to)\n        if mem[\"n\"] >= DAY_MOST:\n            return 429, {\"error\": \"enough for today\"}\n        sig = row[\"sig\"]\n        if kind != \"feedback\" and mem[\"sigs\"].get(sig, 0) >= SAME_SIG_DAY:\n            # Counted, so the problem's number stays right; its text is\n            # already here many times over today.\n            row[\"text\"], row[\"counted\"] = \"\", True\n        elif mem[\"bytes\"] + _bytes(row[\"text\"]) > DAY_BYTES:\n            # The day's room is used up (many long reports, or someone\n            # filling it): this one keeps its start, enough to read it by.\n            short = _cut(row[\"text\"], LATE_BYTES)\n            if short != row[\"text\"]:\n                row[\"text\"], row[\"cut\"] = short.rstrip() + \" …\", True\n        mem[\"hashes\"][same] = now\n        mem[\"n\"] += 1\n        mem[\"sigs\"][sig] = mem[\"sigs\"].get(sig, 0) + 1\n        mem[\"bytes\"] += _bytes(row[\"text\"])\n        with open(path, \"a\", encoding=\"utf-8\") as fh:\n            fh.write(json.dumps(row, ensure_ascii=False) + \"\\n\")\n    if rid:\n        # A reply waits to be read: out of the archive, unread (its own id\n        # has no mark yet).\n        archive(stats_dir, rid, False)\n    return 200, {\"ok\": True, \"id\": row[\"id\"]}",
+      "repo": "site"
+     }
+    ]
+   }
+  ],
+  "sync": [
+   {
+    "id": "key",
+    "parts": [
+     {
+      "path": "dopeiptv/core/sync.py",
+      "start": 123,
+      "end": 130,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/sync.py#L123-L130",
+      "code": "def format_code(raw: bytes) -> str:\n    \"\"\"32 bytes as base32 in groups of four: 13 groups.\"\"\"\n    text = base64.b32encode(raw).decode(\"ascii\").rstrip(\"=\")\n    return \"-\".join(text[i:i + 4] for i in range(0, len(text), 4))\n\n\ndef new_code() -> str:\n    return format_code(secrets.token_bytes(32))",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/sync.py",
+      "start": 157,
+      "end": 174,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/sync.py#L157-L174",
+      "code": "def hkdf(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:\n    \"\"\"HKDF-SHA256 (RFC 5869).\"\"\"\n    prk = hmac.new(salt or b\"\\0\" * 32, ikm, hashlib.sha256).digest()\n    out, block = b\"\", b\"\"\n    counter = 1\n    while len(out) < length:\n        block = hmac.new(prk, block + info + bytes([counter]), hashlib.sha256).digest()\n        out += block\n        counter += 1\n    return out[:length]\n\n\ndef derive(raw: bytes) -> tuple[str, bytes]:\n    \"\"\"(slot, key) for a code: the slot the site keeps it under (64 hex)\n    and the encryption key, each from its own HKDF label - knowing one says\n    nothing about the other.\"\"\"\n    slot = hkdf(raw, _SALT, b\"slot\", 32).hex()\n    return slot, hkdf(raw, _SALT, b\"key\", 32)",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/sync.py",
+      "start": 188,
+      "end": 194,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/sync.py#L188-L194",
+      "code": "def seal(key: bytes, doc: dict[str, Any]) -> bytes:\n    \"\"\"The snapshot as the site keeps it: a format byte, a random nonce and\n    the compressed JSON, encrypted and authenticated.\"\"\"\n    plain = zlib.compress(_canon(doc).encode(\"utf-8\"), 6)\n    nonce = secrets.token_bytes(12)\n    head = bytes([FORMAT])\n    return head + nonce + aead.encrypt(key, nonce, plain, _AAD + head)",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "send",
+    "parts": [
+     {
+      "path": "dopeiptv/core/sync.py",
+      "start": 929,
+      "end": 949,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/sync.py#L929-L949",
+      "code": "    def __init__(self, slot: str, endpoint: str | None = None,\n                 timeout: float = 20.0) -> None:\n        self.url = (endpoint or ENDPOINT) + slot\n        self.timeout = timeout\n        from .. import __version__\n        self.headers = {\"User-Agent\": f\"dopeIPTV/{__version__}\",\n                        \"Content-Type\": \"application/json\", **build_check.headers()}\n\n    def _call(self, method: str, body: dict | None = None) -> Any:\n        from ._lazy_requests import requests\n        if not build_check.allowed():\n            # Never asked from a modified build: the site refuses it anyway.\n            raise SyncError(\"modified\")\n        try:\n            return requests.request(method, self.url, headers=self.headers,\n                                    data=None if body is None\n                                    else json.dumps(body).encode(\"ascii\"),\n                                    timeout=self.timeout)\n        except Exception as e:\n            log.info(\"sync: %s not answered (%s)\", method, type(e).__name__)\n            raise SyncError(\"net\") from e",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "server",
+    "parts": [
+     {
+      "path": "donate/sync.py",
+      "start": 203,
+      "end": 236,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/sync.py#L203-L236",
+      "code": "def put(stats_dir: str, slot: str, version_seen: object, blob: object) -> tuple[int, dict]:\n    \"\"\"Keep *blob* as the next version of *slot* - if *version_seen* is the\n    version kept now (0: none yet). A new slot is refused while all the\n    slots keep MAX_TOTAL; one there already can still be written. (status,\n    body to answer).\"\"\"\n    path = _path(stats_dir, slot)\n    if not isinstance(version_seen, int) or isinstance(version_seen, bool) or version_seen < 0:\n        return 400, {\"error\": \"version_seen\"}\n    size = blob_size(blob)\n    if size > MAX_BLOB:\n        return 413, {\"error\": \"too big\", \"most\": MAX_BLOB}\n    if size < MIN_BLOB:\n        return 400, {\"error\": \"blob\"}\n    with _lock(slot):\n        cur = _read(path)\n        version = cur[\"version\"] if cur else 0\n        if version_seen != version:\n            body: dict = {\"error\": \"conflict\", \"version\": version,\n                          \"t\": int(cur.get(\"t\") or 0) if cur else 0}\n            if cur:\n                body[\"blob\"] = cur[\"blob\"]\n            return 409, body\n        if cur is None and usage(stats_dir)[\"bytes\"] + size > MAX_TOTAL:\n            return 507, {\"error\": \"full\"}\n        before = _size(path) if cur else 0\n        grows = len(str(blob)) - len(cur[\"blob\"]) if cur else 0\n        if grows > 0 and usage(stats_dir)[\"bytes\"] + grows > MAX_TOTAL * GROW_SHARE:\n            # Rewritten no larger it would still be taken: a household that\n            # syncs goes on syncing while the space is full.\n            return 507, {\"error\": \"full\"}\n        now = int(time.time())\n        _write(path, {\"version\": version + 1, \"t\": now, \"blob\": blob})\n        _changed(stats_dir, _size(path) - before, 0 if cur else 1)\n    return 200, {\"version\": version + 1, \"t\": now}",
+      "repo": "site"
+     }
+    ]
+   },
+   {
+    "id": "nolog",
+    "parts": [
+     {
+      "path": "deploy/proxy-dopeiptv.org.conf",
+      "start": 72,
+      "end": 88,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/deploy/proxy-dopeiptv.org.conf#L72-L88",
+      "code": "    # Settings sync from the app (donate/sync.py): a body of up to 3 MB\n    # (nginx's default is 1 MB), and not logged - a slot and an address\n    # together would say which computers belong together. The content host\n    # limits the rate.\n    location ^~ /sync/ {\n        proxy_pass http://CONTENT_HOST:8081;   # <-- the same address as below\n        client_max_body_size 3m;\n        access_log off;\n        limit_conn conn_limit 64;\n        limit_conn_status 429;\n        proxy_set_header Host              $host;\n        proxy_set_header X-Real-IP         $remote_addr;\n        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_set_header X-Forwarded-Host  $host;\n        proxy_set_header X-Forwarded-Port  443;\n    }",
+      "repo": "site"
+     }
+    ]
+   }
+  ],
+  "together": [
+   {
+    "id": "key",
+    "parts": [
+     {
+      "path": "dopeiptv/core/together.py",
+      "start": 71,
+      "end": 73,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/together.py#L71-L73",
+      "code": "#: A message's plain text is padded up to one of these, so the sizes the\n#: relay sees say little about what was sent.\n_PAD = (192, 384, 768, 1536)",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/together.py",
+      "start": 108,
+      "end": 118,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/together.py#L108-L118",
+      "code": "@functools.lru_cache(maxsize=8)\ndef derive(code: str) -> tuple[str, bytes]:\n    \"\"\"(room id, key) for a code: the name the relay keeps the room's\n    messages under (64 hex) and the key they are sealed with, each from its\n    own HKDF label - one says nothing about the other.\"\"\"\n    shown = parse_code(code)\n    if shown is None:\n        raise ValueError(\"not a room code\")\n    seed = hashlib.pbkdf2_hmac(\"sha256\", shown.replace(\"-\", \"\").encode(\"ascii\"),\n                               _SALT, STRETCH, 32)\n    return hkdf(seed, _SALT, b\"room\", 32).hex(), hkdf(seed, _SALT, b\"key\", 32)",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/together.py",
+      "start": 128,
+      "end": 138,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/together.py#L128-L138",
+      "code": "def seal(key: bytes, room: str, msg: dict[str, Any]) -> bytes:\n    \"\"\"*msg* as the relay passes it: a format byte, a random nonce, and the\n    padded JSON, encrypted and tied to the room.\"\"\"\n    text = json.dumps(msg, separators=(\",\", \":\"), ensure_ascii=False).encode(\"utf-8\")\n    size = next((p for p in _PAD if p >= len(text) + 2), 0)\n    if not size:\n        raise ValueError(\"message too long\")\n    plain = struct.pack(\">H\", len(text)) + text + b\"\\0\" * (size - 2 - len(text))\n    nonce = secrets.token_bytes(12)\n    head = bytes([FORMAT])\n    return head + nonce + aead.encrypt(key, nonce, plain, _AAD + head + bytes.fromhex(room))",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "server",
+    "parts": [
+     {
+      "path": "donate/together.py",
+      "start": 133,
+      "end": 154,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/together.py#L133-L154",
+      "code": "    # -- the requests\n    def post(self, rid: str, member: str, blob: bytes) -> tuple[int, dict]:\n        if not ROOM.match(rid or \"\") or not MEMBER.match(member or \"\"):\n            return 400, {\"error\": \"room or member\"}\n        if not isinstance(blob, (bytes, bytearray)) or len(blob) > MAX_MESSAGE:\n            return 413, {\"error\": \"too big\", \"most\": MAX_MESSAGE}\n        if len(blob) < MIN_MESSAGE:\n            return 400, {\"error\": \"message\"}\n        now = self._clock()\n        with self._lock:\n            room = self._room(rid, now)\n            if room is None:\n                return 503, {\"error\": \"busy\"}\n            if not self._seat(room, member, now):\n                return 403, {\"error\": \"full\", \"most\": MAX_MEMBERS}\n            room.seq += 1\n            room.msgs.append((room.seq, member, bytes(blob)))\n            room.size += len(blob)\n            while room.msgs and (len(room.msgs) > KEEP_MESSAGES or room.size > ROOM_BYTES):\n                room.size -= len(room.msgs.popleft()[2])\n            room.cond.notify_all()\n            return 200, self._answer(room)",
+      "repo": "site"
+     }
+    ]
+   },
+   {
+    "id": "nolog",
+    "parts": [
+     {
+      "path": "deploy/proxy-dopeiptv.org.conf",
+      "start": 90,
+      "end": 109,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/deploy/proxy-dopeiptv.org.conf#L90-L109",
+      "code": "    # Watch together from the app (donate/together.py): a request waits up\n    # to 25 s for the room's next message, so the read timeout is longer\n    # than that and nothing is buffered; not logged - a room and the\n    # addresses in it would say who watches with whom. The content host\n    # limits the rate; a long poll holds a connection, hence limit_conn.\n    location ^~ /together/ {\n        proxy_pass http://CONTENT_HOST:8081;   # <-- the same address as below\n        client_max_body_size 4k;\n        access_log off;\n        proxy_read_timeout 50s;\n        proxy_buffering off;\n        limit_conn conn_limit 64;\n        limit_conn_status 429;\n        proxy_set_header Host              $host;\n        proxy_set_header X-Real-IP         $remote_addr;\n        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_set_header X-Forwarded-Host  $host;\n        proxy_set_header X-Forwarded-Port  443;\n    }",
+      "repo": "site"
+     }
+    ]
+   }
+  ],
+  "private": [
+   {
+    "id": "switch",
+    "parts": [
+     {
+      "path": "dopeiptv/core/privacy.py",
+      "start": 34,
+      "end": 42,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/privacy.py#L34-L42",
+      "code": "def set_private(on: bool) -> None:\n    global _private\n    if on != _private:\n        log.info(\"private viewing %s\", \"on\" if on else \"off\")\n    _private = bool(on)\n\n\ndef private() -> bool:\n    return _private",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/privacy.py",
+      "start": 52,
+      "end": 80,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/privacy.py#L52-L80",
+      "code": "def playback_started(kind: str, key: Any) -> None:\n    \"\"\"The window's player took a stream (or private viewing was turned on\n    while one plays): marked private while private viewing is on; anything\n    else chosen after it ended is not.\"\"\"\n    global _private_playback\n    ident = (str(kind or \"\"), key)\n    if private():\n        _private_playback = ident\n    elif _private_playback != ident:\n        _private_playback = None\n\n\ndef playback_stopped() -> None:\n    \"\"\"Stop: what is played next is a new playback.\"\"\"\n    global _private_playback\n    if not private():\n        _private_playback = None\n\n\ndef playback_private(kind: str, key: Any) -> bool:\n    \"\"\"Whether the playback (*kind*, *key*) is to be kept to this computer.\"\"\"\n    return private() or _private_playback == (str(kind or \"\"), key)\n\n\ndef for_log(text: Any) -> Any:\n    \"\"\"What a log line may say of what is played: its title or name, or\n    \"<private>\" while private viewing is on - the log is kept on disk and\n    goes with a report.\"\"\"\n    return \"<private>\" if _private else text",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "stores",
+    "parts": [
+     {
+      "path": "dopeiptv/core/stores.py",
+      "start": 483,
+      "end": 506,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/stores.py#L483-L506",
+      "code": "    def add(self, url: str, title: str, icon_url: str | None,\n            key: str, kind: str, extra: dict | None = None) -> None:\n        # Private viewing: nothing played is kept - nor the private playback\n        # going on after it ends (a live channel's reconnect starts it again).\n        if not url or privacy.playback_private(kind, key):\n            return\n        # str() both sides: providers mix int and str ids, and a key that\n        # round-tripped through JSON elsewhere may come back the other type -\n        # a raw == then missed and the same title stacked up as duplicates.\n        self.entries = [e for e in self.entries\n                        if not (str(e.get(\"_key\")) == str(key)\n                                and e.get(\"_kind\") == kind)]\n        entry = {\n            \"name\": title, \"stream_icon\": icon_url,\n            \"_url\": url, \"_key\": key, \"_kind\": kind,\n            \"_watched_at\": datetime.now().isoformat(),\n        }\n        # Carry through extra channel fields (e.g. stream_id, tv_archive) so a\n        # live channel replayed from History keeps its catch-up/timeshift.\n        if extra:\n            entry.update({k: v for k, v in extra.items() if v is not None})\n        self.entries.insert(0, entry)\n        self.entries = self.entries[:self.MAX_ENTRIES]\n        self._save()",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/services/resume.py",
+      "start": 60,
+      "end": 94,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/services/resume.py#L60-L94",
+      "code": "    def record(self, group: str, key, pos: float, dur: float,\n               item: dict | None = None,\n               series_ctx: dict | None = None) -> None:\n        \"\"\"Store (or drop) a resume point for *group:key*. Positions in the\n        first minute or past 95% of the runtime are dropped, not saved - the\n        user is effectively at the start or the end. For movies and episodes an\n        *item* snapshot is kept (plus the episode's *series_ctx*) so the\n        'Continue watching' list can render and replay it.\"\"\"\n        if privacy.private():\n            return       # private viewing: where it stopped is not kept\n        rkey = f\"{group}:{key}\"\n        if dur > 0 and 60 < pos < dur * 0.95:\n            entry: dict[str, Any] = {\"pos\": round(pos), \"dur\": round(dur),\n                                     \"ts\": int(time.time())}\n            if group in (\"vod\", \"episode\") and item:\n                snap = {k: item[k] for k in _SNAP_FIELDS\n                        if item.get(k) is not None}\n                if snap:\n                    entry[\"item\"] = snap\n                if group == \"episode\" and series_ctx:\n                    ctx = {k: series_ctx[k] for k in _CTX_FIELDS\n                           if series_ctx.get(k) is not None}\n                    if ctx:\n                        entry[\"ctx\"] = ctx\n            else:\n                # Preserve any existing snapshot when we only have position.\n                old = self._data.get(rkey) or {}\n                if old.get(\"item\"):\n                    entry[\"item\"] = old[\"item\"]\n                if old.get(\"ctx\"):\n                    entry[\"ctx\"] = old[\"ctx\"]\n            self._data[rkey] = entry\n        else:\n            self._data.pop(rkey, None)\n        self._settings.setValue(self._key, json.dumps(self._data))",
+      "repo": "app"
+     }
+    ]
+   }
+  ],
+  "updates": [
+   {
+    "id": "headers",
+    "parts": [
+     {
+      "path": "dopeiptv/core/updates.py",
+      "start": 37,
+      "end": 41,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/updates.py#L37-L41",
+      "code": "def user_agent() -> str:\n    \"\"\"``dopeIPTV/1.4.4 (Windows; AMD64)``: what the app is, which version\n    it runs and on what - all the site learns of an update check or an\n    update, and how it tells them from a browser.\"\"\"\n    return f\"dopeIPTV/{VERSION} ({platform.system() or sys.platform}; {platform.machine() or '?'})\"",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/updates.py",
+      "start": 48,
+      "end": 54,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/updates.py#L48-L54",
+      "code": "def site_headers(url: str = SITE) -> dict:\n    \"\"\"A request's headers: the user agent, and to dopeiptv.org which kind\n    of build asks (core/build_check.py) - the site serves no modified one.\"\"\"\n    out = {\"User-Agent\": user_agent()}\n    if is_site(url):\n        out.update(build_check.headers())\n    return out",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/build_check.py",
+      "start": 49,
+      "end": 51,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/build_check.py#L49-L51",
+      "code": "#: Sent with every request to dopeiptv.org: official, modified or source.\nHEADER = \"X-dopeIPTV-Build\"\nOFFICIAL, MODIFIED, SOURCE = \"official\", \"modified\", \"source\"",
+      "repo": "app"
+     },
+     {
+      "path": "dopeiptv/core/build_check.py",
+      "start": 420,
+      "end": 422,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/build_check.py#L420-L422",
+      "code": "def headers() -> dict[str, str]:\n    \"\"\"What every request to dopeiptv.org carries.\"\"\"\n    return {HEADER: kind()}",
+      "repo": "app"
+     }
+    ]
+   },
+   {
+    "id": "signed",
+    "parts": [
+     {
+      "path": "dopeiptv/core/selfupdate.py",
+      "start": 127,
+      "end": 175,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/selfupdate.py#L127-L175",
+      "code": "def signed_asset(release: dict, asset: dict) -> dict:\n    \"\"\"*asset* with the SHA-256 the release's signed checksum list gives\n    it - the list signed with dopeIPTV's own key (core/update_keys.py).\n    The site sends the list and its signature with the release\n    (releases.json, nightly.json); otherwise they come from GitHub. With\n    no signature, or one that is not by that key, or the file not on the\n    list, the update stops: a site or mirror taken over cannot serve\n    anything this accepts.\"\"\"\n    keys = []\n    for k in UPDATE_KEYS:\n        try:\n            keys.append(base64.b64decode(k, validate=True))\n        except ValueError:\n            continue\n    if not keys:\n        # A test build made before the release key existed: the checksum\n        # the release gives is all there is. Never a release - the build\n        # signs it with the key this carries, or refuses (tools/sign_sums.py).\n        log.warning(\"update: this build carries no release key; checksum only\")\n        return asset\n    tag = str(release.get(\"tag\") or \"\")\n    name = asset.get(\"name\")\n    # The site's copy first; GitHub's when that one is missing, stale or\n    # does not check out - the signature, not where it came from, decides.\n    for where in (\"site\", \"GitHub\"):\n        try:\n            if where == \"site\":\n                sums, sig = release.get(\"sums\"), release.get(\"sums_sig\")\n                if not (sums and sig):\n                    continue\n            else:\n                sums, sig = _github_file(tag, \"SHA256SUMS\"), _github_file(tag, \"SHA256SUMS.sig\")\n            data = sums.encode() if isinstance(sums, str) else bytes(sums)\n            raw_sig = base64.b64decode(sig.strip() if isinstance(sig, (str, bytes)) else b\"\",\n                                       validate=True)\n        except Exception as e:\n            log.error(\"update: no signed checksum list for %s from %s: %s\", tag, where, e)\n            continue\n        if not any(ed25519.verify(k, data, raw_sig) for k in keys):\n            log.error(\"update: the checksum list of %s from %s is not signed with \"\n                      \"dopeIPTV's key\", tag, where)\n            continue\n        for line in data.decode(\"utf-8\", \"replace\").splitlines():\n            m = _SUMS_LINE.fullmatch(line.strip())\n            if m and m.group(2) == name:\n                return dict(asset, digest=\"sha256:\" + m.group(1).lower())\n        log.error(\"update: %s is not on the signed checksum list of %s from %s\",\n                  name, tag, where)\n    raise UpdateError(\"upd_err_unsigned\")",
+      "repo": "app"
+     }
+    ]
+   }
+  ],
+  "hosts": [
+   {
+    "id": "route",
+    "parts": [
+     {
+      "path": "dopeiptv/providers/cast_bridge.py",
+      "start": 246,
+      "end": 261,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/cast_bridge.py#L246-L261",
+      "code": "def lan_address() -> str:\n    \"\"\"This machine's address on the LAN, as the Chromecast will see it.\n\n    A UDP socket is 'connected' to an outside address to find out which\n    interface the kernel would route through - nothing is sent, and it is the\n    only way that survives a machine with several interfaces (Wi-Fi, Ethernet,\n    a VPN, Docker) where the hostname resolves to the wrong one.\n    \"\"\"\n    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n    try:\n        s.connect((\"8.8.8.8\", 80))\n        return s.getsockname()[0]\n    except Exception:\n        return \"127.0.0.1\"\n    finally:\n        s.close()",
+      "repo": "app"
+     }
+    ]
+   }
+  ],
+  "builds": [
+   {
+    "id": "allowed",
+    "parts": [
+     {
+      "path": "dopeiptv/core/build_check.py",
+      "start": 411,
+      "end": 417,
+      "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/build_check.py#L411-L417",
+      "code": "def kind() -> str:\n    return verdict().kind\n\n\ndef allowed() -> bool:\n    \"\"\"dopeiptv.org's services: on, unless this is a modified build.\"\"\"\n    return kind() != MODIFIED",
+      "repo": "app"
+     }
+    ]
+   }
+  ],
+  "website": [
+   {
+    "id": "log",
+    "parts": [
+     {
+      "path": "deploy/content-iptv.dope.rs.conf",
+      "start": 96,
+      "end": 104,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/deploy/content-iptv.dope.rs.conf#L96-L104",
+      "code": "# -- statistics -----------------------------------------------------------------\n# One line per page view (only / and /help/ are logged here), read every\n# quarter hour by donate/stats_collect.py, which keeps nothing but counts per\n# day for the admin page. The address is in the log, as in any access log;\n# newsyslog (DEPLOY.md \"Statistics\") keeps a week of it.\nlog_format iptv_stats escape=json\n    '{\"ip\":\"$http_x_real_ip\",\"t\":\"$time_iso8601\",\"m\":\"$request_method\",'\n    '\"u\":\"$request_uri\",\"s\":$status,\"r\":\"$http_referer\",\"a\":\"$http_user_agent\",'\n    '\"l\":\"$iptv_lang\"}';",
+      "repo": "site"
+     }
+    ]
+   },
+   {
+    "id": "visitor",
+    "parts": [
+     {
+      "path": "donate/stats_collect.py",
+      "start": 409,
+      "end": 411,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/stats_collect.py#L409-L411",
+      "code": "def _hash(state: dict, *parts: str) -> str:\n    secret = state.setdefault(\"secret\", secrets.token_hex(32))\n    return hashlib.sha256(\"|\".join((secret, *parts)).encode()).hexdigest()[:12]",
+      "repo": "site"
+     },
+     {
+      "path": "donate/stats_collect.py",
+      "start": 673,
+      "end": 681,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/stats_collect.py#L673-L681",
+      "code": "def _new_visit(visits: Visits, day: str, vid: str, t: int, ip: str, ua: str, db) -> dict:\n    name, version = browser_of(ua)\n    v = {\"id\": vid, \"start\": t, \"end\": t, \"browser\": name, \"bv\": version,\n         \"os\": os_version_of(ua), \"device\": device_of(ua),\n         \"country\": (db.country(ip) if db is not None else \"\") or \"\",\n         \"returning\": visits.before(day, vid), \"pages\": [], \"time\": 0,\n         \"downloads\": [], \"events\": []}\n    visits.day(day).append(v)\n    return v",
+      "repo": "site"
+     }
+    ]
+   },
+   {
+    "id": "anon",
+    "parts": [
+     {
+      "path": "donate/stats_collect.py",
+      "start": 1053,
+      "end": 1063,
+      "url": "https://github.com/slimture/dopeIPTV/blob/5c700e7b5b546e1711cdfea71cb42874c6294ad9/donate/stats_collect.py#L1053-L1063",
+      "code": "def anonymous(v: dict, day: str) -> dict:\n    \"\"\"A visit with nothing left that points to a person.\"\"\"\n    events = {e[1] for e in v.get(\"events\") or []}\n    return {\"day\": day, \"country\": v.get(\"country\") or \"\", \"browser\": v.get(\"browser\") or \"Other\",\n            \"os\": _family(v.get(\"os\") or \"\"), \"device\": v.get(\"device\") or \"\",\n            \"lang\": v.get(\"lang\") or \"\", \"channel\": v.get(\"channel\") or \"\",\n            \"site\": v.get(\"ref\") or \"\", \"pages\": len(v.get(\"pages\") or []),\n            \"time\": round((v.get(\"time\") or 0) / 10) * 10, \"timed\": bool(v.get(\"time\")),\n            \"returning\": bool(v.get(\"returning\")), \"downloaded\": bool(v.get(\"downloads\")),\n            \"donate\": \"donate\" in events, \"donated\": \"donated\" in events,\n            \"kind\": v.get(\"kind\") or \"\"}",
+      "repo": "site"
+     }
+    ]
+   }
+  ]
+ },
+ "tests": {
+  "reports": [
+   {
+    "name": "test_nothing_that_identifies_a_stream_or_a_person_is_left",
+    "path": "tests/test_report.py",
+    "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/tests/test_report.py#L21-L41"
+   },
+   {
+    "name": "test_the_window_offers_scrubs_and_sends_only_on_send",
+    "path": "tests/test_report.py",
+    "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/tests/test_report.py#L265-L271"
+   },
+   {
+    "name": "test_only_the_short_answers_go_with_feedback",
+    "path": "tests/test_report.py",
+    "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/tests/test_report.py#L400-L419"
+   },
+   {
+    "name": "test_a_supporter_key_never_goes_in_a_report",
+    "path": "tests/test_report.py",
+    "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/tests/test_report.py#L422-L426"
+   },
+   {
+    "name": "test_asking_for_answers_sends_only_hashes",
+    "path": "tests/test_report.py",
+    "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/tests/test_report.py#L483-L493"
+   }
+  ]
+ },
+ "hosts": [
+  {
+   "host": "bitdash-a.akamaihd.net",
+   "kind": "talks",
+   "group": "demo",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/providers/client.py",
+     "line": 1265,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/client.py#L1265"
+    },
+    {
+     "path": "dopeiptv/providers/client.py",
+     "line": 1267,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/client.py#L1267"
+    }
+   ]
+  },
+  {
+   "host": "devstreaming-cdn.apple.com",
+   "kind": "talks",
+   "group": "demo",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/client.py",
+     "line": 1262,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/client.py#L1262"
+    }
+   ]
+  },
+  {
+   "host": "test-streams.mux.dev",
+   "kind": "talks",
+   "group": "demo",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/providers/client.py",
+     "line": 1260,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/client.py#L1260"
+    },
+    {
+     "path": "dopeiptv/providers/client.py",
+     "line": 1270,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/client.py#L1270"
+    }
+   ]
+  },
+  {
+   "host": "1.0.0.1",
+   "kind": "talks",
+   "group": "dns",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/doh.py",
+     "line": 35,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/doh.py#L35"
+    }
+   ]
+  },
+  {
+   "host": "1.1.1.1",
+   "kind": "talks",
+   "group": "dns",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/doh.py",
+     "line": 35,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/doh.py#L35"
+    }
+   ]
+  },
+  {
+   "host": "149.112.112.112",
+   "kind": "talks",
+   "group": "dns",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/doh.py",
+     "line": 36,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/doh.py#L36"
+    }
+   ]
+  },
+  {
+   "host": "8.8.4.4",
+   "kind": "talks",
+   "group": "dns",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/doh.py",
+     "line": 37,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/doh.py#L37"
+    }
+   ]
+  },
+  {
+   "host": "8.8.8.8",
+   "kind": "talks",
+   "group": "dns",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/providers/cast_bridge.py",
+     "line": 256,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/cast_bridge.py#L256"
+    },
+    {
+     "path": "dopeiptv/core/doh.py",
+     "line": 37,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/doh.py#L37"
+    }
+   ]
+  },
+  {
+   "host": "9.9.9.9",
+   "kind": "talks",
+   "group": "dns",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/doh.py",
+     "line": 36,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/doh.py#L36"
+    }
+   ]
+  },
+  {
+   "host": "api.github.com",
+   "kind": "talks",
+   "group": "github",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/core/updates.py",
+     "line": 125,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/updates.py#L125"
+    },
+    {
+     "path": "dopeiptv/core/updates.py",
+     "line": 171,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/updates.py#L171"
+    }
+   ]
+  },
+  {
+   "host": "github.com",
+   "kind": "talks",
+   "group": "github",
+   "count": 4,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_settings.py",
+     "line": 3254,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_settings.py#L3254"
+    },
+    {
+     "path": "dopeiptv/ui/mw_settings.py",
+     "line": 3256,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_settings.py#L3256"
+    },
+    {
+     "path": "dopeiptv/core/selfupdate.py",
+     "line": 119,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/selfupdate.py#L119"
+    }
+   ]
+  },
+  {
+   "host": "api.hdhomerun.com",
+   "kind": "talks",
+   "group": "hdhomerun",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/hdhomerun.py",
+     "line": 24,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/hdhomerun.py#L24"
+    }
+   ]
+  },
+  {
+   "host": "itunes.apple.com",
+   "kind": "talks",
+   "group": "itunes",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_local.py",
+     "line": 2249,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_local.py#L2249"
+    }
+   ]
+  },
+  {
+   "host": "api.opensubtitles.com",
+   "kind": "talks",
+   "group": "opensubtitles",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/opensubtitles.py",
+     "line": 22,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/opensubtitles.py#L22"
+    }
+   ]
+  },
+  {
+   "host": "dopeiptv.org",
+   "kind": "talks",
+   "group": "ours",
+   "count": 15,
+   "where": [
+    {
+     "path": "dopeiptv/ui/app_menu.py",
+     "line": 45,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/app_menu.py#L45"
+    },
+    {
+     "path": "dopeiptv/ui/dialogs.py",
+     "line": 1316,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/dialogs.py#L1316"
+    },
+    {
+     "path": "dopeiptv/ui/mw_donate.py",
+     "line": 37,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_donate.py#L37"
+    }
+   ]
+  },
+  {
+   "host": "plex.tv",
+   "kind": "talks",
+   "group": "plex",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/plex.py",
+     "line": 39,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/plex.py#L39"
+    }
+   ]
+  },
+  {
+   "host": "all.api.radio-browser.info",
+   "kind": "talks",
+   "group": "radio",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/radio_browser.py",
+     "line": 30,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/radio_browser.py#L30"
+    }
+   ]
+  },
+  {
+   "host": "api.radio-browser.info",
+   "kind": "talks",
+   "group": "radio",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/radio_browser.py",
+     "line": 31,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/radio_browser.py#L31"
+    }
+   ]
+  },
+  {
+   "host": "api.simkl.com",
+   "kind": "talks",
+   "group": "simkl",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/simkl.py",
+     "line": 41,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/simkl.py#L41"
+    }
+   ]
+  },
+  {
+   "host": "api.themoviedb.org",
+   "kind": "talks",
+   "group": "tmdb",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/metadata.py",
+     "line": 60,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/metadata.py#L60"
+    }
+   ]
+  },
+  {
+   "host": "image.tmdb.org",
+   "kind": "talks",
+   "group": "tmdb",
+   "count": 6,
+   "where": [
+    {
+     "path": "dopeiptv/providers/metadata.py",
+     "line": 54,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/metadata.py#L54"
+    },
+    {
+     "path": "dopeiptv/providers/metadata.py",
+     "line": 55,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/metadata.py#L55"
+    },
+    {
+     "path": "dopeiptv/providers/metadata.py",
+     "line": 58,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/metadata.py#L58"
+    }
+   ]
+  },
+  {
+   "host": "api.trakt.tv",
+   "kind": "talks",
+   "group": "trakt",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/trakt.py",
+     "line": 17,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/trakt.py#L17"
+    }
+   ]
+  },
+  {
+   "host": "trakt.tv",
+   "kind": "talks",
+   "group": "trakt",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/providers/trakt.py",
+     "line": 20,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/trakt.py#L20"
+    },
+    {
+     "path": "dopeiptv/providers/trakt.py",
+     "line": 41,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/trakt.py#L41"
+    }
+   ]
+  },
+  {
+   "host": "homeassistant.local",
+   "kind": "name",
+   "group": "example",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/nerd_settings.py",
+     "line": 1145,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/nerd_settings.py#L1145"
+    }
+   ]
+  },
+  {
+   "host": "tv4.se",
+   "kind": "name",
+   "group": "example",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/services/failover.py",
+     "line": 5,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/services/failover.py#L5"
+    }
+   ]
+  },
+  {
+   "host": "bouquets.tv",
+   "kind": "name",
+   "group": "file",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/enigma2.py",
+     "line": 45,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/enigma2.py#L45"
+    }
+   ]
+  },
+  {
+   "host": "www.imdb.com",
+   "kind": "link",
+   "group": "imdb",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_detail.py",
+     "line": 397,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_detail.py#L397"
+    }
+   ]
+  },
+  {
+   "host": "mpv.io",
+   "kind": "link",
+   "group": "mpv",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/i18n.py",
+     "line": 2077,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/i18n.py#L2077"
+    }
+   ]
+  },
+  {
+   "host": "www.opensubtitles.com",
+   "kind": "link",
+   "group": "opensubtitles",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/subtitle_search.py",
+     "line": 27,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/subtitle_search.py#L27"
+    }
+   ]
+  },
+  {
+   "host": "solecraft.se",
+   "kind": "link",
+   "group": "ours",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_settings.py",
+     "line": 3308,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_settings.py#L3308"
+    },
+    {
+     "path": "dopeiptv/ui/mw_settings.py",
+     "line": 3309,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_settings.py#L3309"
+    }
+   ]
+  },
+  {
+   "host": "app.plex.tv",
+   "kind": "link",
+   "group": "plex",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/plex.py",
+     "line": 40,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/plex.py#L40"
+    }
+   ]
+  },
+  {
+   "host": "radio-browser.info",
+   "kind": "name",
+   "group": "radio",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_radio.py",
+     "line": 439,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_radio.py#L439"
+    }
+   ]
+  },
+  {
+   "host": "simkl.com",
+   "kind": "link",
+   "group": "simkl",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_simkl.py",
+     "line": 257,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_simkl.py#L257"
+    },
+    {
+     "path": "dopeiptv/providers/simkl.py",
+     "line": 43,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/simkl.py#L43"
+    }
+   ]
+  },
+  {
+   "host": "ts.net",
+   "kind": "name",
+   "group": "suffix",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/services/home_server.py",
+     "line": 627,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/services/home_server.py#L627"
+    }
+   ]
+  },
+  {
+   "host": "www.themoviedb.org",
+   "kind": "link",
+   "group": "tmdb",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/widgets.py",
+     "line": 266,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/widgets.py#L266"
+    }
+   ]
+  },
+  {
+   "host": "app.trakt.tv",
+   "kind": "link",
+   "group": "trakt",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_trakt.py",
+     "line": 941,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_trakt.py#L941"
+    }
+   ]
+  },
+  {
+   "host": "auth.trakt.tv",
+   "kind": "link",
+   "group": "trakt",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/trakt.py",
+     "line": 23,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/trakt.py#L23"
+    }
+   ]
+  },
+  {
+   "host": "bilibili.com",
+   "kind": "name",
+   "group": "web",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 65,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L65"
+    }
+   ]
+  },
+  {
+   "host": "dailymotion.com",
+   "kind": "name",
+   "group": "web",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 64,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L64"
+    }
+   ]
+  },
+  {
+   "host": "kick.com",
+   "kind": "name",
+   "group": "web",
+   "count": 3,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 64,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L64"
+    },
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 110,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L110"
+    },
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 110,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L110"
+    }
+   ]
+  },
+  {
+   "host": "rumble.com",
+   "kind": "name",
+   "group": "web",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 64,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L64"
+    }
+   ]
+  },
+  {
+   "host": "twitch.tv",
+   "kind": "name",
+   "group": "web",
+   "count": 3,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 63,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L63"
+    },
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 108,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L108"
+    },
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 108,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L108"
+    }
+   ]
+  },
+  {
+   "host": "vimeo.com",
+   "kind": "name",
+   "group": "web",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 64,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L64"
+    }
+   ]
+  },
+  {
+   "host": "www.twitch.tv",
+   "kind": "name",
+   "group": "web",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/ui/mw_webstreams.py",
+     "line": 84,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/ui/mw_webstreams.py#L84"
+    }
+   ]
+  },
+  {
+   "host": "youtube-nocookie.com",
+   "kind": "name",
+   "group": "web",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 63,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L63"
+    }
+   ]
+  },
+  {
+   "host": "youtube.com",
+   "kind": "name",
+   "group": "web",
+   "count": 3,
+   "where": [
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 63,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L63"
+    },
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 112,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L112"
+    },
+    {
+     "path": "dopeiptv/core/ytdlp.py",
+     "line": 112,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/core/ytdlp.py#L112"
+    }
+   ]
+  },
+  {
+   "host": "purl.org",
+   "kind": "name",
+   "group": "xml",
+   "count": 1,
+   "where": [
+    {
+     "path": "dopeiptv/providers/dlna.py",
+     "line": 91,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/dlna.py#L91"
+    }
+   ]
+  },
+  {
+   "host": "schemas.xmlsoap.org",
+   "kind": "name",
+   "group": "xml",
+   "count": 2,
+   "where": [
+    {
+     "path": "dopeiptv/providers/dlna.py",
+     "line": 318,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/dlna.py#L318"
+    },
+    {
+     "path": "dopeiptv/providers/dlna.py",
+     "line": 319,
+     "url": "https://github.com/slimture/dopeIPTV/blob/fd537ee/dopeiptv/providers/dlna.py#L319"
+    }
+   ]
+  }
+ ],
+ "examples": {
+  "reports": {
+   "before": "12:04:31 INFO player: opening http://line.example-tv.net:8080/live/kalle77/secret123/4711.ts\n12:04:33 WARNING player: SVT1 HD dropped, reconnecting from 192.168.1.20 (aa:bb:cc:dd:ee:ff)\n12:05:10 INFO history: The Bridge S02E03 resumed at 31:20\n12:05:12 ERROR epg: token=abc123def failed for kalle.anka@example.com in /home/kalle/.config/dopeiptv\n12:05:14 INFO source: My IPTV logged in as kalle77",
+   "after": "12:04:31 INFO player: opening http://<address>\n12:04:33 WARNING player: <private> dropped, reconnecting from <ip> (<mac>)\n12:05:10 INFO history: <private> resumed at 31:20\n12:05:12 ERROR epg: token=<hidden> failed for <email> in ~/.config/dopeiptv\n12:05:14 INFO source: <private> logged in as <private>"
+  },
+  "sync": {
+   "inside": "{\n \"v\": 1,\n \"c\": {\n  \"favorites\": {\n   \"chan|SVT1 HD\": {\n    \"t\": 1763550000,\n    \"v\": {\n     \"name\": \"SVT1 HD\"\n    }\n   }\n  },\n  \"settings\": {\n   \"theme\": {\n    \"t\": 1763550000,\n    \"v\": \"midnight\"\n   }\n  }\n }\n}",
+   "request": "PUT https://dopeiptv.org/sync/03a2082438c9f9528fb6bde26dfbef2c15bb32b1becec1ea14759943670d5c83\n{\"version_seen\": 0, \"blob\": \"ARxNXqgyTdZZlMv26f/jgaO6JSplp9nr1hXlVFk2TrdE\\u2026JqioHp74AxIbp+Ok/9Mw==\"}"
+  },
+  "together": {
+   "inside": "{\"k\": \"st\", \"f\": \"6b38f1bc554564ae\", \"n\": 1, \"t\": 1795096913901, \"st\": {\"m\": {\"k\": \"episode\", \"n\": \"The Bridge S02E03\", \"q\": \"the bridge\", \"y\": 2011, \"s\": 2, \"e\": 3}, \"p\": true, \"x\": 1880.0, \"t\": 1795096913901, \"v\": 1, \"b\": \"6b38f1bc554564ae\"}}",
+   "request": "POST https://dopeiptv.org/together/0258caccc3f0ce8fedc3566735114e0f3f359c829cb6ee42b1b670dbba91cd4a\nX-Together-Member: 6b38f1bc554564ae\n\nAT5rukWhdmnDoz3oYavGHltwvCoK/nRMrHa9Nx3V+jyZ…6C7hpexSMP5/GbzErtjWM="
+  },
+  "private": {
+   "lines": "playing: The Bridge S02E03\nplaying: <private>"
+  },
+  "updates": {
+   "lines": "User-Agent: dopeIPTV/1.6.6 (Linux; x86_64)\nX-dopeIPTV-Build: official | source | modified"
+  },
+  "website": {
+   "log": "{\"ip\": \"203.0.113.7\", \"t\": \"2026-11-19T21:04:31+01:00\", \"m\": \"GET\", \"u\": \"/hit?p=help&ev=view\", \"s\": 204, \"r\": \"https://duckduckgo.com/\", \"a\": \"Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0\", \"l\": \"sv\"}",
+   "visit": "{\n \"id\": \"83df2a2728da\",\n \"start\": 1763582671,\n \"end\": 1763582671,\n \"browser\": \"Firefox\",\n \"bv\": \"133\",\n \"os\": \"Linux\",\n \"device\": \"Computer\",\n \"country\": \"SE\",\n \"returning\": false,\n \"pages\": [\n  [\n   \"help\",\n   1763582671,\n   48\n  ]\n ],\n \"time\": 48,\n \"downloads\": [],\n \"events\": [],\n \"lang\": \"sv\",\n \"channel\": \"search\",\n \"ref\": \"duckduckgo.com\"\n}",
+   "anon": "{\n \"day\": \"2026-11-19\",\n \"country\": \"SE\",\n \"browser\": \"Firefox\",\n \"os\": \"Linux\",\n \"device\": \"Computer\",\n \"lang\": \"sv\",\n \"channel\": \"search\",\n \"site\": \"duckduckgo.com\",\n \"pages\": 1,\n \"time\": 50,\n \"timed\": true,\n \"returning\": false,\n \"downloaded\": false,\n \"donate\": false,\n \"donated\": false,\n \"kind\": \"\"\n}"
+  }
+ }
+}

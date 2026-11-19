@@ -125,7 +125,7 @@ def test_the_payment_terms_are_a_page_of_the_legal_set():
     for lang, n, last in (("sv", 10, 'id="foretaget"'), ("en", 10, 'id="company"')):
         page = _support("", "29 kr", lang, "https://billing.stripe.com/p/login/x", page="payments")
         tabs = re.search(r'<nav class="legal-tabs"[^>]*>(.*?)</nav>', page, re.S).group(1)
-        assert re.findall(r'href="/([a-z]+)/"', tabs) == ["privacy", "terms", "payments", "about"]
+        assert re.findall(r'href="/([a-z]+)/"', tabs) == ["privacy", "transparency", "terms", "payments", "about"]
         assert 'href="/payments/" aria-current="page"' in tabs and "/support/" not in tabs
         assert page.count('<span class="lnum">') == n and f'<h2 {last}>' in page
         assert "sp-q" not in page and "sp-company" not in page and "%PORTAL%" not in page
