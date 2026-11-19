@@ -1,7 +1,10 @@
 """Settings dialog, theme/language/view application, and About (mixin).
 
 Split out of main_window.py verbatim; MainWindow inherits this. All methods
-keep their original `self.*` access, so behaviour is unchanged.
+keep their original `self.*` access, so behaviour is unchanged. The pages'
+builders are one module per group of the Settings sidebar - ui/set_watch.py,
+set_content.py, set_services.py and set_system.py - each handed the
+window's SettingsContext; Nerd's pages are ui/nerd_settings.py's.
 """
 
 from __future__ import annotations
@@ -14,13 +17,13 @@ from typing import Any, Callable
 
 from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QLocale, QObject, Qt, QTimer
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QAbstractSlider, QAbstractSpinBox,
     QApplication,
-    QColorDialog, QComboBox, QDialog, QDialogButtonBox,
+    QComboBox, QDialog, QDialogButtonBox,
     QFileDialog,
-    QHBoxLayout, QInputDialog, QLabel, QLineEdit,
+    QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
     QScrollBar, QSpinBox, QTextBrowser, QVBoxLayout, QWidget,
 )
@@ -64,39 +67,37 @@ from ..core import connections
 from ..core import places as _places
 from ..core.log import log
 from ..core.xdg import open_url
-from ..core.recording import format_size
-from . import set_content, set_services, set_watch
+from . import set_content, set_services, set_system, set_watch
 from .theme import (
-    ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, SUPPORTER_THEMES, THEME_ORDER,
-    THEMES, UI_SCALES, apply_theme, build_style, effective_theme,
-    is_light,
+    P, THEMES, apply_theme, build_style, effective_theme,
 )
 from .settings_ui import (
-    Chip, ChipGroups, ChoicePicker, ColorDot, SettingsPage,
-    SettingsShell, ThemeTile, after_shown, hbox, page_icon,
-    settings_style,
+    Chip, SettingsPage, SettingsShell, page_icon, settings_style,
 )
 from .widgets import confirm, file_dialog_options
 from ..core.updates import GITHUB_REPO, fetch_update, offered
-from ..core.workers import (
-    clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
+from ..core.workers import run_async
 
 
 @dataclass(eq=False)
 class SettingsContext:
     """What a Settings page's builder takes from open_settings - what it
     took there by name when it was a closure inside it. One per Settings
-    window, handed to every builder (ui/set_watch.py); its dicts are the
-    window's own, shared by every page."""
+    window, handed to every builder (ui/set_watch.py, set_content.py,
+    set_services.py, set_system.py); its dicts and lists are the window's
+    own, shared by every page."""
 
     #: The main window (the builders' ``self`` when they were closures).
     win: Any
     #: The Settings window.
     dialog: QDialog
+    shell: SettingsShell
     #: Every page, by its key ("playback", "general", ...).
     pages: dict[str, SettingsPage]
     #: A switch on, as stored ("true").
     on: str
+    #: The language reads right to left.
+    rtl: bool
     #: is_on(key, default): *key*'s stored value is on.
     is_on: Callable[[str, str], bool]
     #: flag(box): a switch as stored, "true" or "false".
@@ -107,10 +108,23 @@ class SettingsContext:
     #: nerd_link(card, text_key, names, part): the row that leads to one of
     #: Nerd's pages, shown while Nerd is on.
     nerd_link: Callable[[Any, str, list[str], str], None]
+    #: Nerd's switch once its pages are built ({"box": None} until then).
+    nerd_switch: dict[str, Any]
+    #: The cards with a row that leads to one of Nerd's pages.
+    link_cards: list
     #: Each page built's commit(put, changed, final), by the page's key.
     page_commits: dict[str, Callable[..., None]]
     #: What one page's code changes on another, while that one is built.
     shared: dict[str, Any]
+    #: The supporter key, read once ({"mine": ..., "read": ...}).
+    key_state: dict[str, Any]
+    #: supporter_key(): the key, read the first time it is asked for.
+    supporter_key: Callable[[], Any]
+    #: restyle_dialog(): the window's own rules again, from the palette.
+    restyle_dialog: Callable[[], None]
+    #: supporter_window(): the key's window; the pages follow what it
+    #: changed.
+    supporter_window: Callable[[], None]
     #: The sources (the window's playlist store; None without one).
     store: Any
     #: account_of(source, done): its account, looked up off the window's
@@ -122,6 +136,12 @@ class SettingsContext:
     #: add_playlist(prefill=None): the quick form, then the new source's
     #: page.
     add_playlist: Callable[..., None]
+    #: General's backup: saved, and restored (Sources' list follows).
+    export_playlists: Callable[[], None]
+    import_playlists: Callable[[], None]
+    #: A change made: stored and applied a moment later (set once the
+    #: window's change timer is made, before any page is built).
+    soon: Callable[..., None] | None = None
 
 
 class _SettingsMixin:
@@ -1010,14 +1030,20 @@ class _SettingsMixin:
             self._backup_restore(d, playlists_added)
 
         # -- each page's builder, run the first time the page is needed ------
-        # What the builders in ui/set_watch.py, ui/set_content.py and
-        # ui/set_services.py take from here.
+        # One builder per page, one module per group (ui/set_watch.py,
+        # set_content.py, set_services.py, set_system.py), and what they
+        # take from here; ctx.soon is set once the change timer is made,
+        # below, before any page is built.
         ctx = SettingsContext(
-            win=self, dialog=d, pages={pg.key: pg for pg in shell.pages}, on=on,
-            is_on=is_on, flag=flag, own=own, nerd_link=nerd_link,
-            page_commits=page_commits, shared=shared, store=store,
+            win=self, dialog=d, shell=shell, pages={pg.key: pg for pg in shell.pages},
+            on=on, rtl=rtl, is_on=is_on, flag=flag, own=own, nerd_link=nerd_link,
+            nerd_switch=nerd_switch, link_cards=link_cards,
+            page_commits=page_commits, shared=shared, key_state=key_state,
+            supporter_key=supporter_key, restyle_dialog=restyle_dialog,
+            supporter_window=supporter_window, store=store,
             account_of=account_of, edit_source=edit_source,
-            add_playlist=add_playlist)
+            add_playlist=add_playlist, export_playlists=export_playlists,
+            import_playlists=import_playlists)
         play.set_builder(lambda: set_watch.build_playback(ctx))
         audio.set_builder(lambda: set_watch.build_audio(ctx))
         guide.set_builder(lambda: set_watch.build_guide(ctx))
@@ -1031,630 +1057,12 @@ class _SettingsMixin:
         history.set_builder(lambda: set_services.build_history(ctx))
         sync_page.set_builder(lambda: set_services.build_sync(ctx))
         integrations.set_builder(lambda: set_services.build_integrations(ctx))
-
-        # -- General ----------------------------------------------------------
-        def build_general() -> None:
-            from ..i18n import LANGUAGES, current_language
-            # A normal dropdown: click to open, scroll inside the popup.
-            # _combo() caps the popup at 14 rows, scrolls per pixel and
-            # keeps the scrollbar visible for the 27 languages.
-            lang_box = self._combo(
-                [(code, name) for code, name in LANGUAGES.items()],
-                current_language())
-            lang_box.currentIndexChanged.connect(
-                lambda _i: self._set_language(lang_box.currentData()))
-            c = general.card(tr("set_card_language"))
-            c.row(tr("setting_language"), lang_box,
-                  tr("setting_language_restart_hint"))
-            # Where the app opens: where you left off (each profile its own
-            # place), or always on Mine.
-            start_box = self._combo(
-                [("last", tr("start_place_last")), ("mitt", tr("start_place_mine"))],
-                _places.start_choice(self.settings))
-            c = general.card(tr("set_card_start"))
-            c.row(tr("set_start_place"), start_box, tr("set_start_place_hint"),
-                  search="start startup open launch home mine")
-            # Privacy: private viewing lasts until the app closes, so it is
-            # not stored (an untouched window still writes nothing).
-            from ..core import privacy as _privacy
-            c = general.card(tr("set_card_privacy"))
-            private_box = c.toggle(tr("private_menu"), _privacy.private(), tr("private_hint"))
-            private_box.toggled.connect(self.set_private_viewing)
-            clear_btn = QPushButton(tr("clear_btn"))
-            clear_btn.clicked.connect(lambda: self.open_clear_history())
-            c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
-                  search="history incognito private recently viewed")
-            c = general.card(tr("set_card_updates"))
-            from ..core import build_check as _build
-            if not _build.allowed():
-                # A modified build checks for none: said once, above its rows.
-                c.note(_build.notice("updates"))
-            updates_box = c.toggle(tr("setting_check_updates"),
-                                   is_on("check_updates", "true"))
-            channel_box = self._combo(
-                [("stable", tr("option_channel_stable")),
-                 ("nightly", tr("option_channel_nightly"))],
-                self._update_channel())
-            c.row(tr("setting_update_channel"), channel_box,
-                  tr("setting_update_channel_hint"))
-            # Everything a person would miss on a new computer, in one file
-            # (it was the playlists only, on the Playlists page).
-            export_btn = QPushButton(tr("backup_btn"))
-            import_btn = QPushButton(tr("restore_btn"))
-            c = general.card(tr("set_card_backup"))
-            c.row(tr("set_backup_label"), hbox(export_btn, import_btn,
-                                               stretch=False),
-                  tr("set_backup_hint"),
-                  search="export import backup restore playlists json")
-            c.note(tr("backup_note"))
-            export_btn.clicked.connect(export_playlists)
-            import_btn.clicked.connect(import_playlists)
-            if not store:
-                export_btn.setEnabled(False)
-                import_btn.setEnabled(False)
-            # Only where an entry is actually missing: a .deb or a Flatpak
-            # has one already, and offering to add a second would be
-            # nonsense.
-            desktop_box = None
-            mpris_box = None
-            if sys.platform.startswith("linux"):
-                from ..core import desktop_entry as _de
-                c = general.card(tr("set_card_system"))
-                if _de.is_installed() or _de.can_offer():
-                    desktop_box = c.toggle(tr("setting_desktop_entry"),
-                                           _de.is_installed(),
-                                           tr("setting_desktop_entry_hint"))
-                mpris_box = c.toggle(tr("setting_mpris"), is_on("mpris", "true"),
-                                     tr("setting_mpris_hint"))
-            elif sys.platform in ("darwin", "win32"):
-                # The same switch for Now Playing / the System Media
-                # Transport Controls, where this build has the bridge to them.
-                from ..services import media_session as _ms
-                if _ms.supported():
-                    c = general.card(tr("set_card_system"))
-                    mpris_box = c.toggle(
-                        tr("setting_media_controls"), is_on("mpris", "true"),
-                        tr("setting_media_controls_hint_mac"
-                           if sys.platform == "darwin"
-                           else "setting_media_controls_hint_win"))
-            # TV mode (mw_tv): the window as a 10-foot interface, from a remote.
-            c = general.card(tr("tv_mode"))
-            tv_open_btn = QPushButton(tr("tv_open"))
-            tv_open_btn.clicked.connect(lambda _c=False: (d.accept(), QTimer.singleShot(0, self.enter_tv_mode)))
-            c.row(tr("tv_mode"), tv_open_btn, tr("tv_mode_hint"),
-                  search="tv 10-foot sofa couch remote htpc fullscreen kodi")
-            tv_start_box = c.toggle(tr("tv_start_in"), is_on("tv_mode_start", "false"),
-                                    tr("tv_start_hint"))
-            tv_inputs_box = c.toggle(tr("tv_inputs"), is_on("tv_inputs", "true"),
-                                     tr("tv_inputs_hint"))
-            tv_found = QLabel(self.tv_inputs_text())
-            tv_found.setWordWrap(True)
-            c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
-                  search="lirc gamepad controller joystick cec remote evdev sdl")
-            # Supporting the app: feedback, the supporter key, and - last and
-            # quiet - whether the app asks for support now and then.
-            c = support_card = general.card(tr("donate_support"))
-            icon_box = None
-            if hasattr(self, "open_answers"):
-                # Feedback, and the answers to it (their own window, over
-                # this one).
-                feedback_btn = QPushButton(tr("feedback_menu") + "…")
-                feedback_btn.clicked.connect(lambda _c=False: self.open_feedback())
-                answers_btn = QPushButton(self._answers_menu_text())
-
-                def show_answers(_c=False) -> None:
-                    self.open_answers(d)
-                    answers_btn.setText(self._answers_menu_text())
-                answers_btn.clicked.connect(show_answers)
-                # As wide as the two buttons: the column's width for controls
-                # cut the second one's text in some languages.
-                fb_pair = QWidget()
-                fb_pair.setLayout(hbox(feedback_btn, answers_btn, stretch=False))
-                fb_pair.layout().setContentsMargins(0, 0, 0, 0)
-                fb_pair.setFixedWidth(fb_pair.sizeHint().width())     # kept out of the column
-                c.row(tr("fba_settings"), fb_pair, tr("fba_settings_hint"),
-                      search="feedback answer answers reply replies report idea bug svar")
-                fb_pair.ensurePolished()                               # now in the window's style
-                fb_pair.setFixedWidth(fb_pair.sizeHint().width())
-            if hasattr(self, "open_supporter"):
-                from .qt_i18n import format_month
-                mine = supporter_key()
-                key_btn = QPushButton(tr("set_supporter_open") if mine else tr("set_supporter_enter"))
-                key_btn.clicked.connect(lambda _c=False: supporter_window())
-                key_row = c.row(tr("supporter_menu"), key_btn,
-                                tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
-                                search="supporter key tip monthly support donation code nyckel")
-                shared["supporter_row"] = (key_btn, key_row, support_card)
-                # The supporter's app icon - for a supporter only, on unless
-                # turned off; applied as it is switched (commit below).
-                icon_box = c.toggle(tr("set_supporter_icon"),
-                                    is_on("supporter_icon", "true"),
-                                    tr("set_supporter_icon_hint"))
-                c.shown_if(c.rows[-1][0], lambda: key_state["mine"] is not None)
-            # Asking for a donation now and then (mw_donate): the
-            # household's, off for good until switched on again.
-            from ..core import donate_rhythm
-            ask_box = c.toggle(tr("set_donate_ask"), donate_rhythm.asking(self.settings),
-                               tr("set_donate_ask_hint"))
-
-            # About and the version, where a search of Settings finds them:
-            # they were only in the menu bar's first menu (issue #31). Over
-            # Settings, as its child, so it is never hidden behind it.
-            def about() -> None:
-                self.show_about(parent=d)
-                # Seven taps on its version turn Nerd on; the switch here
-                # follows, or closing Settings would store it off again.
-                if not is_on("nerd_enabled", "false"):
-                    return
-                box = nerd_switch["box"]
-                if box is None:
-                    # Nerd's pages not built yet: shown, and built as on.
-                    shell.set_group_enabled("nerd", True)
-                    for card in link_cards:
-                        card.refresh()
-                elif not box.isChecked():
-                    box.setChecked(True)
-            general.card().link(
-                tr("menu_about"), tr("set_about_version", version=VERSION),
-                tr("common_open"), about,
-                search=f"about version update updates release notes changelog "
-                       f"{tr('set_card_updates')} {tr('about_check_updates')}")
-
-            def commit_general(put, changed: set, final: bool) -> None:
-                put("check_updates", flag(updates_box))
-                # Written once chosen ("last" is the default).
-                if start_box.currentData() != _places.start_choice(self.settings):
-                    put(_places.START_KEY, start_box.currentData())
-                # Written once switched (on is the default).
-                if ask_box.isChecked() != donate_rhythm.asking(self.settings):
-                    put(donate_rhythm.K_ASK, flag(ask_box))
-                    self._donate_heart_refresh()
-                # Written once switched (on is the default): an untouched
-                # window stores nothing.
-                if icon_box is not None and icon_box.isChecked() != is_on("supporter_icon", "true"):
-                    put("supporter_icon", flag(icon_box))
-                    self._app_icon_refresh()
-                if channel_box.currentData() != self._update_channel():
-                    put("update_channel", channel_box.currentData())
-                    # Look again now, on the channel just chosen.
-                    self.settings.setValue("update_check_ts", "0")
-                    self.settings.setValue("update_banner_dismissed", "")
-                    QTimer.singleShot(0, self._maybe_check_updates)
-                # Written once switched: an untouched window stores nothing.
-                for tv_key, tv_box, tv_default in (("tv_mode_start", tv_start_box, "false"),
-                                                   ("tv_inputs", tv_inputs_box, "true")):
-                    if tv_box.isChecked() != is_on(tv_key, tv_default):
-                        put(tv_key, flag(tv_box))
-                if mpris_box is not None:
-                    put("mpris", flag(mpris_box))
-                    if "mpris" in changed:
-                        self._apply_media_session_setting()
-                if desktop_box is not None:
-                    put("desktop_entry", flag(desktop_box))
-                    if "desktop_entry" in changed or final:
-                        # Answered here, so the status-row offer has nothing
-                        # left to ask - either way round.
-                        self.settings.setValue("desktop_entry_asked", "true")
-                        self.desktop_entry_btn.hide()
-                    if "desktop_entry" in changed:
-                        self._apply_desktop_entry(desktop_box.isChecked())
-            page_commits["general"] = commit_general
-
-        general.set_builder(build_general)
-
-        # -- Appearance -------------------------------------------------------
-        def build_appearance() -> None:
-            themes = ChoicePicker(
-                [ThemeTile(key, tr(f"theme_{key}")) for key in THEME_ORDER],
-                self.settings.value("theme", "graphite"),
-                groups=[(tr("set_themes_dark"),
-                         [k for k in THEME_ORDER if not is_light(k)]),
-                        (tr("set_themes_light"),
-                         [k for k in THEME_ORDER if is_light(k)])],
-                fill=True)
-            accent_keys = [ACCENT_THEME, *ACCENTS, ACCENT_CUSTOM]
-            accents = ChoicePicker(
-                [ColorDot(key, tr(f"accent_{key}"),
-                          ACCENTS[key][1] if key in ACCENTS else
-                          (self.settings.value("accent_custom", "") or ""))
-                 for key in accent_keys],
-                self.settings.value("accent", "blue"), spacing=6)
-            # One row of dots where the page is wide enough; they wrap if not.
-            accents.setMinimumWidth(min(len(accent_keys) * (ColorDot.D + 6), 440))
-            light_box = self._combo(
-                [(key, tr(f"theme_{key}")) for key in THEME_ORDER
-                 if is_light(key) and (key not in SUPPORTER_THEMES
-                                       or supporter_key() is not None)],
-                self.settings.value("theme_light", "light"))
-            corner_box = self._combo(
-                [("sharp", tr("option_corners_sharp")),
-                 ("rounded", tr("option_corners_rounded")),
-                 ("round", tr("option_corners_round"))],
-                self.settings.value("corner_style", "rounded"))
-            scale_box = self._combo(
-                [(v, tr("opt_percent", n=v)) for v in UI_SCALES],
-                str(self.settings.value("ui_scale", "100")))
-
-            def sync_pickers() -> None:
-                # Each tile shows its theme with the accent chosen now, and
-                # the theme's-own dot the theme on show.
-                shown = effective_theme(self.settings)
-                for tile in themes.tiles:
-                    tile.accent = (accents.value(),
-                                   self.settings.value("accent_custom", ""))
-                for dot in accents.tiles:
-                    dot.theme = shown
-                themes.refresh()
-                accents.refresh()
-
-            def restyle() -> None:
-                self._apply_theme_now()
-                restyle_dialog()
-
-            def sync_locks() -> None:
-                """The supporter themes: a heart and a word on them without a
-                key; in the light-theme list only with one."""
-                closed = supporter_key() is None
-                for tile in themes.tiles:
-                    tile.set_locked(closed and tile.key in SUPPORTER_THEMES,
-                                    tr("theme_supporter_tip"))
-                light_box.blockSignals(True)
-                for key in THEME_ORDER:
-                    if key not in SUPPORTER_THEMES or not is_light(key):
-                        continue
-                    at = light_box.findData(key)
-                    if not closed and at < 0:
-                        light_box.addItem(tr(f"theme_{key}"), key)
-                    elif closed and at >= 0:
-                        light_box.removeItem(at)
-                at = light_box.findData(self.settings.value("theme_light", "light"))
-                light_box.setCurrentIndex(max(at, 0))
-                light_box.blockSignals(False)
-
-            shared["sync_pickers"] = sync_pickers
-            shared["theme_locks"] = (sync_locks, themes)
-            sync_pickers()
-            sync_locks()
-
-            def pick_theme(key: str) -> None:
-                if key in SUPPORTER_THEMES and supporter_key() is None:
-                    # Not open yet: the supporter window says what opens it,
-                    # and the theme comes on as soon as a key does.
-                    themes.set_value(self.settings.value("theme", "graphite"))
-                    if not hasattr(self, "open_supporter"):
-                        return
-                    supporter_window()
-                    if key_state["mine"] is None:
-                        return
-                    themes.set_value(key)
-                self.settings.setValue("theme", key)
-                restyle()
-
-            def pick_accent(key: str) -> None:
-                if key == ACCENT_CUSTOM:
-                    start = (self.settings.value("accent_custom", "")
-                             or P["accent"])
-                    col = QColorDialog.getColor(
-                        QColor(start), d, tr("accent_pick_title"),
-                        QColorDialog.ColorDialogOption.DontUseNativeDialog)
-                    if not col.isValid():
-                        accents.set_value(self.settings.value("accent", "blue"))
-                        return
-                    hex_ = col.name().upper()
-                    self.settings.setValue("accent_custom", hex_)
-                    accents.tiles[-1].color = hex_
-                self.settings.setValue("accent", key)
-                restyle()
-
-            themes.picked.connect(pick_theme)
-            accents.picked.connect(pick_accent)
-            light_box.currentIndexChanged.connect(
-                lambda _i: (self.settings.setValue("theme_light",
-                                                   light_box.currentData()),
-                            restyle()))
-            corner_box.currentIndexChanged.connect(
-                lambda _i: (self.settings.setValue("corner_style",
-                                                   corner_box.currentData()),
-                            restyle()))
-            density_box = self._combo(
-                [("compact", tr("option_compact")), ("medium", tr("option_medium")),
-                 ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
-                self.settings.value("view_density", "medium"))
-            sort_box = self._combo(
-                [("default", tr("sort_provider")),
-                 ("alpha_asc", tr("option_sort_az")),
-                 ("alpha_desc", tr("option_sort_za")),
-                 ("recent", tr("option_sort_recent"))],
-                self.settings.value("sort_order", "default"))
-            c = theme_card = look.card(tr("set_card_theme"))
-            theme_mark = own()
-            if theme_mark is not None:
-                # The theme is the profile's own: said over its tiles.
-                holder = QWidget()
-                hv = QVBoxLayout(holder)
-                hv.setContentsMargins(0, 0, 0, 0)
-                hv.addWidget(theme_mark, 0, Qt.AlignmentFlag.AlignRight)
-                hv.addWidget(themes)
-                c.widget(holder, " ".join([tr("setting_theme")]
-                                          + [t.text() for t in themes.tiles]))
-            else:
-                c.widget(themes, " ".join([tr("setting_theme")]
-                                          + [t.text() for t in themes.tiles]))
-            c.row(tr("setting_accent_color"), accents,
-                  tr("misc_theme_applies_immediately"), stretch_control=True,
-                  badge=own())
-            follow_box = c.toggle(
-                tr("setting_follow_system"),
-                self.settings.value("theme_follow_system", "false") == "true",
-                tr("setting_follow_system_hint"), badge=own())
-            light_row = c.row(tr("setting_light_theme"), light_box, badge=own())
-            c.shown_if(light_row, follow_box.isChecked)
-
-            def follow(on: bool) -> None:
-                self.settings.setValue("theme_follow_system",
-                                       "true" if on else "false")
-                # theme_card, not c: c is the next card by the time it is
-                # switched, and the light-theme row stayed as it was.
-                theme_card.refresh()
-                restyle()
-
-            follow_box.toggled.connect(follow)
-            c.row(tr("setting_corners"), corner_box)
-            c.row(tr("setting_ui_scale"), scale_box, tr("setting_ui_scale_hint"))
-            c = look.card(tr("set_card_lists"))
-            c.row(tr("setting_list_size"), density_box)
-            c.row(tr("setting_sort_by"), sort_box)
-
-            # What the places show (core/places.py, mw_place_look): Just the
-            # list over all of it, the rows over the lists, the sidebar's
-            # entries and its fold - each profile's own. Popular right now
-            # keeps its one place on Posters & info: a row leads there.
-            from .mw_places import PLACE_WORDS
-            c = look.card(tr("set_card_places_show"))
-            just_box = c.toggle(tr("set_just_list"), _places.just_list(self.settings),
-                                tr("set_just_list_hint"), badge=own())
-
-            def chips_row(heading: str, chips: list) -> None:
-                box = ChipGroups([(heading, chips)])
-                words = " ".join([heading] + [ch.text() for ch in chips])
-                mark = own()
-                if mark is None:
-                    c.widget(box, words)
-                    return
-                holder = QWidget()
-                hv = QVBoxLayout(holder)
-                hv.setContentsMargins(0, 0, 0, 0)
-                hv.addWidget(mark, 0, Qt.AlignmentFlag.AlignRight)
-                hv.addWidget(box)
-                c.widget(holder, words)
-
-            # Pointing the way the words read, as nerd_link's.
-            sep = "‹" if rtl else "›"
-            row_chips = {r.name: Chip(f"{tr(PLACE_WORDS[r.place])} {sep} {tr(r.words)}",
-                                      _places.row_on(self.settings, r.name))
-                         for r in _places.ROWS.values() if r.own}
-            chips_row(tr("set_rows_over_lists"), list(row_chips.values()))
-            # "Posters & info": its "&" a letter on the button, not a mnemonic.
-            c.link(tr("card_popular"), tr("set_popular_link_hint"), meta.title.replace("&", "&&"),
-                   lambda: shell.show_page("metadata"),
-                   search=" ".join([tr("nav_movies"), tr("nav_series")]))
-            gone = _places.hidden(self.settings)
-            entry_chips = {p: Chip(tr(PLACE_WORDS[p]), p not in gone) for p in _places.HIDEABLE}
-            chips_row(tr("set_sidebar_entries"), list(entry_chips.values()))
-            c.note(tr("set_sidebar_entries_note"))
-            fold_box = c.toggle(tr("places_fold"), _places.folded(self.settings),
-                                tr("set_places_fold_hint"), badge=own())
-
-            def commit_appearance(put, changed: set, final: bool) -> None:
-                put("view_density", density_box.currentData())
-                put("ui_scale", scale_box.currentData())
-                put("sort_order", sort_box.currentData())
-                # Written once switched: an untouched window stores nothing.
-                if just_box.isChecked() != _places.just_list(self.settings):
-                    put(_places.JUST_LIST_KEY, flag(just_box))
-                for name, chip in row_chips.items():
-                    if chip.isChecked() != _places.row_on(self.settings, name):
-                        put(_places.ROWS[name].key, flag(chip))
-                want = _places.hidden_text(p for p, ch in entry_chips.items() if not ch.isChecked())
-                if want != _places.hidden_text(_places.hidden(self.settings)):
-                    put(_places.HIDDEN_KEY, want)
-                if fold_box.isChecked() != _places.folded(self.settings):
-                    put(_places.FOLDED_KEY, flag(fold_box))
-            page_commits["appearance"] = commit_appearance
-
-        look.set_builder(build_appearance)
-
-        # -- Parental controls ------------------------------------------------
-        def build_parental() -> None:
-            set_pin_btn = QPushButton(tr("pin_set_change"))
-            remove_pin_btn = QPushButton(tr("pin_remove"))
-            lock_now_btn = QPushButton(tr("pin_lock_now"))
-            c = par.card(tr("set_card_pin"))
-            pin_row = c.row(tr("pin_none_set"), None)
-            c.layout_row(hbox(set_pin_btn, remove_pin_btn, lock_now_btn))
-            c.note(tr("parental_hint"))
-
-            def refresh_pin_status():
-                if self.parental.has_pin():
-                    pin_row.label.setText(tr("pin_set_unlocked")
-                                          if self.parental.session_unlocked
-                                          else tr("pin_set_locked"))
-                else:
-                    pin_row.label.setText(tr("pin_none_set"))
-                remove_pin_btn.setEnabled(self.parental.has_pin())
-                lock_now_btn.setEnabled(
-                    self.parental.has_pin()
-                    and self.parental.session_unlocked)
-
-            def set_pin():
-                if self.parental.has_pin() and not self._request_unlock():
-                    return
-                pin, ok = QInputDialog.getText(
-                    d, tr("parental_control"), tr("pin_new_prompt"),
-                    QLineEdit.EchoMode.Password)
-                pin = (pin or "").strip()
-                if ok and pin:
-                    self.parental.set_pin(pin)
-                refresh_pin_status()
-
-            def remove_pin():
-                if not self._request_unlock():
-                    return
-                self.parental.clear_pin()
-                refresh_pin_status()
-                self._load_categories()
-
-            def lock_now():
-                self.parental.lock_session()
-                refresh_pin_status()
-                self._load_categories()
-
-            set_pin_btn.clicked.connect(set_pin)
-            remove_pin_btn.clicked.connect(remove_pin)
-            lock_now_btn.clicked.connect(lock_now)
-            refresh_pin_status()
-
-        par.set_builder(build_parental)
-
-        # -- Profiles ---------------------------------------------------------
-        def build_profiles() -> None:
-            from .profiles_ui import ProfilesPage
-            ProfilesPage(prof_page, self, d)
-
-        prof_page.set_builder(build_profiles)
-
-        # -- Keyboard shortcuts ---------------------------------------------
-        # Every rebindable action and its key: recorded on a click, applied
-        # as it changes.
-        def build_shortcuts() -> None:
-            from ..core import shortcut_keys
-            from .shortcuts import ShortcutEditor
-            keys_shown = self.settings.value(shortcut_keys.SETTING, "") or ""
-            key_editor = ShortcutEditor(keys_page.card(tr("sc_title")), keys_shown, d)
-            # The key rows change no control the change hookups watch: they
-            # say so.
-            key_editor.changed.connect(soon)
-
-            def commit_shortcuts(put, changed: set, final: bool) -> None:
-                # Written only when changed: nothing stored and nothing
-                # changed is not a setting.
-                keys_now = key_editor.text()
-                if keys_now != (self.settings.value(shortcut_keys.SETTING, "") or ""):
-                    put(shortcut_keys.SETTING, keys_now)
-                if shortcut_keys.SETTING in changed:
-                    self.apply_shortcuts()
-            page_commits["shortcuts"] = commit_shortcuts
-
-        keys_page.set_builder(build_shortcuts)
-
-        # -- Advanced ---------------------------------------------------------
-        def build_advanced() -> None:
-            # Disk-cache controls: covers/logos accumulate under
-            # QStandardPaths.CacheLocation and don't clean themselves. The
-            # live cache is the shared "images" dir; the two legacy dirs
-            # predate the loaders sharing one directory - keep them in the
-            # sweep so files from old sessions still get counted and cleared.
-            cache_dirs = [default_image_cache_dir("images"),
-                          default_image_cache_dir("logos"),
-                          default_image_cache_dir("posters")]
-            clear_cache_btn = QPushButton(tr("btn_clear"))
-            clear_cache_btn.setAccessibleName(tr("settings_image_cache_clear"))
-            ts_reset_btn = QPushButton(tr("common_reset"))
-            ts_reset_btn.setAccessibleName(tr("ts_reset_broken"))
-            c = adv.card(tr("sec_maintenance"))
-            c.row(tr("ts_reset_broken"), ts_reset_btn, tr("ts_reset_hint"))
-            maint = c
-            # Every cache in one card: the image cache was here and the local
-            # files' three on the Local files page. (The guide's own cache
-            # stays on the Guide page, beside fetching it again.)
-            loc_clear_lib = QPushButton(tr("local_clear_lib_cache"))
-            loc_clear_post = QPushButton(tr("local_clear_posters"))
-            loc_clear_thumb = QPushButton(tr("local_clear_thumbs"))
-            caches = adv.card(tr("set_card_caches"))
-            cache_row = caches.row(tr("settings_image_cache_label", size="…"),
-                                   clear_cache_btn,
-                                   tr("settings_image_cache_hint"))
-            caches.layout_row(hbox(loc_clear_lib, loc_clear_post,
-                                   loc_clear_thumb), tr("nav_local"))
-            loc_note = caches.note(tr("set_caches_hint"))
-            c = maint
-
-            def loc_cleared():
-                loc_note.setText(tr("local_cleared"))
-
-            loc_clear_lib.clicked.connect(
-                lambda: (self._local_clear_library_cache(), loc_cleared()))
-            loc_clear_post.clicked.connect(
-                lambda: (self._local_clear_poster_cache(), loc_cleared()))
-            loc_clear_thumb.clicked.connect(
-                lambda: (self._local_clear_thumbs(), loc_cleared()))
-
-            def show_cache_size(total: int) -> None:
-                if sip.isdeleted(cache_row.label):
-                    return
-                cache_row.label.setText(
-                    tr("settings_image_cache_label", size=format_size(total)))
-                clear_cache_btn.setEnabled(total > 0)
-
-            def cache_size() -> int:
-                return sum(dir_size_bytes(cdir) for cdir in cache_dirs)
-
-            def refresh_cache_label() -> None:
-                # Off the window's thread: every cached logo and poster is a
-                # stat, tens of thousands of them for a big source.
-                run_async(self.pool, cache_size, show_cache_size)
-
-            def clear_cache() -> None:
-                for cdir in cache_dirs:
-                    clear_directory(cdir)
-                # Also drop the in-memory LRUs so a re-scroll doesn't just
-                # rewrite the same pixmaps back to disk from RAM.
-                self.logos.cache.clear()
-                self.poster_art.cache.clear()
-                refresh_cache_label()
-
-            clear_cache_btn.clicked.connect(clear_cache)
-
-            def reset_ts() -> None:
-                self._clear_ts_broken()
-                self._flash_status(tr("ts_reset_done"))
-
-            ts_reset_btn.clicked.connect(reset_ts)
-            # Portable Windows build: let the user add Start-menu/desktop
-            # shortcuts so it feels installed. Each is just a .lnk file (no
-            # registry), easy to delete. Hidden on Linux/macOS.
-            if sys.platform == "win32":
-                win_sc_btn = QPushButton(tr("win_shortcut_btn"))
-
-                def _make_win_shortcut() -> None:
-                    from ..core.platform_windows import create_shortcut
-                    made = create_shortcut()
-                    self._flash_status(tr("win_shortcut_done") if made
-                                       else tr("win_shortcut_fail"))
-
-                win_sc_btn.clicked.connect(_make_win_shortcut)
-                c.row(tr("win_shortcut_hint"), win_sc_btn)
-            nerd_link(maint, "set_link_diag",
-                      [tr("nerd_log_level"), tr("nerd_log_file"),
-                       tr("nerd_card_view"), tr("nerd_card_health")], "diag")
-            after_shown(d, refresh_cache_label)
-            x11_box = None
-            if sys.platform.startswith("linux"):
-                c = adv.card(tr("set_card_system"))
-                x11_box = c.toggle(tr("setting_force_x11"),
-                                   is_on("force_x11", "false"),
-                                   tr("setting_force_x11_hint"))
-            reset_btn = QPushButton(tr("set_reset_btn"), objectName="Danger")
-            reset_btn.clicked.connect(lambda: self._reset_all_settings(d))
-            c = adv.card(tr("set_card_reset"))
-            c.row(tr("set_reset_label"), reset_btn, tr("set_reset_hint"))
-
-            def commit_advanced(put, changed: set, final: bool) -> None:
-                if x11_box is not None:
-                    put("force_x11", flag(x11_box))
-            page_commits["advanced"] = commit_advanced
-
-        adv.set_builder(build_advanced)
+        general.set_builder(lambda: set_system.build_general(ctx))
+        look.set_builder(lambda: set_system.build_appearance(ctx))
+        keys_page.set_builder(lambda: set_system.build_shortcuts(ctx))
+        prof_page.set_builder(lambda: set_system.build_profiles(ctx))
+        par.set_builder(lambda: set_system.build_parental(ctx))
+        adv.set_builder(lambda: set_system.build_advanced(ctx))
 
         # -- Nerd -------------------------------------------------------------
         # Its six pages are one build (nerd_settings.build): the first of
@@ -1826,6 +1234,7 @@ class _SettingsMixin:
 
         def soon(*_a) -> None:
             live.start()
+        ctx.soon = soon
 
         controls_of = (QComboBox, QAbstractButton, QAbstractSpinBox,
                        QAbstractSlider, QLineEdit, QPlainTextEdit)

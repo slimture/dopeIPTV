@@ -8,12 +8,12 @@ a setting goes"; `tests/test_settings_map.py` checks that every page is in
 one group, every row on one page, that the search finds them, and that
 this file names every page.
 
-The pages are built in `ui/mw_settings.py` (`open_settings`; WATCH's in
-`ui/set_watch.py`, CONTENT's in `ui/set_content.py`, SERVICES' in
-`ui/set_services.py`), Nerd's in
-`ui/nerd_settings.py` (with `ui/net_advanced.py`), the shortcuts in
-`ui/shortcuts.py`, Simkl in `ui/mw_simkl.py`, sync in `ui/mw_sync.py`,
-Discord in `ui/mw_discord.py`. A row without a key is an action or a
+The pages are built one module per group - `ui/set_watch.py`,
+`ui/set_content.py`, `ui/set_services.py` and `ui/set_system.py`, each
+page's `build_<page>` - and put together in `ui/mw_settings.py`
+(`open_settings`); Nerd's in `ui/nerd_settings.py` (with
+`ui/net_advanced.py`), the shortcuts in `ui/shortcuts.py`, Simkl in
+`ui/mw_simkl.py`, sync in `ui/mw_sync.py`, Discord in `ui/mw_discord.py`. A row without a key is an action or a
 status. "(inverted)" is stored the other way round from what the row says.
 A source's own options are on its own page, under Sources (below).
 "(this profile's)" is a profile's own (`core/profiles.py`): kept under
