@@ -208,7 +208,14 @@ def _id(value: Any) -> int | str | None:
     s = "" if value is None else str(value).strip()
     if not s:
         return None
-    return int(s) if s.isdigit() else s
+    return int(s) if _digits(s) else s
+
+
+def _digits(s: str) -> bool:
+    """Whether *s* is a whole number int() reads: decimal digits only (a
+    superscript is a digit to isdigit() and no number to int()), 18 at
+    most (more is no portal's id or time, and int() refuses thousands)."""
+    return s.isdecimal() and len(s) <= 18
 
 
 def _numbers(value: Any) -> list[int]:
@@ -227,7 +234,7 @@ def _utc_stamp(value: Any) -> int | None:
     """A portal time as unix time. The cookie asks for UTC, so a plain
     "YYYY-MM-DD HH:MM:SS" is read as UTC."""
     s = str(value or "").strip()
-    if s.isdigit():
+    if _digits(s):
         return int(s) or None
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
@@ -240,7 +247,7 @@ def _utc_stamp(value: Any) -> int | None:
 def _expiry(value: Any) -> int | None:
     """An account's end date as unix time, or None for none/unlimited."""
     s = str(value or "").strip()
-    if s.isdigit():
+    if _digits(s):
         n = int(s)
         return n if n > 10 ** 8 else None
     for fmt in _EXPIRY_FORMATS:
@@ -284,7 +291,7 @@ def _episode_key(series: str, season: int, num: int) -> str:
     """An id for an episode the portal only numbers. The window keeps
     watched episodes by int(id), so it must be a number, and one no other
     series' episode has."""
-    base = (int(series) if series.isdigit()
+    base = (int(series) if _digits(series)
             else zlib.crc32(series.encode("utf-8")) & 0x7FFFFFFF)
     return str(base * 10 ** 7 + min(season, 999) * 10 ** 4 + min(num, 9999))
 
@@ -986,7 +993,7 @@ class StalkerClient(Mirrored, ListCache):
                 "epg_channel_id": str(ch.get("xmltv_id") or ""),
                 "added": "0", "is_adult": int(_flag(ch.get("censored"))),
                 "category_id": cat,
-                "category_ids": [int(cat)] if cat.isdigit() else [],
+                "category_ids": [int(cat)] if _digits(cat) else [],
                 "custom_sid": "", "direct_source": "",
                 # Played by programme (archive_link), in whole days as
                 # Xtream counts.
@@ -1087,7 +1094,7 @@ class StalkerClient(Mirrored, ListCache):
                 "rating": rating,
                 "rating_5based": round(_float(rating) / 2, 1),
                 "category_id": cat,
-                "category_ids": [int(cat)] if cat.isdigit() else []}
+                "category_ids": [int(cat)] if _digits(cat) else []}
             details: dict[str, Any] = {
                 "plot": str(v.get("description") or "").strip(),
                 "cast": str(v.get("actors") or "").strip(),
@@ -1209,7 +1216,7 @@ class StalkerClient(Mirrored, ListCache):
             n = (_int(erow.get("series_number"))
                  or _int(erow.get("episode_number")) or j)
             raw_id = str(erow.get("id") or "")
-            eid = raw_id if raw_id.isdigit() else _episode_key(sid, snum, n)
+            eid = raw_id if _digits(raw_id) else _episode_key(sid, snum, n)
             cmd = str(erow.get("cmd") or "")
             rec = {"cmd": cmd} if cmd else {
                 "module": module, "movie_id": sid, "season_id": season_id,

@@ -109,7 +109,7 @@ def _int(value: Any) -> int | None:
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, str) and value.strip().isdigit():
+    if isinstance(value, str) and value.strip().isdecimal() and len(value.strip()) <= 18:
         return int(value.strip())
     return None
 

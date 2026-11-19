@@ -282,7 +282,7 @@ def parse_m3u(text: str) -> tuple[list[dict], str]:
             name = (m.group("name") if m else line.split(",", 1)[-1]).strip() or attrs.get("tvg-name", "")
             chno = attrs.get("tvg-chno", "").strip()
             pending = {"name": name, "group": attrs.get("group-title", ""), "logo": attrs.get("tvg-logo", ""),
-                       "tvg_id": attrs.get("tvg-id", ""), "chno": int(chno) if chno.isdigit() else 0}
+                       "tvg_id": attrs.get("tvg-id", ""), "chno": int(chno) if chno.isdecimal() and len(chno) <= 9 else 0}
         elif line.startswith("#EXTGRP:"):
             group = line[len("#EXTGRP:"):].strip()
         elif not line.startswith("#"):
@@ -334,7 +334,7 @@ def service_pid(pids: str) -> str:
     the stuffing (8191); "" when there is none."""
     for p in (pids or "").split(","):
         p = p.strip()
-        if p.isdigit() and 32 <= int(p) < 8191:
+        if p.isdecimal() and len(p) <= 5 and 32 <= int(p) < 8191:
             return str(int(p))
     return ""
 

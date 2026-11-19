@@ -72,7 +72,7 @@ def duration_secs(text: str) -> int:
         if len(s) == 6 and s.isdigit():
             return int(s[:2]) * 3600 + int(s[2:4]) * 60 + int(s[4:])
         return max(0, int(float(s)))
-    except ValueError:
+    except (ValueError, OverflowError):
         return 0
 
 

@@ -272,7 +272,7 @@ class VdrClient(BoxClient):
             m = _NUMBERED.match(name)
             if m and m.group(1) == seg:
                 num, name = int(m.group(1)), m.group(2).strip()
-            elif seg.isdigit():
+            elif seg.isdecimal() and len(seg) <= 9:
                 num = int(seg)
             # A channel id (S19.2E-1-1019-10301) names it for good; a number
             # changes when the list is sorted, its name does not.

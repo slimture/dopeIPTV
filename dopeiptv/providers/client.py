@@ -887,7 +887,7 @@ class M3UClient(OfflineClient):
                     "catchup": catchup,
                     "catchup_source": catchup_src,
                     "tv_archive": 1 if has_archive else 0,
-                    "tv_archive_duration": int(days) if days.isdigit() else (
+                    "tv_archive_duration": int(days) if days.isdecimal() and len(days) <= 9 else (
                         7 if has_archive else 0),
                 }
                 # What a Nerd catch-up template's {catchup-id} stands for.

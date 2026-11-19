@@ -139,7 +139,11 @@ def build_xmltv(channels: list[tuple[str, str]], events: list[dict]) -> bytes:
         if key in seen or ev["stop"] <= ev["start"] or not ev.get("title"):
             continue
         seen.add(key)
-        parts = [f'<programme start="{xmltv_time(ev["start"])}" stop="{xmltv_time(ev["stop"])}" '
+        try:
+            start, stop = xmltv_time(ev["start"]), xmltv_time(ev["stop"])
+        except (OverflowError, OSError, ValueError):
+            continue                    # a time no calendar has: that one left out
+        parts = [f'<programme start="{start}" stop="{stop}" '
                  f'channel={quoteattr(ev["channel"])}><title>{escape(ev["title"])}</title>']
         if ev.get("subtitle"):
             parts.append(f"<sub-title>{escape(ev['subtitle'])}</sub-title>")

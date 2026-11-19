@@ -72,7 +72,7 @@ _LAST_YEAR = time.localtime().tm_year + 1
 
 
 def _is_year(word: str) -> bool:
-    return len(word) == 4 and word.isdigit() and 1900 <= int(word) <= _LAST_YEAR
+    return len(word) == 4 and word.isdecimal() and 1900 <= int(word) <= _LAST_YEAR
 
 
 def name_keys(name: str) -> list[tuple[str, int, int | None]]:

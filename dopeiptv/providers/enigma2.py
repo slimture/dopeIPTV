@@ -755,7 +755,7 @@ class Enigma2Client(BoxClient):
 def _int(text: str) -> int:
     try:
         return int(float(text))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

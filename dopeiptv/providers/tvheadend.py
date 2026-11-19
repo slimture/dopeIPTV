@@ -24,7 +24,7 @@ GRID = {"limit": "999999", "start": "0"}
 def _num(value: Any) -> int:
     try:
         return int(float(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

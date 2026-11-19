@@ -52,6 +52,7 @@ All of it is network: called off the window's thread.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
@@ -148,7 +149,7 @@ def _int(text: str) -> int:
     """A whole number from what the box wrote ("5", "5.0", "1700000000")."""
     try:
         return max(0, int(round(float(text))))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
@@ -165,7 +166,7 @@ def parse_rule(el: ET.Element) -> Rule:
     """A ``<timer>`` as the box wrote it."""
     a = dict(el.attrib)
     rid = a.get("id", "")
-    r = Rule(id=int(rid) if rid.lstrip("-").isdigit() else None,
+    r = Rule(id=int(rid) if re.fullmatch(r"-?\d{1,18}", rid) else None,
              name=a.get("name", ""), match=a.get("match", ""),
              enabled=a.get("enabled", "yes") != "no",
              search_type=a.get("searchType") or PARTIAL,

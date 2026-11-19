@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 from ..core.log import log
 from ..i18n import tr
 from . import device_urls
-from .boxes import BoxClient, build_xmltv, clean_text
+from .boxes import BoxClient, _number, build_xmltv, clean_text
 
 GUIDE_API = "https://api.hdhomerun.com/api/guide.php"
 DISCOVER_PORT = 65001
@@ -49,7 +49,7 @@ class HDHomeRunClient(BoxClient):
         model = clean_text(d.get("ModelNumber"))
         return {"kind": "hdhomerun", "name": f"{name} ({model})" if model else name,
                 "model": model, "device_id": str(d.get("DeviceID") or ""),
-                "tuners": int(d.get("TunerCount") or 0),
+                "tuners": _number(d.get("TunerCount")),
                 "firmware": str(d.get("FirmwareVersion") or "")}
 
     def _lineup_url(self) -> str:
@@ -124,9 +124,14 @@ class HDHomeRunClient(BoxClient):
                 break
             last = start
             for ch in js if isinstance(js, list) else []:
+                if not isinstance(ch, dict):
+                    continue
                 number = str(ch.get("GuideNumber") or "")
-                for p in ch.get("Guide") or []:
-                    s, t = int(p.get("StartTime") or 0), int(p.get("EndTime") or 0)
+                guide = ch.get("Guide")
+                for p in guide if isinstance(guide, list) else []:
+                    if not isinstance(p, dict):
+                        continue
+                    s, t = _number(p.get("StartTime")), _number(p.get("EndTime"))
                     if not (number and s and t > s):
                         continue
                     last = max(last, t)
