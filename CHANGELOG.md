@@ -162,6 +162,23 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   is remembered by its own id, so one that answers to a known name as
   another device is not cast to until picked, and each device's address is
   shown.
+- Parental lock: a locked category's channel or film is no longer shown
+  or played from History, Continue watching, Recently watched, the
+  phone's Recent or Mine while the lock is shut; History keeps a title's
+  category now, older rows are checked against the source's catalogue.
+- Kids profile: a category for adults can no longer be reached by
+  renaming it (the provider's own name counts too); Manage categories…
+  lists only what the kids profile sees; About's seven taps turn Nerd on
+  only from Settings, which already asks a grown-up's PIN.
+- The sidebar search names a locked category without its channels.
+- The phone remote forgets its play ids on a profile or source switch and
+  checks Continue and History rows again when they play.
+- Sidebar entry colours from sync or a backup are used only as `#rrggbb`:
+  a crafted value can no longer inject style rules or stop the app from
+  starting.
+- core/xdg.py: only https addresses, or server mode's page on this
+  computer, are opened in the browser - a service's answer cannot open
+  `file:` or another program's scheme.
 ## [1.6.8]
 
 ### Security

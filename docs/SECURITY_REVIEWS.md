@@ -61,6 +61,9 @@ assessment of each. The findings, and what came of them:
 | PINs | One SHA-256 per PIN (all 10 000 tried at once from the settings file); unlimited tries | medium | 1.6.9: PBKDF2 600 000 rounds; waits after two wrong tries |
 | Local IPC | Discord's socket in /tmp and lircd's socket taken from anyone; a media server's token in the artwork address on the session bus | medium | 1.6.9: this user's own only; no login address on the bus |
 | Casting | An SSDP or DLNA answer could send the app's requests (and the stream's address) anywhere; a device taking a known TV's name got the next cast | medium | 1.6.9: same host, no redirect, capped; a TV known by its own id |
+| Parental lock | A locked category's title played without the PIN from History, Continue, Recently watched and Mine; a kids profile could rename an adult category past its filter; the sidebar search named locked channels (ui sweep; proven) | medium | 1.6.9: one lock filter for every reader; the provider's own name counts; names only |
+| Settings from outside | A nav colour from sync or a backup was pasted into a style sheet, and a bad one stopped the app starting | medium | 1.6.9: `#rrggbb` only |
+| Links | A sign-in page or a download from a service's answer was opened whatever its scheme | low | 1.6.9: https only (and this computer's http) |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round
