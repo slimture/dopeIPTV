@@ -517,7 +517,8 @@ dopeiptv/
     list_place.py      The form a place over the window's list shares: Back,
                        header, filter, Grid / List, rows, cards as they paint
     list_mirror.py     Such a place kept to the list, its source of truth
-    mw_local.py        Local files: folders, library view, music queue
+    mw_local.py        Local files: the folders, the folder view, the search
+    mw_local_library.py The library view: its walk, its cache, its pictures
     mw_place_local.py  The Local files place where the list was: Back, header,
                        Continue, the folder's rows or the library's posters
     local_place.py     The Local files place itself, dressed as it paints
