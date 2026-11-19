@@ -29,5 +29,8 @@ Without the Stripe parts the site still works, but the tip dialog cannot load
 Stripe.js and says something went wrong; monthly support (a Payment Link,
 Stripe's own page, reached by a plain link) is not governed by the CSP.
 
-The global add_header Content-Security-Policy $csp_policy already applies it, so no
-per-server add_header is needed.
+The global add_header Content-Security-Policy $csp_policy applies it - but
+dopeiptv.org's server (proxy-dopeiptv.org.conf) has security headers of its
+own, and nginx then leaves out the http block's add_header lines there, so
+that server names $csp_policy again (with always: a 404 carries it too) and
+adds a second policy, frame-ancestors 'none'. Both are enforced.
