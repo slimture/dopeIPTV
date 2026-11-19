@@ -440,7 +440,7 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   say so in the notes). A profile's PIN stays on the computer it was set
   on: settings sync carries profiles without it, and never takes one out.
   Not yet: a "recently searched" list of its own (no search keeps one
-  today; `recent_searches` is reserved in the split), Home Assistant's
+  today), Home Assistant's
   profile as a list in its discovery (a `profile` command and state field
   for now), and a cast going on through a switch (the TV keeps playing).
 

@@ -105,7 +105,7 @@ def test_the_split_is_declared_in_one_place():
                 "series_favorites_x", "radio_favorites", "web_favorites", "history", "history_a",
                 "resume_positions_a", "epg_reminders_a", "followed_series_a", "viewing_stats",
                 "trakt_watched_cache", "trakt_watchlist_cache", "trakt_access_token",
-                "simkl_access_token", "recent_searches", "theme", "accent", "audio_lang",
+                "simkl_access_token", "theme", "accent", "audio_lang",
                 "sub_lang", "sub_lang2", "sub_mode", "last_place", "last_list_place",
                 "track_prefs"):
         assert profiles.is_own(key), key
