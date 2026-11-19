@@ -38,7 +38,7 @@ from pathlib import Path
 
 from . import build_check
 from .log import log
-from .selfupdate import UpdateError, download, signed_asset
+from .selfupdate import UpdateError, download, refuse_older, signed_asset
 from .updates import is_nightly
 from .xdg import system_env
 
@@ -186,6 +186,7 @@ def install(release: dict, current_version: str,
     if app is None or cpu is None or not can_self_update():
         raise UpdateError("upd_err_not_installed")
     tag = release.get("tag") or ""
+    refuse_older(tag)
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
         raise UpdateError("upd_err_no_asset", cpu=cpu)

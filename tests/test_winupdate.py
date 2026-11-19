@@ -11,6 +11,13 @@ import pytest
 from dopeiptv.core import selfupdate, winupdate
 
 
+@pytest.fixture(autouse=True)
+def running_1_4_4(monkeypatch):
+    """These tests run as 1.4.4: an installer asks which version runs
+    before it takes a release (selfupdate.refuse_older)."""
+    monkeypatch.setattr(selfupdate, "VERSION", "1.4.4")
+
+
 def assets(version):
     names = [f"dopeIPTV-{version}-windows-x64-setup.exe", f"dopeIPTV-{version}-windows-arm64-setup.exe",
              f"dopeIPTV-{version}-windows-x64.zip", f"dopeIPTV-{version}-x86_64.AppImage"]
@@ -85,3 +92,43 @@ def test_the_installer_starts_at_once_and_waits_for_the_app_itself(monkeypatch):
     assert seen["argv"] == [str(setup), "/update", "/relaunch", "/waitpid=4242"]
     env = seen["kw"]["env"]
     assert "_PYI_APPLICATION_HOME_DIR" not in env and env["PYINSTALLER_RESET_ENVIRONMENT"] == "1"
+
+
+def test_a_release_that_is_not_newer_is_never_fetched(monkeypatch):
+    monkeypatch.setattr(winupdate, "can_self_update", lambda: True)
+    monkeypatch.setattr(winupdate, "arch", lambda: "x64")
+    monkeypatch.setattr(winupdate, "signed_asset", lambda rel, asset: pytest.fail("asked for a signature"))
+    monkeypatch.setattr(winupdate, "download", lambda *a: pytest.fail("downloaded"))
+    for old in ("v1.4.4", "v1.4.3", "v1.2.0", ""):
+        with pytest.raises(selfupdate.UpdateError):
+            winupdate.install({"tag": old, "assets": assets(old.lstrip("v") or "1.4.3")}, "1.4.4")
+
+
+def test_the_installer_waits_in_the_users_own_folder_not_the_shared_temp(monkeypatch, tmp_path):
+    # A PC where every account shares one temp folder: another account could
+    # make dopeIPTV-update there first and swap the installer once checked.
+    local = tmp_path / "Local"
+    local.mkdir()
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    assert winupdate.update_folder() == local / "dopeiptv" / "dopeIPTV" / "update"
+    assert winupdate.update_folder() != winupdate.legacy_update_folder()
+    # Without one (not Windows, or a broken environment) it is where it was.
+    monkeypatch.delenv("LOCALAPPDATA")
+    assert winupdate.update_folder() == winupdate.legacy_update_folder()
+    monkeypatch.setenv("LOCALAPPDATA", "relative")
+    assert winupdate.update_folder() == winupdate.legacy_update_folder()
+
+
+def test_cleanup_removes_this_versions_and_the_older_versions_folder(monkeypatch, tmp_path):
+    local, temp = tmp_path / "Local", tmp_path / "Temp"
+    (local / "dopeiptv" / "dopeIPTV" / "update").mkdir(parents=True)
+    (temp / "dopeIPTV-update").mkdir(parents=True)
+    (local / "dopeiptv" / "dopeIPTV" / "update" / "setup.exe").write_bytes(b"x")
+    (temp / "dopeIPTV-update" / "setup.exe").write_bytes(b"x")
+    (local / "dopeiptv" / "dopeIPTV" / "cache").mkdir()
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    monkeypatch.setattr(winupdate.tempfile, "gettempdir", lambda: str(temp))
+    winupdate.cleanup()
+    assert not (local / "dopeiptv" / "dopeIPTV" / "update").exists()
+    assert not (temp / "dopeIPTV-update").exists()
+    assert (local / "dopeiptv" / "dopeIPTV" / "cache").is_dir()      # nothing else of the app's

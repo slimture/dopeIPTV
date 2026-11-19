@@ -33,7 +33,7 @@ from pathlib import Path
 
 from . import build_check
 from .log import log
-from .selfupdate import UpdateError, download, signed_asset
+from .selfupdate import UpdateError, download, refuse_older, signed_asset
 
 # What the update dialog says once the installer is downloaded (i18n key:
 # install it, and dopeIPTV opens again); the download is checked as it
@@ -82,8 +82,21 @@ def pick_asset(assets: list[dict], version: str, cpu: str) -> dict | None:
     return None
 
 
-def update_folder() -> Path:
+def legacy_update_folder() -> Path:
+    """Where versions up to 1.6.8 kept a downloaded installer."""
     return Path(tempfile.gettempdir()) / "dopeIPTV-update"
+
+
+def update_folder() -> Path:
+    """Where a downloaded installer waits until it is run: a folder of this
+    user's own, beside the app's cache in their local app data (which the
+    uninstaller empties). Not the temp folder: on a PC where every account
+    shares one, another account could make this folder first and change
+    the installer between its checksum and its start."""
+    base = os.environ.get("LOCALAPPDATA") or ""
+    if base and os.path.isabs(base) and os.path.isdir(base):
+        return Path(base) / "dopeiptv" / "dopeIPTV" / "update"
+    return legacy_update_folder()
 
 
 def install(release: dict, current_version: str,
@@ -97,6 +110,7 @@ def install(release: dict, current_version: str,
     if not can_self_update() or cpu is None:
         raise UpdateError("upd_err_not_installed")
     tag = release.get("tag") or ""
+    refuse_older(tag)
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
         raise UpdateError("upd_err_no_setup", cpu=cpu)
@@ -154,4 +168,5 @@ def _hand_over_the_front(proc: subprocess.Popen) -> None:
 def cleanup() -> None:
     """At start: the installers an earlier update left in the temp folder.
     One still running (it has just opened us) stays until next time."""
-    shutil.rmtree(update_folder(), ignore_errors=True)
+    for folder in {update_folder(), legacy_update_folder()}:
+        shutil.rmtree(folder, ignore_errors=True)

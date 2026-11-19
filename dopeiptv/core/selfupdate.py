@@ -30,10 +30,11 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from .. import VERSION
 from . import build_check, desktop_entry, ed25519
 from ._lazy_requests import requests
 from .update_keys import UPDATE_KEYS
-from .updates import GITHUB_REPO, is_nightly, site_headers
+from .updates import GITHUB_REPO, is_nightly, offered, site_headers
 from ..i18n import LocalizedError
 from .log import log
 from .xdg import system_env
@@ -106,6 +107,21 @@ def target_path(current: Path, old_version: str, new_version: str) -> Path:
     if old and old in current.name:
         return current.with_name(current.name.replace(old, new))
     return current
+
+
+def refuse_older(tag: str) -> None:
+    """Stop unless the release *tag* is an update for the version running.
+
+    Every installer (this one, the Windows and the Mac one) asks here
+    before it fetches anything, whatever offered the release: a release
+    signed long ago stays signed, so a site taken over could hand out an
+    old one, with the faults fixed since. Newer than this copy it must be -
+    or, as on the Releases channel today, the release a test build carries
+    the number of (1.4.0 over 1.4.0.12: updates.offered)."""
+    if offered(tag, VERSION, "stable"):
+        return
+    log.error("update: %s is not newer than the running %s - not installed", tag or "(no version)", VERSION)
+    raise UpdateError("upd_err_mac_check", step="version")
 
 
 _SUMS_LINE = re.compile(r"([0-9a-fA-F]{64}) [ *](\S.*)")
@@ -227,7 +243,11 @@ def download(asset: dict, dest: Path,
         with _get_https(asset["url"], stream=True, timeout=30) as r:
             r.raise_for_status()
             total = size or int(r.headers.get("Content-Length") or 0)
-            with open(dest, "wb") as fh:
+            # A file of our own making, never one that was lying there: in a
+            # folder others may write to, a file (or a link) put under this
+            # name beforehand would be theirs to change after the checksum.
+            dest.unlink(missing_ok=True)
+            with open(dest, "xb") as fh:
                 for chunk in r.iter_content(chunk_size=1 << 16):
                     if cancel is not None and cancel.is_set():
                         raise UpdateError("cancelled")
@@ -307,6 +327,7 @@ def install(release: dict, current_version: str,
     if current is None or cpu is None:
         raise UpdateError("upd_err_not_appimage")
     tag = release.get("tag") or ""
+    refuse_older(tag)
     asset = pick_asset(release.get("assets") or [], tag, cpu)
     if asset is None:
         raise UpdateError("upd_err_no_asset", cpu=cpu)
