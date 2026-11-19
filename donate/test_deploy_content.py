@@ -213,3 +213,39 @@ def test_nothing_of_a_request_reaches_the_error_log():
     srv = _server(conf())
     assert srv.values("error_log") == ["/var/log/nginx/error.log crit"]
     assert srv.values("access_log") == ["off"]
+
+
+def test_a_name_with_a_dot_first_is_never_served_but_well_known():
+    srv = _server(conf())
+    dot = find_location(srv, "/.gitignore")
+    assert dot.args == ["~", r"/\.(?!well-known/)"] and dot.values("return") == ["404"]
+    for uri in ("/files/.gitignore", "/.git/config", "/.env", "/help-shots/sv/.x.webp", "/.x.css",
+                "/.well-known", "/fonts/.DS_Store"):
+        assert find_location(srv, uri) is dot, uri
+    regexes = [b for b in srv.all("location") if b.args[0] in ("~", "~*")]
+    assert regexes[0] is dot                       # before any other regex can answer
+    txt = find_location(srv, "/.well-known/security.txt")
+    assert txt.args == ["=", "/.well-known/security.txt"] and txt.values("default_type") == ["text/plain"]
+    assert txt.one("types").body == []             # text/plain, whatever its ending says
+    apple = "/.well-known/apple-developer-merchantid-domain-association"
+    assert find_location(srv, apple).args == ["=", apple]
+    # Everything else as before.
+    for uri, where in (("/", "= /"), ("/assets/style.0123456789.css", r"~* \.(css|js)$"),
+                       ("/files/dopeIPTV-1.6.8-x86_64.AppImage", "/files/"),
+                       ("/help-shots/sv/set-sync.webp", r"~* \.(svg|png|ico|webp|webmanifest|woff2)$"),
+                       ("/x.php", r"~ \.php$"), ("/privacy/", "~ ^/(?<iptv_legal>privacy|terms|payments|support|about)/$")):
+        assert " ".join(find_location(srv, uri).args) == where, uri
+
+
+def test_security_txt_says_where_to_report_and_has_not_expired():
+    import datetime as dt
+    with open(os.path.join(ROOT, "public", ".well-known", "security.txt"), encoding="utf-8") as fh:
+        fields = dict(line.split(": ", 1) for line in fh.read().splitlines() if line and not line.startswith("#"))
+    assert fields["Contact"] == "https://github.com/slimture/dopeIPTV/security/advisories/new"
+    assert fields["Canonical"] == "https://dopeiptv.org/.well-known/security.txt"
+    assert fields["Policy"] == "https://github.com/slimture/dopeIPTV/blob/main/SECURITY.md"
+    assert fields["Preferred-Languages"] == "en, sv"
+    expires = dt.datetime.fromisoformat(fields["Expires"].replace("Z", "+00:00"))
+    now = dt.datetime.now(dt.timezone.utc)
+    # Renewed once a year, never more than a year and a bit ahead (RFC 9116).
+    assert now < expires < now + dt.timedelta(days=400), "security.txt's Expires: a year from today"

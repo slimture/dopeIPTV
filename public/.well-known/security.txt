@@ -1,0 +1,5 @@
+Contact: https://github.com/slimture/dopeIPTV/security/advisories/new
+Expires: 2027-11-19T00:00:00.000Z
+Preferred-Languages: en, sv
+Canonical: https://dopeiptv.org/.well-known/security.txt
+Policy: https://github.com/slimture/dopeIPTV/blob/main/SECURITY.md
