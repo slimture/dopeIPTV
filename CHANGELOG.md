@@ -41,6 +41,26 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   playback; what one member can cause is bounded (members listed, hellos
   answered, version jumps, seeks past a title's end). A room with an old
   8-character code says that it is easier to guess (`together_old_code`).
+- Private viewing: for a playback that began private, nothing is kept or
+  sent to its end even if private viewing is turned off meanwhile - stream
+  health, stream details, the track and subtitle chosen for a title, a
+  channel's audio delay and teletext page, the subtitle language, a
+  series' season, the folder of a file opened by hand, radio-browser.info's
+  click, Trakt's start after its lookup, a title cast again to a TV.
+- Private viewing: a film, episode or recording watched privately is no
+  longer marked watched (and sent to a media server, Trakt or Simkl) once
+  it was stopped after private viewing had been turned off.
+- Private viewing: TMDB is not asked about the title playing privately
+  (`privacy.title_private`); the lists around it load their posters as
+  before.
+- Private viewing: a private channel's rewind buffer is deleted when
+  another channel is watched, when private viewing ends and before the app
+  has closed, and one left by a crash at the next start.
+- Private viewing: the log no longer carries a subtitle file's name, a
+  file's path or a stream's address for a private playback (the server's
+  name only, `privacy.url_for_log`; a Chromecast's resolved address was
+  logged unredacted), and the system is no longer told the title as the
+  reason the screen stays awake.
 
 ## [1.6.8]
 
