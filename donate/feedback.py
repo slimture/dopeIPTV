@@ -104,6 +104,10 @@ _seen: dict[str, dict] = {}
 
 _URL = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]{1,15})://[^\s'\"<>()\[\]]+")
 _IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
+# IPv6 as the app's core/report.py finds it: in full (six groups or more, so
+# a time like 21:05:03 is left alone) or shortened with "::" (fe80::1, ::1).
+_IPV6 = re.compile(r"(?<![\w:])(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
+                   r"|[0-9A-Fa-f:]{0,30}::[0-9A-Fa-f:]{0,30}[0-9A-Fa-f])(?![\w:])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|secret|auth|mac)(\s*[=:]\s*)([^\s&'\",;]+)")
@@ -116,6 +120,7 @@ def scrub(text: str) -> str:
     out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
     out = _MAC.sub("<mac>", out)
+    out = _IPV6.sub("<ip>", out)
     out = _IPV4.sub(lambda m: m.group(0) if m.group(0).startswith("127.") else "<ip>", out)
     return _KEYVAL.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
 

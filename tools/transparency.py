@@ -53,7 +53,7 @@ CODE: dict[str, list[dict]] = {
         {"id": "answers", "repo": "app", "path": "dopeiptv/core/report.py",
          "names": ["new_code", "code_hash", "fetch_replies"]},
         {"id": "server", "repo": "site", "path": "donate/feedback.py",
-         "names": ["_URL", "_IPV4", "_EMAIL", "_MAC", "_KEYVAL", "_SUPPORTER", "scrub", "accept"]},
+         "names": ["_URL", "_IPV4", "_IPV6", "_EMAIL", "_MAC", "_KEYVAL", "_SUPPORTER", "scrub", "accept"]},
     ],
     "sync": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/sync.py",
