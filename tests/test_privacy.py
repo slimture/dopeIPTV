@@ -351,3 +351,39 @@ def test_the_window_turns_private_viewing_on_and_off_and_clears():
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=120)
     assert "PRIVACY_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
+def test_trakt_and_simkl_hear_nothing_of_a_private_playback_going_on():
+    """Trakt and Simkl are asked of the playback, not of the switch alone: a
+    film that began in private viewing is not told when its stream starts
+    again after the switch went off - the next title chosen is."""
+    from dopeiptv.ui.mw_trakt import _TraktMixin
+
+    told: list = []
+
+    class W(_TraktMixin):
+        def _trakt_start_for_item(self, kind, item):
+            told.append(("trakt", kind, item.get("name")))
+
+        def _simkl_start_for_item(self, kind, item):
+            told.append(("simkl", kind, item.get("name")))
+
+    w = W()
+    film = {"stream_id": 7, "name": "The Bridge"}
+    try:
+        privacy.set_private(True)
+        privacy.playback_started("movie", 7)
+        w._watch_accounts_start("movie", 7, film)
+        privacy.set_private(False)
+        w._watch_accounts_start("movie", 7, film)          # the stream again: a reconnect
+        privacy.playback_started("movie", 7)
+        assert told == []
+        w._watch_accounts_start("movie", 8, {"name": "Other"})
+        assert told == [("trakt", "movie", "Other"), ("simkl", "movie", "Other")]
+        told.clear()
+        privacy.playback_stopped()
+        w._watch_accounts_start("local", "/m/f.mkv", {"name": "f.mkv", "_clean_title": "Film"})
+        assert told == [("trakt", "movie", "Film"), ("simkl", "movie", "Film")]
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()

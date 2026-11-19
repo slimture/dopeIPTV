@@ -96,6 +96,24 @@ class _TraktMixin:
                     log.debug("%s: %s failed (%s)", type(acc).__name__,
                               method, type(e).__name__)
         threading.Thread(target=job, daemon=True).start()
+    def _watch_accounts_start(self, kind: str, key, item) -> None:
+        """Trakt and Simkl told what began to play - asked of this playback,
+        not of the switch alone: one that began in private viewing stays
+        untold when its stream starts again after the switch went off (a
+        reconnect, the same title once more)."""
+        from ..core import privacy
+        if privacy.playback_private(kind, key):
+            return
+        if kind in ("movie", "episode"):
+            self._trakt_start_for_item(kind, item)
+            self._simkl_start_for_item(kind, item)
+        elif kind == "local" and item is not None and not item.get("_no_scrobble"):
+            # A local file scrobbles as a movie when Trakt can match the
+            # cleaned title; an unmatched file just scrobbles nothing.
+            local_movie = {"name": item.get("_clean_title") or item.get("name") or ""}
+            self._trakt_start_for_item("movie", local_movie)
+            self._simkl_start_for_item("movie", local_movie)
+
     def _trakt_start_for_item(self, kind: str, item) -> None:
         from ..core import privacy
         # The account of the profile watching, whatever profile is in use by
