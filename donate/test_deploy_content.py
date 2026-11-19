@@ -118,32 +118,39 @@ def _py(regex: str) -> str:
     return re.sub(r"\(\?<(?=[A-Za-z_])", "(?P<", regex)
 
 
-def find_location(server: Block, uri: str) -> Block | None:
-    """The location nginx gives *uri* (ngx_http_core_find_location): an
-    exact one, else the longest prefix - and inside it its own regexes -,
-    then, unless that prefix is ^~, the regexes of the level in order."""
-    def find(blocks: list[Block]) -> tuple[Block | None, bool]:
+def locate(server: Block, uri: str) -> list[Block]:
+    """The locations nginx gives *uri*, the outer first, the one that
+    answers last (ngx_http_core_find_location): an exact one, else the
+    longest prefix - and inside it its own -, then, unless that prefix is
+    ^~, the regexes of the level in order."""
+    def find(blocks: list[Block]) -> tuple[list[Block], bool]:
         locs = [b for b in blocks if b.name == "location"]
         for b in locs:
             if b.args[0] == "=" and b.args[1] == uri:
-                return b, True
+                return [b], True
         prefixes = [b for b in locs if (len(b.args) == 1 and not b.args[0].startswith("@"))
                     or b.args[0] == "^~"]
         best = max((b for b in prefixes if uri.startswith(b.args[-1])), key=lambda b: len(b.args[-1]),
                    default=None)
-        found = best
+        found: list[Block] = []
         if best is not None:
             inner, final = find(best.body)
             if final:
-                return inner, True
-            found = inner or best
+                return [best] + inner, True
+            found = [best] + inner
         if best is None or best.args[0] != "^~":
             for b in locs:
                 if b.args[0] in ("~", "~*") and re.search(_py(b.args[1]), uri,
                                                           re.I if b.args[0] == "~*" else 0):
-                    return b, True
+                    return [b] + find(b.body)[0], True
         return found, False
     return find(server.body)[0]
+
+
+def find_location(server: Block, uri: str) -> Block | None:
+    """The location that answers *uri*."""
+    path = locate(server, uri)
+    return path[-1] if path else None
 
 
 def map_value(top: Block, var: str, value: str) -> str:
@@ -259,14 +266,7 @@ def _size(value: str) -> int:
 def _effective(srv: Block, uri: str, name: str) -> str:
     """*name*'s value for *uri*: its location's own, else the location's
     around it, else the server's (nginx's inheritance)."""
-    chain, blocks = [], srv.body
-    while True:
-        loc = find_location(Block("", [], blocks, 0), uri)
-        if loc is None or loc in chain:
-            break
-        chain.append(loc)
-        blocks = loc.body
-    for b in reversed([srv] + chain):
+    for b in reversed([srv] + locate(srv, uri)):
         if b.values(name):
             return b.values(name)[-1]
     return ""
@@ -395,3 +395,22 @@ def test_the_language_cookie_goes_over_https_and_only_from_the_site():
         for value in loc.values("add_header"):
             if value.startswith("Set-Cookie"):
                 assert value.split()[1] == "$iptv_set_cookie", loc
+
+
+def test_the_admin_pages_are_counted_by_address_whatever_cookie_comes():
+    top = conf()
+    srv = _server(top)
+    # A browser with the session cookie is not counted by iptv_admin - nor
+    # was one with a made-up cookie. Every request is by its address.
+    assert map_value(top, "$iptv_admin_limit", "") == "$http_x_real_ip"
+    assert map_value(top, "$iptv_admin_limit", "made-up") == ""
+    assert _zones(top)["iptv_admin_addr"] == "$http_x_real_ip"
+    assert [b.args for b in top.all("limit_req_zone") if "zone=iptv_admin_addr:1m" in b.args] == [
+        ["$http_x_real_ip", "zone=iptv_admin_addr:1m", "rate=600r/m"]]
+    for uri in ("/admin/", "/admin/stats", "/admin/login", "/admin/sw.js"):
+        path = locate(srv, uri)
+        assert path[0].args == ["^~", "/admin/"], uri
+        limits = next(b.values("limit_req") for b in reversed(path) if b.values("limit_req"))
+        assert limits == ["zone=iptv_admin burst=30 nodelay", "zone=iptv_admin_addr burst=300 nodelay"], uri
+    # Signing in as before: its own zone, for everyone.
+    assert find_location(srv, "/admin/auth/password").values("limit_req") == ["zone=iptv_signin burst=10 nodelay"]
