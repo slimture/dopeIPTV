@@ -430,7 +430,7 @@ def test_stored_entries_that_make_no_sense_are_left_out():
 
 def test_nothing_found_says_why_and_what_helps():
     pytest.importorskip("PyQt6")
-    from dopeiptv.providers.chromecast import none_found_text
+    from dopeiptv.ui.cast_dialog import none_found_text
     from dopeiptv.ui.box_finder import nothing_found_text
     why = tr("vlan_nothing_found")
     for words in ("VLAN", "mDNS", "Avahi", "Multicast DNS", "UniFi", "SSDP", "UPnP", "IGMP"):
@@ -448,7 +448,7 @@ def test_the_windows_show_it(monkeypatch):
     from PyQt6.QtCore import QThreadPool
     from PyQt6.QtWidgets import QApplication, QWidget
 
-    from dopeiptv.providers import chromecast
+    from dopeiptv.ui import cast_dialog
     from dopeiptv.ui.box_finder import FindOnNetwork
     app = QApplication.instance() or QApplication([])
 
@@ -466,7 +466,7 @@ def test_the_windows_show_it(monkeypatch):
     win.settings = FakeSettings()
     win.cast, win.pool, win._cast_device = hub, QThreadPool(), None
     win.add_cast_device = lambda parent, current: None
-    d = chromecast.CastDialog(win, "http://a", "A", probe=False)
+    d = cast_dialog.CastDialog(win, "http://a", "A", probe=False)
     win.pool.waitForDone(5000)
     for _ in range(20):
         app.processEvents()
@@ -490,7 +490,7 @@ def test_the_cast_window_adds_and_forgets_by_address(monkeypatch):
     from PyQt6.QtCore import QThreadPool
     from PyQt6.QtWidgets import QApplication, QWidget
 
-    from dopeiptv.providers import chromecast
+    from dopeiptv.ui import cast_dialog
     app = QApplication.instance() or QApplication([])
 
     class Mgr:
@@ -518,7 +518,7 @@ def test_the_cast_window_adds_and_forgets_by_address(monkeypatch):
         asked.append(current)
         return answers.pop(0)
     win.add_cast_device = add_cast_device
-    d = chromecast.CastDialog(win, "http://a", "A", probe=False)
+    d = cast_dialog.CastDialog(win, "http://a", "A", probe=False)
     win.pool.waitForDone(5000)
     app.processEvents()
     answers.append("Attic")

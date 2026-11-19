@@ -315,7 +315,8 @@ def test_the_cast_panel_offers_kodi(app, monkeypatch):
     from PyQt6.QtWidgets import QWidget
 
     from dopeiptv.i18n import tr
-    from dopeiptv.providers import casting, chromecast
+    from dopeiptv.providers import casting
+    from dopeiptv.ui import cast_dialog
     monkeypatch.setattr(casting.ChromecastManager, "available", staticmethod(lambda: True))
     kodis = _Mgr(["Den (Kodi)"], " (Kodi)")
     kodis.devices = {"Den (Kodi)": object()}
@@ -325,7 +326,7 @@ def test_the_cast_panel_offers_kodi(app, monkeypatch):
     win.cast, win.pool, win._cast_device = hub, QThreadPool(), None
     answers = []
     win.add_kodi = lambda parent, current: answers.pop(0)
-    d = chromecast.CastDialog(win, "http://a", "A", probe=False)
+    d = cast_dialog.CastDialog(win, "http://a", "A", probe=False)
     win.pool.waitForDone(3000)
     app.processEvents()
     assert not d.kodi_btn.isHidden()
@@ -359,7 +360,7 @@ def test_the_cast_panel_offers_kodi(app, monkeypatch):
     d.close()
     # Without the window's form there is no button.
     del win.add_kodi
-    d2 = chromecast.CastDialog(win, "http://a", "A", probe=False, managing=True)
+    d2 = cast_dialog.CastDialog(win, "http://a", "A", probe=False, managing=True)
     assert d2.kodi_btn.isHidden()
     d2.close()
 

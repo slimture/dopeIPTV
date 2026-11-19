@@ -79,8 +79,7 @@ dopeiptv/
     opensubtitles.py   OpenSubtitles.com REST client (search, download, hash)
     radio_browser.py   Internet radio from radio-browser.info: servers from
                        its DNS round robin, falling back between them
-    chromecast.py      ChromecastManager, CastDialog (devices by address, the
-                       TV cast to last first)
+    chromecast.py      ChromecastManager (devices by address too)
     dlna.py            DLNA / UPnP TVs: SSDP discovery, SOAP control, file share
     casting.py         CastHub - Chromecast, DLNA and Kodi behind one object
     cast_devices.py    Devices to cast to added by their address: what was
@@ -419,6 +418,8 @@ dopeiptv/
     mw_cast.py         Casting: the cast dialog, the card's controls, archive hand-over
     mw_cast_watch.py   The cast card's picture, words and state; a stuck cast
                        sent again (twice, then Try again); "On TV" marks
+    cast_dialog.py     The cast window: the devices found and added, tracks and
+                       quality, the TV cast to last first
     cast_card.py       The cast card in the video's place (pure presentation)
     mw_airplay.py      AirPlay (macOS): the receiver added, its own endings
     mw_popout.py       Detached-window ("pop out") player mixin

@@ -57,7 +57,7 @@ from ..core.privacy import for_log
 from ..core.workers import run_async
 from ..i18n import LocalizedError, tr
 from ..providers import cast_feed
-from ..providers.chromecast import CastDialog
+from .cast_dialog import CastDialog
 from ..providers.kodi import DEFAULT_PORT, parse_address
 from .theme import P
 

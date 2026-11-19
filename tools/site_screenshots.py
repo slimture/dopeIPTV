@@ -1383,7 +1383,7 @@ class _PlayingTV:
 def feat_cast(st: Stage):
     """Cast to the TV: the channel sent to a TV found on the home network,
     the cast card in the video's place while the TV plays it."""
-    from dopeiptv.providers.chromecast import CastDialog
+    from dopeiptv.ui.cast_dialog import CastDialog
     w = st.w
     tv_place(st, "Arena Sport")
     # The home network's devices, and the TV taking the stream: what the

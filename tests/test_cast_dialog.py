@@ -47,7 +47,7 @@ def _dialog(**kw):
     """Build the dialog. No libass question any more: a text subtitle is
     handed to the receiver as WebVTT beside the picture, which any ffmpeg
     can write, so every subtitle in the stream can be offered."""
-    import dopeiptv.providers.chromecast as cc
+    import dopeiptv.ui.cast_dialog as cc
     win = _window()
     kw.setdefault("probe", False)       # never open the stream from a test
     dlg = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", **kw)
@@ -66,7 +66,7 @@ def test_dialog_builds_from_a_row():
 
 def test_dialog_builds_on_a_running_cast():
     """Managing mode skips discovery and lists the remembered devices."""
-    from dopeiptv.providers.chromecast import CastDialog
+    from dopeiptv.ui.cast_dialog import CastDialog
     win, dlg = _dialog(managing=True)
     assert dlg.list.count() == 0        # nothing remembered yet
     win.settings.setValue("cast_devices", "Bedroom\nLiving room")
@@ -85,7 +85,7 @@ def test_the_picture_question_is_remembered_per_device():
     everybody knows which one they bought."""
     win = _window()
     win.settings.setValue("cast_devices", "Living room\nBedroom")
-    from dopeiptv.providers.chromecast import CastDialog
+    from dopeiptv.ui.cast_dialog import CastDialog
     dlg = CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1",
                      probe=False, managing=True)
     assert dlg.quality() == "original"
@@ -190,7 +190,7 @@ def test_the_tv_used_last_is_on_top_picked_and_named_on_the_button():
     from PyQt6.QtGui import QKeyEvent
     from PyQt6.QtWidgets import QApplication
 
-    import dopeiptv.providers.chromecast as cc
+    import dopeiptv.ui.cast_dialog as cc
     win = _window()
     win.settings.setValue("cast_devices", "Living room\nBedroom\nKitchen")
     cc.remember_device(win.settings, True, "Bedroom")
@@ -229,7 +229,7 @@ def test_the_tv_used_last_is_on_top_picked_and_named_on_the_button():
 def test_what_is_kept_of_the_tv_used_last():
     from PyQt6.QtCore import QSettings
 
-    import dopeiptv.providers.chromecast as cc
+    import dopeiptv.ui.cast_dialog as cc
     s = QSettings("dopeiptv-test", "cast-last")
     s.clear()
     assert cc.last_device(s, True) == "" and cc.last_device(s, False) == ""
