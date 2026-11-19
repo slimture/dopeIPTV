@@ -44,7 +44,11 @@ bytes before it; one whose key does not hash to its id or whose signature
 does not hold is dropped, so no member can speak as another. A 16-hex id
 is taken as before - an older app's, which ignores the two fields it does
 not know and so follows a newer one's messages too. (Such an older member
-can still be spoken for by another member: updating ends that.) Signing
+can still be spoken for by another member: updating ends that.) An
+unsigned message never speaks for a key-bound id: not as its sender, nor
+as who chose the state it carries (Room.receive). Unsigned members are
+taken for one release of overlap only - an app of UNSIGNED_UNTIL or later
+refuses them - and the log says once per room that one is in it. Signing
 takes about 5 ms and checking about 3.5 ms of plain Python - every
 message is signed, on the link's threads, never the window's.
 
@@ -138,6 +142,10 @@ TEXT_MAX = 120
 #: 40 hex from one with a key of its own (the hash of its public key).
 OLD_ID_LEN = 16
 ID_LEN = 40
+#: The first version that takes no unsigned member (an OLD_ID_LEN id): 1.6.9
+#: takes 1.6.8's for one release of overlap (tests/test_together.py fails
+#: once the app's version reaches this, so it is not forgotten).
+UNSIGNED_UNTIL = "1.7.0"
 _ID_CTX = b"dopeIPTV together member v1"
 _SIGN_CTX = b"dopeIPTV together signed v1"
 _SIG_HEAD = b',"sg":"'
@@ -580,6 +588,8 @@ class Room:
         self._born = clock.mono()
         #: Per sender: the highest "n" seen and when (this computer's seconds).
         self._last_n: dict[str, tuple[int, float]] = {}
+        #: Whether the log has said an unsigned (older app's) member is here.
+        self._told_unsigned = False
 
     # -- out
     def _make(self, kind: str, **fields: Any) -> dict[str, Any]:
@@ -639,11 +649,18 @@ class Room:
         computer's own, an old one handed again or one out of its time."""
         if msg.sender == self.me:
             return []
+        if len(msg.sender) == ID_LEN and not msg.signed:
+            log.debug("together: an unsigned message under a key's id was dropped")
+            return []
         if not self._timely(msg):
             log.debug("together: a message out of its time was ignored")
             return []
         if not self._counted(msg, now):
             return []
+        if not msg.signed and not self._told_unsigned:
+            self._told_unsigned = True
+            log.info("together: a member on dopeIPTV 1.6.8 or older is in the room - their "
+                     "messages are not signed (taken until %s)", UNSIGNED_UNTIL)
         events: list[tuple[str, Any]] = []
         if msg.kind == "bye":
             gone = self.members.pop(msg.sender, None)
@@ -670,6 +687,10 @@ class Room:
         state = msg.state
         if state is not None and msg.kind == "st" and state.by != msg.sender:
             state = None        # a choice is told by whoever made it
+        if state is not None and not msg.signed and len(state.by) == ID_LEN:
+            # An older member passing on what plays never says a key's
+            # holder chose it: the state is taken as theirs.
+            state = dataclasses.replace(state, by=msg.sender)
         if (state is not None and self.state is not None
                 and state.ver > self.state.ver + VER_JUMP):
             state = None

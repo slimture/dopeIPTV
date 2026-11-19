@@ -48,6 +48,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   playback; what one member can cause is bounded (members listed, hellos
   answered, version jumps, seeks past a title's end). A room with an old
   8-character code says that it is easier to guess (`together_old_code`).
+- core/together.py: members on 1.6.8, whose messages are not signed, are
+  taken in this release only - 1.7.0 refuses them (`UNSIGNED_UNTIL`; a
+  test fails once the version reaches it). An unsigned message never
+  speaks for a member with a key, neither as its sender nor as who chose
+  the state it passes on, and the log says once per room that an unsigned
+  member is in it.
 - Private viewing: for a playback that began private, nothing is kept or
   sent to its end even if private viewing is turned off meanwhile - stream
   health, stream details, the track and subtitle chosen for a title, a

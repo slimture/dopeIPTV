@@ -990,6 +990,85 @@ def test_a_member_on_1_6_8_is_still_heard_and_hears():
     assert together.parse({"k": "ka", "f": 1234567812345678, "n": 1, "t": 1}) is None
 
 
+class _Lines:
+    """What the app's logger says while it is held, at info and up."""
+
+    def __enter__(self):
+        import logging
+
+        from dopeiptv.core.log import log
+        self.records: list = []
+        outer = self
+
+        class Catch(logging.Handler):
+            def emit(self, record):
+                outer.records.append(record)
+        self._log, self._handler, self._level = log, Catch(), log.level
+        log.addHandler(self._handler)
+        log.setLevel(logging.INFO)
+        return self
+
+    def __exit__(self, *exc):
+        self._log.removeHandler(self._handler)
+        self._log.setLevel(self._level)
+
+    def saying(self, words: str) -> list:
+        return [r for r in self.records if words in r.getMessage()]
+
+
+def test_an_unsigned_message_never_speaks_for_a_keys_holder():
+    """1.6.8's members are taken unsigned - under their own 16-hex ids only:
+    never as a key-bound id (40 hex), sent or passed on as who chose."""
+    import logging
+    anna, me = together.new_identity(), together.new_identity()
+    old = "ab" * 8
+    # Sealed without a signature under Anna's id: no message at all.
+    blob = together.seal(KEY, ROOM, {"k": "hi", "f": anna.id, "n": 1, "t": 5, "name": "Anna"})
+    assert together.open_message(KEY, ROOM, blob) is None
+    # Nor does the room take one that came another way.
+    clock = _Clock()
+    room = together.Room("ABCD-EFGH", me.id, "Me", clock)
+    assert room.receive(_msg("hi", anna.id, 1, clock.ms, name="Anna"), now=10.0) == []
+    assert room.receive(_msg("st", anna.id, 2, clock.ms, st=_state_wire(b=anna.id)), now=10.0) == []
+    assert room.members == {} and room.state is None
+    # An older member passing on what plays: taken, as its own choice.
+    with _Lines() as lines:
+        ev = room.receive(_msg("hi", old, 1, clock.ms, name="Old",
+                               st=_state_wire(b=anna.id, v=7, t=clock.ms)), now=11.0)
+        room.receive(_msg("ka", old, 2, clock.ms, name="Old"), now=12.0)
+    assert ("joined", room.members[old]) in ev
+    assert room.state is not None and room.state.ver == 7 and room.state.by == old
+    told = lines.saying("not signed")
+    assert len(told) == 1 and told[0].levelno == logging.INFO, "once per room"
+    # Anna's own signed message is taken as hers.
+    signed = together.open_message(KEY, ROOM, together.seal(
+        KEY, ROOM, {"k": "st", "f": anna.id, "n": 3, "t": clock.ms,
+                    "st": _state_wire(b=anna.id, v=8, t=clock.ms)}, anna))
+    assert signed is not None and signed.signed
+    room.receive(signed, now=13.0)
+    assert room.state.by == anna.id and room.state.ver == 8
+    # A room with no older member says nothing of one.
+    quiet = together.Room("ABCD-EFGH", me.id, "Me", clock)
+    with _Lines() as lines:
+        quiet.receive(signed, now=14.0)
+    assert quiet.state is not None and not lines.saying("not signed")
+
+
+def test_unsigned_members_are_refused_from_the_version_named():
+    """1.6.9 takes 1.6.8's unsigned members for one release of overlap. This
+    fails once the app reaches UNSIGNED_UNTIL: refuse an OLD_ID_LEN sender in
+    open_message then, drop the overlap's code, and this test with it."""
+    import re
+
+    from dopeiptv import __version__
+
+    def version(text: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in re.findall(r"\d+", text)[:3])
+    assert version(together.UNSIGNED_UNTIL) == (1, 7, 0)
+    assert version(__version__) < version(together.UNSIGNED_UNTIL), (
+        f"dopeIPTV {__version__} still takes unsigned Watch together members")
+
+
 def test_the_longest_names_still_fit_signed():
     me = together.new_identity()
     room = together.Room("ABCD-EFGH", me.id, "Ж" * together.NAME_MAX, _Clock())

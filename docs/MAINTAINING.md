@@ -517,6 +517,11 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   route), and the phone remote from a phone on the guest network.
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
+- **Watch together, 1.7.0**: 1.6.9 still takes 1.6.8's unsigned members
+  (16-hex ids, `OLD_ID_LEN`) for one release of overlap. In 1.7.0 refuse
+  them in `open_message` and drop the overlap's code
+  (`core/together.py` `UNSIGNED_UNTIL`); `tests/test_together.py` fails
+  from the version bump on until it is done. Say it in the release notes.
 - **Profiles**: built - one per person in the household, as Netflix and
   Plex have them (`core/profiles.py`, `ui/mw_profiles.py`,
   `ui/profiles_ui.py`; Settings > System > Profiles). What is a profile's
