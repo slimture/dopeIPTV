@@ -51,6 +51,7 @@
     "dl_phone_p": "dopeIPTV はパソコン用のアプリです（Linux・macOS・Windows）。パソコンでこのページを開いてダウンロードするか、リンクを自分に送ってください。",
     "dl_phone_share": "リンクを送る",
     "dl_phone_copied": "リンクをコピーしました",
+    "menu_send_link": "リンクをパソコンに送る",
     "dl_phone_show": "ダウンロードを表示",
     "dl_latest": "最新",
     "dl_tip_total": "ダウンロード数(全バージョン)",

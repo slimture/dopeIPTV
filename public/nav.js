@@ -30,6 +30,56 @@ if (IPTV_CR) { document.documentElement.classList.add("cr"); }
     document.documentElement.classList.add("handheld");
   }
 })();
+/* The header's menus (the menu and the language picker): the page behind
+ * toned down while one is open, a tap on it, Escape or a link followed in
+ * it closing it - a link to this same page's section left it open. On a
+ * phone the menu's "Send the link to your computer" opens the phone's own
+ * sharing (Messages, Mail, AirDrop to a Mac), or copies the link; with
+ * neither it goes to the download section, which says what to do. */
+(function () {
+  var menus = document.querySelectorAll('header.bar details[name="hdrmenu"]');
+  if (!menus.length) { return; }
+  var each = function (fn) { Array.prototype.forEach.call(menus, fn); };
+  var scrim = document.createElement("div");
+  scrim.className = "menu-scrim";
+  scrim.hidden = true;
+  document.body.appendChild(scrim);
+  function closeAll() { each(function (d) { d.open = false; }); }
+  function sync() {
+    scrim.hidden = !Array.prototype.some.call(menus, function (d) { return d.open; });
+  }
+  each(function (d) {
+    d.addEventListener("toggle", sync);
+    d.addEventListener("click", function (e) {
+      var a = e.target.closest ? e.target.closest("a") : null;
+      if (a && !a.hasAttribute("data-send-link")) { setTimeout(closeAll, 0); }
+    });
+  });
+  scrim.addEventListener("click", closeAll);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !scrim.hidden) { closeAll(); }
+  });
+  var send = document.querySelector("a[data-send-link]");
+  if (!send) { return; }
+  send.addEventListener("click", function (e) {
+    var url = location.origin + "/";
+    if (navigator.share) {
+      e.preventDefault();
+      closeAll();
+      navigator.share({ title: "dopeIPTV", url: url }).catch(function () { /* closed */ });
+    } else if (navigator.clipboard && window.isSecureContext) {
+      e.preventDefault();
+      var words = send.querySelector(".mi-t");
+      navigator.clipboard.writeText(url).then(function () {
+        var was = words.textContent;
+        words.textContent = send.getAttribute("data-copied") || was;
+        setTimeout(function () { words.textContent = was; closeAll(); }, 1600);
+      }, function () { location.href = send.href; });
+    } else {
+      closeAll();
+    }
+  });
+})();
 
 var iptvHit = (function () {
   "use strict";

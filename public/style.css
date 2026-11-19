@@ -465,19 +465,60 @@ footer .foot-company a:hover { color: var(--accent); }
 .navmenu[open] .navmenu-bars i:nth-child(2) { opacity: 0; }
 .navmenu[open] .navmenu-bars i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 @media (prefers-reduced-motion: reduce) { .navmenu-bars i { transition: none; } }
+/* Its rows (render.jq, nav): an icon in a tinted square, the words and a
+   chevron, each a finger's height; the page you are on in the accent; under
+   them, small, feedback and the rules. It slides in over a toned-down page
+   (nav.js, .menu-scrim), and a tap beside it closes it. */
 .navmenu-panel {
   position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 40;
-  min-width: 200px; padding: 6px; border-radius: 12px;
+  min-width: 260px; padding: 8px; border-radius: 16px;
   background: var(--surface); border: 1px solid var(--line-2);
-  box-shadow: 0 18px 44px -18px rgba(0,0,0,.6);
+  box-shadow: 0 24px 60px -20px rgba(0,0,0,.6);
   display: flex; flex-direction: column; gap: 2px;
+  animation: menu-in .18s ease-out;
 }
 .navmenu-item {
-  display: block; padding: 11px 14px; border-radius: 8px;
-  color: var(--text); font-size: 15px; white-space: nowrap;
+  display: flex; align-items: center; gap: 12px; min-height: 48px;
+  padding-block: 6px; padding-inline: 8px 14px; border-radius: 11px;
+  color: var(--text); font-size: 15.5px; white-space: nowrap;
 }
-.navmenu-item:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.navmenu-item.is-current { color: var(--accent); font-weight: 600; }
+.navmenu-item .mi-ico { flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.navmenu-item .mi-ico svg { width: 18px; height: 18px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.navmenu-item.navdonate .mi-ico { color: var(--heart);
+  background: color-mix(in srgb, var(--heart) 15%, transparent); }
+.navmenu-item.navdonate .mi-ico svg { fill: currentColor; stroke: none; }
+.navmenu-item::after { content: ""; flex: none; margin-inline-start: auto; width: 7px; height: 7px;
+  border-top: 2px solid var(--faint); border-right: 2px solid var(--faint); transform: rotate(45deg); }
+[dir="rtl"] .navmenu-item::after { transform: rotate(-135deg); }
+.navmenu-item:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.navmenu-item.is-current { color: var(--accent); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.navmenu-item.is-current::after { border-color: var(--accent); }
+/* A computer's row, or a phone's (nav.js marks a phone or tablet .handheld;
+   a narrow touch screen before it has). */
+.navmenu-item.menu-phone { display: none; }
+.handheld .navmenu-item.menu-phone { display: flex; }
+.handheld .navmenu-item.menu-desk { display: none; }
+@media (max-width: 760px) and (pointer: coarse) {
+  .navmenu-item.menu-phone { display: flex; }
+  .navmenu-item.menu-desk { display: none; }
+}
+.navmenu-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px;
+  margin-top: 6px; padding: 8px 12px 2px; border-top: 1px solid var(--line); font-size: 13px; }
+.navmenu-foot a { color: var(--muted); padding: 8px 0; }
+.navmenu-foot a:hover { color: var(--accent); }
+.navmenu-foot span { color: var(--faint); }
+.menu-scrim { position: fixed; inset: 0; z-index: 15;
+  background: color-mix(in srgb, var(--bg) 62%, transparent); animation: scrim-in .18s ease-out; }
+.menu-scrim[hidden] { display: none; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .navmenu-panel { animation-name: scrim-in; }
+}
 
 /* The phone header's heart (render.jq, nav): Donate where the links are
    folded away. Same size and frame as the menu button beside it. */
@@ -1030,7 +1071,6 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 nav.links .navdonate { color: var(--muted); }
 .navdonate .heart { width: 15px; height: 15px; flex: none; fill: var(--heart); }
 @media (min-width: 1001px) { nav.links a.navdonate { display: inline-flex; align-items: center; gap: 6px; } }
-.navmenu-item.navdonate { display: flex; align-items: center; gap: 9px; }
 footer .v a { color: inherit; }
 /* Solecraft's logotype (its S is the company's mark) as the footer's own
    sign, the copyright line under it; drawn in a text colour, so it follows

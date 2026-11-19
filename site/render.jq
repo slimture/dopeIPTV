@@ -244,12 +244,30 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     ([$links[] | select(.[2] == "help") | . as [$href, $label, $key]
       | "      <a class=\"navlink\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $navlinks
-    | ([$links[] | . as [$href, $label, $key]
-      | "          <a role=\"menuitem\" class=\"navmenu-item\(if cur($key) then " is-current" else "" end)\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
-     | add) as $menuitems
+    # The menu's rows: an icon in a tinted square, the words, a chevron (CSS).
+    # On a phone or tablet the download row sends the link to a computer
+    # instead (menu-phone / menu-desk, nav.js): the one row an iPhone or iPad
+    # app of dopeIPTV's own takes over once there is one.
+    | def mrow($cls; $href; $label; $icon; $extra):
+        "          <a role=\"menuitem\" class=\"navmenu-item\($cls)\" href=\"\($href | h)\"\($extra)><span class=\"mi-ico\" aria-hidden=\"true\"><svg viewBox=\"0 0 24 24\" focusable=\"false\">\($icon)</svg></span><span class=\"mi-t\">\($label | h)</span></a>\n";
+    {features: "<rect x=\"3.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.6\"/><rect x=\"13.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.6\"/><rect x=\"3.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.6\"/><rect x=\"13.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.6\"/>",
+     download: "<path d=\"M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14\"/>",
+     send: "<path d=\"M20.5 3.5 10 14M20.5 3.5l-6.6 17-3.9-6.5-6.5-3.9z\"/>",
+     help: "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7M12 17.2h.01\"/>",
+     heart: "<path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/>"} as $ICON
+    | def mcur($key): if cur($key) then " is-current" else "" end;
+    def macur($key): if cur($key) then " aria-current=\"page\"" else "" end;
+    (mrow(""; $base + "#features"; t("nav_features"); $ICON.features; "")
+     + mrow(" menu-desk"; $base + "#download"; t("nav_download"); $ICON.download; "")
+     + mrow(" menu-phone"; "/#download"; t("menu_send_link"); $ICON.send;
+            " data-send-link data-copied=\"\(t("dl_phone_copied") | h)\"")
+     + mrow(mcur("help"); "/help/"; t("nav_help"); $ICON.help; macur("help"))) as $menuitems
     # Support: a quiet link beside the others, to the support page.
     | "      <a class=\"navlink navdonate\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
-    | "          <a role=\"menuitem\" class=\"navmenu-item navdonate\" href=\"/support/\"><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $menudonate
+    | mrow(" navdonate" + mcur("support"); "/support/"; t("support_nav"); $ICON.heart; macur("support")) as $menudonate
+    # Under the rows, small: feedback and the rules, without scrolling to
+    # the footer.
+    | ("          <div class=\"navmenu-foot\"><a href=\"#feedback\" data-feedback>\(t("foot_feedback") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/privacy/\">\(t("foot_privacy_terms") | h)</a></div>\n") as $menufoot
     # ...and on a phone, where the links fold into the menu, a heart of its
     # own in the header, one tap from anywhere.
     | "      <a class=\"navheart\" href=\"/support/\" aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
@@ -270,7 +288,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
                 {navlinks: ($navlinks + (if $SUPPORT_ON then $navdonate + $navheart else "" end)),
                  langpick: $langpick,
-                 menuitems: ($menuitems + (if $SUPPORT_ON then $menudonate else "" end))}))
+                 menuitems: ($menuitems + (if $SUPPORT_ON then $menudonate else "" end) + $menufoot)}))
       + tip_i18n + feedback_i18n;
   # Every page's footer, one for all: dopeIPTV and what it is, the links in
   # three small groups, and under a hairline who makes it, where to reach
