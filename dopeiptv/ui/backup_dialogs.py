@@ -33,6 +33,9 @@ class RestoreBackupDialog(QDialog):
     _RISKY_LABELS = {"nerd_rec_post": ("nerd_card_rec_after", "nerd_rec_post"),
                      "nerd_mpv_options": ("nerd_mpv_options",),
                      "nerd_mpv_config_dir": ("nerd_mpv_dir",),
+                     "nerd_shaders": ("nerd_card_player", "nerd_shaders"),
+                     "nerd_other_networks": ("nerd_card_lan",),
+                     "nerd_log_file": ("nerd_log_file",),
                      "nerd_proxy": ("nerd_proxy",),
                      "nerd_headers": ("nerd_headers",),
                      "nerd_udpxy": ("nerd_card_udpxy",),
@@ -58,15 +61,21 @@ class RestoreBackupDialog(QDialog):
     #: What is shown as on, not with a value: the switches that let others
     #: in, and the sync a backup joins this computer to (never its code).
     _SWITCHES = frozenset({"nerd_remote", "nerd_share", "nerd_mqtt_commands", "nerd_server",
-                           "sync_code"})
+                           "nerd_log_file", "sync_code", "trakt_access_token",
+                           "simkl_access_token"})
+    #: A watch history signed in to: by the service's name.
+    _SIGN_INS = {"trakt_access_token": "Trakt", "simkl_access_token": "Simkl"}
     #: What a switch says beside itself for the setting that widens it.
     _WIDER = {"nerd_remote_lan": "nerd_remote_home", "nerd_server_adult": "srv_adult"}
     #: What runs something on this computer: shown whole, up to _WHOLE.
-    _RUNS = frozenset({"nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir"})
+    _RUNS = frozenset({"nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir",
+                       "nerd_shaders"})
     _WHOLE = 4000
 
     @classmethod
     def _label(cls, key: str) -> str:
+        if key in cls._SIGN_INS:
+            return tr("restore_signed_in", service=cls._SIGN_INS[key])
         return " · ".join(tr(k) for k in cls._RISKY_LABELS.get(key, (key,)))
 
     @classmethod

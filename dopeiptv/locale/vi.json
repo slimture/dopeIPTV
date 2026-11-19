@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "Bản sao lưu này không có danh sách phát hay cài đặt nào, nên không thể thay thế những gì đang có ở đây.",
   "restore_kept": "Không có trong bản sao lưu này nên được giữ nguyên như ở đây: {what}.",
   "restore_risky_source": "Danh sách phát “{name}”: {what}",
+  "restore_signed_in": "Đã đăng nhập {service}: nội dung phát ở đây được đánh dấu trên tài khoản đó",
   "restore_sync_note": "Đồng bộ đang bật: sau khi khôi phục, máy tính này tham gia đồng bộ lại như một máy mới. Các máy khác giữ nguyên những gì chúng có, và các thay đổi mới hơn của chúng sẽ quay về đây. Để chỉ giữ nội dung trong bản sao lưu, hãy tắt đồng bộ trước khi khôi phục.",
   "restore_token_note": "Mã thông báo của điều khiển từ xa không bao giờ được lấy từ bản sao lưu: một mã mới được tạo trên máy tính này khi bật điều khiển từ xa hoặc chia sẻ.",
   "epg_zoom_out": "Thu nhỏ",

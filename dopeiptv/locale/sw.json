@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "Nakala rudufu hii haina orodha za kucheza wala mipangilio, kwa hiyo haiwezi kuchukua nafasi ya kilichopo hapa.",
   "restore_kept": "Havimo kwenye nakala rudufu hii, kwa hiyo vinabaki kama vilivyo hapa: {what}.",
   "restore_risky_source": "Orodha ya kucheza “{name}”: {what}",
+  "restore_signed_in": "Umeingia kwenye {service}: kinachochezwa hapa kinawekwa alama kwenye akaunti hiyo",
   "restore_sync_note": "Usawazishaji umewashwa: baada ya kurejesha, kompyuta hii inajiunga tena na usawazishaji kama mpya. Kompyuta nyingine zinabaki na walichonacho, na mabadiliko yao mapya yanarudi hapa. Ili kubaki na kilicho kwenye nakala pekee, zima usawazishaji kabla ya kurejesha.",
   "restore_token_note": "Tokeni ya udhibiti wa mbali haichukuliwi kamwe kutoka kwenye nakala rudufu: mpya hutengenezwa kwenye kompyuta hii udhibiti wa mbali au kushiriki kunapowashwa.",
   "epg_zoom_out": "Vuta mbali",

@@ -113,6 +113,9 @@ _LEFT_OUT = frozenset({
     # When this computer's own copy of yt-dlp was last compared with the
     # newest release.
     "ytdlp_checked",
+    # The PIN's wrong guesses and how long they lock it (core/pins.Tries):
+    # an older file put back would give the guesses back.
+    "pin_tries",
 })
 # update_*: the update channel and what its check last found; ts_*: what a
 # source's timeshift probe learned; "_": the files' own markers;
@@ -130,13 +133,15 @@ _PATHS = {"recordings_dir": "dir", "local_open_dir": "dir",
 #: Settings that run something or send the connections, or what is played,
 #: elsewhere: a restore shows them before it is made. Headers by their
 #: names only (a value may be a token).
-RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy",
-         "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
-         "nerd_mqtt_host", "nerd_dns_url")
+#: The shaders run on the graphics card; the other networks let more of the
+#: network reach server mode's tuner, which takes no token.
+RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_shaders",
+         "nerd_proxy", "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
+         "nerd_mqtt_host", "nerd_dns_url", "nerd_other_networks")
 #: Switches that let others in or send out what is played: shown when on.
 #: Server mode among them: it serves the channels to the home network, its
-#: tuner without a token.
-RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands", "nerd_server")
+#: tuner without a token; and a log file kept, which names what plays.
+RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands", "nerd_server", "nerd_log_file")
 #: Those of them that the home network choice (nerd_remote_lan) opens wider.
 _LAN_ON = ("nerd_remote", "nerd_share")
 #: Server mode's channels for adults: said with its switch when both are on.
@@ -145,6 +150,10 @@ _SERVER_ADULT = "nerd_server_adult"
 #: whoever made the file reads what is synced from here on. Shown as set,
 #: never its value (core/sync.K_CODE).
 SYNC_CODE = "sync_code"
+#: A sign-in to a watch history (any profile's): what plays here is marked
+#: on that account from then on - another person's, in a file of theirs.
+#: Shown as set, never its token.
+SIGN_INS = ("trakt_access_token", "simkl_access_token")
 #: A playlist's own options that do the same for its connections (its
 #: backup addresses, a certificate trusted for it, its own DNS server).
 RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
@@ -579,7 +588,8 @@ def risky(b: Backup) -> list[tuple[str, str]]:
     switches it turns on ("" for a switch, or the setting that widens it:
     "nerd_remote_lan" when it also opens them to the home network,
     "nerd_server_adult" when server mode hands out channels for adults),
-    and (SYNC_CODE, "") when it joins this computer to a sync."""
+    and (SYNC_CODE, "") when it joins this computer to a sync, (a SIGN_INS
+    key, "") for each watch history it signs in to."""
     main = _taken(b, "main")
     out = [(key, shown) for key in RISKY
            if isinstance(main.get(key), str) and (shown := _shown(key, main[key]))]
@@ -589,6 +599,9 @@ def risky(b: Backup) -> list[tuple[str, str]]:
             for key in RISKY_ON if _on(main.get(key))]
     if isinstance(main.get(SYNC_CODE), str) and main[SYNC_CODE].strip():
         out.append((SYNC_CODE, ""))
+    for token in SIGN_INS:
+        if any(isinstance(v, str) and v.strip() and _base(k) == token for k, v in main.items()):
+            out.append((token, ""))
     return out
 
 

@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "此备份中没有播放列表或设置，因此无法替换这里现有的内容。",
   "restore_kept": "此备份中没有，因此保持本机原样：{what}。",
   "restore_risky_source": "播放列表“{name}”：{what}",
+  "restore_signed_in": "已登录 {service}：在这里播放的内容会记在那个账户上",
   "restore_sync_note": "同步已开启：恢复后，这台电脑会作为新电脑重新加入同步。其他电脑保留各自已有的内容，它们较新的更改会回到这里。若只想保留备份中的内容，请在恢复前关闭同步。",
   "restore_token_note": "远程控制的令牌绝不会从备份中取用：开启远程控制或共享时，会在这台计算机上新建一个。",
   "epg_zoom_out": "缩小",

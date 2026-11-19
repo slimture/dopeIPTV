@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "Este backup não tem listas nem configurações, então não pode substituir o que está aqui.",
   "restore_kept": "Não estão neste backup, então ficam como estão aqui: {what}.",
   "restore_risky_source": "Lista “{name}”: {what}",
+  "restore_signed_in": "Sessão iniciada no {service}: o que é reproduzido aqui é marcado nessa conta",
   "restore_sync_note": "A sincronização está ativada: depois da restauração, este computador entra de novo na sincronização como um novo. Os outros computadores mantêm o que têm, e as alterações mais recentes deles voltam para cá. Para ficar só com o que está no backup, desative a sincronização antes de restaurar.",
   "restore_token_note": "O token do controle remoto nunca vem de um backup: um novo é criado neste computador quando o controle remoto ou o compartilhamento é ligado.",
   "epg_zoom_out": "Diminuir zoom",

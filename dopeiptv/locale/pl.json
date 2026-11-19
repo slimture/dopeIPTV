@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "Ta kopia zapasowa nie zawiera playlist ani ustawień, więc nie może zastąpić tego, co jest tutaj.",
   "restore_kept": "Nie ma ich w tej kopii zapasowej, więc pozostają takie jak tutaj: {what}.",
   "restore_risky_source": "Playlista „{name}”: {what}",
+  "restore_signed_in": "Zalogowano do {service}: to, co tu leci, jest oznaczane na tamtym koncie",
   "restore_sync_note": "Synchronizacja jest włączona: po przywróceniu ten komputer dołączy do synchronizacji ponownie jako nowy. Pozostałe komputery zachowają to, co mają, a ich nowsze zmiany wrócą tutaj. Aby zachować tylko zawartość kopii zapasowej, wyłącz synchronizację przed przywróceniem.",
   "restore_token_note": "Token zdalnego sterowania nigdy nie jest brany z kopii zapasowej: nowy powstaje na tym komputerze, gdy włączysz zdalne sterowanie lub udostępnianie.",
   "epg_zoom_out": "Pomniejsz",

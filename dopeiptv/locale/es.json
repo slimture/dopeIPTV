@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "Esta copia de seguridad no tiene listas de reproducción ni ajustes, así que no puede reemplazar lo que hay aquí.",
   "restore_kept": "No están en esta copia de seguridad, así que se quedan como están aquí: {what}.",
   "restore_risky_source": "Lista «{name}»: {what}",
+  "restore_signed_in": "Con sesión en {service}: lo que se reproduce aquí se marca en esa cuenta",
   "restore_sync_note": "La sincronización está activada: tras la restauración, este ordenador vuelve a unirse a la sincronización como uno nuevo. Los demás ordenadores conservan lo que tienen y sus cambios más recientes vuelven aquí. Para quedarte solo con lo que contiene la copia, desactiva la sincronización antes de restaurar.",
   "restore_token_note": "El token del control remoto nunca se toma de una copia de seguridad: se crea uno nuevo en este ordenador cuando se activa el control remoto o compartir.",
   "epg_zoom_out": "Alejar",

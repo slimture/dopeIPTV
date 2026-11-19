@@ -1789,6 +1789,7 @@
   "restore_cannot_replace": "Deze back-up bevat geen afspeellijsten of instellingen en kan dus niet vervangen wat hier staat.",
   "restore_kept": "Niet in deze back-up, dus ze blijven zoals ze hier zijn: {what}.",
   "restore_risky_source": "Afspeellijst ‘{name}’: {what}",
+  "restore_signed_in": "Aangemeld bij {service}: wat hier speelt, wordt op dat account gemarkeerd",
   "restore_sync_note": "Synchronisatie staat aan: na het herstellen doet deze computer opnieuw mee als een nieuwe. De andere computers houden wat ze hebben, en hun nieuwere wijzigingen komen hier terug. Wil je alleen wat in de back-up staat, zet synchronisatie dan uit voordat je herstelt.",
   "restore_token_note": "Het token voor bediening op afstand wordt nooit uit een back-up overgenomen: er wordt op deze computer een nieuw gemaakt zodra bediening op afstand of delen aan gaat.",
   "epg_zoom_out": "Uitzoomen",
