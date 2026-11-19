@@ -16,6 +16,7 @@ from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ..core import stream_address
 from ..core.log import log
 from ..i18n import tr
 from ..media.loading_overlay import LoadingOverlay, quiet
@@ -394,6 +395,12 @@ class _MultiviewCell(QWidget):
     def play(self, url: str, title: str, item: dict | None = None,
              client=None, guide=None, playlist: str = "",
              start: float = 0.0) -> bool:
+        # The last look, as the docked player's (core/stream_address.py):
+        # what is no stream, whoever asks, is never handed to mpv.
+        why = stream_address.refusal(url or "", remote=False)
+        if why:
+            log.warning("multiview: an address that is no stream (%s) is not opened", why)
+            return False
         self.url = url
         self.title = title
         self._live_url = url

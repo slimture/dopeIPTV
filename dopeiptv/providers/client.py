@@ -13,7 +13,7 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
-from ..core import m3u_ids, mirrors
+from ..core import m3u_ids, mirrors, stream_address
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
@@ -895,7 +895,10 @@ class M3UClient(OfflineClient):
                 pending["stream_id"] = sid
                 pending["num"] = sid
                 pending["category_id"] = pending["category_name"]
-                pending["_url"] = line
+                # What is no stream whoever lists it (an edit list or a
+                # filter graph in the address, core/stream_address.py) is no
+                # address: the channel keeps its place and does not play.
+                pending["_url"] = stream_address.played(line, False, "m3u")
                 channels.append(pending)
                 pending = None
         stable = m3u_ids.stable_ids(
@@ -1183,12 +1186,28 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
     from ..core import nerd_lists
     from ..core.url_rewrite import rewrite
     streams, url = client.live_streams, client.live_url
+    kind = str(source.get("_kind") or "xtream")
+    remote = _is_remote(kind, str(source.get("_server") or ""))
+
+    def handed(raw: Any, udpxy: bool = False) -> Any:
+        """What is played for the address the source gave: through the
+        person's rewrite rules (and udpxy), and only what a stream can be
+        (core/stream_address.py) - the source says what goes to the player,
+        the recorder and a cast. An address the person's own rules made is
+        theirs: only what is no stream whoever lists it is kept from it."""
+        if not raw:
+            return raw
+        out = rewrite(raw, source)
+        from_source = out == raw
+        if udpxy:
+            out = nerd_lists.udpxy_url(out, source)
+        return stream_address.played(out, remote and from_source, kind)
 
     def live_streams(category_id: str | None = None) -> list[dict]:
         return nerd_lists.decorate(streams(category_id), source, pid)
 
     def live_url(stream_id: int | str, fmt: str = "ts") -> str:
-        return nerd_lists.udpxy_url(rewrite(url(stream_id, fmt), source), source)
+        return handed(url(stream_id, fmt), udpxy=True)
 
     client.live_streams = live_streams
     client.live_url = live_url
@@ -1196,23 +1215,41 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
                                    for n in ("vod_url", "episode_url", "timeshift_urls", "copy_url"))
     if copy is not None:
         def copy_url(stream_id: int | str) -> str:
-            got = copy(stream_id)
-            return nerd_lists.udpxy_url(rewrite(got, source), source) if got else got
+            return handed(copy(stream_id), udpxy=True)
         client.copy_url = copy_url
     if vod is not None:
         def vod_url(stream_id: int | str, ext: str | None = None) -> str:
-            return rewrite(vod(stream_id, ext), source)
+            return handed(vod(stream_id, ext))
         client.vod_url = vod_url
     if episode is not None:
         def episode_url(episode_id: int | str, ext: str | None = None) -> str:
-            return rewrite(episode(episode_id, ext), source)
+            return handed(episode(episode_id, ext))
         client.episode_url = episode_url
     if archive is not None:
         def timeshift_urls(stream_id: int | str, start_dt: datetime,
                            duration_min: int) -> list[str]:
             urls = archive(stream_id, start_dt, duration_min)
-            return [rewrite(u, source) for u in urls] if urls else urls
+            if not urls:
+                return urls
+            return [u for u in map(handed, urls) if u]
         client.timeshift_urls = timeshift_urls
+    link = getattr(client, "archive_link", None)
+    if link is not None:
+        def archive_link(stream_id: int | str, start: float,
+                         stop: float | None = None) -> dict | None:
+            # A portal's archive by programme: its link is the portal's word
+            # too (not rewritten: it was never one of the source's lists').
+            got = link(stream_id, start, stop)
+            if got is not None and not stream_address.played(got.get("url"), remote, kind):
+                return None
+            return got
+        client.archive_link = archive_link
+
+
+def _is_remote(kind: str, server: str) -> bool:
+    """Whether a source's addresses come over the network: every kind but a
+    playlist file on this computer (core/stream_address.py)."""
+    return kind != "m3u" or server.strip().lower().startswith(("http://", "https://"))
 
 
 def _make_client(playlist: dict):

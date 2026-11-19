@@ -186,6 +186,7 @@ files = [
     "dopeiptv/core/video_mode.py",
     "dopeiptv/core/local_buffer.py",
     "dopeiptv/core/stream_info.py",
+    "dopeiptv/core/stream_address.py",
     "dopeiptv/core/dvr_store.py",
     "dopeiptv/core/dvr_server.py",
     "dopeiptv/core/dvr_ingest.py",

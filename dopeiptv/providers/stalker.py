@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote, urlsplit
 
-from ..core import mirrors
+from ..core import mirrors, stream_address
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..core.privacy import for_log
@@ -300,7 +300,16 @@ def archive_address(answer: Any) -> str:
     got = answer.get("cmd") if isinstance(answer, dict) else answer
     s = strip_cmd(got if isinstance(got, str) else "")
     s = _MAG_OPTIONS.sub("", s).strip().replace(" ", "%20")
-    return s if _URL.match(s) else ""
+    return s if _is_address(s) else ""
+
+
+def _is_address(s: str) -> bool:
+    """Whether a portal's answer is an address to play: one with a
+    protocol, and not one of those that are no stream whoever gives them
+    (core/stream_address.py: an edit list or a filter graph in the address
+    itself). Which protocols a portal's stream may come over is looked at
+    where the address is handed out (providers/client.py make_client)."""
+    return bool(_URL.match(s)) and not stream_address.refusal(s, remote=False)
 
 
 def archive_cmds(row: dict) -> list[str]:
@@ -1286,7 +1295,7 @@ class StalkerClient(Mirrored, ListCache):
                             read=self.LINK_BUDGET_SECS, deadline=deadline)
             got = js.get("cmd") if isinstance(js, dict) else js
             url = strip_cmd(got if isinstance(got, str) else "")
-            if not _URL.match(url):
+            if not _is_address(url):
                 err = js.get("error") if isinstance(js, dict) else ""
                 log.warning("stalker create_link %s @ %s: no address%s", key,
                             self.server, f" ({err})" if err else "")

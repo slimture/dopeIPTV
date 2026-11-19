@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QPushButton,
 )
 
-from ..core import channel_prefs, night_mode
+from ..core import channel_prefs, night_mode, stream_address
 from ..core.log import log
 from ..core.privacy import for_log, url_for_log
 from ..core.local_buffer import rewind_bytes
@@ -1552,6 +1552,14 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # mpv opens it, with mpv's own rewind. outside: an address from
         # outside the source's lists, not on its server - none of its Nerd
         # headers, user agent, proxy or route (core/nerd.same_server).
+        # An address that is no stream, whoever asks for it - a filter graph
+        # or an edit list in the address itself (core/stream_address.py) -
+        # is never handed to mpv. A source's addresses are looked at where
+        # they are handed out; this is the last look.
+        why = stream_address.refusal(url, remote=False)
+        if why:
+            log.warning("play: an address that is no stream (%s) is not opened", why)
+            return False
         # What a fallback of the video surface plays again (_video_fallback).
         self._play_args = (url, title, start, {"local_buffer": local_buffer,
                                                "buffer_key": buffer_key, "web": web,
