@@ -274,6 +274,32 @@ TOGETHER_NEW_PER_WINDOW = 30      # rooms one address opens in WINDOW
 _SPAN: dict[str, float] = {}       # a limit's own window, where it is not WINDOW
 
 
+_SWEPT = [0.0]
+#: How soon an address whose window has passed is forgotten.
+FORGET_EVERY = 60.0
+
+
+def _forget_quiet(now: float) -> int:
+    """The addresses whose last request is older than their limit's window,
+    forgotten: an address is held only as long as its limit needs it - ten
+    minutes, a day for the daily ones - and a minute more at the most.
+    Under _LOCK. How many went."""
+    _SWEPT[0] = now
+    gone = [k for k, v in _SEEN.items() if not v or now - v[-1] > _SPAN.get(k, WINDOW)]
+    for key in gone:
+        _SEEN.pop(key, None)
+        _SPAN.pop(key, None)
+    return len(gone)
+
+
+def _forget_loop() -> None:
+    """Every FORGET_EVERY: the quiet addresses forgotten, requests or none."""
+    while True:
+        time.sleep(FORGET_EVERY)
+        with _LOCK:
+            _forget_quiet(time.monotonic())
+
+
 def _allowed(addr: str, most: int = PER_WINDOW, window: float = WINDOW) -> bool:
     now = time.monotonic()
     with _LOCK:
@@ -285,11 +311,8 @@ def _allowed(addr: str, most: int = PER_WINDOW, window: float = WINDOW) -> bool:
             return False
         hits.append(now)
         _SEEN[addr] = hits
-        if len(_SEEN) > 5000:              # forget the quiet ones
-            for key in [k for k, v in _SEEN.items()
-                        if not v or now - v[-1] > _SPAN.get(k, WINDOW)]:
-                _SEEN.pop(key, None)
-                _SPAN.pop(key, None)
+        if len(_SEEN) > 5000 or now - _SWEPT[0] >= FORGET_EVERY:
+            _forget_quiet(now)
         return True
 
 
@@ -1821,6 +1844,7 @@ def main() -> None:
     if push_ready() and _secret():
         threading.Thread(target=_watch_donations, name="donations", daemon=True).start()
     threading.Thread(target=_sync_cleanup, name="sync-cleanup", daemon=True).start()
+    threading.Thread(target=_forget_loop, name="forget-addresses", daemon=True).start()
     srv.serve_forever()
 
 
