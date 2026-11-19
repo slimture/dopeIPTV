@@ -307,6 +307,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "      <div class=\"foot-brand\">\n"
     + "        <a class=\"foot-mark\" href=\"/\"><svg class=\"logo\" viewBox=\"0 0 100 100\" aria-hidden=\"true\" focusable=\"false\"><rect width=\"100\" height=\"100\" rx=\"22\"/><path d=\"M38 28v44l36-22z\"/></svg><b>dopeIPTV</b></a>\n"
     + "        <p class=\"foot-tag\">\(t("foot_tagline") | h)</p>\n"
+    + (($R.version // "" | tostring) as $v
+       | if ($v | truthy) then "        <p class=\"foot-ver\">v\($v | h)</p>\n" else "" end)
     + "      </div>\n"
     + "      <nav class=\"foot-cols\">\n"
     + foot_group(t("foot_h_app");
@@ -323,7 +325,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "    <div class=\"foot-base\">\n"
     + "      <div class=\"foot-maker\">\n"
     + "        <a class=\"sole\" href=\"https://solecraft.se/\" rel=\"noopener\" aria-label=\"\(t("footer_built_by") | h)\" data-tip=\"\(t("footer_built_by") | h)\"><span class=\"sole-logo\">Solecraft</span></a>\n"
-    + "        <span class=\"v\">dopeIPTV\(($R.version // "" | tostring) as $v | if ($v | truthy) then " " + ($v | h) else "" end) · © \($year | h) Solecraft AB</span>\n"
+    + "        <span class=\"v\">© \($year | h) Solecraft AB</span>\n"
     + "      </div>\n"
     + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a> · \(t("foot_nocontent") | h)</p>\n"
     + "    </div>\n"
