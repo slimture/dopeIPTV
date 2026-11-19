@@ -542,6 +542,11 @@ def install(settings: Settings | None) -> Nerd:
         log.setLevel(logging.DEBUG if debug else logging.INFO)
     from .log import set_file_logging
     set_file_logging(_current.on and _current.flag("nerd_log_file"))
+    # The picon folder is where pictures of the person's own are: the image
+    # loader reads a file as a picture only from such a folder.
+    from . import picture_files
+    folder = _current.get("nerd_picon_dir").strip() if _current.on else ""
+    picture_files.trust("picons", [folder] if folder else [])
     return _current
 
 

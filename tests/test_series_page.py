@@ -191,11 +191,18 @@ def test_the_page_is_mirrored_in_a_right_to_left_language(app):
 
 class _Response:
     status_code = 200
+    headers: dict = {}
 
     def __init__(self, data):
         self.content = data
 
     def raise_for_status(self):
+        pass
+
+    def iter_content(self, _n):
+        yield self.content
+
+    def close(self):
         pass
 
 

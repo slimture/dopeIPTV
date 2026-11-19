@@ -224,6 +224,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # fallback logic isn't inconsistent between list and detail
         # panel for the same movie.
         self.poster_art.dead = self.logos.dead
+        # Where covers of the person's own are, for the loaders above.
+        self._local_trust_pictures()
         self.epg_progress.connect(self._on_epg_progress)
         pid = (active_pl or {}).get("id")
         self.xmltv = XmltvGuide(

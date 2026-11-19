@@ -74,8 +74,13 @@ class _Host:
 
 def _art(tmp_path):
     from PyQt6.QtCore import QUrl
+
+    from dopeiptv.core import picture_files
     p = tmp_path / "logo.png"
     p.write_bytes(_PNG)
+    # The image cache's copy: a file is handed over only from where the
+    # app's own pictures are (core/picture_files.py).
+    picture_files.trust_also("cache", str(tmp_path))
     return QUrl.fromLocalFile(str(p)).toString(), str(p)
 
 

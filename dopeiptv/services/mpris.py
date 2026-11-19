@@ -49,6 +49,19 @@ def _strings(values: list[str]) -> Any:
     return arg
 
 
+def art_url(art: str) -> str:
+    """*art* as the desktop is told it: a web address, or a file where the
+    app's own pictures are (its image cache, a picon folder) - never some
+    other path or protocol a source's row names; "" then."""
+    if art.lower().startswith(("http://", "https://")):
+        return art
+    from PyQt6.QtCore import QUrl
+
+    from ..core import picture_files
+    path = QUrl(art).toLocalFile() if art.lower().startswith("file:") else art
+    return art if path and picture_files.trusted(path) else ""
+
+
 def _build_adaptors(service: MprisService) -> None:
     """The two exported interfaces, as QDBusAbstractAdaptors of *service*.
     Built here so QtDBus is imported only where it is used."""
@@ -300,8 +313,9 @@ class MprisService(QObject):
             md["xesam:artist"] = _strings([s["artist"]])
         if s["album"]:
             md["xesam:album"] = s["album"]
-        if s["art"]:
-            md["mpris:artUrl"] = s["art"]
+        art = art_url(s["art"]) if s["art"] else ""
+        if art:
+            md["mpris:artUrl"] = art
         if s["length"] > 0:
             md["mpris:length"] = _int64(int(s["length"] * 1e6))
         return md

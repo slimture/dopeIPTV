@@ -94,6 +94,15 @@ class _LocalFilesMixin(_LocalLibraryMixin):
 
     def _save_local_dirs(self, dirs: list[str]) -> None:
         self.settings.setValue("local_dirs", json.dumps(dirs))
+        self._local_trust_pictures()
+
+    def _local_trust_pictures(self) -> None:
+        """Local files' folders - those added, and where the system mounts
+        shares and discs - are where covers of the person's own are: the
+        image loader reads a file as a picture only from such a folder
+        (core/picture_files.py). Names only, nothing read from the disk."""
+        from ..core import picture_files
+        picture_files.trust("local", [*self._local_dirs(), *picture_files.mount_parents()])
 
     @staticmethod
     def _mounted_roots() -> list[tuple[str, str]]:

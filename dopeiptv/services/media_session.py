@@ -128,6 +128,11 @@ def local_art(art: str) -> str | None:
         path = art
     else:
         return None
+    # A row's picture is its source's word too: only a file where the app's
+    # own pictures are (its cache, a picon folder: core/picture_files.py).
+    from ..core import picture_files
+    if not picture_files.trusted(path):
+        return None
     try:
         size = os.path.getsize(path)
     except (OSError, ValueError):

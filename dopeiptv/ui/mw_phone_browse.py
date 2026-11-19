@@ -111,9 +111,14 @@ def thumbnail(path: str, size: int = THUMB_PX) -> bytes:
     """(server's thread) A picture file made small: JPEG, or PNG when it
     has transparency (a station's logo); b"" when it is no picture."""
     from PyQt6.QtCore import QBuffer, Qt
-    from PyQt6.QtGui import QImage
-    img = QImage(path)
-    if img.isNull():
+
+    from ..core import picture_files
+    from ..core.workers import decode_image
+    # Read and decoded as the image loader does: a plain file of a
+    # picture's size, an SVG screened (the cache may hold one from outside).
+    data = picture_files.read_file(path)
+    img = decode_image(data) if data else None
+    if img is None:
         return b""
     if img.width() > size or img.height() > size:
         img = img.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,

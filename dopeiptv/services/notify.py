@@ -34,6 +34,13 @@ def _strings(values: list[str]) -> Any:
     return arg
 
 
+def body_text(text: str) -> str:
+    """*text* as a notification's body shows it as words: the body is
+    markup to the desktop (links, pictures, bold), and it carries a
+    series' or a programme's name - a provider's words."""
+    return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def notify(summary: str, body: str = "", image: str = "") -> bool:
     """Show *summary* and *body* on the desktop, with *image* (a file:// URL
     or a path) beside them. Returns whether the message went out - not
@@ -56,7 +63,7 @@ def notify(summary: str, body: str = "", image: str = "") -> bool:
         hints["image-path"] = image
     msg = QDBusMessage.createMethodCall(SERVICE, OBJECT_PATH, SERVICE,
                                         "Notify")
-    msg.setArguments(["dopeIPTV", _uint32(0), DESKTOP_ENTRY, summary, body,
+    msg.setArguments(["dopeIPTV", _uint32(0), DESKTOP_ENTRY, summary, body_text(body),
                       _strings([]), hints, EXPIRE_MS])
     ok = bus.send(msg)
     if not ok:

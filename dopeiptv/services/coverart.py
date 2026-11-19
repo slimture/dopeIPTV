@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QThreadPool
 
+from ..core import picture_files
 from ..core.workers import choose_cover_url, is_tmdb_image_url
 from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
 
@@ -129,9 +130,17 @@ class CoverArtService:
 
     @classmethod
     def _provider_cover(cls, it: dict) -> str | None:
-        raw = (it.get("stream_icon") or it.get("cover") or "").strip()
+        raw = it.get("stream_icon") or it.get("cover") or ""
+        raw = raw.strip() if isinstance(raw, str) else ""
         if raw.lower() in cls._JUNK_COVERS:
             return None
+        # A web address - or a file where the app's own pictures are (a
+        # frame, a cover, a picon: core/picture_files.py). A provider writes
+        # this field too, and any other path is not a picture to read.
+        if not raw.lower().startswith(("http://", "https://")):
+            local = picture_files.local_path(raw)
+            if local is None or not picture_files.trusted(local):
+                return None
         return raw or None
 
     @staticmethod

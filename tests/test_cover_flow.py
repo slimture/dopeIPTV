@@ -20,6 +20,20 @@ from unittest.mock import MagicMock
 import pytest
 
 
+class _Body:
+    """What the loader reads of an answer: its headers, then its body a
+    chunk at a time - never .content, an answer may not end."""
+    headers: dict = {}
+    content = b""
+
+    def iter_content(self, _n):
+        if self.content:
+            yield self.content
+
+    def close(self):
+        pass
+
+
 def _pool():
     """A real QThreadPool - single-worker so tests are deterministic."""
     from PyQt6.QtCore import QThreadPool
@@ -268,12 +282,12 @@ def test_logo_loader_disk_cache_roundtrip(qapp, tmp_path, monkeypatch):
 
     calls = {"n": 0}
 
-    class FakeResp:
+    class FakeResp(_Body):
         status_code = 200
         content = red_png
         def raise_for_status(self): pass
 
-    def fake_get(url, headers=None, timeout=None):
+    def fake_get(url, headers=None, timeout=None, stream=False):
         calls["n"] += 1
         return FakeResp()
 
@@ -305,13 +319,13 @@ def test_logo_loader_corrupt_disk_file_recovers(qapp, tmp_path, monkeypatch):
 
     red_png = _valid_png_bytes()
 
-    class FakeResp:
+    class FakeResp(_Body):
         status_code = 200
         content = red_png
         def raise_for_status(self): pass
 
     monkeypatch.setattr(
-        "dopeiptv.core.workers.requests.get", lambda u, headers=None, timeout=None: FakeResp())
+        "dopeiptv.core.workers.requests.get", lambda u, headers=None, timeout=None, stream=False: FakeResp())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -340,12 +354,12 @@ def test_logo_loader_a_non_image_200_is_not_fetched_on_every_paint(
 
     calls = {"n": 0}
 
-    class Html:
+    class Html(_Body):
         status_code = 200
         content = b"<html>login</html>"
         def raise_for_status(self): pass
 
-    def fake_get(url, headers=None, timeout=None):
+    def fake_get(url, headers=None, timeout=None, stream=False):
         calls["n"] += 1
         return Html()
 
@@ -400,9 +414,9 @@ def test_logo_loader_decodes_once_off_the_gui_thread_at_its_size(qapp, tmp_path,
     decodes: list[bool] = []
     real_decode = workers.decode_image
 
-    def decode(data, fit=0):
+    def decode(data, fit=0, **kw):
         decodes.append(threading.current_thread() is threading.main_thread())
-        return real_decode(data, fit)
+        return real_decode(data, fit, **kw)
 
     handed: list = []
     real_run = workers.run_async
@@ -413,7 +427,7 @@ def test_logo_loader_decodes_once_off_the_gui_thread_at_its_size(qapp, tmp_path,
             _cb(result)
         return real_run(pool, fn, done, on_fail, *a, **k)
 
-    class FakeResp:
+    class FakeResp(_Body):
         status_code = 200
         content = jpeg
         def raise_for_status(self): pass
@@ -421,7 +435,7 @@ def test_logo_loader_decodes_once_off_the_gui_thread_at_its_size(qapp, tmp_path,
     monkeypatch.setattr(workers, "decode_image", decode)
     monkeypatch.setattr(workers, "run_async", run)
     monkeypatch.setattr("dopeiptv.core.workers.requests.get",
-                        lambda u, headers=None, timeout=None: FakeResp())
+                        lambda u, headers=None, timeout=None, stream=False: FakeResp())
     pool = _pool()
     loader = LogoLoader(pool, max_size=64, cache_dir=tmp_path / "cache", disk_budget=0)
     got = []
@@ -430,7 +444,9 @@ def test_logo_loader_decodes_once_off_the_gui_thread_at_its_size(qapp, tmp_path,
     loader.cache.clear()
     loader.get("https://cdn/still.jpg", got.append)          # the disk cache
     _drain_pool(pool, qapp)
-    local = tmp_path / "thumb.jpg"
+    # A frame the app made, where it keeps them: the loader reads a file
+    # as a picture only from where its own are (core/picture_files.py).
+    local = tmp_path / "cache" / "thumb.jpg"
     local.write_bytes(jpeg)
     loader.get(str(local), got.append)                       # a local file
     _drain_pool(pool, qapp)
@@ -499,14 +515,14 @@ def test_logo_loader_trimming_keeps_a_shared_dead_map(qapp):
 def test_logo_loader_marks_404_dead_long_ttl(qapp, tmp_path, monkeypatch):
     from dopeiptv.core.workers import LogoLoader
 
-    class Resp404:
+    class Resp404(_Body):
         status_code = 404
         content = b""
         def raise_for_status(self):
             raise RuntimeError("404")
 
     monkeypatch.setattr(
-        "dopeiptv.core.workers.requests.get", lambda u, headers=None, timeout=None: Resp404())
+        "dopeiptv.core.workers.requests.get", lambda u, headers=None, timeout=None, stream=False: Resp404())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -520,7 +536,7 @@ def test_logo_loader_transient_error_short_ttl(qapp, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "dopeiptv.core.workers.requests.get",
-        lambda u, headers=None, timeout=None: (_ for _ in ()).throw(RuntimeError("timeout")))
+        lambda u, headers=None, timeout=None, stream=False: (_ for _ in ()).throw(RuntimeError("timeout")))
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -783,7 +799,7 @@ def test_logo_loader_host_circuit_breaker(qapp, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "dopeiptv.core.workers.requests.get",
-        lambda u, headers=None, timeout=None: (_ for _ in ()).throw(
+        lambda u, headers=None, timeout=None, stream=False: (_ for _ in ()).throw(
             RuntimeError("Connection reset by peer")))
 
     pool = _pool()
@@ -805,12 +821,12 @@ def test_logo_loader_host_breaker_resets_on_success(
     png = _valid_png_bytes()
     fail = {"on": True}
 
-    class OkResp:
+    class OkResp(_Body):
         status_code = 200
         content = png
         def raise_for_status(self): pass
 
-    def fake_get(u, headers=None, timeout=None):
+    def fake_get(u, headers=None, timeout=None, stream=False):
         if fail["on"]:
             raise RuntimeError("reset")
         return OkResp()
@@ -839,7 +855,7 @@ def test_host_breaker_ignores_http_errors(qapp, tmp_path, monkeypatch):
     from dopeiptv.core.workers import LogoLoader
     import requests as _requests
 
-    class Resp404:
+    class Resp404(_Body):
         status_code = 404
         content = b""
         def raise_for_status(self):
@@ -848,7 +864,7 @@ def test_host_breaker_ignores_http_errors(qapp, tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "dopeiptv.core.workers.requests.get",
-        lambda u, headers=None, timeout=None: Resp404())
+        lambda u, headers=None, timeout=None, stream=False: Resp404())
 
     pool = _pool()
     loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
@@ -872,14 +888,14 @@ def test_http_response_resets_host_strikes(qapp, tmp_path, monkeypatch):
 
     mode = {"fail": True}
 
-    class Resp404:
+    class Resp404(_Body):
         status_code = 404
         content = b""
         def raise_for_status(self):
             raise _requests.exceptions.HTTPError(
                 "404 Client Error: Not Found for url: x")
 
-    def fake_get(u, headers=None, timeout=None):
+    def fake_get(u, headers=None, timeout=None, stream=False):
         if mode["fail"]:
             raise RuntimeError("Connection reset by peer")
         return Resp404()
@@ -913,7 +929,7 @@ def test_queued_job_skips_network_when_host_died(qapp, tmp_path, monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_get(u, headers=None, timeout=None):
+    def fake_get(u, headers=None, timeout=None, stream=False):
         calls["n"] += 1
         raise RuntimeError("Connection reset by peer")
 
@@ -941,12 +957,12 @@ def test_logo_loader_sends_browser_user_agent(qapp, tmp_path, monkeypatch):
     seen = {}
     png = _valid_png_bytes()
 
-    class OkResp:
+    class OkResp(_Body):
         status_code = 200
         content = png
         def raise_for_status(self): pass
 
-    def fake_get(u, headers=None, timeout=None):
+    def fake_get(u, headers=None, timeout=None, stream=False):
         seen["headers"] = headers or {}
         seen["timeout"] = timeout
         return OkResp()
