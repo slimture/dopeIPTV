@@ -539,6 +539,7 @@ class _PhoneBrowseMixin:
 
     def _pb_snapshot(self, mode: str) -> dict[str, Any]:
         """What a list of *mode* needs of the window, read at once."""
+        self._pb_era_kept()             # another source or profile: its ids forgotten
         snap: dict[str, Any] = {"locked": bool(self._profile_locked()), "client": self.client,
                                 "cid": id(self.client), "kids": bool(self._profile_kids())}
         if snap["locked"]:
@@ -614,6 +615,8 @@ class _PhoneBrowseMixin:
         """The series *sid* - the one playing, the series page's, or one the
         phone listed - with what the window already holds of its episodes
         (the series page's answer, kept ten minutes)."""
+        if not self._pb_era_kept():
+            listed = None               # listed for another source or profile
         if self._profile_locked():
             return {"locked": True}
         lp = getattr(self, "_last_playback", None) or {}
@@ -681,11 +684,38 @@ class _PhoneBrowseMixin:
             self.series_ctx = saved
         return out
 
+    def _pb_era(self) -> tuple:
+        """Whose the ids the phone was given are: the source and the profile
+        in use when they were listed."""
+        from ..core import profiles
+        return (id(self.client), profiles.active_id())
+
+    def _pb_era_kept(self) -> bool:
+        """(the window's thread) Whether the ids handed out are still of the
+        source and profile in use; when not, they are forgotten with the
+        lists that carry them - a row listed for another profile or source
+        never plays, and every list is built again with ids of its own."""
+        era = self._pb_era()
+        if self.__dict__.get("_pb_refs_for") == era:
+            return True
+        lists, refs, _t, _l = self._pb()
+        lists.clear()
+        refs.clear()
+        self._pb_refs_for = era
+        return False
+
     def _pb_play(self, kind: str, value: Any) -> dict[str, Any]:
-        """A row the phone listed, played through the window's own path."""
+        """A row the phone listed, played through the window's own path -
+        if the lists would show it now (the lock, a kids profile)."""
         self._profile_refuse_locked()
+        if not self._pb_era_kept():
+            raise ValueError("no such title")
         self._phone_asked()
         self._come_forward()
+        if kind == "continue" and not self._pb_continue_allowed(value):
+            raise ValueError("no such title")
+        if kind == "history" and not self._pb_history_shown([value]):
+            raise ValueError("no such title")
         if kind == "movie":
             if not self._pb_movie_allowed(value):
                 raise ValueError("no such title")
@@ -718,6 +748,16 @@ class _PhoneBrowseMixin:
                 self._sp_start_once = None
             return {"ok": True}
         raise ValueError("no such title")
+
+    def _pb_continue_allowed(self, row: dict) -> bool:
+        """A Continue watching row as the lists show it now."""
+        if not isinstance(row, dict) or not self._lock_filter([row]):
+            return False
+        if row.get("_kind") == "episode":
+            ctx = row.get("_series_ctx")
+            return (self._pb_series_allowed(ctx if isinstance(ctx, dict) else {}, "")
+                    and self._kids_allows(row, "series"))
+        return self._pb_movie_allowed(row)
 
     def _pb_movie_allowed(self, row: dict) -> bool:
         unlocked = bool(getattr(self.parental, "session_unlocked", False))

@@ -275,6 +275,73 @@ def test_mine_leaves_another_sources_locked_rows_out(settings):
     assert mw_mitt._lock_keeps({"_kind": "live", "_key": 5}, {"vod": frozenset({"9"})}) is True
 
 
+class PhonePlayWin(Win):
+    """The phone's play of a row it listed, the playback itself left out."""
+
+    def __init__(self, settings: Settings, unlocked: bool = False, kids: bool = False) -> None:
+        super().__init__(settings, unlocked)
+        self.kids = kids
+        self.played: list = []
+
+    def _profile_kids(self) -> bool:
+        return self.kids
+
+    def _kids_keep(self, _mode):                   # the news is not for this kid
+        return (lambda it: str(it.get("category_id")) != "1") if self.kids else None
+
+    def _kids_allows(self, it, mode="live") -> bool:
+        keep = self._kids_keep(mode)
+        return keep is None or keep(it)
+
+    def _profile_refuse_locked(self) -> None:
+        pass
+
+    def _phone_asked(self) -> None:
+        pass
+
+    def _come_forward(self) -> None:
+        pass
+
+    def _pb_play_continue(self, row) -> bool:
+        self.played.append(("continue", row["stream_id"]))
+        return True
+
+    def _pb_play_history(self, it) -> bool:
+        self.played.append(("history", it["_key"]))
+        return True
+
+
+def test_a_phones_row_is_asked_again_when_it_plays(settings, monkeypatch):
+    from dopeiptv.core import profiles
+    _watched(settings)
+    w = PhonePlayWin(settings, unlocked=True)
+    adult = next(h for h in w.history.items() if h["_key"] == 700)
+    film = {**FILM, "_kind": "vod", "_resume_pos": 60.0}
+    refs = w._pb()[1]
+    w._pb_era_kept()                               # the phone lists Recent (_pb_snapshot)
+    h_ref = refs.put("history", "live:700", adult)
+    c_ref = refs.put("continue", "vod:900", film)
+    assert w._pb_play("history", adult) == {"ok": True}
+    # The lock shut since it was listed: neither plays now.
+    w.parental.lock_session()
+    for kind, value in (("history", adult), ("continue", film)):
+        with pytest.raises(ValueError):
+            w._pb_play(kind, value)
+    assert w.played == [("history", 700)]
+    # A kids profile now: the ids listed for the grown-up are forgotten.
+    monkeypatch.setattr(profiles, "active_id", lambda: "kid")
+    w.parental.session_unlocked = True
+    news = next(h for h in w.history.items() if h["_key"] == 100)
+    with pytest.raises(ValueError):
+        w._pb_play("history", news)
+    assert refs.get(h_ref) is None and refs.get(c_ref) is None
+    w.kids = True                                  # and its limits asked again
+    with pytest.raises(ValueError):
+        w._pb_play("history", news)
+    w.kids = False
+    assert w._pb_play("history", news) == {"ok": True}
+
+
 def test_the_sidebar_search_names_a_locked_category_without_its_channels(settings):
     from PyQt6.QtWidgets import QApplication, QListWidget
 
