@@ -1974,7 +1974,7 @@
   "together_live_note": "Live-Sender lassen sich nicht exakt gleichschalten: Jede Quelle hat ihre eigene Verzögerung, ihr könnt also ein paar Sekunden auseinander sein.",
   "together_alone": "Noch niemand sonst hier – teile den Code.",
   "together_alone_join": "Noch niemand sonst hier. Wenn du jemanden erwartest, prüfe den Code.",
-  "together_code_bad": "Das ist kein Raumcode. Ein Code hat 8 Buchstaben und Ziffern, etwa K7PQ-M2XD.",
+  "together_code_bad": "Das ist kein Raumcode. Ein Code hat 10 Buchstaben und Ziffern, etwa K7PQM-2XDH9.",
   "together_name_needed": "Wähle einen Namen, den die anderen sehen.",
   "together_left_room": "Du hast den Raum verlassen. Die anderen schauen weiter.",
   "together_private_left": "Du hast den Raum zum gemeinsamen Ansehen verlassen: Privates Ansehen ist an.",

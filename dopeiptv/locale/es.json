@@ -1974,7 +1974,7 @@
   "together_live_note": "Los canales en directo no pueden ir exactamente a la par: cada fuente tiene su propio retraso, así que podéis estar unos segundos desfasados.",
   "together_alone": "Aún no hay nadie más aquí: comparte el código.",
   "together_alone_join": "Aún no hay nadie más aquí. Si esperabas a alguien, revisa el código.",
-  "together_code_bad": "Eso no es un código de sala. Un código tiene 8 letras y cifras, como K7PQ-M2XD.",
+  "together_code_bad": "Eso no es un código de sala. Un código tiene 10 letras y cifras, como K7PQM-2XDH9.",
   "together_name_needed": "Elige un nombre que verán los demás.",
   "together_left_room": "Has salido de la sala. Los demás siguen viendo.",
   "together_private_left": "Has salido de la sala de ver juntos: la visualización privada está activada.",

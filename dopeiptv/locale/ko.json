@@ -1974,7 +1974,7 @@
   "together_live_note": "라이브 채널은 정확히 맞출 수 없습니다. 소스마다 지연이 달라 몇 초 차이가 날 수 있습니다.",
   "together_alone": "아직 아무도 없습니다. 코드를 공유하세요.",
   "together_alone_join": "아직 아무도 없습니다. 기다리는 사람이 있다면 코드를 확인하세요.",
-  "together_code_bad": "방 코드가 아닙니다. 코드는 K7PQ-M2XD처럼 영문자와 숫자 8자입니다.",
+  "together_code_bad": "방 코드가 아닙니다. 코드는 K7PQM-2XDH9처럼 영문자와 숫자 10자입니다.",
   "together_name_needed": "다른 사람들에게 보일 이름을 정하세요.",
   "together_left_room": "방에서 나갔습니다. 다른 사람들은 계속 시청합니다.",
   "together_private_left": "함께 보기 방에서 나갔습니다: 비공개 시청이 켜져 있습니다.",

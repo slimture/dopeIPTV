@@ -1974,7 +1974,7 @@
   "together_live_note": "Les chaînes en direct ne peuvent pas être parfaitement synchronisées : chaque source a son propre délai, vous pouvez donc avoir quelques secondes d'écart.",
   "together_alone": "Personne d'autre ici pour l'instant – partage le code.",
   "together_alone_join": "Personne d'autre ici pour l'instant. Si tu attendais quelqu'un, vérifie le code.",
-  "together_code_bad": "Ce n'est pas un code de salon. Un code a 8 lettres et chiffres, comme K7PQ-M2XD.",
+  "together_code_bad": "Ce n'est pas un code de salon. Un code a 10 lettres et chiffres, comme K7PQM-2XDH9.",
   "together_name_needed": "Choisis un nom que les autres verront.",
   "together_left_room": "Tu as quitté le salon. Les autres continuent de regarder.",
   "together_private_left": "Tu as quitté le salon « Regarder ensemble » : le visionnage privé est activé.",

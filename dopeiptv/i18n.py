@@ -2574,7 +2574,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "together_live_note": {"en": "Live channels can't be in exact step: each source has its own delay, so you may be a few seconds apart."},
     "together_alone": {"en": "Nobody else is here yet - share the code."},
     "together_alone_join": {"en": "Nobody else is here yet. If you expected someone, check the code."},
-    "together_code_bad": {"en": "That isn't a room code. A code has 8 letters and digits, like K7PQ-M2XD."},
+    "together_code_bad": {"en": "That isn't a room code. A code has 10 letters and digits, like K7PQM-2XDH9."},
     "together_name_needed": {"en": "Choose a name the others will see."},
     "together_left_room": {"en": "You left the room. The others go on watching."},
     "together_private_left": {"en": "You left the watch together room: private viewing is on."},

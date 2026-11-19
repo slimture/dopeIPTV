@@ -1974,7 +1974,7 @@
   "together_live_note": "I canali in diretta non possono essere perfettamente in sincronia: ogni sorgente ha il suo ritardo, quindi potreste essere sfasati di qualche secondo.",
   "together_alone": "Non c'è ancora nessun altro – condividi il codice.",
   "together_alone_join": "Non c'è ancora nessun altro. Se aspettavi qualcuno, controlla il codice.",
-  "together_code_bad": "Questo non è un codice di stanza. Un codice ha 8 lettere e cifre, come K7PQ-M2XD.",
+  "together_code_bad": "Questo non è un codice di stanza. Un codice ha 10 lettere e cifre, come K7PQM-2XDH9.",
   "together_name_needed": "Scegli un nome che gli altri vedranno.",
   "together_left_room": "Sei uscito dalla stanza. Gli altri continuano a guardare.",
   "together_private_left": "Sei uscito dalla stanza di Guarda insieme: la visione privata è attiva.",

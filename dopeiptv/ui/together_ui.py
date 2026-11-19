@@ -130,7 +130,7 @@ class TogetherDialog(QDialog):
         col.addWidget(join_lbl)
         join_row = QHBoxLayout()
         self.code = QLineEdit()
-        self.code.setPlaceholderText(together.format_code("K7PQM2XD"))
+        self.code.setPlaceholderText(together.format_code("K7PQM2XDH9"))
         self.code.setMaxLength(16)
         self.code.setAccessibleName(tr("together_code"))
         self.code.returnPressed.connect(self._join)

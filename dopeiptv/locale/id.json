@@ -1974,7 +1974,7 @@
   "together_live_note": "Saluran langsung tidak bisa benar-benar serempak: tiap sumber punya jedanya sendiri, jadi kalian bisa selisih beberapa detik.",
   "together_alone": "Belum ada orang lain di sini – bagikan kodenya.",
   "together_alone_join": "Belum ada orang lain di sini. Kalau kamu menunggu seseorang, periksa kodenya.",
-  "together_code_bad": "Itu bukan kode ruang. Kode terdiri dari 8 huruf dan angka, seperti K7PQ-M2XD.",
+  "together_code_bad": "Itu bukan kode ruang. Kode terdiri dari 10 huruf dan angka, seperti K7PQM-2XDH9.",
   "together_name_needed": "Pilih nama yang akan dilihat orang lain.",
   "together_left_room": "Kamu keluar dari ruang. Yang lain tetap menonton.",
   "together_private_left": "Kamu keluar dari ruang nonton bareng: tontonan pribadi aktif.",

@@ -1974,7 +1974,7 @@
   "together_live_note": "Kanali uživo ne mogu biti potpuno usklađeni: svaki izvor ima vlastito kašnjenje, pa možete biti nekoliko sekundi razmaknuti.",
   "together_alone": "Ovdje još nema nikoga – podijeli kod.",
   "together_alone_join": "Ovdje još nema nikoga. Ako si nekoga očekivao, provjeri kod.",
-  "together_code_bad": "To nije kod sobe. Kod ima 8 slova i znamenki, npr. K7PQ-M2XD.",
+  "together_code_bad": "To nije kod sobe. Kod ima 10 slova i znamenki, npr. K7PQM-2XDH9.",
   "together_name_needed": "Odaberi ime koje će drugi vidjeti.",
   "together_left_room": "Napustio si sobu. Drugi nastavljaju gledati.",
   "together_private_left": "Napustio si sobu za gledanje zajedno: privatno gledanje je uključeno.",

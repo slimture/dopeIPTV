@@ -1974,7 +1974,7 @@
   "together_live_note": "Livekanaler kan inte gå exakt i takt: varje källa har sin egen fördröjning, så ni kan ligga några sekunder isär.",
   "together_alone": "Ingen annan är här än – dela koden.",
   "together_alone_join": "Ingen annan är här än. Om du väntade dig någon, kontrollera koden.",
-  "together_code_bad": "Det där är ingen rumskod. En kod har 8 bokstäver och siffror, som K7PQ-M2XD.",
+  "together_code_bad": "Det där är ingen rumskod. En kod har 10 bokstäver och siffror, som K7PQM-2XDH9.",
   "together_name_needed": "Välj ett namn som de andra ser.",
   "together_left_room": "Du lämnade rummet. De andra fortsätter titta.",
   "together_private_left": "Du lämnade rummet för att titta tillsammans: privat läge är på.",

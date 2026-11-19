@@ -1974,7 +1974,7 @@
   "together_live_note": "Canlı kanallar tam olarak eş zamanlı olamaz: her kaynağın kendi gecikmesi vardır, bu yüzden aranızda birkaç saniye fark olabilir.",
   "together_alone": "Burada henüz başka kimse yok – kodu paylaş.",
   "together_alone_join": "Burada henüz başka kimse yok. Birini bekliyorsan kodu kontrol et.",
-  "together_code_bad": "Bu bir oda kodu değil. Kod, K7PQ-M2XD gibi 8 harf ve rakamdan oluşur.",
+  "together_code_bad": "Bu bir oda kodu değil. Kod, K7PQM-2XDH9 gibi 10 harf ve rakamdan oluşur.",
   "together_name_needed": "Diğerlerinin göreceği bir ad seç.",
   "together_left_room": "Odadan çıktın. Diğerleri izlemeye devam ediyor.",
   "together_private_left": "Birlikte izleme odasından çıktın: gizli izleme açık.",
