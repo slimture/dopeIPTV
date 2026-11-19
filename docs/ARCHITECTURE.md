@@ -363,6 +363,8 @@ dopeiptv/
                        first time it is needed
     set_content.py     Settings' CONTENT pages (Sources, Mine, Local files,
                        Posters and info)
+    set_services.py    Settings' SERVICES pages (Watch history, Sync,
+                       Integrations)
     net_advanced.py    Nerd's Own DNS, Other networks (VLANs) and Low latency
                        cards
     nerd_check_line.py The ✓ / ! / ✗ line under a Nerd setting, its Test and

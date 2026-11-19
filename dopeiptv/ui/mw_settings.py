@@ -59,15 +59,13 @@ from ..i18n import tr
 from .dialogs import PlaylistDialog
 from .source_page import SourcePage
 from ..providers.metadata import CacheFiles
-from ..providers.opensubtitles import OpenSubtitles
-from ..providers.opensubtitles import bundled_key as bundled_os_key
 from ..providers.client import make_client
 from ..core import connections
 from ..core import places as _places
 from ..core.log import log
 from ..core.xdg import open_url
 from ..core.recording import format_size
-from . import set_content, set_watch
+from . import set_content, set_services, set_watch
 from .theme import (
     ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, SUPPORTER_THEMES, THEME_ORDER,
     THEMES, UI_SCALES, apply_theme, build_style, effective_theme,
@@ -1012,8 +1010,8 @@ class _SettingsMixin:
             self._backup_restore(d, playlists_added)
 
         # -- each page's builder, run the first time the page is needed ------
-        # What the builders in ui/set_watch.py and ui/set_content.py take
-        # from here.
+        # What the builders in ui/set_watch.py, ui/set_content.py and
+        # ui/set_services.py take from here.
         ctx = SettingsContext(
             win=self, dialog=d, pages={pg.key: pg for pg in shell.pages}, on=on,
             is_on=is_on, flag=flag, own=own, nerd_link=nerd_link,
@@ -1030,6 +1028,9 @@ class _SettingsMixin:
         mine.set_builder(lambda: set_content.build_mine(ctx))
         loc.set_builder(lambda: set_content.build_local(ctx))
         meta.set_builder(lambda: set_content.build_metadata(ctx))
+        history.set_builder(lambda: set_services.build_history(ctx))
+        sync_page.set_builder(lambda: set_services.build_sync(ctx))
+        integrations.set_builder(lambda: set_services.build_integrations(ctx))
 
         # -- General ----------------------------------------------------------
         def build_general() -> None:
@@ -1240,13 +1241,6 @@ class _SettingsMixin:
             page_commits["general"] = commit_general
 
         general.set_builder(build_general)
-
-        # Sync between computers, for everyone (mw_sync).
-        def build_sync() -> None:
-            if hasattr(self, "_build_sync_card"):
-                self._build_sync_card(sync_page, d)
-
-        sync_page.set_builder(build_sync)
 
         # -- Appearance -------------------------------------------------------
         def build_appearance() -> None:
@@ -1469,179 +1463,6 @@ class _SettingsMixin:
             page_commits["appearance"] = commit_appearance
 
         look.set_builder(build_appearance)
-
-        # -- Integrations -----------------------------------------------------
-        def build_integrations() -> None:
-            # OpenSubtitles: a key (built in, or the user's own) and an
-            # optional account, which only raises how many subtitles a day can
-            # be fetched. A service's account, so beside the other services
-            # rather than among the subtitle settings it serves.
-            os_bundled = bool(bundled_os_key())
-            os_key_edit = QLineEdit(self.settings.value("os_api_key", "") or "")
-            os_test_btn = QPushButton(tr("btn_test"))
-            os_user_edit = QLineEdit(self.settings.value("os_username", "") or "")
-            os_pass_edit = QLineEdit(self.settings.value("os_password", "") or "")
-            os_pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
-            os_user_edit.setPlaceholderText(tr("login_username"))
-            os_pass_edit.setPlaceholderText(tr("login_password"))
-            c = os_card = integrations.card("OpenSubtitles.com")
-            c.row(tr("setting_api_key"), hbox(os_key_edit, os_test_btn,
-                                              stretch=False),
-                  tr("os_key_builtin_hint") if os_bundled else tr("os_key_hint"),
-                  stretch_control=True)
-            c.row(tr("set_card_account"),
-                  hbox(os_user_edit, os_pass_edit, stretch=False),
-                  tr("os_account_hint"), stretch_control=True,
-                  search=f"{tr('login_username')} {tr('login_password')}")
-            os_status = QLabel()
-            os_status.setWordWrap(True)
-            c.shown_if(c.widget(os_status), lambda: bool(os_status.text()))
-
-            def os_say(text: str, style: str) -> None:
-                if sip.isdeleted(os_status):        # an answer after the window went
-                    return
-                os_status.setText(text)
-                os_status.setStyleSheet(style)
-                os_card.refresh()
-
-            def test_os_key() -> None:
-                key = os_key_edit.text().strip() or bundled_os_key()
-                if not key:
-                    os_say(tr("tmdb_enter_key"),
-                           f"color:{P['error']}; font-size:12px;")
-                    return
-                os_say(tr("tmdb_checking"), f"color:{P['muted']}; font-size:12px;")
-                client = OpenSubtitles(key, os_user_edit.text(),
-                                       os_pass_edit.text())
-
-                def check():
-                    # With an account, its password is what gets checked too.
-                    if client.username and client.password:
-                        client.login()
-                    client.search(languages="en", query="big buck bunny")
-                    return True
-
-                def ok(_r):
-                    os_say(tr("tmdb_key_works"),
-                           f"color:{P['accent']}; font-size:12px; font-weight:600;")
-
-                def fail(msg):
-                    os_say(tr("tmdb_key_failed", msg=msg),
-                           f"color:{P['error']}; font-size:12px;")
-
-                run_async(self.pool, check, ok, fail)
-
-            os_test_btn.clicked.connect(test_os_key)
-            # What plays, as a Discord status (mw_discord): only in a build
-            # that carries the Discord application's id.
-            if hasattr(self, "_build_discord_card"):
-                self._build_discord_card(integrations, d)
-            # The radio directory: whether a station played is told
-            # (mw_radio).
-            self._build_radio_card(integrations)
-
-            def commit_integrations(put, changed: set, final: bool) -> None:
-                # Written only when changed: an untouched empty field is not
-                # a setting.
-                for skey, value in (
-                        ("os_api_key", os_key_edit.text().strip()),
-                        ("os_username", os_user_edit.text().strip()),
-                        ("os_password", os_pass_edit.text())):
-                    if value != (self.settings.value(skey, "") or ""):
-                        put(skey, value)
-            page_commits["integrations"] = commit_integrations
-
-        integrations.set_builder(build_integrations)
-
-        # -- Watch history: Trakt, Simkl and what they keep -------------------
-        # Trakt and Simkl were a page each, with a sync row each for the one
-        # store they fill together: a card each, and that store's own below.
-        def build_history() -> None:
-            trakt_browser_btn = QPushButton(tr("trakt_connect_browser"),
-                                            objectName="Primary")
-            trakt_disconnect_btn = QPushButton(tr("trakt_disconnect"))
-            trakt_watchlist_btn = QPushButton(tr("trakt_watchlist_btn"))
-            c = history.card(tr("tab_trakt"))
-            trakt_row = c.row(tr("trakt_not_connected"),
-                              hbox(trakt_browser_btn, trakt_disconnect_btn,
-                                   stretch=False),
-                              tr("trakt_connect_browser_hint"),
-                              search="trakt account sign in", badge=own())
-            c.row(tr("set_trakt_lists"), trakt_watchlist_btn,
-                  tr("trakt_scrobble_hint"), search="trakt")
-            # Simkl's card (mw_simkl): only in a build with its client id.
-            simkl_card = (self._build_simkl_card(history, d)
-                          if hasattr(self, "_build_simkl_card") else None)
-            sync_now_btn = QPushButton(tr("trakt_sync_now"))
-            c = history.card(tr("set_card_watched_history"))
-            sync_row = c.row(tr("trakt_sync_never"), sync_now_btn,
-                             tr("trakt_sync_hint"), search="trakt simkl sync")
-
-            def refresh_sync_status():
-                n_m, n_e = (len(self.watched.movies),
-                            sum(len(v) for v in self.watched.episodes.values()))
-                if self.watched.last_sync_at:
-                    when = datetime.fromtimestamp(
-                        self.watched.last_sync_at).strftime("%Y-%m-%d %H:%M")
-                    sync_row.label.setText(
-                        tr("trakt_sync_status", when=when,
-                           movies=n_m, episodes=n_e))
-                else:
-                    sync_row.label.setText(tr("trakt_sync_never"))
-                # Trakt's, Simkl's or both: the one store they fill together.
-                sync_now_btn.setEnabled(
-                    bool(self._watch_accounts())
-                    and not self._watched_sync_running)
-
-            def do_sync_now():
-                sync_now_btn.setEnabled(False)
-                sync_row.label.setText(tr("trakt_syncing"))
-                # Kick a forced sync and re-poll status while it runs so the
-                # label flips to "synced" without reopening the dialog.
-                self._maybe_sync_watched(force=True)
-                poll = QTimer(d)
-
-                def tick():
-                    if not self._watched_sync_running:
-                        poll.stop()
-                        refresh_sync_status()
-                poll.timeout.connect(tick)
-                poll.start(400)
-
-            sync_now_btn.clicked.connect(do_sync_now)
-
-            def refresh_trakt_status():
-                connected = self.trakt.is_connected()
-                trakt_row.label.setText(tr("trakt_connected") if connected
-                                        else tr("trakt_not_connected"))
-                # One of the two: connect while signed out, disconnect while
-                # in.
-                trakt_browser_btn.setVisible(not connected)
-                trakt_disconnect_btn.setVisible(connected)
-                trakt_row.hint_label.setVisible(not connected)
-                trakt_watchlist_btn.setEnabled(connected)
-                refresh_sync_status()
-
-            def do_connect_browser():
-                # Sign in through the browser with whatever Trakt app is
-                # active (the built-in one unless the user saved their own).
-                self._trakt_browser_auth_dialog(d)
-                refresh_trakt_status()
-
-            def do_trakt_disconnect():
-                self.trakt.disconnect()
-                refresh_trakt_status()
-
-            trakt_browser_btn.clicked.connect(do_connect_browser)
-            trakt_disconnect_btn.clicked.connect(do_trakt_disconnect)
-            trakt_watchlist_btn.clicked.connect(
-                lambda: self._open_trakt_dialog(d))
-            refresh_trakt_status()
-            if simkl_card is not None:
-                # Signed in or out there: the history card says so here.
-                simkl_card.on_change = refresh_sync_status
-
-        history.set_builder(build_history)
 
         # -- Parental controls ------------------------------------------------
         def build_parental() -> None:
