@@ -27,7 +27,9 @@ from .feedback_dialogs import (  # noqa: F401
     PRIVACY_URL, AnswersDialog, FeedbackDialog, ReportDialog, answer_text, answers_html,
     privacy_link,
 )
-from .backup_dialogs import RestoreBackupDialog, pick_backup, stage_backup  # noqa: F401
+from .backup_dialogs import (  # noqa: F401
+    RestoreBackupDialog, UnlockBackupDialog, pick_backup, stage_backup,
+)
 
 
 class KindOwnFields:

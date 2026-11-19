@@ -20,7 +20,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QColorDialog, QInputDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout,
+    QColorDialog, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
     QWidget,
 )
 
@@ -104,12 +104,45 @@ def build_general(ctx: SettingsContext) -> None:
                                        stretch=False),
           tr("set_backup_hint"),
           search="export import backup restore playlists json")
+    # An optional password for the next backup made: never stored, and
+    # emptied once the file is written. Empty, the file is as it always was.
+    backup_pw = QLineEdit()
+    backup_pw.setEchoMode(QLineEdit.EchoMode.Password)
+    backup_pw.setPlaceholderText(tr("set_backup_pw_none"))
+    backup_pw.setAccessibleName(tr("set_backup_pw"))
+    backup_again = QLineEdit()
+    backup_again.setEchoMode(QLineEdit.EchoMode.Password)
+    backup_again.setPlaceholderText(tr("set_backup_pw_again"))
+    backup_again.setAccessibleName(tr("set_backup_pw_again"))
+    backup_again.setEnabled(False)
+    c.row(tr("set_backup_pw"), hbox(backup_pw, backup_again, stretch=False),
+          tr("set_backup_pw_hint"), stretch_control=True,
+          search="password encrypt encrypted lock protect backup")
     c.note(tr("backup_note"))
-    export_btn.clicked.connect(export_playlists)
+
+    def backup_pw_typed(text: str) -> None:
+        # The repeat only for a password; emptied with it.
+        backup_again.setEnabled(bool(text) and bool(store))
+        if not text:
+            backup_again.clear()
+
+    def back_up() -> None:
+        password = backup_pw.text()
+        if password != backup_again.text():
+            QMessageBox.warning(d, tr("backup_title"), tr("backup_pw_mismatch"))
+            backup_again.setFocus()
+            backup_again.selectAll()
+            return
+        if export_playlists(password) and password:
+            backup_pw.clear()
+
+    backup_pw.textChanged.connect(backup_pw_typed)
+    export_btn.clicked.connect(back_up)
     import_btn.clicked.connect(import_playlists)
     if not store:
         export_btn.setEnabled(False)
         import_btn.setEnabled(False)
+        backup_pw.setEnabled(False)
     # Only where an entry is actually missing: a .deb or a Flatpak
     # has one already, and offering to add a second would be
     # nonsense.

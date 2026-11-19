@@ -1,21 +1,234 @@
 """A full backup put back (core/backup.py reads and stages it): the file
-picked and read (``pick_backup``), what it holds and how to take it - over
+picked and read (``pick_backup``) - one with a password opened with it
+first (``UnlockBackupDialog``) -, what it holds and how to take it - over
 everything here, or its playlists beside the ones here, with what runs
 something, lets others in or sends the connections elsewhere shown first
 (``RestoreBackupDialog``) - and one left to be put back at the next start
 (``stage_backup``). Settings' restore and the welcome's Bring step both
-go through here.
+go through here. A backup made with a password is encrypted off the
+window's thread (``run_working``).
+
+A password's key is made and the file opened or locked on a thread of its
+own (PBKDF2's rounds, then the whole file in plain Python: up to a few
+seconds), the window's thread going on meanwhile. The password is never
+logged nor kept: the field is emptied as it is sent, the thread lets go of
+it when it ends.
 """
 
 from __future__ import annotations
 
-from typing import Any
+import threading
+from collections.abc import Callable
+from typing import Any, TypeVar
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout
+from PyQt6.QtCore import QEventLoop, Qt, QTimer
+from PyQt6.QtWidgets import (
+    QDialog, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QScrollArea,
+    QVBoxLayout, QWidget,
+)
 
 from ..i18n import tr
 from .theme import P
+
+T = TypeVar("T")
+#: How often the window looks whether the work on its own thread is done (ms).
+_POLL_MS = 30
+
+
+def _off_thread(work: Callable[[], Any], name: str) -> tuple[threading.Thread, dict]:
+    """*work()* started on a thread of its own: (the thread, where its
+    result lands - "ok", or "err" with what it raised)."""
+    box: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            box["ok"] = work()
+        except Exception as exc:
+            box["err"] = exc
+
+    thread = threading.Thread(target=run, name=name, daemon=True)
+    thread.start()
+    return thread, box
+
+
+def _busy(text: str, muted: bool = False) -> QWidget:
+    """*text* over the thin moving bar the app shows while it waits."""
+    box = QWidget()
+    col = QVBoxLayout(box)
+    col.setContentsMargins(0, 0, 0, 0)
+    col.setSpacing(8)
+    line = QLabel(text)
+    line.setTextFormat(Qt.TextFormat.PlainText)
+    line.setWordWrap(True)
+    line.setStyleSheet(f"font-size:{12 if muted else 13}px; "
+                       f"color:{P['muted'] if muted else P['text']};")
+    col.addWidget(line)
+    bar = QProgressBar(objectName="LoadBar")
+    bar.setRange(0, 0)
+    bar.setTextVisible(False)
+    bar.setFixedHeight(3)
+    bar.setAccessibleName(text)
+    col.addWidget(bar)
+    return box
+
+
+class _Working(QDialog):
+    """What is being done while it runs off the window's thread: a line and
+    a moving bar, no button, and it does not close until the work is done
+    (``run_working``)."""
+
+    def __init__(self, parent, title: str, text: str) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.done_working = False
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 24)
+        col.addWidget(_busy(text))
+        self.setMinimumWidth(380)
+
+    def reject(self) -> None:
+        if self.done_working:
+            super().reject()
+
+    def closeEvent(self, e) -> None:
+        if self.done_working:
+            super().closeEvent(e)
+        else:
+            e.ignore()
+
+
+def run_working(parent, title: str, text: str, work: Callable[[], T]) -> T:
+    """*work()* on a thread of its own while a small window over *parent*
+    says *text*: the window's thread goes on - the app answers, nothing
+    else can be clicked meanwhile. Its result; what it raised is raised
+    here."""
+    thread, box = _off_thread(work, "dopeiptv-backup")
+    dlg = _Working(parent, title, text)
+    loop = QEventLoop()
+    timer = QTimer(dlg)
+    timer.setInterval(_POLL_MS)
+    timer.timeout.connect(lambda: None if thread.is_alive() else loop.quit())
+    dlg.show()
+    timer.start()
+    loop.exec()
+    timer.stop()
+    dlg.done_working = True
+    dlg.close()
+    dlg.deleteLater()
+    if "err" in box:
+        raise box.pop("err")
+    return box["ok"]
+
+
+class UnlockBackupDialog(QDialog):
+    """A backup's password asked for (*locked*: core/backup.Locked), and
+    the backup opened with it on a thread of its own while the window says
+    so. A wrong password - or a file changed since it was made, never told
+    apart - says so and asks again; Cancel, at any moment, leaves
+    everything as it was. Accepted: ``backup`` is what the file holds.
+    Rejected with ``refused`` (a reason and a detail, as BackupError's): the
+    file opened, and what is inside is no backup this app can put back."""
+
+    WIDTH = 440
+
+    def __init__(self, parent, locked) -> None:
+        super().__init__(parent)
+        self.locked = locked
+        self.backup: Any = None
+        self.refused: tuple[str, str] | None = None
+        self._job: tuple[threading.Thread, dict] | None = None
+        self.setWindowTitle(tr("restore_title"))
+        self.setModal(True)
+        self.setMinimumWidth(self.WIDTH)
+        col = QVBoxLayout(self)
+        col.setContentsMargins(24, 22, 24, 20)
+        col.setSpacing(10)
+        ask = QLabel(tr("restore_pw_ask"))
+        ask.setTextFormat(Qt.TextFormat.PlainText)
+        ask.setWordWrap(True)
+        ask.setStyleSheet(f"font-size:13px; color:{P['text']};")
+        col.addWidget(ask)
+        self.field = QLineEdit()
+        self.field.setEchoMode(QLineEdit.EchoMode.Password)
+        self.field.setAccessibleName(tr("login_password"))
+        self.field.setPlaceholderText(tr("login_password"))
+        col.addWidget(self.field)
+        self.wrong = QLabel(tr("restore_pw_wrong"))
+        self.wrong.setTextFormat(Qt.TextFormat.PlainText)
+        self.wrong.setWordWrap(True)
+        self.wrong.setStyleSheet(f"font-size:12px; color:{P.get('error', P['muted'])};")
+        self.wrong.setVisible(False)
+        col.addWidget(self.wrong)
+        self.busy = _busy(tr("restore_unlocking"), muted=True)
+        self.busy.setVisible(False)
+        col.addWidget(self.busy)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton(tr("common_cancel"))
+        self.go = QPushButton(tr("restore_unlock"), objectName="Primary")
+        self.go.setDefault(True)
+        self.go.setEnabled(False)
+        cancel.clicked.connect(self.reject)
+        self.go.clicked.connect(self._try)
+        self.field.textChanged.connect(
+            lambda text: self.go.setEnabled(bool(text) and self._job is None))
+        buttons.addWidget(cancel)
+        buttons.addWidget(self.go)
+        col.addLayout(buttons)
+        self._timer = QTimer(self)
+        self._timer.setInterval(_POLL_MS)
+        self._timer.timeout.connect(self._poll)
+        self.field.setFocus()
+
+    def working(self) -> bool:
+        return self._job is not None
+
+    def _try(self) -> None:
+        password = self.field.text()
+        if not password or self._job is not None:
+            return
+        # Nothing of it left in the field while the key is made.
+        self.field.clear()
+        self.field.setEnabled(False)
+        self.go.setEnabled(False)
+        self.wrong.setVisible(False)
+        self.busy.setVisible(True)
+        self._job = _off_thread(lambda locked=self.locked, pw=password: locked.unlock(pw),
+                                "dopeiptv-restore")
+        del password
+        self._timer.start()
+
+    def _poll(self) -> None:
+        if self._job is None or self._job[0].is_alive():
+            return
+        box = self._job[1]
+        self._job = None
+        self._timer.stop()
+        self.busy.setVisible(False)
+        self.field.setEnabled(True)
+        if "ok" in box:
+            self.backup = box["ok"]
+            self.accept()
+            return
+        from ..core import backup
+        exc = box.get("err")
+        if isinstance(exc, backup.BackupError) and exc.reason == "password":
+            from ..core.log import log
+            log.info("restore: the password did not open the backup")
+            self.wrong.setVisible(True)
+            self.field.setFocus()
+            return
+        self.refused = ((exc.reason, exc.detail) if isinstance(exc, backup.BackupError)
+                        else ("invalid", type(exc).__name__))
+        self.reject()
+
+    def done(self, r: int) -> None:
+        # Cancel while the key is made: the thread ends by itself, its
+        # answer goes nowhere.
+        self._timer.stop()
+        self._job = None
+        super().done(r)
 
 
 class RestoreBackupDialog(QDialog):
@@ -226,9 +439,20 @@ class RestoreBackupDialog(QDialog):
         return "add"
 
 
+def _refusal(reason: str, detail: str) -> str:
+    """Why a file is not put back, in the person's words."""
+    if reason == "unreadable":
+        return tr("pl_import_unreadable", error=detail)
+    if reason == "newer":
+        return tr("restore_newer", version=detail or "?")
+    return tr("restore_invalid")
+
+
 def pick_backup(parent) -> tuple[Any, str]:
     """A backup file picked and read (core/backup.py): (it, "") - or
-    (None, why) for a file that is not one, (None, "") for none picked.
+    (None, why) for a file that is not one, (None, "") for none picked or
+    a password not given. One with a password is opened with it first
+    (UnlockBackupDialog); what it holds then goes on as any backup's.
     Settings' restore and the welcome's both start here."""
     from PyQt6.QtWidgets import QFileDialog
 
@@ -242,13 +466,19 @@ def pick_backup(parent) -> tuple[Any, str]:
     if not path:
         return None, ""
     try:
-        return backup.read(path), ""
+        got = backup.read_any(path)
     except backup.BackupError as exc:
         log.warning("restore: %s", exc)
-        return None, (tr("pl_import_unreadable", error=exc.detail)
-                      if exc.reason == "unreadable"
-                      else tr("restore_newer", version=exc.detail or "?")
-                      if exc.reason == "newer" else tr("restore_invalid"))
+        return None, _refusal(exc.reason, exc.detail)
+    if not isinstance(got, backup.Locked):
+        return got, ""
+    dlg = UnlockBackupDialog(parent, got)
+    if dlg.exec():
+        return dlg.backup, ""
+    if dlg.refused is not None:
+        log.warning("restore: what the password opened is refused (%s)", dlg.refused[0])
+        return None, _refusal(*dlg.refused)
+    return None, ""
 
 
 def stage_backup(b: Any) -> str:

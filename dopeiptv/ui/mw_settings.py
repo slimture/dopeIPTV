@@ -131,8 +131,9 @@ class SettingsContext:
     #: add_playlist(prefill=None): the quick form, then the new source's
     #: page.
     add_playlist: Callable[..., None]
-    #: General's backup: saved, and restored (Sources' list follows).
-    export_playlists: Callable[[], None]
+    #: General's backup: saved - export_playlists(password=""), whether it
+    #: was written - and restored (Sources' list follows).
+    export_playlists: Callable[..., bool]
     import_playlists: Callable[[], None]
     #: A change made: stored and applied a moment later (set once the
     #: window's change timer is made, before any page is built).
@@ -441,32 +442,43 @@ class _SettingsMixin:
         return "\n".join(tr("backup_count", what=tr(f"backup_kind_{kind}"), n=n)
                          for kind, n in counts.items() if n)
 
-    def _backup_save(self, parent) -> None:
-        """Settings > General > Backup: everything to one file."""
+    def _backup_save(self, parent, password: str = "") -> bool:
+        """Settings > General > Backup: everything to one file - with
+        *password*, encrypted with it (core/backup.lock) on a thread of its
+        own while a small window says so. Whether it was written."""
         from datetime import date
 
         from ..core import backup
+        # The same name with a password or without: the file says inside
+        # what it is, and the restore finds either kind the same way.
         path, _f = QFileDialog.getSaveFileName(
             parent, tr("backup_title"),
             f"dopeIPTV-backup-{date.today().isoformat()}.json",
             tr("file_filter_json"),
             options=file_dialog_options())
         if not path:
-            return
+            return False
         doc = backup.collect(self._backup_stores(), VERSION)
+        locked = bool(password)
         try:
-            backup.write(path, doc)
+            if locked:
+                from .backup_dialogs import run_working
+                run_working(parent, tr("backup_title"), tr("backup_locking"),
+                            lambda: backup.write(path, backup.for_file(doc, password)))
+            else:
+                backup.write(path, doc)
         except OSError as exc:
             log.warning("backup: not written: %s", exc)
             QMessageBox.warning(parent, tr("backup_title"),
                                 tr("pl_export_failed", error=exc))
-            return
+            return False
         counts = backup.summary(backup.parse(doc))
-        log.info("backup: written (%s)", ", ".join(
-            f"{k} {n}" for k, n in counts.items() if n))
-        QMessageBox.information(
-            parent, tr("backup_title"),
-            tr("backup_done", what=self._backup_counts(counts), path=path))
+        log.info("backup: written%s (%s)", " with a password" if locked else "",
+                 ", ".join(f"{k} {n}" for k, n in counts.items() if n))
+        done = tr("backup_done_locked" if locked else "backup_done",
+                  what=self._backup_counts(counts), path=path)
+        QMessageBox.information(parent, tr("backup_title"), done)
+        return True
 
     def _backup_restore(self, parent, playlists_added) -> None:
         """Settings > General > Backup: a backup back - over everything, as
@@ -1065,8 +1077,8 @@ class _SettingsMixin:
                 sources_changed(pl["id"])
                 edit_source(pl["id"], shell.current_key())
 
-        def export_playlists():
-            self._backup_save(d)
+        def export_playlists(password: str = "") -> bool:
+            return self._backup_save(d, password)
 
         def playlists_added() -> None:
             sources_changed(store.active_id)

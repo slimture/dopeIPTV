@@ -201,6 +201,34 @@ def test_no_module_decides_on_entities_from_the_bytes():
     assert not found, found
 
 
+# -- rule 6: a password is never handed to the log -------------------------------------
+
+#: What a password is called where it is held (a backup's, a source's, a login's).
+PASSWORD_NAMES = {"password", "passphrase", "passwd", "pw"}
+_LOG_LEVELS = {"debug", "info", "warning", "error", "exception", "critical", "log"}
+
+
+def test_no_log_line_is_handed_a_password():
+    """Rule 6: core/log.py's filter is the net, not the plan - nothing named
+    a password (a variable, an attribute, a key looked up) is an argument
+    of a log call, the backup's password among them."""
+    found = []
+    for rel, tree in _modules():
+        for name, _fn, call in _calls_in(tree):
+            parts = name.split(".")
+            if len(parts) < 2 or parts[-1] not in _LOG_LEVELS or parts[-2] not in (
+                    "log", "_log", "logger", "logging"):
+                continue
+            for arg in [*call.args, *(k.value for k in call.keywords)]:
+                for n in ast.walk(arg):
+                    named = (n.id if isinstance(n, ast.Name) else n.attr
+                             if isinstance(n, ast.Attribute) else n.value
+                             if isinstance(n, ast.Constant) and isinstance(n.value, str) else "")
+                    if named in PASSWORD_NAMES:
+                        found.append(f"{rel}:{call.lineno} {named}")
+    assert not found, "a password handed to the log: " + ", ".join(found)
+
+
 # -- words from outside never read as markup (rule 5) ---------------------------------
 
 def _plain_words(node: ast.expr) -> bool:
@@ -222,8 +250,7 @@ OWN_WORDS = {
     ("ui/mw_profiles.py", "tr('pin_wait', n=max(1, math.ceil(wait)))"): "a number",
     ("ui/mw_profiles.py", "text"): "the wrong PIN's words and the wait, a number",
     ("ui/mw_settings.py", "tr('pl_export_failed', error=exc)"): "the file the person picked",
-    ("ui/mw_settings.py", "tr('backup_done', what=self._backup_counts(counts), path=path)"):
-        "counts and the file the person picked",
+    ("ui/mw_settings.py", "done"): "backup_done's counts and the file the person picked",
     ("ui/mw_settings.py", "tr('pl_import_done', n=added)"): "a number",
 }
 
