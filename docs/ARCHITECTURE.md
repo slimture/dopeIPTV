@@ -428,6 +428,9 @@ dopeiptv/
     mw_airplay.py      AirPlay (macOS): the receiver added, its own endings
     mw_popout.py       Detached-window ("pop out") player mixin
     mw_multiview.py    Multiview: 2/4/6/9 live streams (own mpv per cell)
+    multiview_cell.py  One multiview cell: its own mpv surface, title strip,
+                       seek bar, focus, mute, pause
+    multiview_window.py The multiview grid's own window
     mw_connections.py  Connections to the account: counted, warned about
     mw_mirrors.py      Nerd: a stream whose server is down, on the next address
     conn_test_dialog.py Nerd: Test connection's window
