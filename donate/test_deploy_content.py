@@ -249,3 +249,55 @@ def test_security_txt_says_where_to_report_and_has_not_expired():
     now = dt.datetime.now(dt.timezone.utc)
     # Renewed once a year, never more than a year and a bit ahead (RFC 9116).
     assert now < expires < now + dt.timedelta(days=400), "security.txt's Expires: a year from today"
+
+
+def _size(value: str) -> int:
+    m = re.fullmatch(r"(\d+)([kKmM]?)", value)
+    return int(m.group(1)) * {"": 1, "k": 1024, "m": 1 << 20}[m.group(2).lower()]
+
+
+def _effective(srv: Block, uri: str, name: str) -> str:
+    """*name*'s value for *uri*: its location's own, else the location's
+    around it, else the server's (nginx's inheritance)."""
+    chain, blocks = [], srv.body
+    while True:
+        loc = find_location(Block("", [], blocks, 0), uri)
+        if loc is None or loc in chain:
+            break
+        chain.append(loc)
+        blocks = loc.body
+    for b in reversed([srv] + chain):
+        if b.values(name):
+            return b.values(name)[-1]
+    return ""
+
+
+def test_a_body_is_held_in_memory_and_nothing_taken_today_is_refused():
+    import sys
+    sys.path.insert(0, HERE)
+    import sync
+    import together
+    src = open(os.path.join(HERE, "donate.py"), encoding="utf-8").read()
+
+    def takes(method: str) -> int:
+        return int(re.search(r"def %s\(self.*?self\._body\((\d+)" % method, src, re.S).group(1))
+    admin = max(int(n) for n in re.search(r"self\._body\((\d+) if path == \"/admin/pick\" else (\d+)\)",
+                                          src).groups())
+    # What the service takes on each route, at the most: nginx never refuses
+    # it, and holds it in memory (a buffer as large as what it lets in).
+    most = {"/feedback/report": takes("_feedback"), "/feedback/replies": takes("_feedback_replies"),
+            "/sync/" + "ab" * 32: sync.MAX_BODY, "/together/" + "ab" * 32: together.MAX_MESSAGE,
+            "/admin/pick": admin, "/admin/account/passkey": admin, "/admin/auth/password": takes("_sign_in"),
+            "/donate/session": 1024, "/support/key": takes("_key")}
+    assert most["/feedback/report"] == 200000 and most["/admin/pick"] == 65536
+    srv = _server(conf())
+    assert _size(srv.values("client_max_body_size")[0]) == 64 * 1024
+    for uri, body in most.items():
+        allowed = _size(_effective(srv, uri, "client_max_body_size"))
+        buffer = _size(_effective(srv, uri, "client_body_buffer_size"))
+        assert allowed >= body, (uri, allowed, body)
+        assert buffer >= allowed, (uri, buffer, allowed)
+    # Where a route had a limit of its own, it is the same.
+    assert _effective(srv, "/sync/x", "client_max_body_size") == "3m"
+    assert _effective(srv, "/feedback/report", "client_max_body_size") == "256k"
+    assert _effective(srv, "/together/x", "client_max_body_size") == "4k"
