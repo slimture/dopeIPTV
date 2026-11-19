@@ -336,6 +336,8 @@ dopeiptv/
   ui/                  Everything the user sees
     __init__.py        Lazy MainWindow export (PEP 562)
     main_window.py     MainWindow composition root (QMainWindow + mixins)
+    mw_lists.py        The lists: a mode switched, the categories, the middle
+                       list, the filter
     app_menu.py        The app's menus, one layout on every platform: File,
                        View, History, Help
     mw_settings.py     Settings dialog mixin: the window, its pages in their

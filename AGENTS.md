@@ -209,6 +209,7 @@ map and the one-way import rule.
 | `media/video_surface.py` | The window-thread video surface (`_MpvGLWidget`: the fallback and the switch's other side; `DOPEIPTV_GUI_RENDER=tuned` takes its waits off the window's thread) and the Linux pop-out's raster mirror; the core's options (`build_core`) for every surface |
 | `media/subtitle_text.py` | Stray right-to-left marks out of subtitle files before mpv reads them |
 | `ui/main_window.py` | MainWindow composition root (+ `mw_*` mixins) |
+| `ui/mw_lists.py` | The lists in the window (`_ListsMixin`): a mode switched and the modes a source has (`switch_mode`, `_refresh_mode_availability`, `_apply_mode_visibility`), the category column with the category kept per mode (`_load_categories`, `_remembered_cat_row`, `_category_changed`; `_UNSET`, no category waiting to be picked again), the middle list (`_load_items`; the combined views under their headings - `_show_grouped`, `_load_recordings_grouped`, `_load_favorites_all`), grid or rows (`_apply_list_layout`), what a row is called and how it is tinted (`channel_display_name`, `item_tint`), the catalogue as the lists show it - hidden, locked, a kids profile's (`_visible_catalog`, `_catalog_filter`, `_channel_hidden`), the filter and the status row's count (`_apply_filter`, `_count_text`), a row found and selected (`_try_select_key`, `_reveal_item_in_list`, `_reveal_channel_in_list`) |
 | `ui/app_menu.py` | The app's menus, one layout on every platform: File (Settings and Quit at its foot), View, History, Help (About last); on macOS About, Settings, Quit and the supporter entries go into the application menu by their roles (`_MAC_ROLES`), the rest never moved by its words; no empty menu, no stray separator |
 | `ui/channel_list.py` | List model, view, delegate painting; rows put in and taken out without a reset, the selection and the scroll kept (`insert_items`, `append_items`, `remove_rows`); a live channel list's rows painted the TV place's way (`tv_rows`, `tv_density`, `ui/tv_place.paint_tv_row`: the window's facts per painted row - number, logo, favourite, catch-up, stream health, a box's tuner ring, the technical line, its own colours - and the guide's now and next from memory, kept per channel for the minute, `forget_guide`; the name's column as wide as the list's longest names need, worked out once per list - `_tv_name_w`, `tv_place.name_need` - and a row's whole name in its tooltip), every other list and a grid of tiles as before |
 | `ui/dialogs.py` | Dialog windows; `SourceFields` (a source's connection fields and what they mean, no layout) and the Add source quick form (`PlaylistDialog`) |
@@ -342,7 +343,8 @@ row in the table above; in short:
   `mw_profiles` (profiles: one per person, switching, the picker, kids).
 - Places and lists: `mw_places` (the places - Mine, TV, Movies, Series,
   Guide, Search, Local files, Radio, Recordings; no Home - and the way to
-  each, the start where the person left off), `mw_mitt` (Mine's own page:
+  each, the start where the person left off), `mw_lists` (a mode switched,
+  the category column, the middle list, the filter), `mw_mitt` (Mine's own page:
   continue, the favourites live now by habit, the Watch later queue, new
   episodes, History as a timeline, the favourites' folders), `mw_popular` (popular right
   now for Movies and Series), `mw_local` (local files; their library
