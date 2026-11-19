@@ -1235,10 +1235,11 @@ fetch -T 5 -qo /dev/null http://10.0.1.2:8081/ && echo "8081 answers here"
 
 Only the proxy should get an answer. Where another does, the content
 server's file includes `/usr/local/etc/nginx/iptv-only-from-proxy.conf`
-(a pattern: nothing until the file is there, and a new copy of the repo's
-file keeps it). With the proxy's address as pontusweb sees it - `jls -j
-webproxy ip4.addr` on the host, or `ifconfig` in webproxy for a VNET jail -
-put in that file, in pontusweb:
+(a pattern this round: nothing until the file is there, and a new copy of
+the repo's file keeps it - since "Every log, and port 8081 closed" a
+plain name, without which nginx does not start). With the proxy's address
+as pontusweb sees it - `jls -j webproxy ip4.addr` on the host, or
+`ifconfig` in webproxy for a VNET jail - put in that file, in pontusweb:
 
 ```nginx
 allow <the proxy's address>;
@@ -1319,3 +1320,73 @@ cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
 seventh "The servers behind dopeiptv.org" (`?lang=sv`: "Servrarna bakom
 dopeiptv.org"), and its *Copy the code and the question* gives the question
 with the proxy's `location /` first.
+
+## Every log, and port 8081 closed
+
+What a second review of the site found, and what changed (each commit
+says it in full). Nothing changes for a visitor, for the app - 1.6.7, 1.6.8
+and newer sync, send feedback, watch together, update and tip as before -
+or for the admin page.
+
+- **Port 8081 closed to all but the proxy.** The content server's file
+  includes `iptv-only-from-proxy.conf` by its plain name now: without the
+  file `nginx -t` fails and nginx does not start. Before, a pattern
+  (`.con[f]`) matched nothing while the file was missing, and the port
+  answered whoever reached it - and believed the X-Real-IP they said. The
+  file lets in the proxy alone: nothing in pontusweb itself asks for 8081
+  (`sync-releases.sh` fetches only from GitHub; the service and
+  `stats_collect.py` only from Stripe, the push services, GitHub and
+  DB-IP), so it has no `allow 127.0.0.1;`. A location that only answers
+  with a redirect or a "not found" answers before nginx asks the list, and
+  gives nothing but that.
+
+**pontusweb (jail)** - `bastille console pontusweb`, then `sh`. First the
+allow list, before the content server's new file, which nginx no longer
+loads without it. `PROXY_ADDRESS` in the first line is the proxy's address
+as pontusweb sees it - `jls -j webproxy ip4.addr` on the host, or
+`ifconfig` in webproxy for a VNET jail: put it in before running the line
+(left as it is, `nginx -t` below refuses it with `invalid parameter`).
+Nothing of it goes to git.
+
+```sh
+printf 'allow %s;\ndeny all;\n' PROXY_ADDRESS > /usr/local/etc/nginx/iptv-only-from-proxy.conf
+cat /usr/local/etc/nginx/iptv-only-from-proxy.conf
+```
+
+The files and the tests:
+
+```sh
+cd ~/dopeiptv
+git checkout website
+git pull origin website
+python3 -m pytest -q -p no:cacheprovider donate/
+```
+
+The content server's file - no zone's key changed, so a reload takes it:
+
+```sh
+diff /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf deploy/content-iptv.dope.rs.conf
+cp /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.before-logs
+cp deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+nginx -t && service nginx reload
+ps -axo pid,lstart,command | grep "[n]ginx: worker"
+grep -n emerg /var/log/nginx/error.log | tail -3
+curl -sI https://dopeiptv.org/ | head -1
+```
+
+`HTTP/2 200`. A 403 means the proxy comes from another address than the
+file says: load a page, then `netstat -an -p tcp | grep '\.8081 '` in
+pontusweb names it (the foreign address), put that one in with the
+`printf` line and `service nginx reload`. To go back meanwhile: `rm
+/usr/local/etc/nginx/iptv-only-from-proxy.conf`, `cp
+/root/iptv.dope.rs.conf.before-logs
+/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf`, `service nginx reload`.
+
+**Check.** From the host and from a jail other than webproxy:
+
+```sh
+fetch -T 5 -o /dev/null http://10.0.1.2:8081/
+```
+
+says `Forbidden`; from anywhere, the site, Sync now, Send feedback and a
+watch-together room in the app, and the admin page work as before.

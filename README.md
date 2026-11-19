@@ -162,6 +162,12 @@ new install:
    chown -R iptv:iptv /usr/local/www/iptv
    ```
 
+   The content server's port answers only the TLS-front proxy: the file
+   includes `/usr/local/etc/nginx/iptv-only-from-proxy.conf`, which holds
+   the proxy's address and is never in git - `allow <the proxy's
+   address>;` and `deny all;` on two lines. nginx does not start without
+   it (DEPLOY.md, "Every log, and port 8081 closed").
+
 3. **TLS-front proxy** — install `deploy/proxy-iptv.dope.rs.conf`, set
    `CONTENT_HOST` to the content server's internal address:port, add the CSP
    row from `deploy/csp.snippet.txt` to your `map $server_name $csp_policy`

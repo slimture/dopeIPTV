@@ -416,19 +416,31 @@ def test_the_admin_pages_are_counted_by_address_whatever_cookie_comes():
     assert find_location(srv, "/admin/auth/password").values("limit_req") == ["zone=iptv_signin burst=10 nodelay"]
 
 
-def test_the_port_can_be_kept_to_the_proxy_without_this_file_naming_it():
+def test_the_port_is_kept_to_the_proxy_and_nginx_will_not_start_without_the_list():
     # The proxy's address is the server's own: a file of the owner's beside
-    # nginx.conf, which a new copy of this one keeps. A pattern (nginx lets
-    # one match nothing), so until it is made nothing changes.
-    import fnmatch
+    # nginx.conf, which a new copy of this one keeps. A plain name, never a
+    # pattern: a pattern nginx lets match nothing, and with the file gone
+    # the port answered everyone - and believed whatever X-Real-IP they
+    # said. Without the file nginx -t fails and nginx does not start.
     srv = _server(conf())
-    pattern = srv.values("include")
-    assert pattern == ["iptv-only-from-proxy.con[f]"]
-    assert fnmatch.fnmatch("iptv-only-from-proxy.conf", pattern[0])
-    assert not fnmatch.fnmatch("iptv-only-from-proxy.conf.bak", pattern[0])
+    assert srv.values("include") == ["iptv-only-from-proxy.conf"]
+    assert not re.search(r"[*?\[\]]", srv.values("include")[0])
     assert srv.body.index(srv.one("include")) < srv.body.index(next(b for b in srv.body if b.name == "location"))
+    # Nothing puts the list aside: an allow or a deny of a location's own
+    # would stand in for it there (limit_except's deny is for the methods
+    # it refuses), and the addresses are the file's alone.
+    assert not srv.all("allow") and not srv.all("deny")
+    for loc in _locations(srv.body):
+        assert not loc.all("allow") and not loc.all("deny"), loc
+    # The file, and the proxy's address, are never in the repository.
+    assert not os.path.exists(os.path.join(ROOT, "deploy", "iptv-only-from-proxy.conf"))
     deploy = open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8").read()
-    assert "/usr/local/etc/nginx/iptv-only-from-proxy.conf" in deploy and "deny all;" in deploy
+    assert not re.search(r"allow\s+(?!127\.)\d{1,3}(?:\.\d{1,3}){3}", deploy)
+    # The deploy makes it before it copies the file that needs it.
+    section = deploy[deploy.index("## Every log, and port 8081 closed"):]
+    line = next(ln for ln in section.splitlines() if ln.endswith("> /usr/local/etc/nginx/iptv-only-from-proxy.conf"))
+    assert line.startswith("printf 'allow %s;\\ndeny all;\\n' PROXY_ADDRESS >"), line
+    assert section.index(line) < section.index("cp deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/")
 
 
 def test_the_services_log_is_turned_over_and_reopened():
