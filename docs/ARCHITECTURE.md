@@ -279,6 +279,8 @@ dopeiptv/
   media/               Playback
     __init__.py        The media layer (no code)
     embedded.py        EmbeddedPlayer: the in-app player
+    popout_mirror.py   The pop-out's picture: the mirror (raster, GL or the
+                       picture's own thread), the docked placeholder
     seek_slider.py     The seek bar slider: click, drag, hover time
     video_thread.py    ThreadedVideoSurface (the default): a native window
                        a render thread of its own draws mpv's frames into;
