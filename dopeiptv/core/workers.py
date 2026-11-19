@@ -146,10 +146,8 @@ def _outside(data: bytes, sized: bool = True) -> bytes | None:
     (core/svg_safe.py), and then reads what was screened. With *sized*, one
     that says it is larger than OUTSIDE_PICTURE_MIB is not decoded.
 
-    Both are read from the bytes here, never asked of QImageReader: its
-    format() and size() run under Qt's lock for its image plugins with
-    Python's own lock held, while read() on another thread holds Qt's and
-    waits for Python's - two pictures decoded at once stopped for good."""
+    Both are read from the bytes here, before any reader is made for them
+    (``_reader``, ``ready``)."""
     from . import svg_safe
     if svg_safe.maybe_svg(data):
         clean = svg_safe.screened(data)
@@ -175,7 +173,22 @@ def _reader(data: bytes, own: bool, sized: bool = True
     buf = _read_only(data)
     if buf is None:
         return None
-    return QImageReader(buf), buf, data
+    reader = QImageReader(buf)
+    return (reader, buf, data) if ready(reader) else None
+
+
+def ready(reader: QImageReader) -> bool:
+    """Whether *reader* has a handler for its picture - found now, with the
+    GIL held, so that ``read()``, which lets go of it, finds one made.
+
+    Qt finds a picture's handler under one lock for every image plugin in
+    the process, and each plugin asks the device; a device made in Python
+    (our QBuffer) answers through sip, which takes the GIL. Left to
+    ``read()``, a worker held Qt's lock and waited for the GIL while the
+    window's thread - an icon for a field's clear button, a picture loaded
+    - held the GIL and waited for Qt's lock: the app stopped for good.
+    ``canRead()`` keeps the GIL, and the handler it finds stays."""
+    return reader.canRead()
 
 
 def decode_image(data: bytes, fit: int = 0, own: bool = False,

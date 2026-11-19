@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 
 from ..core import picture_files
 from ..core.log import log
-from ..core.workers import OUTSIDE_PICTURE_MIB, run_async
+from ..core.workers import OUTSIDE_PICTURE_MIB, ready, run_async
 from ..i18n import tr
 from ..providers.enigma2 import GRAB_MAX, signal_rows
 from .theme import ACCENTS, P
@@ -49,6 +49,8 @@ def decode_grab(data: Any) -> QImage | None:
         return None
     reader = QImageReader(buf, fmt)
     reader.setAutoDetectImageFormat(False)
+    if not ready(reader):
+        return None
     img = reader.read()
     return None if img.isNull() else img
 

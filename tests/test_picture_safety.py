@@ -353,9 +353,8 @@ class _Answer:
 
 
 def test_a_pictures_size_is_read_from_its_first_bytes(qapp):
-    """Not asked of QImageReader: its format() and size() hold Python's
-    lock while they wait for Qt's, which a read() on another thread holds
-    while it waits for Python's."""
+    """Read from the bytes, before any reader is made for them: a picture
+    larger than the app decodes is never handed to Qt's plugins."""
     from pathlib import Path
 
     from PyQt6.QtCore import QBuffer, QIODevice
@@ -377,8 +376,8 @@ def test_a_pictures_size_is_read_from_its_first_bytes(qapp):
                  b"\xff\xd8" + b"\xff\xe0\x00\x02" * 5000):
         assert picture_files.picture_size(junk) is None
     src = Path(workers.__file__).read_text(encoding="utf-8")
-    for call in ("imageFormat(", ".canRead(", "supportedImageFormats("):
-        assert call not in src, f"{call} runs under Qt's plugin lock with Python's held"
+    assert src.count(".canRead(") == 1, "a reader's handler is found in ready() alone"
+    assert "if ready(reader)" in src, "_reader finds the handler before read() lets go of the GIL"
 
 
 def test_pictures_are_decoded_on_several_threads_at_once(qapp):

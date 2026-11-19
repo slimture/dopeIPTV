@@ -9,6 +9,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- The window could stop for good while pictures loaded - a macOS hang
+  report after an update, and the same on Linux. A poster or logo decoded
+  on a worker held Qt's lock for its image plugins and waited for Python's,
+  while the window's thread (an icon for a search field's clear button, any
+  picture it loaded) held Python's and waited for Qt's. Each reader now
+  finds its handler before it decodes, with Python's lock held
+  (`core/workers.ready`); a test runs workers and the window's thread
+  decoding at once.
 - Ctrl+C in the terminal the app was started from closes the window as its
   close button does (the player, recordings and settings let go in order);
   it was raised inside whatever Qt callback ran then and offered as a crash
