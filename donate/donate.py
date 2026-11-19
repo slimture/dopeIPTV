@@ -59,7 +59,8 @@ only for charities.
 
 Standard library only (Python 3.9+). It listens on a Unix socket - no
 network, so nothing outside the machine can reach it and a jail's loopback
-does not matter - and nginx passes /donate/ to it
+does not matter; on the machine only nginx's workers (its group) and this
+service may connect - and nginx passes /donate/ to it
 (deploy/content-iptv.dope.rs.conf), with a rate limit in front.
 
     python3 donate.py --check     asks the running service how it is set up
@@ -94,6 +95,9 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     STRIPE_API_VERSION      empty: the account's default
     LISTEN                  unix:/var/run/iptv_donate/donate.sock (default),
                             or host:port for TCP
+    SOCKET_GROUP            the group nginx's workers run as (www): the socket
+                            is 0660 and that group's (the rc file's folder,
+                            iptv_donate_socket_group, names the same one)
     ADMIN_USERS             only until the new sign-in has its first admin,
                             and only with nginx's old password prompt still
                             in front: who of it may open /admin/. Empty (the
@@ -162,7 +166,7 @@ def _load_config() -> dict[str, str]:
     except OSError:
         pass
     conf.update({k: v for k, v in os.environ.items()
-                 if k.startswith(("STRIPE_", "DONATE_", "LISTEN", "STATS_", "ADMIN_", "DL_LOG",
+                 if k.startswith(("STRIPE_", "DONATE_", "LISTEN", "SOCKET_", "STATS_", "ADMIN_", "DL_LOG",
                                   "DOWNLOADS_JSON", "SITE_HOST", "GEO_", "PUSH_"))})
     return conf
 
@@ -1928,6 +1932,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
+#: The group nginx's workers run as (www on FreeBSD): the socket is theirs
+#: and this service's alone, 0660 (open_to_nginx). The rc file makes the
+#: socket's folder iptv:www 0750 with the same group
+#: (iptv_donate_socket_group in rc.conf; the two name one group).
+SOCKET_GROUP = CONF.get("SOCKET_GROUP", "www")
 
 
 def _gb(n: int) -> str:
@@ -2056,6 +2065,43 @@ def keep_private(stats_dir: str) -> int:
     return narrowed
 
 
+def open_to_nginx(path: str, group: str = SOCKET_GROUP) -> str:
+    """The socket at *path* for nginx's workers and this service alone:
+    its group *group*, mode 0660. In the rc file's folder (iptv:www 0750) a
+    new file already has the folder's group, as FreeBSD gives every new
+    file; elsewhere it is given it. Where the group does not exist, or this
+    user may not give it (it is not one of the group's), the socket is
+    0666 as before - nginx's workers reach it whoever they run as - and its
+    folder, if it is this service's own, is one the others can only pass
+    through (0711): nothing else put in it, nothing listed. What was done,
+    for the start line."""
+    import grp
+    import stat
+    try:
+        gid = grp.getgrnam(group).gr_gid if group else None
+    except KeyError:
+        gid = None
+    if gid is not None:
+        try:
+            if os.stat(path).st_gid != gid:
+                os.chown(path, -1, gid)
+            os.chmod(path, 0o660)
+            return f"0660, group {group}"
+        except OSError:
+            pass
+    os.chmod(path, 0o666)
+    folder = os.path.dirname(os.path.abspath(path))
+    try:
+        st = os.stat(folder)
+        want = (stat.S_IMODE(st.st_mode) & 0o700) | 0o011
+        if st.st_uid == os.geteuid() and stat.S_IMODE(st.st_mode) != want:
+            os.chmod(folder, want)
+    except OSError:
+        pass
+    why = f"no group {group!r} here" if gid is None else f"the group {group!r} could not be given"
+    return f"0666: {why}, so any user here may connect (SOCKET_GROUP)"
+
+
 def _connection():
     import http.client
     if LISTEN.startswith("unix:"):
@@ -2088,27 +2134,33 @@ def main() -> None:
     if "--check" in sys.argv[1:]:
         raise SystemExit(check())
     # Whatever this service makes from here on is its own alone to read
-    # (the socket below is opened to nginx by name).
+    # (the socket below is nginx's workers' too, by its group).
     os.umask(0o077)
     narrowed = keep_private(_stats_dir())
     if narrowed:
         print(f"[donate] {narrowed} file(s) and folder(s) beside the statistics were readable by others "
               "on this machine: now the service's alone", file=sys.stderr, flush=True)
     srv: socketserver.BaseServer
+    how = ""
     if LISTEN.startswith("unix:"):
         path = LISTEN[5:]
         try:
             os.unlink(path)                 # a socket left by a stopped run
         except FileNotFoundError:
             pass
-        srv = UnixHTTPServer(path, Handler)
-        os.chmod(path, 0o666)               # nginx's worker connects to it
+        # Made 0660 and the folder's group: never wider, and nginx's at once.
+        old = os.umask(0o117)
+        try:
+            srv = UnixHTTPServer(path, Handler)
+        finally:
+            os.umask(old)
+        how = f" ({open_to_nginx(path)})"
     else:
         host, _, port = LISTEN.rpartition(":")
         srv = TCPHTTPServer((host or "127.0.0.1", int(port)), Handler)
     dialog = (f"on ({len(CURRENCIES)} currencies, {CURRENCY} by default)" if PUBLISHABLE
               else "off (no STRIPE_PUBLISHABLE_KEY)")
-    print(f"[donate] listening on {LISTEN}, Stripe {'set up' if _secret() else 'NOT set up'}, "
+    print(f"[donate] listening on {LISTEN}{how}, Stripe {'set up' if _secret() else 'NOT set up'}, "
           f"tip dialog {dialog}, supporter keys {'on' if _supporter_seed() is not None else 'off'}, "
           f"push notifications {'ready' if push_ready() else 'off (no cryptography package)'}",
           file=sys.stderr, flush=True)

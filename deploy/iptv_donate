@@ -25,6 +25,7 @@ load_rc_config $name
 
 : ${iptv_donate_enable:=NO}
 : ${iptv_donate_user:=iptv}
+: ${iptv_donate_socket_group:=www}
 : ${iptv_donate_python:=/usr/local/bin/python3}
 : ${iptv_donate_script:=/usr/local/www/iptv/donate/donate.py}
 : ${iptv_donate_log:=/var/log/iptv-donate.log}
@@ -34,7 +35,11 @@ load_rc_config $name
 # to switch users again without root ("failed to set user environment").
 # Running as that user, it can only write its pidfile into a directory of
 # that user's, made here as root before the start ("Permission denied" in
-# /var/run itself).
+# /var/run itself). The service's socket is there too: the folder is the
+# service's and nginx's workers' group's (iptv_donate_socket_group, www -
+# the service's SOCKET_GROUP names the same), 0750, so only they reach the
+# socket in it (0660, made there with the folder's group); it was 0755
+# around a socket anyone in the jail could connect to.
 piddir=/var/run/${name}
 pidfile=${piddir}/${name}.pid
 command=/usr/sbin/daemon
@@ -43,7 +48,7 @@ start_precmd=iptv_donate_precmd
 
 iptv_donate_precmd()
 {
-	install -d -o "${iptv_donate_user}" -m 755 "${piddir}"
+	install -d -o "${iptv_donate_user}" -g "${iptv_donate_socket_group}" -m 750 "${piddir}"
 }
 
 run_rc_command "$1"

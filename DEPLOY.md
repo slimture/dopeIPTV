@@ -1339,6 +1339,22 @@ or for the admin page.
   DB-IP), so it has no `allow 127.0.0.1;`. A location that only answers
   with a redirect or a "not found" answers before nginx asks the list, and
   gives nothing but that.
+- **The service's socket is nginx's and the service's alone.** It was 0666
+  in a folder anyone could pass through: any program in the jail could
+  connect, and say any X-Real-IP or X-Admin-User header (the admin pages
+  check the session themselves). Now the socket is 0660 and of the group
+  nginx's workers run as, `www` (`SOCKET_GROUP` in `iptv-donate.conf`, `www`
+  if not set), made so from the start (umask 117 while it is made), in
+  `/var/run/iptv_donate`, which the rc file makes `iptv:www` 0750 at every
+  start (`iptv_donate_socket_group` in rc.conf, `www` - the same group as
+  `SOCKET_GROUP`); it was `iptv` 0755. On FreeBSD a new file takes its
+  folder's group, so the socket is `www`'s without the service being in
+  the group. Where the group does not exist (another system, a typo), the
+  socket is 0666 as before - nginx still reaches it whoever it runs as -
+  in a folder of the service's own that others can only pass through
+  (0711), and the start line says so. Note what is left: Nextcloud's
+  php-fpm runs as `www` in this jail too, so it can reach the socket as
+  nginx can; no other user can.
 
 **pontusweb (jail)** - `bastille console pontusweb`, then `sh`. First the
 allow list, before the content server's new file, which nginx no longer
@@ -1361,6 +1377,29 @@ git checkout website
 git pull origin website
 python3 -m pytest -q -p no:cacheprovider donate/
 ```
+
+The service, with its new rc file - its socket's folder is made again at
+the start:
+
+```sh
+cp -R donate /usr/local/www/iptv/
+install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
+service iptv_donate restart
+ls -ld /var/run/iptv_donate
+ls -l /var/run/iptv_donate/
+tail -n 1 /var/log/iptv-donate.log
+python3 -I /usr/local/www/iptv/donate/donate.py --check
+```
+
+`drwxr-x---  2 iptv  www` for the folder; in it `srw-rw----  1 iptv  www
+... donate.sock` and `-rw-------  1 iptv  www ... iptv_donate.pid`; the
+log's last line `[donate] listening on
+unix:/var/run/iptv_donate/donate.sock (0660, group www), Stripe set up,
+...`; `--check` (as root) answers `200 {"stripe": true, ...}`. A line with
+`0666: no group 'www' here` means the group is named otherwise in this
+jail: `pw groupshow www`, and `SOCKET_GROUP=` in
+`/usr/local/etc/iptv-donate.conf` with `sysrc
+iptv_donate_socket_group=` set to the group nginx's workers run as.
 
 The content server's file - no zone's key changed, so a reload takes it:
 
