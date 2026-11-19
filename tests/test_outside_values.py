@@ -34,6 +34,43 @@ def test_a_number_no_source_sends_never_drops_the_source():
     assert popular._is_year("\U00010a40\U00010a41\U00010a42\U00010a43") is False
 
 
+def test_server_mode_s_port_past_65535_is_a_line_not_a_traceback(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    env = dict(os.environ, HOME=str(tmp_path), XDG_CONFIG_HOME=str(tmp_path / "config"),
+               XDG_CACHE_HOME=str(tmp_path / "cache"), XDG_DATA_HOME=str(tmp_path / "data"),
+               DOPEIPTV_LOG="info", QT_QPA_PLATFORM="offscreen")
+    env.pop("DOPEIPTV_LOG_FILE", None)
+    for port in ("70000", "-1", "x"):
+        r = subprocess.run([sys.executable, str(root / "dopeiptv.py"), "--server", "--port", port,
+                            "--no-discovery"], cwd=str(tmp_path), env=env,
+                           capture_output=True, text=True, timeout=60)
+        assert r.returncode == 2 and "Traceback" not in r.stderr, r.stderr[-500:]
+        assert "--port takes a number from 0 to 65535" in r.stderr + r.stdout
+
+
+def test_a_box_s_backup_is_read_no_further_than_a_backup_goes():
+    import io
+    import tarfile
+
+    from dopeiptv.providers import bouquets
+
+    def tar(names: list[str], mode: str = "w:gz") -> bytes:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode=mode) as tf:
+            for n in names:
+                tf.addfile(tarfile.TarInfo(n), io.BytesIO(b""))
+        return buf.getvalue()
+    real = tar(["etc/enigma2/bouquets.tv", "etc/enigma2/userbouquet.fav.tv", "tmp/.webouquetedit"])
+    assert bouquets.is_backup(real) and bouquets.is_backup(tar(["./tmp/.webouquetedit"], "w"))
+    flood = tar([f"x{i}" for i in range(bouquets._MEMBERS_MAX + 5)] + ["tmp/.webouquetedit"], "w:bz2")
+    assert not bouquets.is_backup(flood)
+    assert not bouquets.is_backup(b"\x1f\x8b" + b"\x00" * 100) and not bouquets.is_backup(b"")
+
+
 def test_a_number_too_large_to_be_one_is_none():
     from dopeiptv.providers import autotimer, dvbviewer, enigma2, radio_browser, tvheadend
     from dopeiptv.providers.boxes import build_xmltv

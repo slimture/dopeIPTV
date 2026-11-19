@@ -199,7 +199,11 @@ def main(argv: list[str] | None = None) -> int:
         try:
             cfg.port = int(port)
         except ValueError:
-            log.error("server: --port takes a number")
+            cfg.port = -1
+        if not 0 <= cfg.port < 65536:
+            # Past 65535 the bind raised OverflowError, not the OSError a
+            # port in use is: a traceback instead of a line. (0: any free one.)
+            log.error("server: --port takes a number from 0 to 65535")
             return 2
     server = HomeServer(host, cfg, discovery_port=0 if "--no-discovery" in argv else 65001)
     try:
