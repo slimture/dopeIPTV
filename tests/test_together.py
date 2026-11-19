@@ -1,5 +1,6 @@
 """Watch together: the code, the room id and the key; sealed messages and
-their checks; the relay's clock; the room's bookkeeping; keeping in step
+their checks (strict frames, a member's own key and signature, old frames
+handed again, what a hostile member can cause); the relay's clock; the room's bookkeeping; keeping in step
 (Corrector, LocalWatch); the link over an in-memory relay; finding what
 the room plays in this source; and the window's part, two windows in one
 room."""
@@ -341,6 +342,9 @@ def _link(hub, room, key, me, got, status):
                          on_status=lambda k, n: status.append((k, n)),
                          relay_for=lambda r, m: FakeRelay(hub, m))
     link.start()
+    # In the room once its first request is answered: what the relay held
+    # before that is not delivered.
+    assert _wait(lambda: link._polled.is_set() or status)
     return link, clock
 
 
@@ -867,3 +871,379 @@ def test_the_relay_goes_over_https_only_and_follows_no_redirect():
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+# -- hardening: strict frames, who said it, old frames, bounds ---------------------------
+
+
+def _seal_plain(plain: bytes) -> bytes:
+    """A frame with *plain* as its padded text, sealed as the room seals."""
+    nonce = os.urandom(12)
+    head = bytes([together.FORMAT])
+    return head + nonce + together.aead.encrypt(
+        KEY, nonce, plain, together._AAD + head + bytes.fromhex(ROOM))
+
+
+def test_a_frame_is_exactly_as_seal_makes_it():
+    text = json.dumps({"k": "hi", "f": "ab" * 8, "n": 1, "t": 1}).encode()
+    head = len(text).to_bytes(2, "big")
+    good = head + text + b"\0" * (192 - 2 - len(text))
+    assert together.open_frame(KEY, ROOM, _seal_plain(good)) is not None
+    # Something other than zeros after the text: refused.
+    for at in (2 + len(text), 100, 191):
+        dirty = bytearray(good)
+        dirty[at] = 1
+        assert together.open_frame(KEY, ROOM, _seal_plain(bytes(dirty))) is None, at
+    # A size that is none of the padded ones: refused, shorter or longer.
+    assert together.open_frame(KEY, ROOM, _seal_plain(head + text)) is None
+    assert together.open_frame(KEY, ROOM, _seal_plain(good + b"\0")) is None
+    assert together.open_frame(KEY, ROOM, _seal_plain(good[:-1])) is None
+    # A length that reaches past the frame, and text that is no JSON object.
+    assert together.open_frame(KEY, ROOM, _seal_plain(b"\xff\xff" + good[2:])) is None
+    assert together.open_frame(KEY, ROOM, _seal_plain(b"\0\x02[]" + b"\0" * 188)) is None
+    # Every size seal() makes passes.
+    for n in (1, 150, 300, 700, 1400):
+        assert together.open_frame(KEY, ROOM, together.seal(KEY, ROOM, {"x": "a" * n})) is not None
+
+
+def test_a_member_has_a_key_of_its_own_and_its_id_is_the_keys_hash():
+    me, other = together.new_identity(), together.new_identity()
+    assert len(me.id) == together.ID_LEN == 40 and me.id != other.id
+    assert me.id == together.member_of(me.public)
+    # What the relay asks of a member id (donate/together.py).
+    import re
+    assert re.fullmatch(r"[0-9a-f]{16,64}", me.id)
+    assert me.seed.hex() not in repr(me)
+    msg = {"k": "hi", "f": me.id, "n": 1, "t": 5, "name": "Anna"}
+    got = together.open_message(KEY, ROOM, together.seal(KEY, ROOM, msg, me))
+    assert got is not None and got.signed and got.sender == me.id and got.name == "Anna"
+    # Signing for an id that is not the key's is not done.
+    with pytest.raises(ValueError):
+        together.seal(KEY, ROOM, dict(msg, f=other.id), me)
+    with pytest.raises(ValueError):
+        together.Link(ROOM, KEY, other.id, together.Clock(), on_message=lambda m: None,
+                      on_status=lambda k, n: None, identity=me)
+
+
+def test_nobody_speaks_under_another_members_id():
+    anna, mallory = together.new_identity(), together.new_identity()
+    msg = {"k": "st", "f": anna.id, "n": 9, "t": 5, "st": _state_wire(b=anna.id)}
+    # No signature at all (what any holder of the room's key could write).
+    assert together.open_message(KEY, ROOM, together.seal(KEY, ROOM, msg)) is None
+    # Mallory's key and signature under Anna's id.
+    text = together.encode(dict(msg, f=mallory.id), ROOM, mallory)
+    forged = text.replace(mallory.id.encode(), anna.id.encode())
+    assert together.parse(json.loads(forged)).sender == anna.id
+    assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, forged)) is None
+    # Anna's own key shown, the signature Mallory's.
+    theirs = json.loads(text)
+    theirs["f"] = anna.id
+    theirs["st"]["b"] = anna.id
+    import base64
+    theirs["pk"] = base64.b64encode(anna.public).decode()
+    relabelled = json.dumps(theirs, separators=(",", ":")).encode()
+    assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, relabelled)) is None
+    # Anna's real message with one field changed, or carried to another room.
+    real = together.encode(msg, ROOM, anna)
+    assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, real)).signed
+    changed = real.replace(b'"x":12.5', b'"x":99.5')
+    assert changed != real
+    assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, changed)) is None
+    room2, key2 = together.derive("ABCD-EFGJ")
+    assert together.open_message(key2, room2, together._seal_text(key2, room2, real)) is None
+    # A signature not at the very end, or cut short.
+    moved = real[:-1] + b',"z":1}'
+    assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, moved)) is None
+    assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, real[:-12] + b'"}')) is None
+
+
+def test_a_member_on_1_6_8_is_still_heard_and_hears():
+    """Both ways across the versions: a 1.6.8 message (16 hex, no key, no
+    signature) is taken as before; and what this version sends is what
+    1.6.8 reads - its parse() takes ids of 8 to 64 hex and looks only at
+    the fields it knows."""
+    old = {"k": "st", "f": "ab" * 8, "n": 3, "t": 5, "st": _state_wire(b="ab" * 8)}
+    got = together.open_message(KEY, ROOM, together.seal(KEY, ROOM, old))
+    assert got is not None and not got.signed and got.sender == "ab" * 8 and got.state is not None
+    me = together.new_identity()
+    clock = _Clock()
+    room = together.Room("ABCD-EFGH", me.id, "Me", clock)
+    sent = room.publish(together.Media("movie", "Dune", "Dune", 2021), True, 30.0)
+    opened = together.open_frame(KEY, ROOM, together.seal(KEY, ROOM, sent, me))
+    # What 1.6.8 checks of a message and of a state, by its own rules.
+    assert opened["k"] in ("hi", "ka", "bye", "st")
+    for mid in (opened["f"], opened["st"]["b"]):
+        assert 8 <= len(mid) <= 64 and all(ch in "0123456789abcdef" for ch in mid)
+    assert isinstance(opened["n"], int) and isinstance(opened["t"], int)
+    assert set(opened) - {"k", "f", "n", "t", "st"} == {"pk", "sg"}     # the two it ignores
+    assert together.parse(opened).state == room.state
+    # Ids of any other length are nobody's.
+    for n in (4, 7, 12, 24, 32):
+        assert together.parse({"k": "ka", "f": "ab" * n, "n": 1, "t": 1}) is None, n
+    assert together.parse({"k": "ka", "f": 1234567812345678, "n": 1, "t": 1}) is None
+
+
+def test_the_longest_names_still_fit_signed():
+    me = together.new_identity()
+    room = together.Room("ABCD-EFGH", me.id, "Ж" * together.NAME_MAX, _Clock())
+    long = "Ж" * together.TEXT_MAX
+    room.publish(together.Media("episode", long, long, 2021, 438631, 12, 345, long), True, 9999.999)
+    assert len(together.seal(KEY, ROOM, room.hello(answer=True), me)) <= together.MAX_FRAME
+
+
+class _Known(_Clock):
+    """A clock that knows the relay's time: *ms* now, *joined* when the
+    room was made."""
+
+    def __init__(self, ms: int = 10_000_000, joined: int | None = None) -> None:
+        super().__init__(ms)
+        self.joined = ms if joined is None else joined
+
+    known = True
+
+    def now_ms(self, mono=None) -> int:
+        return self.ms if mono is None else self.joined
+
+
+def test_an_old_frame_handed_again_after_a_rejoin_is_ignored():
+    bob = "bb" * 8
+    clock = _Known()
+    room = together.Room("ABCD-EFGH", "aa" * 8, "Me", clock)
+    seek = _msg("st", bob, 7, clock.ms, st=_state_wire(v=5, b=bob, x=600.0, t=clock.ms))
+    assert room.receive(seek, now=1.0)[-1][0] == "state"
+    assert room.receive(seek, now=2.0) == []                  # the same again: its number is known
+    # Rejoined an hour's film later: nothing is remembered of Bob, and the
+    # old seek is handed again. It is from before this stay in the room.
+    later = _Known(clock.ms + 240_000)
+    again = together.Room("ABCD-EFGH", "a1" * 8, "Me", later)
+    assert again.receive(seek, now=1.0) == [] and again.state is None and again.members == {}
+    assert again._last_n == {}
+    # What Bob says now is taken.
+    now_msg = _msg("st", bob, 8, later.ms, st=_state_wire(v=6, b=bob, t=later.ms))
+    assert again.receive(now_msg, now=2.0)[-1][0] == "state"
+
+
+def test_a_message_out_of_its_time_is_ignored_and_a_normal_one_never():
+    bob = "bb" * 8
+    clock = _Known(joined=10_000_000 - 3_600_000)           # in the room for an hour
+    room = together.Room("ABCD-EFGH", "aa" * 8, "Me", clock)
+    n = iter(range(1, 100))
+
+    def counted(t: int) -> bool:
+        k = next(n)
+        room.receive(_msg("ka", bob, k, t, name="Bob"), now=1.0)
+        return room._last_n.get(bob, (0, 0.0))[0] == k
+
+    assert counted(clock.ms)                                  # now
+    assert counted(clock.ms - 26_000)                         # held a long poll's time
+    assert counted(clock.ms - 90_000)                         # three slow tries at sending
+    assert counted(clock.ms + 4_000)                          # clocks a few seconds apart
+    assert not counted(clock.ms - together.STALE_MS - 1)
+    assert not counted(clock.ms + together.AHEAD_MS + 1)
+    # Just joined: only what is from before the join (and some slack) goes.
+    fresh = _Known(joined=10_000_000 - 1_000)
+    room = together.Room("ABCD-EFGH", "aa" * 8, "Me", fresh)
+    assert counted(fresh.ms - 20_000)
+    assert not counted(fresh.ms - 1_000 - together.JOIN_SLACK_MS - 1)
+    # Until the relay's clock is known nothing can be said - nothing is refused.
+    room = together.Room("ABCD-EFGH", "aa" * 8, "Me", _Clock())
+    assert counted(5) and counted(10 ** 15)
+
+
+def test_the_join_moment_follows_the_relays_clock_once_known():
+    mono = [100.0]
+    clock = together.Clock(mono=lambda: mono[0], wall=lambda: 5.0)     # a wall clock far off
+    room = together.Room("ABCD-EFGH", "aa" * 8, "Me", clock)
+    mono[0] = 102.0
+    clock.sample(101.9, 2_000_000_000, 102.0)
+    assert abs(clock.now_ms(room._born) - (2_000_000_000 - 1_950)) <= 2
+    bob = "bb" * 8
+    assert room.receive(_msg("hi", bob, 1, 2_000_000_000 - 500, name="Bob"), now=1.0)
+    assert room.receive(_msg("hi", bob, 2, 2_000_000_000 - 120_000, name="Bob"), now=1.0) == []
+    assert room._last_n[bob][0] == 1
+
+
+def test_what_a_hostile_member_can_cause_is_bounded():
+    clock = _Known()
+    me = "aa" * 8
+    room = together.Room("ABCD-EFGH", me, "Me", clock)
+    # More "members" than a room has: not listed, not remembered without end.
+    for i in range(500):
+        room.receive(_msg("hi", f"{i:016x}", 1, clock.ms, name=f"M{i}"), now=1.0)
+    assert len(room.members) == together.MEMBERS_MAX
+    assert len(room._last_n) == together.SENDERS_MAX
+    # Senders long silent make room again - not the ones in the room.
+    late = 1.0 + (together.STALE_MS + together.AHEAD_MS) / 1000.0 + 1.0
+    assert room.receive(_msg("ka", "ee" * 8, 1, clock.ms, name="Eve"), now=late) == []   # the room is full
+    assert "ee" * 8 in room._last_n and len(room._last_n) == together.MEMBERS_MAX + 1
+    assert set(room.members) <= set(room._last_n)
+
+    room = together.Room("ABCD-EFGH", me, "Me", clock)
+    bob, cleo = "bb" * 8, "cc" * 8
+    # A hello is answered, a flood of them once in a while.
+    asked = 0
+    for i in range(1, 51):
+        ev = room.receive(_msg("hi", bob, i, clock.ms, name="Bob"), now=10.0 + i * 0.01)
+        asked += sum(1 for k, _ in ev if k == "hello")
+    assert asked == 1
+    ev = room.receive(_msg("hi", bob, 60, clock.ms, name="Bob"), now=10.0 + together.HELLO_EVERY + 1)
+    assert [k for k, _ in ev] == ["hello"]
+    # A choice told by someone other than who made it is not a choice.
+    ev = room.receive(_msg("st", bob, 61, clock.ms, st=_state_wire(v=2, b=cleo, t=clock.ms)), now=20.0)
+    assert ev == [] and room.state is None
+    assert room.receive(_msg("st", bob, 62, clock.ms, st=_state_wire(v=2, b=bob, t=clock.ms)),
+                        now=20.0)[-1][0] == "state"
+    # A hello may carry what someone else chose (that is how a joiner learns it).
+    ev = room.receive(_msg("hi", cleo, 1, clock.ms, name="Cleo", re=True,
+                           st=_state_wire(v=3, b=bob, t=clock.ms)), now=20.0)
+    assert ev[-1][0] == "state" and room.state.ver == 3
+    # A version nobody could choose past is not taken; the next one is.
+    top = _state_wire(v=1 << 53, b=bob, t=clock.ms)
+    assert room.receive(_msg("st", bob, 63, clock.ms, st=top), now=21.0) == [] and room.state.ver == 3
+    room.receive(_msg("st", bob, 64, clock.ms, st=_state_wire(v=4, b=bob, t=clock.ms)), now=21.0)
+    assert room.state.ver == 4
+    # Positions: a number, finite, in range - as JSON may spell others.
+    for bad in ("NaN", "Infinity", "-Infinity", "-1", "1e400", "1e7", '"12"', "true", "null"):
+        wire = json.loads('{"x": %s}' % bad)
+        assert together.PlayState.from_wire(_state_wire(**wire)) is None, bad
+    for huge in ("1e400", "NaN"):
+        d = json.loads('{"k":"ka","f":"%s","n":%s,"t":5}' % (bob, huge))
+        assert together.parse(d) is None
+    # A name is one short line whatever was sent.
+    got = together.parse({"k": "hi", "f": bob, "n": 1, "t": 1, "name": "x" * 5000 + "\n<b>"})
+    assert len(got.name) == together.NAME_MAX
+
+
+def test_a_paused_room_never_seeks_past_the_titles_end():
+    fix = together.Corrector()
+    got = fix.decide(100.0, False, 9_999_999.0, False, now=10.0, duration=7200.0)
+    assert got.action == "seek" and got.value <= 7200.0
+    # There, it stays: no seek again and again.
+    assert fix.decide(got.value, False, 9_999_999.0, False, now=20.0, duration=7200.0) == together.NONE
+    # Within the title nothing changed.
+    fix = together.Corrector()
+    assert fix.decide(103.0, False, 100.0, False, now=14.0, duration=7200.0) == together.Fix("seek", 100.0)
+
+
+def test_the_app_makes_no_old_code_and_says_when_a_room_has_one():
+    assert all(len(together.new_code().replace("-", "")) == together.CODE_LEN for _ in range(50))
+    assert together.is_old_code("K7PQ-M2XD") and together.is_old_code("k7pq m2xd")
+    assert not together.is_old_code("K7PQM-2XDH9") and not together.is_old_code("nonsense")
+    _qapp()
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.together_ui import note_text
+    view = {"in": True, "conn": "ok", "members": [("Bob", "ok")], "old_code": True}
+    assert tr("together_old_code") in note_text(view)
+    assert tr("together_old_code") not in note_text(dict(view, old_code=False))
+    assert tr("together_old_code") != "together_old_code"
+
+
+def test_a_window_in_a_room_with_an_old_code_says_so():
+    _qapp()
+    Win = _window_class()
+    hub = Hub()
+    w = Win(FakeClient(), hub)
+    try:
+        assert w.together_join("K7PQ-M2XD", "Anna") is None
+        assert w.together_view()["old_code"] is True
+        assert w.together_start("Anna") is None
+        assert w.together_view()["old_code"] is False
+        assert len(w._together_room.me) == together.ID_LEN
+        assert _spin(lambda: w._together_link is not None)
+        assert w._together_link.identity.id == w._together_room.me
+    finally:
+        _close(w)
+
+
+def test_what_the_relay_held_before_joining_is_not_delivered():
+    """A rejoin: the relay still holds the room's old messages (or hands
+    them again). The link's first answer is only where to go on from."""
+    hub = Hub()
+    bob = together.new_identity()
+    old_room = together.Room("ABCD-EFGH", bob.id, "Bob", together.Clock())
+    film = together.Media("movie", "Dune", "Dune", 2021)
+    FakeRelay(hub, bob.id).post(together.seal(KEY, ROOM, old_room.hello(), bob))
+    FakeRelay(hub, bob.id).post(together.seal(KEY, ROOM, old_room.publish(film, True, 600.0), bob))
+    got, status = [], []
+    me = together.new_identity()
+    clock = together.Clock()
+    link = together.Link(ROOM, KEY, me.id, clock, on_message=got.append,
+                         on_status=lambda k, n: status.append((k, n)),
+                         relay_for=lambda r, m: FakeRelay(hub, m), identity=me)
+    link.start()
+    try:
+        link.send(together.Room("ABCD-EFGH", me.id, "Me", clock).hello())
+        assert _wait(lambda: len(hub.msgs) == 3)             # the hello went out, after the first answer
+        assert got == []
+        # What comes after is delivered, signed.
+        FakeRelay(hub, bob.id).post(together.seal(KEY, ROOM, old_room.hello(answer=True), bob))
+        assert _wait(lambda: got)
+        assert got[0].kind == "hi" and got[0].signed and got[0].state is not None
+        # ...and what this link sent is signed with its key, stamped by the relay's clock.
+        mine = together.open_message(KEY, ROOM, hub.msgs[2][2])
+        assert mine.signed and mine.sender == me.id
+        assert abs(mine.t - int(time.time() * 1000)) < 5_000
+        # A forged message under Bob's id never reaches the room.
+        forged = dict(old_room.publish(film, False, 5.0))
+        FakeRelay(hub, "c3" * 8).post(together.seal(KEY, ROOM, forged))
+        FakeRelay(hub, bob.id).post(together.seal(KEY, ROOM, old_room.keepalive(), bob))
+        assert _wait(lambda: len(got) == 2)
+        assert [m.kind for m in got] == ["hi", "ka"]
+    finally:
+        link.close()
+
+
+def test_sending_does_not_wait_for_ever_for_a_relay_that_does_not_answer():
+    hub = Hub()
+
+    class Deaf(FakeRelay):
+        def poll(self, after, wait):
+            raise together.RelayError("net")
+
+    bob = "b2" * 8
+    FakeRelay(hub, bob).post(together.seal(KEY, ROOM, {"k": "ka", "f": bob, "n": 1, "t": 5, "name": "Bob"}))
+    deaf = [True]
+    got = []
+    link = together.Link(ROOM, KEY, "a1" * 8, together.Clock(), on_message=got.append,
+                         on_status=lambda k, n: None,
+                         relay_for=lambda r, m: Deaf(hub, m) if deaf[0] else FakeRelay(hub, m))
+    link.FIRST_POLL_WAIT = 0.3
+    link.BACKOFF = (0.2,)
+    link.start()
+    try:
+        link.send({"k": "ka", "f": "a1" * 8, "n": 1, "t": 5, "name": "Anna"})
+        assert _wait(lambda: len(hub.msgs) == 2)
+        # Sent before any answer: the backlog is then read (the room's
+        # rules of time judge it) - an answer to the hello may be in it.
+        link._poll_relay.__class__ = FakeRelay
+        assert _wait(lambda: got)
+        assert got[0].name == "Bob"
+    finally:
+        link.close()
+
+
+def test_back_after_a_while_without_the_relay_the_window_says_hello_again():
+    """What was said while the relay could not be reached may be too old
+    to be taken when it comes: the others' answers to a hello say it anew."""
+    _qapp()
+    Win = _window_class()
+    hub = Hub()
+    w = Win(FakeClient(), hub)
+    try:
+        assert w.together_start("Anna") is None
+        assert _spin(lambda: w._together_link is not None and len(hub.msgs) == 1)
+        lid = w._together_lid
+        w._together_on_status(lid, "net", 0)
+        w._together_on_status(lid, "ok", 1)                  # a blip: nothing more is said
+        w._together_on_status(lid, "net", 0)
+        w._together_down_at -= 120.0
+        w._together_on_status(lid, "net", 0)                 # still down: the count goes on
+        w._together_on_status(lid, "ok", 1)
+        assert _spin(lambda: len(hub.msgs) == 2)
+        room_id, key = together.derive(w._together_room.code)
+        again = together.open_message(key, room_id, hub.msgs[1][2])
+        assert again.kind == "hi" and not again.answer and again.signed
+        time.sleep(0.2)
+        assert len(hub.msgs) == 2
+    finally:
+        _close(w)
