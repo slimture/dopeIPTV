@@ -166,7 +166,7 @@ def map_value(top: Block, var: str, value: str) -> str:
             m = re.search(_py(key[2:] if key.startswith("~*") else key[1:]), value,
                           re.I if key.startswith("~*") else 0)
             if m:
-                return re.sub(r"\$(\w+)", lambda v: m.groupdict().get(v.group(1), v.group(0)), out)
+                return re.sub(r"\$(\w+)", lambda v, m=m: m.groupdict().get(v.group(1), v.group(0)), out)
     return dict(entries).get("default", "")
 
 
