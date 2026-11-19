@@ -139,11 +139,11 @@ def signed_asset(release: dict, asset: dict) -> dict:
         except ValueError:
             continue
     if not keys:
-        # A test build made before the release key existed: the checksum
-        # the release gives is all there is. Never a release - the build
-        # signs it with the key this carries, or refuses (tools/sign_sums.py).
-        log.warning("update: this build carries no release key; checksum only")
-        return asset
+        # A build without the release key (core/update_keys.py) has nothing
+        # to check a signature with: it takes no update at all rather than
+        # trust a checksum the same site sent.
+        log.error("update: this build carries no release key - no update is taken")
+        raise UpdateError("upd_err_unsigned")
     tag = str(release.get("tag") or "")
     name = asset.get("name")
     # The site's copy first; GitHub's when that one is missing, stale or
