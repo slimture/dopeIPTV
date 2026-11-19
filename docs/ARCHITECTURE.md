@@ -387,7 +387,8 @@ dopeiptv/
                        watching?", the PIN, kids profiles
     profiles_ui.py     Profiles on screen: the avatar, the picker, the
                        profile's window, Settings > Profiles
-    mw_recording.py    Recording / timeshift mixin
+    mw_recording.py    Recording mixin (its base: mw_timeshift.py)
+    mw_timeshift.py    The provider's archive: catch-up and timeshift
     mw_place_rec.py    The Recordings place where the list was: header, ⋯,
                        recording now and next, the recordings as rows or cards
     rec_place.py       The Recordings place itself, dressed as it paints
