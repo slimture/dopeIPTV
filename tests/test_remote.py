@@ -394,6 +394,61 @@ class _Lists:
         return f"http://provider.invalid/live/u/p/{sid}.{fmt}"
 
 
+def test_no_login_reaches_another_device_through_the_shared_playlist_or_guide(tmp_path):
+    """The remote API's playlist wrote a channel's logo as it was - a box's
+    picon with its user:password@, a Plex logo with the X-Plex-Token - and
+    an unnamed source by its server, an M3U address with its login. The
+    guide passed on whole carried a programme's <icon>, <url> and <image>
+    the same way (a box's, a Plex or Jellyfin server's guide as the app
+    writes it). As server mode's lineup: public_logo and redact_url."""
+    import xml.etree.ElementTree as ET
+
+    class Logos(_Lists):
+        def live_streams(self, _cat=None):
+            return [{"stream_id": 1, "name": "Box", "category_id": "1",
+                     "stream_icon": "http://root:box-secret@192.168.1.9/picon/1.png"},
+                    {"stream_id": 2, "name": "Plex", "category_id": "1",
+                     "stream_icon": "http://192.168.1.8:32400/photo?X-Plex-Token=plex-secret"},
+                    {"stream_id": 3, "name": "Picon", "category_id": "1",
+                     "stream_icon": "/home/someone/picons/3.png"},
+                    {"stream_id": 4, "name": "Plain", "category_id": "1",
+                     "stream_icon": "https://logos.example/4.png"},
+                    {"stream_id": 5, "name": "Loose", "category_id": "none"}]   # under the source's name
+
+    pls = [{"id": "p1", "kind": "m3u",
+            "server": "http://m3u.example/get.php?username=anna&password=m3u-secret&type=m3u"}]
+    guide = tmp_path / "g.xml"
+    guide.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?><tv><channel id="c"><display-name>C</display-name>'
+        '<icon src="http://root:box-secret@192.168.1.9/picon/c.png"/>'
+        '<icon src="https://logos.example/c.png"/></channel>'
+        '<programme start="20261114200000 +0100" stop="20261114213000 +0100" channel="c">'
+        "<title>News</title><url>http://192.168.1.8:32400/x?X-Plex-Token=plex-secret</url>"
+        "<url>https://www.imdb.com/title/tt1</url>"
+        '<icon src="http://jf.lan:8096/Items/1/Images/Primary?api_key=jf-secret&amp;w=300"></icon>'
+        '<image type="poster">http://jf.lan:8096/i?api_key=jf-secret</image>'
+        '<icon src="https://img.example/p.png"/></programme></tv>', encoding="utf-8")
+    sh = Share(lambda: pls, make_client=lambda _pl: Logos(), guide_path=lambda _pid: str(guide))
+    m3u = sh.m3u("http://h", TOKEN)
+    assert "secret" not in m3u and "/home/someone" not in m3u, m3u
+    assert 'tvg-logo="https://logos.example/4.png"' in m3u, "a logo without a login stays"
+    assert "m3u.example" in m3u, "an unnamed source still says which it is"
+    for step in (1, 5, 64, 1 << 20):
+        sh._guide_path = lambda _pid: str(guide)
+        pieces = list(sh.guide())
+        data = b"".join(pieces)
+        assert b"secret" not in data, data
+        root = ET.fromstring(data)
+        prog = root.find("programme")
+        assert [u.text for u in prog.findall("url")] == ["https://www.imdb.com/title/tt1"]
+        assert [i.get("src") for i in prog.findall("icon")] == ["https://img.example/p.png"]
+        assert [i.get("src") for i in root.find("channel").findall("icon")] == \
+            ["https://logos.example/c.png"]
+        from dopeiptv.services import share as share_mod
+        sliced = [data[i:i + step] for i in range(0, len(data), step)]
+        assert b"".join(share_mod.logins_out(iter(sliced))) == data, step
+
+
 def test_the_share_hands_out_only_what_server_mode_s_lineup_does(served):
     """A parent's locked categories, channels hidden by hand and adult ones
     are neither in the playlist nor sent on (the 302), as server mode's

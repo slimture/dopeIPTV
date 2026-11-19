@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import codecs
 import hashlib
+import html
 import json
 import re
 import threading
@@ -26,6 +27,7 @@ from typing import Any, Callable, Iterator
 
 from ..core import safe_xml
 from ..core.log import log, redact_url
+from ..core.privacy import for_log
 from ..core.remote_api import stream_path
 
 _STEP = 1 << 18
@@ -143,7 +145,9 @@ class Share:
         out = [f'#EXTM3U url-tvg="{base}/guide.xml.gz{q}" x-tvg-url="{base}/guide.xml.gz{q}"']
         several = len(sources) > 1
         for pl in sources:
-            name = _attr(pl.get("name") or pl.get("server") or pl.get("id"))
+            # An unnamed source by its server - never with the login an M3U
+            # address or a box's carries (core/log.redact_url).
+            name = _attr(pl.get("name") or redact_url(pl.get("server") or "") or pl.get("id"))
             try:
                 rows, cats = self.handed_out(pl)
             except Exception as e:
@@ -157,8 +161,9 @@ class Share:
                 if r.get("epg_channel_id"):
                     attrs.append(f'tvg-id="{_attr(r["epg_channel_id"])}"')
                 attrs.append(f'tvg-name="{title}"')
-                if r.get("stream_icon"):
-                    attrs.append(f'tvg-logo="{_attr(r["stream_icon"])}"')
+                logo = public_logo(r.get("stream_icon"))
+                if logo:
+                    attrs.append(f'tvg-logo="{_attr(logo)}"')
                 if r.get("num"):
                     attrs.append(f'tvg-chno="{_attr(r["num"])}"')
                 attrs.append(f'group-title="{group}"')
@@ -177,7 +182,7 @@ class Share:
         if row is None:
             return None
         url = self._client(pl).live_url(row["stream_id"], "ts")
-        log.info("share: %s from %s to a player", row.get("name"), pl.get("name"))
+        log.info("share: %s from %s to a player", for_log(row.get("name")), pl.get("name"))
         return str(url) if url else None
 
     # -- the guide -------------------------------------------------------------------
@@ -205,7 +210,7 @@ class Share:
         for pl in self.shared_sources():
             path = self._guide_path(str(pl["id"]))
             try:
-                yield from guide_body(plain_chunks(path))
+                yield from logins_out(guide_body(plain_chunks(path)))
             except FileNotFoundError:
                 continue
             except (OSError, ValueError, zlib.error) as e:
@@ -289,6 +294,8 @@ def lineup_guide(guides: list[tuple[str, str]], channels: list[dict]) -> Iterato
                             out += [channel_xml(c, names, icon) for c in mine]
                     elif elem.tag == "programme":
                         ref = elem.get("channel") or ""
+                        if found.get(ref) or by_id.get(ref):
+                            _public_only(elem)
                         for c in found.get(ref) or by_id.get(ref) or []:
                             elem.set("channel", str(c["number"]))
                             out.append(ET.tostring(elem, encoding="utf-8", xml_declaration=False)
@@ -319,6 +326,82 @@ def public_logo(url: Any) -> str:
     if not text.lower().startswith(("http://", "https://")):
         return ""
     return text if redact_url(text) == text else ""
+
+
+def _with_login(text: str) -> bool:
+    """Whether an address in a guide carries a login: a user:password@, a
+    token or a key (core/log.redact_url would change it)."""
+    text = html.unescape(text).strip()
+    return bool(text) and redact_url(text) != text
+
+
+def _public_only(elem: Any) -> None:
+    """A programme handed to another device without the pictures and
+    links that carry a login (a box's, a Plex or Jellyfin server's guide
+    as the app writes it: their addresses with the login or token in)."""
+    for child in list(elem):
+        if (child.tag == "icon" and _with_login(child.get("src", ""))) or (
+                child.tag in ("url", "image") and _with_login(child.text or "")):
+            elem.remove(child)
+
+
+# <icon src="..."/> (or <icon ...></icon>), <url>...</url> and XMLTV 1.1's
+# <image>...</image>: what a guide passed on whole may carry a login in.
+_ICON = re.compile(rb"""<icon\b[^<>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')[^<>]*?"""
+                   rb"""(?:/>|>[^<]*</icon\s*>)""")
+_LINK = re.compile(rb"<(url|image)\b[^<>]*>([^<]*)</\1\s*>")
+
+
+def _scrubbed(data: bytes) -> bytes:
+    def icon(m: re.Match[bytes]) -> bytes:
+        src = (m.group(1) if m.group(1) is not None else m.group(2)) or b""
+        return b"" if _with_login(src.decode("utf-8", "replace")) else m.group(0)
+
+    def link(m: re.Match[bytes]) -> bytes:
+        return b"" if _with_login(m.group(2).decode("utf-8", "replace")) else m.group(0)
+    return _LINK.sub(link, _ICON.sub(icon, data))
+
+
+def _end_of(data: bytes, at: int, name: bytes) -> int | None:
+    """Where the element that starts at *at* ends in *data* - its tag
+    closed with "/>", or its end tag - or None while it goes on."""
+    end = data.find(b">", at)
+    if end < 0:
+        return None
+    if data[end - 1:end] == b"/":
+        return end + 1
+    close = data.find(b"</" + name, end)
+    shut = data.find(b">", close) if close >= 0 else -1
+    return shut + 1 if shut >= 0 else None
+
+
+def logins_out(pieces: Iterator[bytes]) -> Iterator[bytes]:
+    """A guide's body passed on (the remote API's guide.xml.gz) without an
+    <icon>, <url> or <image> whose address carries a login - public_logo's
+    rule. Each slice is held back from its last "<" (or an <url> or <image>
+    not yet closed) so no element is cut in two; past 1 MiB it goes on."""
+    rest = b""
+    for piece in pieces:
+        data = rest + piece
+        cut = data.rfind(b"<")
+        if cut < 0:
+            cut = len(data)
+        moved = True
+        while moved:                    # cut only ever moves back: it ends
+            moved = False
+            for tag in (b"<icon", b"<url", b"<image"):
+                i = data.rfind(tag, 0, cut)
+                if i >= 0:
+                    end = _end_of(data, i, tag[1:])
+                    if end is None or end > cut:
+                        cut, moved = i, True
+        if len(data) - cut > (1 << 20):
+            cut = len(data)
+        rest = data[cut:]
+        if cut:
+            yield _scrubbed(data[:cut])
+    if rest:
+        yield _scrubbed(rest)
 
 
 def plain_chunks(path: str) -> Iterator[bytes]:

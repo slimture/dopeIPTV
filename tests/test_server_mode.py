@@ -699,12 +699,20 @@ def test_logos_with_a_login_or_a_token_never_reach_a_device(tmp_path):
 
     (tmp_path / "epg_p1.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?><tv><channel id="box.tv"><display-name>Box</display-name>'
-        '<icon src="http://root:box-secret@192.168.1.9/picon/guide.png"/></channel></tv>',
+        '<icon src="http://root:box-secret@192.168.1.9/picon/guide.png"/></channel>'
+        # A programme's pictures and links as a box's or a media server's
+        # guide carries them: the login or the token in the address.
+        '<programme start="20261114200000 +0100" stop="20261114213000 +0100" channel="box.tv">'
+        '<title>News</title><icon src="http://root:box-secret@192.168.1.9/p.png"/>'
+        "<url>http://192.168.1.8:32400/x?X-Plex-Token=plex-secret</url>"
+        '<image>http://jf.lan:8096/i?api_key=jf-secret</image>'
+        '<icon src="https://logos.example/4.png"/></programme></tv>',
         encoding="utf-8")
     srv, pool = _serving(tmp_path, Logos("http://x.invalid"))
     try:
         m3u = _get(srv, f"/playlist.m3u?token={TOKEN}").read().decode()
         guide = _get(srv, f"/xmltv.xml?token={TOKEN}").read().decode()
+        assert "<title>News</title>" in guide and "https://logos.example/4.png\" /></programme>" in guide
         for text in (m3u, guide):
             assert "secret" not in text and "/home/someone" not in text
             assert "https://logos.example/4.png" in text, "a logo without a login stays"
