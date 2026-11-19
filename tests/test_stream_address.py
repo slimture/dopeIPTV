@@ -28,7 +28,7 @@ STREAMS = (
     "rtp://@239.1.1.1:5000", "udp://@239.0.0.1:1234", "udp://239.0.0.1:1234",
     "mms://radio.example/a", "mmsh://radio.example/a", "srt://relay.example:9000?streamid=x",
     "rist://relay.example:1968", "ftp://nas.example/film.mkv", "sftp://nas.example/film.mkv",
-    "smb://nas/films/a.mkv", "tcp://10.0.0.5:1234", "ytdl://www.youtube.com/watch?v=x",
+    "smb://nas/films/a.mkv", "tcp://10.0.0.5:1234",
     "http://192.168.1.1:4022/udp/239.0.0.1:1234", "http://127.0.0.1:6878/ace/getstream?id=abc",
     "http://tv.example/x.ts|User-Agent=VLC&Referer=http://tv.example/",
 )
@@ -82,6 +82,24 @@ def test_a_list_from_the_network_names_streams_and_nothing_of_this_computer():
                     "\\\\.\\pipe\\x", "/dev/video0"):
         assert refusal(address, remote=True), address
         assert played(address, True) == ""
+
+
+def test_yt_dlp_runs_on_a_web_stream_the_person_opened_never_on_a_source_s():
+    """ytdl:// hands the page after it to yt-dlp: the app's own word for an
+    address opened by hand (Open address, a saved web stream), never one a
+    provider, a box or a playlist at a web address may give."""
+    from dopeiptv.core import ytdlp
+    for address in ("ytdl://www.youtube.com/watch?v=x", "YTDL://evil.example/x",
+                    "ytdl://http://127.0.0.1:8080/admin"):
+        assert refusal(address, remote=True), address
+        assert played(address, True) == ""
+    own = ytdlp.mpv_address("https://www.youtube.com/watch?v=x")
+    assert own.startswith("ytdl://")
+    # The player's last look and a playlist file of one's own: as before.
+    assert refusal(own, remote=False) == "" and played(own, False) == own
+    c = _Fake("ytdl://www.youtube.com/watch?v=x")
+    client_mod._nerd_lists(c, {"_kind": "xtream", "_server": "http://tv.example"}, "p1")
+    assert c.live_url(1) == "" and c.vod_url(1) == "" and c.archive_link(1, 1.0) is None
 
 
 def test_the_protocol_is_read_as_mpv_reads_it():

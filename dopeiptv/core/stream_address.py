@@ -22,7 +22,8 @@ person's own. So an address from a source is looked at first
 - from the network (an Xtream or Stalker provider, a box, a media server, a
   playlist at a web address): a stream over one of the network's media
   protocols (:data:`NETWORK`) and nothing else - no file, no disc or
-  device of this computer;
+  device of this computer, and no ``ytdl://`` (yt-dlp run on a page of the
+  sender's choice);
 - from a playlist file on this computer: anything but what is no stream at
   all (:data:`NEVER`, the ``lavfi`` device, an option, control characters) -
   files anywhere, a disc, a tuner card and a capture device stay the
@@ -38,12 +39,14 @@ from __future__ import annotations
 from .log import log
 
 #: The network's media protocols as mpv names them: what a provider's
-#: stream comes over.
+#: stream comes over. Not ``ytdl://``: that runs yt-dlp on whatever page
+#: follows it - the app's own word for a web stream the person opened
+#: (core/ytdlp.mpv_address, which never passes a source), never a source's.
 NETWORK = frozenset((
     "http", "https", "httpproxy", "rtsp", "rtsps", "rtmp", "rtmpe", "rtmps",
     "rtmpt", "rtmpte", "rtmpts", "rtp", "srtp", "udp", "mms", "mmsh",
     "mmshttp", "mmst", "srt", "rist", "ftp", "sftp", "smb", "tcp", "tls",
-    "dav", "davs", "webdav", "webdavs", "ipfs", "ipns", "ytdl"))
+    "dav", "davs", "webdav", "webdavs", "ipfs", "ipns"))
 
 #: No stream, whoever lists it: an address that carries a file or an edit
 #: list in itself, reaches every FFmpeg protocol or a socket of this
