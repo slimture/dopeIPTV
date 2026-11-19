@@ -341,7 +341,7 @@ print(json.dumps({"code": code, "inside": json.dumps(doc, ensure_ascii=False, in
 _TOGETHER = r'''
 import base64, json
 from dopeiptv.core import together
-code = "K7PQ-M2XD"
+code = "K7PQM-2XDH9"
 room, key = together.derive(code)
 member = together.new_member()
 here = together.Room(code, member, "Kalle", together.Clock())

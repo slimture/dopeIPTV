@@ -889,7 +889,8 @@ answers `404` (nothing under that slot, and no key asked for) - not 401
 
 The app's "Watch together…" keeps friends' players in step, each playing
 from their own source: one starts a room and gets a short code
-(`K7PQ-M2XD`), the others join with it. The app makes from the code a room
+(`K7PQM-2XDH9`: ten characters, stretched by 600 000 rounds of PBKDF2;
+one of eight from 1.6.7 still joins its room), the others join with it. The app makes from the code a room
 id and a key; every message - who is in the room, what plays, play, pause
 and seek - is encrypted on the sender's computer, and the service
 (donate/together.py, routes `/together/<room>` in donate.py) only passes
