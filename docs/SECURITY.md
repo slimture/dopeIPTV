@@ -67,6 +67,8 @@ change a playlist file on its web server.
 | They could try | What stops it |
 |---|---|
 | A channel address that is no stream: `av://lavfi` (a filter graph can write a file of the sender's choice), `edl://`, `memory://`, `gopher://` to a port of this computer, `fd`, a line that starts with `-` | `core/stream_address.py`: an address from the network plays only over a network media protocol (`NETWORK`), never one of `NEVER`, the `lavfi` device, an option or a control character; checked where a client hands its addresses out (`providers/client.py`, `providers/stalker.py`) and once more in the docked player and each multiview cell (`media/embedded.py`, `ui/multiview_cell.py`) |
+| From a source on the internet: an `smb://` address (on Windows a sign-in there with the person's account), raw `tcp://` or `tls://` to any service, ftp, WebDAV, a gateway - or an address on this computer or a link-local one (the printer's page, a local engine, a cloud's metadata service) | `core/stream_address.py`: a source whose own address is on the internet (`on_internet`, its backup addresses too) hands out only the media protocols (`MEDIA`), never a host on this computer or link-local in any spelling (`host_refusal`: 127.1, 2130706433, `::ffff:127.0.0.1`, localhost, this computer's name, 0.0.0.0, 169.254/16, fe80::/10); a private address of the home network stays. A home network's source and a playlist file as before; what the person's rewrite rules or udpxy make is theirs |
+| From a source on the internet: a logo or poster on this computer or a link-local host, so the app itself sends requests there | `providers/client._pictures_kept`: such a picture is taken out of that source's lists and pages by the same rule (`stream_address.picture_refusal`) |
 | A line read as an option of an external mpv or VLC, or of the recorder (`--log-file=`, `--include=`) | The address after `--`, and nothing but a stream's address or a file's path handed over (`media/players.py`, `core/recording.py`) |
 | ffmpeg reading `concat:`, `subfile:`, `unix:` or a local file behind an address | `core/player_exec.ffmpeg_protocols`: `-protocol_whitelist` with a stream's protocols wherever ffmpeg or ffprobe is started for a stream |
 | A picture that names a file: `/dev/zero`, or `\\host\share\x.png` (on Windows a login at that host) | `core/picture_files.py`: a file is read as a picture only inside the app's own picture folders, only a plain file, at most 64 MB |
@@ -82,6 +84,7 @@ change a playlist file on its web server.
 - The ceilings are far above any real answer, so a hostile source can still
   make the app read and work up to them.
 - A list chooses where its pictures come from: [below](#a-list-chooses-where-its-pictures-come-from).
+- A host is read as written, never looked up: [below](#a-host-is-read-as-written-never-looked-up).
 - A provider on plain http: [below](#a-provider-on-plain-http).
 - A stream's own bytes are decoded by FFmpeg and libmpv: [below](#bugs-in-the-media-libraries-are-theirs).
 
@@ -152,14 +155,14 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 
 | They could try | What stops it |
 |---|---|
-| Reading the settings files (every login, the sync code, the tokens) from another account | `core/settings_files.protect`: each file 0600 and the app's folder 0700, set at start before anything writes them, and only ever narrowed; on Windows the registry and the user's own profile |
+| Reading the settings files (every login, the sync code, the tokens) from another account | `core/settings_files.protect`: each file 0600 and the app's folder 0700, set at start before anything writes them, and only ever narrowed; on Windows the registry and the user's own profile. Where the drive keeps no permissions (FAT, exFAT, some shares) the app starts all the same, logs the file by name and says once where it is (`not_private`, `ui/mw_settings._tell_settings_not_private`) |
 | Handing the running app a command | `core/instance.py`: a socket in `$XDG_RUNTIME_DIR` or a 0700 folder of the user's own, never the shared /tmp, nor a folder another account owns; on Windows a random word in the pipe's name (`_pipe_key`) |
 | Using the loopback proxy to go out as the person, through their route | A key made for each run (`core/net_bridge.py`) |
 | Reading the rewind buffer's stream | A 144-bit token, loopback only (`core/dvr_server.py`) |
 | Catching the Trakt sign-in's redirect | Its port never shared (`core/exclusive_bind.ExclusiveBindMixin`, `SO_EXCLUSIVEADDRUSE` on Windows), and the code it carries useless without the PKCE verifier that stays in the app (`providers/trakt.py`) |
 | A socket of its own where Discord or lircd would be | `core/discord_rpc.py`: a socket this user owns only; `core/tv_input.lirc_socket_ok`: lircd's when root or this user owns it, or in a folder nobody else can write to |
 | Reading a media server's token off the session bus | `services/media_session.art_for_bus`: no address with a login on the bus |
-| A file planted in the cache | The guide's index read by a restricted unpickler (`providers/epg._IndexUnpickler`); pictures from disk only in the app's folders (`core/picture_files.py`) |
+| A file planted in the cache | The guide's index is plain data with no code path - a header, texts and arrays' bytes checked against it (`providers/epg.read_index_blob`); no pickle anywhere in the app (`tests/test_security_rules.py`); pictures from disk only in the app's folders (`core/picture_files.py`) |
 
 **What is left.**
 
@@ -422,14 +425,31 @@ encrypted", `core/conn_test.py`).
 ### A list chooses where its pictures come from
 
 The picture addresses in a list are fetched as they are: any web address,
-one at home too (`core/workers.py`). A hostile list can make the app send
-plain GET requests to addresses of its choosing, a device at home among
-them. The request carries a generic user agent and nothing of the person's
+one at home too (`core/workers.py`). A source on the internet never names
+one on this computer or a link-local host (`providers/client._pictures_kept`,
+the stream addresses' rule), but its list can still make the app send
+plain GET requests to a private address of the home network - the router,
+a printer - and a source of the home network's, or a playlist file, to
+any. The request carries a generic user agent and nothing of the person's
 (`_IMG_HEADERS`), its answer is read up to a cap, and only a picture is
 drawn.
 
 *Why:* a box's picons and a media server's artwork are at home addresses,
 and a playlist on a server at home is common.
+
+### A host is read as written, never looked up
+
+What a source on the internet may send the player and the picture loader
+to is judged by the host as its address writes it
+(`core/stream_address.host_refusal`): a public name whose DNS answer is
+127.0.0.1, a server that redirects there, or an HLS playlist whose segments
+are there, is not seen; nor is this computer's own address on the home
+network, which counts as the home network's. mpv and requests resolve and
+follow them as they do.
+
+*Why:* looking each name up would ask DNS about every channel of a list,
+and its answer could change between the look and the connection; the
+written host covers what a list can say outright.
 
 ### A link to a channel plays without a question
 
