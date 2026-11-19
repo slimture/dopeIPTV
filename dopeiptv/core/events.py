@@ -912,6 +912,9 @@ class RecordingWatch:
         self._seen: dict[str, str] = {str(j.get("id")): str(j.get("status")) for j in jobs}
         self._ending: dict[str, float] = {}
         self._reasons: dict[str, str] = {}
+        # The recordings that began while what played was private: every
+        # event of theirs says so, to their end (fields' "private").
+        self._private: set[str] = set()
 
     def stopped(self, title: str, reason: str) -> None:
         """RecordingManager.recording_stopped: why it ended."""
@@ -921,11 +924,18 @@ class RecordingWatch:
     def pending(self) -> bool:
         return bool(self._ending)
 
-    @staticmethod
-    def _fields(j: dict) -> dict[str, Any]:
-        return {"title": j.get("title") or "", "channel": j.get("channel") or ""}
+    def _fields(self, j: dict) -> dict[str, Any]:
+        out: dict[str, Any] = {"title": j.get("title") or "", "channel": j.get("channel") or ""}
+        if str(j.get("id")) in self._private:
+            out["private"] = True
+        return out
 
-    def update(self, jobs: Iterable[dict], now: float | None = None) -> list[tuple[str, dict[str, Any]]]:
+    def update(self, jobs: Iterable[dict], now: float | None = None,
+               private: bool = False) -> list[tuple[str, dict[str, Any]]]:
+        """*private*: what plays now is private (core/privacy.py) - a
+        recording that starts now is private to its end, and its events
+        carry ``"private": True`` in their fields for the sender to say
+        what happened, not what."""
         t = time.monotonic() if now is None else now
         out: list[tuple[str, dict[str, Any]]] = []
         by_id: dict[str, dict] = {}
@@ -937,6 +947,8 @@ class RecordingWatch:
             if status == before:
                 continue
             if status == "recording":
+                if private:
+                    self._private.add(jid)
                 out.append(("recording_started", self._fields(j)))
             elif status == "done" and before == "recording":
                 self._ending[jid] = t
@@ -957,6 +969,7 @@ class RecordingWatch:
                         reason=self._reasons.pop(title, "") or "finished")))
         for jid in [k for k in self._seen if k not in by_id]:
             del self._seen[jid]
+            self._private.discard(jid)
         return out
 
 

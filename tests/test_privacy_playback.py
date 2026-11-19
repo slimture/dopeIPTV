@@ -533,3 +533,139 @@ def test_events_say_what_happened_not_what_to_the_end_of_a_private_playback():
     assert {m.get("event") for m in before} >= {"playback_started", "playback_paused",
                                                 "playback_resumed"}
     w._events_stopped()
+
+
+# -- the system's media controls, the remote API, a recording's events -------------------
+
+def test_the_systems_media_controls_are_not_told_what_plays_privately():
+    from dopeiptv.services.media_session import clean_snapshot
+    from dopeiptv.ui.mw_mpris import _MprisMixin, _SessionHost
+    snap = {"status": "Playing", "track": "movie:7", "title": "The Bridge",
+            "artist": "Hidden Show", "album": "A", "art": "file:///p.jpg",
+            "length": 100.0, "position": 5.0, "can_seek": True, "can_next": True,
+            "can_prev": False, "volume": 0.5, "live": False, "audio": False}
+
+    class W(_MprisMixin):
+        def mpris_snapshot(self):
+            return dict(snap)
+
+        def mpris_position(self):
+            return 5.0
+    w = W()
+    host = _SessionHost(w)
+    assert host.mpris_snapshot() == snap and host.mpris_position() == 5.0
+    _began_private("movie", 7)              # the switch is off again
+    told = clean_snapshot(host.mpris_snapshot())
+    assert (told["title"], told["artist"], told["album"], told["art"]) == ("dopeIPTV", "", "", "")
+    assert "7" not in told["track"] and "Bridge" not in json.dumps(told)
+    # The controls, the place and the length stay as they are.
+    for key in ("status", "length", "position", "can_seek", "can_next", "can_prev", "volume"):
+        assert told[key] == snap[key], key
+    # The window's own snapshot (the phone remote's) is as before.
+    assert w.mpris_snapshot() == snap
+    privacy.playback_started("movie", 8)
+    assert host.mpris_snapshot() == snap
+
+
+def test_a_private_cast_is_not_named_to_the_systems_media_controls():
+    from dopeiptv.ui.mw_mpris import _MprisMixin, _SessionHost
+
+    class W(_MprisMixin):
+        player = None
+        xmltv = SimpleNamespace(current_programme=lambda it: {"title": "Secret Show"})
+
+        def _media_cast(self):
+            return {"kind": "live", "key": 7, "item": {"stream_id": 7}, "title": "Hidden Channel",
+                    "icon_url": "", "paused": False, "length": 0.0, "position": 0.0,
+                    "volume": 0.4, "device": "Living room TV", "can_pause": True,
+                    "has_volume": True, "muted": False}
+
+        def _media_art(self, url):
+            return "file:///logo.png"
+    host = _SessionHost(W())
+    assert host.mpris_snapshot()["title"] == "Hidden Channel"
+    _began_private("live", 7)
+    told = host.mpris_snapshot()
+    assert told["status"] == "Playing" and told["cast"] == "Living room TV" and told["can_next"]
+    assert (told["title"], told["artist"], told["art"], told["track"]) == ("dopeIPTV", "", "", "private")
+
+
+def test_the_remote_api_says_that_something_plays_privately_not_what():
+    from dopeiptv.ui.mw_remote import _RemoteMixin
+
+    class W(_RemoteMixin):
+        _last_playback = {"kind": "live", "key": 7}
+        playlist_store = None
+
+        def mpris_snapshot(self):
+            return {"status": "Playing", "title": "Hidden Channel", "artist": "Secret Show",
+                    "volume": 0.5, "position": 12.0, "length": 0}
+    w = W()
+    _began_private("live", 7)
+    out = w._remote_status()
+    assert out["state"] == "playing" and out["private"] is True
+    assert out["title"] == "" and out["programme"] == "" and out["volume"] == 50
+    assert out["position"] == 12.0 and "Hidden" not in json.dumps(out) and "Secret" not in json.dumps(out)
+    privacy.playback_started("live", 9)
+    out = w._remote_status()
+    assert out["title"] == "Hidden Channel" and out["programme"] == "Secret Show"
+    assert "private" not in out
+
+
+def test_a_recording_begun_privately_is_not_named_when_it_ends_after_the_switch():
+    from dopeiptv.core import events
+    from dopeiptv.ui.mw_events import _EventsMixin
+    sent: list = []
+
+    class Dispatcher:
+        active = True
+
+        def emit(self, event, fields=None, private=False, state=None):
+            sent.append(events.payload(event, fields, private))
+
+    job = {"id": "j1", "title": "Secret Show", "channel": "Hidden Channel", "status": "scheduled",
+           "path": "/rec/Secret Show.ts"}
+    other = {"id": "j2", "title": "News", "channel": "Open Channel", "status": "scheduled",
+             "path": "/rec/News.ts"}
+
+    class Watch(events.RecordingWatch):
+        SETTLE_S = 0.0
+
+    class W(_EventsMixin):
+        _events = Dispatcher()
+        rec = SimpleNamespace(jobs=[job, other])
+    w = W()
+    w._events_rec = Watch(w.rec.jobs)
+    privacy.set_private(True)
+    privacy.playback_started("live", 7)
+    job["status"] = "recording"
+    w._events_jobs()
+    privacy.set_private(False)              # the switch off; the channel still plays
+    privacy.playback_started("live", 9)     # ...and then another, in the open
+    other["status"] = "recording"
+    w._events_jobs()
+    job["status"] = other["status"] = "done"
+    w._events_jobs()
+    w._events_jobs()
+    by = {(m["event"], m.get("title", "")): m for m in sent}
+    assert ("recording_started", "News") in by and ("recording_finished", "News") in by
+    assert by[("recording_finished", "News")]["file"] == "News.ts"
+    hidden = [m for m in sent if m.get("private")]
+    assert [m["event"] for m in hidden] == ["recording_started", "recording_finished"]
+    assert all("title" not in m and "channel" not in m and "file" not in m for m in hidden)
+    assert "Secret" not in json.dumps(sent) and "Hidden" not in json.dumps(sent)
+    assert not [m for m in sent if m.get("title") == "News" and m.get("private")]
+
+
+def test_a_failed_private_recording_is_not_named_either():
+    from dopeiptv.core import events
+    job = {"id": "j1", "title": "Secret Show", "channel": "Hidden Channel", "status": "scheduled"}
+    w = events.RecordingWatch([job])
+    job["status"] = "recording"
+    assert w.update([job], now=1, private=True) == [
+        ("recording_started", {"title": "Secret Show", "channel": "Hidden Channel", "private": True})]
+    job.update(status="failed", error="no stream")
+    (event, fields), = w.update([job], now=2)
+    assert event == "recording_failed" and fields["private"] is True
+    m = events.payload(event, {k: v for k, v in fields.items() if k != "private"}, True)
+    assert m["private"] is True and "title" not in m and "error" not in m

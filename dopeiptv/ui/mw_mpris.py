@@ -18,6 +18,7 @@ from typing import Any
 from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QKeySequence, QShortcut
 
+from ..core import privacy
 from ..core.log import log
 
 # The same action from the key and from MPRIS inside this window counts once.
@@ -33,6 +34,21 @@ _MEDIA_KEYS = (
     (Qt.Key.Key_MediaNext, "next"),
     (Qt.Key.Key_MediaPrevious, "previous"),
 )
+
+
+class _SessionHost:
+    """The window as the system's media session sees it: everything the
+    window's own, but what plays as the system may be told it
+    (_session_snapshot)."""
+
+    def __init__(self, window: Any) -> None:
+        self._window = window
+
+    def mpris_snapshot(self) -> dict[str, Any]:
+        return self._window._session_snapshot()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._window, name)
 
 
 class _MprisMixin:
@@ -67,7 +83,7 @@ class _MprisMixin:
 
     def _join_media_session(self) -> None:
         from ..services.media_session import create_session
-        svc = create_session(self, self)
+        svc = create_session(_SessionHost(self), self)
         if svc is None:
             return
         if svc.start():
@@ -136,6 +152,18 @@ class _MprisMixin:
             cast = self._media_cast()
             return float(cast["position"]) if cast is not None else 0.0
         return p.playback_position()
+
+    def _session_snapshot(self) -> dict[str, Any]:
+        """What the system's media controls (MPRIS, Now Playing, the SMTC)
+        are told plays - here or on a TV. Any program on the desktop can
+        read it there, and some keep it or send it on: a private playback
+        (core/privacy.py) shows as playing, with the controls, place and
+        length it has, and says nothing of what it is - no title,
+        programme, series, album or artwork, no track id that names it."""
+        snap = self.mpris_snapshot()
+        if snap.get("status") in ("Playing", "Paused") and privacy.playing_private():
+            snap = dict(snap, track="private", title="dopeIPTV", artist="", album="", art="")
+        return snap
 
     def _cast_snapshot(self, cast: dict[str, Any]) -> dict[str, Any]:
         """What plays on the TV as the controls show it: its title and what

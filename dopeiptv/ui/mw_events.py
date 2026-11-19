@@ -353,10 +353,14 @@ class _EventsMixin:
             watch = self._events_rec
             if watch is None:
                 return
-            told = watch.update(list(self.rec.jobs))
-            if self._events_live() is not None:
+            # A recording that began while what played was private stays
+            # so to its end, though private viewing is off by then.
+            told = watch.update(list(self.rec.jobs), private=privacy.playing_private())
+            d = self._events_live()
+            if d is not None:
                 for event, fields in told:
-                    self._events_send(event, fields, playback=False)
+                    private = bool(fields.pop("private", False)) or privacy.private()
+                    d.emit(event, fields, private)
             if watch.pending:
                 QTimer.singleShot(int(events.RecordingWatch.SETTLE_S * 1000) + 200, self._events_jobs)
         except Exception:
