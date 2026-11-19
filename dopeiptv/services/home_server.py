@@ -58,7 +58,7 @@ from ..core.dvr_session import DvrSession
 from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 from ..core.log import log, redact_url
 from ..core.nerd_check import FAIL, OK, WARN, Check
-from ..core.phone_remote import RateLimiter
+from ..core.phone_remote import RateLimiter, cross_site
 from ..core.remote_api import lan_addresses
 from ..core.restream import BOX, NO_DATA, TUNERS, VPN, Busy, Restreamer, ffmpeg_opener, is_hls
 from .guide_keeper import GuideKeeper
@@ -641,6 +641,15 @@ def tuner_host_ok(host: str | None) -> bool:
     return bool(own) and name == own
 
 
+def _loopback(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address.split("%", 1)[0])
+    except ValueError:
+        return False
+    mapped = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else None
+    return (mapped or ip).is_loopback
+
+
 def _own(handler: BaseHTTPRequestHandler) -> str:
     try:
         return str(handler.connection.getsockname()[0])
@@ -711,18 +720,23 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                 self._text(403, "only the home network")
                 return
             lim = server.limiter
-            if lim.blocked(who):
-                self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
-                return
             parts = urlsplit(self.path)
             path = parts.path.rstrip("/") or "/"
             query = parse_qs(parts.query, keep_blank_values=False)
             reading = method in ("GET", "HEAD")
             try:
                 if path in HDHR_PATHS or _AUTO.match(path):
+                    # No token here, so no lock-out either: a shut-out
+                    # address still has its tuner.
                     if not server.local.allows(who, _own(self)):
                         # No token here: this computer's own networks only.
                         self._text(403, "only this computer's own network")
+                        return
+                    if cross_site(self.headers):
+                        # A web page in a browser here (an <img>, a fetch)
+                        # would open the provider's connection; no tuner
+                        # client sends an Origin or Sec-Fetch-Site.
+                        self._text(403, "not for a web page")
                         return
                     if not tuner_host_ok(self.headers.get("Host")):
                         # Not a home name: a web page's own, rebound here.
@@ -730,11 +744,18 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                         return
                     self._hdhomerun(path, method)
                     return
+                if lim.blocked(who):
+                    self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
+                    return
                 given = self._token(query)
                 if not self._authorized(given):
                     # Only a try at the token counts: a browser asks for
-                    # /favicon.ico by itself.
-                    if given and lim.failed(who):
+                    # /favicon.ico by itself. Never this computer's nor a
+                    # web page's: a page in a browser here would shut out
+                    # the person's own browser, or a phone that visits it.
+                    if given and not _loopback(who) \
+                            and not cross_site(self.headers, self.headers.get("Host")) \
+                            and lim.failed(who):
                         log.warning("server: an address on the network kept guessing the token; "
                                     "it is shut out for %d minutes", int(lim.lockout // 60))
                     time.sleep(0.25)

@@ -209,6 +209,23 @@ def gesture(dx: float, dy: float, ms: float) -> str | None:
     return None
 
 
+#: Fetch Metadata's word for a request a web page of another site made; the
+#: page's own say same-origin, an address typed, a bookmark or a QR code none.
+_OTHER_SITE = ("cross-site", "same-site")
+
+
+def cross_site(headers: Any, host: str | None = None) -> bool:
+    """Whether a browser says a web page of another site asked: its
+    ``Sec-Fetch-Site`` is cross-site or same-site, or it names an ``Origin``
+    other than the server's own - ``http://`` and *host*, the Host it was
+    asked under; with *host* None every Origin is another's. Media servers,
+    players and the app's own pages (same-origin) send neither."""
+    if (headers.get("Sec-Fetch-Site") or "").strip().lower() in _OTHER_SITE:
+        return True
+    origin = (headers.get("Origin") or "").strip().lower()
+    return bool(origin) and (host is None or origin != "http://" + host.strip().lower())
+
+
 class RateLimiter:
     """Per client address: *rate* requests a second with *burst* at once,
     and a lock-out of *lockout* seconds after *fails* wrong tokens within
@@ -404,8 +421,10 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
             given = unquote(segs[1]) if len(segs) > 1 else ""
             if not server.authorized(given):
                 # Only what looks like a try at the token counts: a phone's
-                # browser asks for /favicon.ico by itself.
-                if len(given) >= 16 and lim.failed(who):
+                # browser asks for /favicon.ico by itself. Never a web
+                # page's: one the phone visits would shut it out of its remote.
+                if len(given) >= 16 and not cross_site(self.headers, self.headers.get("Host")) \
+                        and lim.failed(who):
                     log.warning("phone remote: an address on the network kept guessing; "
                                 "it is shut out for %d minutes", int(lim.lockout // 60))
                 self._text(403, "forbidden")
@@ -474,6 +493,11 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 return
             if method != "POST":
                 self._json(405, {"error": "use POST"})
+                return
+            if cross_site(self.headers, self.headers.get("Host")):
+                # Changing something is the phone's own page alone, never a
+                # web page's form or fetch (a text/plain body can be JSON).
+                self._json(403, {"error": "not from another site"})
                 return
             params = self._body()
             if params is None:

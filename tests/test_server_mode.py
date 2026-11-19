@@ -1026,6 +1026,46 @@ def test_the_tuner_s_endpoints_are_refused_beyond_its_own_networks(server, monke
     assert _get(srv, f"/playlist.m3u?token={TOKEN}").status == 200, "the token's routes as before"
 
 
+def test_a_web_page_cannot_drive_the_tuner(server):
+    """A page in a browser here asks the tuner by an IP address (an <img>, a
+    no-cors fetch: sent without asking) - refused, no connection opened;
+    Plex, Jellyfin, VLC and a person typing the address send neither header."""
+    srv, _host, provider, _pool = server
+    for headers in ({"Origin": "https://evil.example"}, {"Origin": "null"},
+                    {"Origin": f"http://127.0.0.1:{srv.port}"},
+                    {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "same-site"}):
+        for path in ("/discover.json", "/lineup.json", "/auto/v5"):
+            with pytest.raises(urllib.error.HTTPError) as e:
+                _get(srv, path, headers)
+            assert e.value.code == 403, (path, headers)
+    assert provider.total() == 0, "nothing opened for a web page"
+    assert _get(srv, "/discover.json").status == 200
+    assert _get(srv, "/lineup.json", {"Sec-Fetch-Site": "none"}).status == 200
+
+
+def test_a_web_page_cannot_shut_the_tuner_or_this_computer_out(server, monkeypatch):
+    srv = server[0]
+    monkeypatch.setattr(srv, "limiter", hs.RateLimiter(fails=3))
+    bad = "/playlist.m3u?token=" + "x" * 32
+    for _ in range(5):
+        with pytest.raises(urllib.error.HTTPError):
+            _get(srv, bad)                      # this computer: never shut out
+    assert not srv.limiter.blocked("127.0.0.1")
+    monkeypatch.setattr(hs, "_loopback", lambda _who: False)     # as if from the network
+    for _ in range(5):
+        with pytest.raises(urllib.error.HTTPError):
+            _get(srv, bad, {"Sec-Fetch-Site": "cross-site"})
+    assert not srv.limiter.blocked("127.0.0.1"), "a web page's guesses never count"
+    for _ in range(3):
+        with pytest.raises(urllib.error.HTTPError):
+            _get(srv, bad)
+    assert srv.limiter.blocked("127.0.0.1"), "a device's own guesses as before"
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(srv, f"/playlist.m3u?token={TOKEN}")
+    assert e.value.code == 429
+    assert _get(srv, "/discover.json").status == 200, "a shut-out address keeps its tuner"
+
+
 def test_the_tuner_answers_only_under_a_home_name(server):
     """DNS rebinding: a web page at home points its own name at this
     computer and asks the tuner, which needs no token - its Host is that
