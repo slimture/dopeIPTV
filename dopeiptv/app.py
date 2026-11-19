@@ -527,7 +527,12 @@ def main() -> int:
         except Exception:
             pass
 
-    app = QApplication(sys.argv)
+    # Qt reads options of its own from what it is handed (-platform,
+    # -platformpluginpath, -style, -stylesheet...). A start by a link hands
+    # it the program's name and nothing else: whatever stands beside a link
+    # is never Qt's to act on. The person's own command line is as before.
+    linked = any(is_link(a) for a in sys.argv[1:])
+    app = QApplication(sys.argv[:1] if linked else sys.argv)
     # A command (--play, --channel, a dopeiptv:// link) goes to the copy
     # already running, if there is one; this start then ends here.
     if command is not None:

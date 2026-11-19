@@ -389,6 +389,56 @@ def test_a_start_by_a_link_hands_the_link_over_and_nothing_else(app, socket_name
     assert got == [want]
 
 
+_QT_SPY = r"""
+import json, sys
+sys.argv = ['dopeiptv'] + json.loads(sys.argv[1])
+import dopeiptv.app as a
+seen = []
+real = a.QApplication
+
+class Spy(real):
+    def __init__(self, argv):
+        seen.append(list(argv))
+        super().__init__(argv)
+
+a.QApplication = Spy
+rc = a.main()
+print("QT" + json.dumps(seen), flush=True)
+sys.exit(rc)
+"""
+
+
+@pytest.mark.parametrize("argv, qt_gets", [
+    # Qt reads options of its own (-platformpluginpath loads a plugin from a
+    # folder): beside a link it is handed the program's name and no more.
+    (["dopeiptv://open", "-platformpluginpath", "/nonexistent/plugins"], ["dopeiptv"]),
+    (["-style", "nosuchstyle", "dopeiptv://open"], ["dopeiptv"]),
+    # The person's own command line is Qt's as it always was.
+    (["--play", "http://h/x.ts", "-style", "fusion"],
+     ["dopeiptv", "--play", "http://h/x.ts", "-style", "fusion"]),
+])
+def test_a_link_hands_qt_nothing_but_the_program_s_name(app, socket_name, argv, qt_gets):
+    from dopeiptv.core.instance import CommandServer
+    got: list[dict] = []
+    server = CommandServer(got.append)
+    child = subprocess.Popen([sys.executable, "-c", _QT_SPY, json.dumps(argv)],
+                             cwd=_REPO_ROOT, env=dict(os.environ, QT_QPA_PLATFORM="offscreen"),
+                             stdout=subprocess.PIPE, text=True)
+    try:
+        end = time.monotonic() + 60
+        while time.monotonic() < end and (not got or child.poll() is None):
+            app.processEvents()
+            time.sleep(0.01)
+        out = child.communicate(timeout=30)[0]
+    finally:
+        if child.poll() is None:
+            child.kill()
+        server.close()
+    assert child.returncode == 0 and len(got) == 1
+    line = next(ln for ln in out.splitlines() if ln.startswith("QT"))
+    assert json.loads(line[2:]) == [qt_gets]
+
+
 # -- dropped on the window ---------------------------------------------------------------
 
 class _Mime:
