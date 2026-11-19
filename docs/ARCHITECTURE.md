@@ -338,8 +338,10 @@ dopeiptv/
     main_window.py     MainWindow composition root (QMainWindow + mixins)
     app_menu.py        The app's menus, one layout on every platform: File,
                        View, History, Help
-    mw_settings.py     Settings dialog mixin (the pages and what they store;
-                       which row is where: docs/SETTINGS_MAP.md)
+    mw_settings.py     Settings dialog mixin: the window, its pages in their
+                       groups, what their builders share (SettingsContext),
+                       what they store (which row is where:
+                       docs/SETTINGS_MAP.md)
     settings_ui.py     Settings building blocks: sidebar shell (groups, a
                        group's pages shown only while it is on), pages,
                        cards, rows, link rows, switches, the playlist delegate
@@ -356,6 +358,9 @@ dopeiptv/
     cert_trust.py      The window that shows a certificate before it is trusted
     nerd_settings.py   Nerd in Settings: Status, and the five pages beside it
                        while it is on
+    set_watch.py       Settings' WATCH pages (Playback, Picture and sound,
+                       Guide, Multiview, Recording, Casting), each built the
+                       first time it is needed
     net_advanced.py    Nerd's Own DNS, Other networks (VLANs) and Low latency
                        cards
     nerd_check_line.py The ✓ / ! / ✗ line under a Nerd setting, its Test and
