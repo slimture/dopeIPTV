@@ -170,7 +170,11 @@ coll = COLLECT(
 # The Info.plist keys that actually matter for user perception:
 #   CFBundleName / CFBundleDisplayName - the app-menu label (fixes "python").
 #   CFBundleShortVersionString / CFBundleVersion - shown in About and Finder.
-#   LSMinimumSystemVersion - macOS floor; keep in step with the runner image.
+#   LSMinimumSystemVersion - the oldest macOS this build runs on, so Finder
+#     refuses an older one instead of the app failing: release.yml names it
+#     per build (DOPEIPTV_MACOS_MIN, its matrix's macos_min - 15.0 for Apple
+#     Silicon, whose Homebrew bottles are macOS 15's, 14.0 for Intel, which
+#     PyQt6's wheel needs); 11.0 for a build made elsewhere, as before.
 #   NSHighResolutionCapable - Retina rendering (mandatory on modern macOS).
 app = BUNDLE(
     coll,
@@ -183,7 +187,7 @@ app = BUNDLE(
         'CFBundleDisplayName': APP_NAME,
         'CFBundleShortVersionString': VERSION,
         'CFBundleVersion': VERSION,
-        'LSMinimumSystemVersion': '11.0',
+        'LSMinimumSystemVersion': os.environ.get("DOPEIPTV_MACOS_MIN", "").strip() or '11.0',
         'NSHighResolutionCapable': True,
         'NSPrincipalClass': 'NSApplication',
         'NSHumanReadableCopyright': 'GPL-3.0-or-later',
