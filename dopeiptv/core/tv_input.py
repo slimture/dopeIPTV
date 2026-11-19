@@ -12,7 +12,9 @@ TV mode (ui/mw_tv.py) is run by actions - "up", "ok", "back", "ch_up",
   from Linux's evdev when the pad's /dev/input/event* can be read (the
   logged-in user can, through logind's uaccess);
 - LIRC, through lircd's socket (/run/lirc/lircd), its key names
-  (KEY_UP, KEY_OK, KEY_BACK, ...) mapped as the kernel's.
+  (KEY_UP, KEY_OK, KEY_BACK, ...) mapped as the kernel's - a socket that is
+  the system's, this user's, or in a folder only its owner writes to
+  (``lirc_socket_ok``): whatever sends lines there presses TV mode's keys.
 
 The same actions come from the phone remote, the remote API and Home
 Assistant (``switch_mode``, ``remote_action`` read what they ask).
@@ -26,6 +28,7 @@ Nothing here needs Qt.
 from __future__ import annotations
 
 import os
+import re
 import select
 import socket
 import stat
@@ -190,17 +193,56 @@ def lirc_event(line: str) -> str | None:
     return None
 
 
+#: A line of lircd's is some tens of bytes; what never ends in a line break
+#: is not one, and is not kept.
+LIRC_LINE_MAX = 4096
+
+
+def lirc_lines(buf: bytes, data: bytes) -> tuple[list[str], bytes]:
+    """The whole lines in what was left (*buf*) and what just came
+    (*data*), and what is left for the next read - nothing, of a "line"
+    longer than any of lircd's."""
+    *whole, rest = (buf + data).split(b"\n")
+    if len(rest) > LIRC_LINE_MAX:
+        rest = b""
+    return [raw.decode("utf-8", "replace").strip() for raw in whole], rest
+
+
+def lirc_socket_ok(path: str) -> bool:
+    """Whether the socket at *path* is one to take keys from: the system's
+    (root's), this user's own, or - lircd often runs as an account of its
+    own - anyone's in a folder only its owner can write to (/run/lirc).
+    One of another account's in a folder everyone can write to (/tmp, with
+    $LIRC_SOCKET_PATH pointing there) could be anyone's, and what it sends
+    would be this app's keys."""
+    try:
+        st = os.stat(path)
+        if not stat.S_ISSOCK(st.st_mode):
+            return False
+        me = os.getuid() if hasattr(os, "getuid") else -1
+        if st.st_uid in (0, me):
+            return True
+        return not os.stat(os.path.dirname(path) or ".").st_mode & stat.S_IWOTH
+    except OSError:
+        return False
+
+
 def lirc_socket(env: dict[str, str] | None = None) -> str | None:
-    """lircd's socket where there is one ($LIRC_SOCKET_PATH first)."""
+    """lircd's socket where there is one ($LIRC_SOCKET_PATH first) - never
+    one that could be another account's stand-in (``lirc_socket_ok``)."""
     first = (os.environ if env is None else env).get("LIRC_SOCKET_PATH", "")
     for path in (first, *LIRC_SOCKETS):
         if not path:
             continue
         try:
-            if stat.S_ISSOCK(os.stat(path).st_mode):
-                return path
+            if not stat.S_ISSOCK(os.stat(path).st_mode):
+                continue
         except OSError:
             continue
+        if lirc_socket_ok(path):
+            return path
+        log.warning("tv input: the socket at %s is another account's, in a folder "
+                    "anyone can write to - no keys are taken from it", path)
     return None
 
 
@@ -280,6 +322,10 @@ def evdev_event(etype: int, code: int, value: int, pad: PadState,
     return []
 
 
+_JS = re.compile(r"js\d{1,4}")
+_EVENT_NODE = re.compile(r"event\d{1,4}")
+
+
 def parse_input_devices(text: str, dev_dir: str = "/dev/input") -> list[tuple[str, str]]:
     """The game controllers in /proc/bus/input/devices: (name, its
     event* path in *dev_dir*) for each device with a joystick handler."""
@@ -291,8 +337,11 @@ def parse_input_devices(text: str, dev_dir: str = "/dev/input") -> list[tuple[st
                 name = line[len("N: Name="):].strip().strip('"')
             elif line.startswith("H: Handlers="):
                 handlers = line[len("H: Handlers="):].split()
-        if any(h.startswith("js") for h in handlers):
-            ev = next((h for h in handlers if h.startswith("event")), None)
+        # The names are the kernel's own (js0, event7). A device names itself
+        # in this file too, so nothing but those is taken for a handler:
+        # never a path out of /dev/input.
+        if any(_JS.fullmatch(h) for h in handlers):
+            ev = next((h for h in handlers if _EVENT_NODE.fullmatch(h)), None)
             if ev:
                 out.append((name or ev, os.path.join(dev_dir, ev)))
     return out
@@ -391,6 +440,10 @@ class LircReader(_Reader):
         said = False
         while not self._halt.is_set():
             try:
+                # Looked at again each time: lircd restarts, and what is at
+                # the path then need not be lircd.
+                if os.path.exists(self.path) and not lirc_socket_ok(self.path):
+                    raise PermissionError("not lircd's socket any more")
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 sock.settimeout(0.5)
                 sock.connect(self.path)
@@ -419,10 +472,8 @@ class LircReader(_Reader):
                 return
             if not data:
                 return
-            buf += data
-            while b"\n" in buf:
-                raw, buf = buf.split(b"\n", 1)
-                line = raw.decode("utf-8", "replace").strip()
+            lines, buf = lirc_lines(buf, data)
+            for line in lines:
                 # A reply to a command (BEGIN ... END), never a key.
                 if line == "BEGIN":
                     block = True

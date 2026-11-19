@@ -19,7 +19,7 @@ from typing import Any
 from PyQt6.QtCore import QMetaType, QObject, QTimer
 
 from ..core.log import log
-from .media_session import MediaHost, clean_snapshot
+from .media_session import MediaHost, art_for_bus, clean_snapshot
 
 BUS_NAME = "org.mpris.MediaPlayer2.dopeiptv"
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
@@ -313,7 +313,10 @@ class MprisService(QObject):
             md["xesam:artist"] = _strings([s["artist"]])
         if s["album"]:
             md["xesam:album"] = s["album"]
-        art = art_url(s["art"]) if s["art"] else ""
+        # Never an address with a login in it - the whole session bus reads
+        # this (media_session.art_for_bus) - nor a file outside the app's own
+        # pictures (art_url).
+        art = art_url(art_for_bus(s["art"])) if s["art"] else ""
         if art:
             md["mpris:artUrl"] = art
         if s["length"] > 0:

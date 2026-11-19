@@ -245,7 +245,11 @@ class _MprisMixin:
             path = None
         if path is not None:
             return QUrl.fromLocalFile(str(path)).toString()
-        if not sys.platform.startswith("linux"):
+        # MPRIS takes a web address and the desktop fetches it - but never
+        # one with a login in it (a media server's pictures carry the
+        # account's token): that one is fetched here like the others'.
+        from ..services.media_session import carries_login
+        if not sys.platform.startswith("linux") or carries_login(str(url)):
             self._fetch_media_art(str(url))
         return str(url)
 

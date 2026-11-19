@@ -67,6 +67,36 @@ def test_metadata_and_track_change(qapp=None):
     assert svc.track_path() == mpris.NO_TRACK
 
 
+def test_a_picture_s_address_with_a_login_in_it_is_not_said_on_the_bus():
+    """Every program on the session bus reads the metadata, and KDE Connect
+    passes it on to a phone. A media server's pictures carry the account's
+    token in their address (Plex's X-Plex-Token)."""
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    host = _Host()
+    svc = mpris.MprisService(host)
+    svc._bus = object()
+    sent = []
+    svc._send_changed = lambda changed: sent.append(changed)
+
+    def art_of(art):
+        host.snap = {"status": "Playing", "track": "vod:" + art, "title": "Film", "art": art}
+        svc.refresh()
+        return sent[-1]["Metadata"].get("mpris:artUrl")
+    plex = ("http://192.168.1.5:32400/photo/:/transcode?width=320&height=480"
+            "&url=%2Flibrary%2Fmetadata%2F1%2Fthumb&X-Plex-Token=s3cr3tT0ken")
+    assert art_of(plex) is None
+    assert art_of("http://anna:pw@box.lan/logo.png") is None
+    assert art_of("http://iptv.example:8080/live/anna/hunter2/12.png") is None
+    assert art_of("https://emby.lan/Items/7/Images/Primary?api_key=abcdef0123") is None
+    # A plain logo's address is said as it always was; so is a local copy.
+    assert art_of("https://image.tmdb.org/t/p/w500/abc.jpg") == "https://image.tmdb.org/t/p/w500/abc.jpg"
+    assert art_of("file:///home/u/.cache/dopeiptv/images/ab12.png") == \
+        "file:///home/u/.cache/dopeiptv/images/ab12.png"
+    assert art_of("/home/u/Music/cover.jpg") == "file:///home/u/Music/cover.jpg"
+    assert art_of("javascript:alert(1)") is None
+
+
 _CHILD = textwrap.dedent(r"""
     import os, subprocess, sys
     os.environ["QT_QPA_PLATFORM"] = "offscreen"

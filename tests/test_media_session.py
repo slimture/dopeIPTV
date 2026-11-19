@@ -870,6 +870,26 @@ def test_window_fetches_art_for_macos_and_windows_only(monkeypatch):
     assert fetched == ["https://p.example/logo.png"]   # once
 
 
+def test_a_picture_with_a_login_in_its_address_is_fetched_here_on_linux_too(monkeypatch):
+    """MPRIS lets the desktop fetch a picture by its address - not one that
+    carries the account's token: the app fetches that into its image cache
+    and the copy there is what the bus hears (mpris.art_for_bus)."""
+    from dopeiptv.services.media_session import art_for_bus, carries_login
+    monkeypatch.setattr(sys, "platform", "linux")
+    w, _, fetched = _window("movie")
+    plex = "http://192.168.1.5:32400/photo/:/transcode?url=%2Fthumb&X-Plex-Token=s3cr3tT0ken"
+    w._last_playback["icon_url"] = plex
+    assert carries_login(plex) and not carries_login("https://p.example/logo.png")
+    w.mpris_snapshot()
+    w.mpris_snapshot()
+    assert fetched == [plex]                               # once, into the image cache
+    assert art_for_bus(plex) == "" and art_for_bus("") == ""
+    # Once it is there, the local copy is what is said.
+    w.logos.disk_file = lambda u: "/home/u/.cache/dopeiptv/images/ab12.png"
+    art = w.mpris_snapshot()["art"]
+    assert art == "file:///home/u/.cache/dopeiptv/images/ab12.png" and art_for_bus(art) == art
+
+
 def test_play_pause_is_one_press_off_linux(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
     w, calls, _ = _window("movie")
