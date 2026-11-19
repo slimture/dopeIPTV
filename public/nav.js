@@ -31,8 +31,9 @@ if (IPTV_CR) { document.documentElement.classList.add("cr"); }
   }
 })();
 /* The header's menus (the menu and the language picker): the page behind
- * toned down while one is open, a tap on it, Escape or a link followed in
- * it closing it - a link to this same page's section left it open. On a
+ * toned down while one is open on a narrow screen (style.css), and a link
+ * followed in one closes it - a link to this same page's section left it
+ * open; a click beside it and Escape close it below. On a
  * phone the menu's "Send the link to your computer" opens the phone's own
  * sharing (Messages, Mail, AirDrop to a Mac), or copies the link; with
  * neither it goes to the download section, which says what to do. */
@@ -54,10 +55,6 @@ if (IPTV_CR) { document.documentElement.classList.add("cr"); }
       var a = e.target.closest ? e.target.closest("a") : null;
       if (a && !a.hasAttribute("data-send-link")) { setTimeout(closeAll, 0); }
     });
-  });
-  scrim.addEventListener("click", closeAll);
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !scrim.hidden) { closeAll(); }
   });
   var send = document.querySelector("a[data-send-link]");
   if (!send) { return; }

@@ -95,10 +95,20 @@ header.bar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(18
 .brand .logo rect { fill: var(--brand); }
 .brand .logo path { fill: #fff; }
 .brand b { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.02em; }
-nav.links { display: flex; align-items: center; gap: 26px; }
+nav.links { display: flex; align-items: center; gap: 4px; }
 nav.links a { color: var(--muted); font-size: 13.5px; }
 nav.links a:hover { color: var(--text); }
-nav.links a[aria-current="page"] { color: var(--text); font-weight: 500; }
+/* The bar's links: quiet text, a hover of the accent's light tint and the
+   page you are on in the accent on its wash - the menu's rows, laid flat
+   (README, "One look everywhere"). The language and Download a step apart. */
+nav.links a.navlink { padding: 7px 12px; border-radius: 10px;
+  transition: background .15s ease, color .15s ease; }
+nav.links a.navlink:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+@media (min-width: 1001px) { nav.links .langpick { margin-inline-start: 14px; } nav.links > .btn { margin-inline-start: 6px; } }
+.bar .btn .btn-ico { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+nav.links a[aria-current="page"] { color: var(--accent); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: inherit;
   font-weight: 500; font-size: 15px; padding: 10px 22px; border-radius: 999px;
   border: 1px solid transparent; transition: background .2s ease, border-color .2s ease, color .2s ease; }
@@ -106,11 +116,10 @@ nav.links a[aria-current="page"] { color: var(--text); font-weight: 500; }
 .btn.primary:hover { background: color-mix(in srgb, var(--btn) 88%, #fff); }
 .btn.ghost { background: transparent; border-color: var(--accent); color: var(--accent); }
 .btn.ghost:hover { background: var(--accent); color: var(--accent-ink); }
-.bar .btn { padding: 5px 14px; font-size: 13px; }
+.bar .btn { padding: 6px 14px; font-size: 13px; gap: 6px; }
 /* Below 1000px the inline links give way to the disclosure in the header
    (.navmenu). They used to just vanish, which left the help page with a
    header of nothing but the logo. The gaps close up a little before that. */
-@media (max-width: 1100px) { nav.links { gap: 20px; } }
 @media (max-width: 1000px) { nav.links a.navlink { display: none; } }
 
 .hero { padding: 96px 0 40px; text-align: center; }
@@ -424,20 +433,28 @@ footer .foot-company a:hover { color: var(--accent); }
 .langpick[open] summary { border-color: var(--accent); }
 .langpick-caret { color: var(--muted); font-size: 11px; transition: transform .2s ease; }
 .langpick[open] .langpick-caret { transform: rotate(180deg); }
+/* Its list: the menu's panel (16px round, a finger's height a row, the
+   accent's tint on hover), the language in use in the accent with a check. */
 .langpick-menu {
   position: absolute; top: calc(100% + 8px); inset-inline-end: 0; z-index: 40;
-  min-width: 190px; max-height: 62vh; overflow-y: auto;
-  padding: 6px; border-radius: 12px;
+  min-width: 220px; max-height: 62vh; overflow-y: auto;
+  padding: 8px; border-radius: 16px;
   background: var(--surface); border: 1px solid var(--line-2);
-  box-shadow: 0 18px 44px -18px rgba(0,0,0,.6);
+  box-shadow: 0 24px 60px -20px rgba(0,0,0,.6);
   display: flex; flex-direction: column; gap: 2px;
+  animation: menu-in .18s ease-out;
 }
 .langpick-item {
-  display: block; padding: 8px 12px; border-radius: 8px;
-  color: var(--text); font-size: 14px; white-space: nowrap;
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 12px; border-radius: 11px;
+  color: var(--text); font-size: 14.5px; white-space: nowrap;
 }
-.langpick-item:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.langpick-item.is-current { color: var(--accent); font-weight: 600; }
+.langpick-item:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.langpick-item.is-current { color: var(--accent); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.langpick-item.is-current::after { content: ""; flex: none; margin-inline-start: auto; width: 10px; height: 5px;
+  border-left: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(-45deg); }
+@media (max-width: 720px) { .langpick-item { min-height: 48px; font-size: 15.5px; } }
 
 /* ---- the narrow-window menu -------------------------------------------- */
 /* Same disclosure as the language picker, so the header has one idea of what
@@ -517,8 +534,10 @@ footer .foot-company a:hover { color: var(--accent); }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .navmenu-panel { animation-name: scrim-in; }
+  .navmenu-panel, .langpick-menu { animation-name: scrim-in; }
 }
+/* A computer's wide window: a list that opens is enough, the page stays. */
+@media (min-width: 1001px) { .menu-scrim { display: none; } }
 
 /* The phone header's heart (render.jq, nav): Donate where the links are
    folded away. Same size and frame as the menu button beside it. */

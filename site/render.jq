@@ -229,19 +229,18 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        elif $current == "features" then "/features/"
        elif ($L.pages | index($current)) != null then "/\($current)/"
        else "/" end) as $self
-    | [[$base + "#features", t("nav_features"), ""],
+    | [[$base + "#features", t("nav_features"), "features"],
        [$base + "#download", t("nav_download"), ""],
        ["/help/", t("nav_help"), "help"]] as $links
     # No GitHub here: a word most visitors do not know, in the one row every
     # one of them reads. The footer has it for whoever looks for the source.
     | def cur($key): $key != "" and $key == $current;
-    # The bar's links are only what a visitor leaves the page for: Help, then
-    # Support, gathered at the end with the language and the blue Download
-    # button - one group, the logo alone on the other side. The features
-    # are further down this same page, where everyone scrolls
-    # anyway. The narrow-window menu keeps every link - it is all there is
-    # where the row folds away.
-    ([$links[] | select(.[2] == "help") | . as [$href, $label, $key]
+    # The bar's links are the menu's, in its order and words (README, "One
+    # look everywhere"): Features, Help, then Support, gathered at the end
+    # with the language and the blue Download button - one group, the logo
+    # alone on the other side. Text only in the bar; the menu's rows carry
+    # icons, a list read downwards.
+    ([$links[] | select(.[2] == "features" or .[2] == "help") | . as [$href, $label, $key]
       | "      <a class=\"navlink\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $navlinks
     # The menu's rows: an icon in a tinted square, the words, a chevron (CSS).
@@ -257,7 +256,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
      heart: "<path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/>"} as $ICON
     | def mcur($key): if cur($key) then " is-current" else "" end;
     def macur($key): if cur($key) then " aria-current=\"page\"" else "" end;
-    (mrow(""; $base + "#features"; t("nav_features"); $ICON.features; "")
+    (mrow(mcur("features"); $base + "#features"; t("nav_features"); $ICON.features; macur("features"))
      + mrow(" menu-desk"; $base + "#download"; t("nav_download"); $ICON.download; "")
      + mrow(" menu-phone"; "/#download"; t("menu_send_link"); $ICON.send;
             " data-send-link data-copied=\"\(t("dl_phone_copied") | h)\"")
