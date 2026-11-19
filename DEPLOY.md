@@ -1274,8 +1274,48 @@ line; the HSTS line; `location: /files/SHA256SUMS`; `404` for a name of
 an empty sync slot, as before. Then in the app: Sync now, Send feedback, a
 watch-together room - as before; the admin page signs in and fills.
 
-**Privacy, behind the scenes** shows the code of site commit 12d6507. Once
-this round is on GitHub, make it again (`python3 tools/transparency.py
---app <a checkout of the app at v1.6.8> --ref v1.6.8`) so its excerpts of
-feedback.py's cleaning, the proxy's /sync/ and /together/ blocks and the
-statistics' log format are this round's.
+**Privacy, behind the scenes** showed the code of site commit 12d6507; it
+is made again from this round's code with the part below.
+
+## The servers on the transparency page
+
+*Security and privacy, behind the scenes* has a part of its own for the
+servers (part 7, "The servers behind dopeiptv.org"): the way a request
+takes, what each server writes down and for how long, the limits, the
+headers on every answer, and what it does not protect against - in the
+front proxy's and the content server's own lines, `donate.py`'s socket and
+the log rotation's lines in this file. `tools/transparency.py` reads
+nginx's files as nginx does and takes a block by its first words
+(`"nginx": ["server > location = /hit", ...]`, `nginx_find`), with the
+comments above it; the headers the page shows as an example are worked out
+from the proxy's file and `csp.snippet.txt`. Nothing it shows is a secret:
+the proxy's address, the live allow-list and nginx.conf stay on the
+server.
+
+The page quotes this file in three places - the newsyslog lines for the
+downloads' and statistics' logs and the service's ("10. Log rotation",
+"Statistics and the admin page", "Hardening, November 2026") - found by
+their words: change those, and change `CODE` in `tools/transparency.py`
+with them. `python3 -m pytest donate/test_transparency.py` fails once a
+block the page shows is gone from its file. After a change to a file the
+page shows, once it is on GitHub:
+
+```sh
+python3 tools/transparency.py --app <a checkout of the app at v1.6.8> --ref v1.6.8
+```
+
+and commit `site/transparency.json`.
+
+Deploy (jail) - of what the server runs only `site/` changed (beside it a
+test in `donate/` and `tools/`); neither nginx file nor the service:
+
+```sh
+cd ~/dopeiptv && git checkout website && git pull origin website
+cp -R site donate sync-releases.sh /usr/local/www/iptv/
+cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
+```
+
+**Check:** `https://dopeiptv.org/transparency/` has nine parts, the
+seventh "The servers behind dopeiptv.org" (`?lang=sv`: "Servrarna bakom
+dopeiptv.org"), and its *Copy the code and the question* gives the question
+with the proxy's `location /` first.
