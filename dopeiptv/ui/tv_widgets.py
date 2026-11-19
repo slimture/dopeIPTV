@@ -380,10 +380,6 @@ class ColourLegend(QWidget):
         self._labels = labels
         self.setFixedHeight(px(40))
 
-    def set_labels(self, labels: dict[str, str]) -> None:
-        self._labels = labels
-        self.update()
-
     def paintEvent(self, _e) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)

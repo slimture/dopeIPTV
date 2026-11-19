@@ -1067,9 +1067,6 @@ class _PaintedView(QListView):
             self._fit_h = -1
         self._relayout()
 
-    def is_fitted(self) -> bool:
-        return self._host is not None
-
     def content_height(self) -> int:
         raise NotImplementedError
 
@@ -2068,9 +2065,6 @@ class CardRow(QWidget):
         """The row's name among the rows that can be hidden; "" for none
         (its heading offers nothing)."""
         self._hide_key = str(name or "")
-
-    def hide_key(self) -> str:
-        return self._hide_key
 
     def heading_menu(self) -> QMenu | None:
         """The heading's menu: "Hide this row" - None for a row with no

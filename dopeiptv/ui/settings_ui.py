@@ -927,14 +927,6 @@ class SettingsShell(QWidget):
             page.body.show()
             page.show_path(False)
 
-    def set_page_enabled(self, key: str, on: bool) -> None:
-        """Show or leave out a whole page."""
-        if on:
-            self._off.discard(key)
-        else:
-            self._off.add(key)
-        self._filter(self.search.text())
-
     def show_page(self, key: str | None) -> None:
         item = self._items.get(key or "")
         if item is not None and not item.isHidden():
