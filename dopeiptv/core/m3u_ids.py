@@ -37,6 +37,7 @@ from typing import Any, Protocol
 
 from . import profiles
 from .log import log
+from .source_files import file_part
 
 #: Ids by place are below it, stable ids from it up (and below 2**31).
 LINE_MAX = 1 << 30
@@ -134,7 +135,7 @@ class Remap:
 
 
 def map_path(cache_dir: str, pid: str) -> str:
-    return os.path.join(cache_dir, f"m3u_ids_{pid}.json")
+    return os.path.join(cache_dir, f"m3u_ids_{file_part(pid)}.json")
 
 
 def save_map(path: str, rows: list[tuple[int, int, str, str]]) -> None:

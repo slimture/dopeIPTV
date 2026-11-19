@@ -184,6 +184,7 @@ files = [
     "dopeiptv/providers/dlna.py",
     "dopeiptv/providers/device_urls.py",
     "dopeiptv/core/safe_xml.py",
+    "dopeiptv/core/source_files.py",
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",
     "dopeiptv/core/video_mode.py",

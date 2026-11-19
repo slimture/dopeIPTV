@@ -1074,11 +1074,12 @@ def _list_cache_path(playlist: dict) -> str | None:
     pid = (playlist or {}).get("id")
     if not pid:
         return None
+    from ..core.source_files import file_part
     from .epg import _epg_cache_dir
     try:
         d = _epg_cache_dir()
         d.mkdir(parents=True, exist_ok=True)
-        return str(d / f"lists_{pid}.json")
+        return str(d / f"lists_{file_part(pid)}.json")
     except Exception:
         return None
 

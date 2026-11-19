@@ -24,6 +24,7 @@ from PyQt6.QtCore import QStandardPaths
 
 from ..core import safe_xml
 from ..core.log import log
+from ..core.source_files import file_part
 from .client import XtreamClient
 
 
@@ -194,8 +195,9 @@ def _epg_cache_dir() -> "Path":
 
 
 def epg_cache_path(playlist_id: str | None) -> str:
-    """Per-playlist file path for the cached XMLTV guide."""
-    return str(_epg_cache_dir() / f"epg_{playlist_id or 'default'}.xml")
+    """Per-playlist file path for the cached XMLTV guide - in the cache
+    folder whatever the id is (core/source_files.py)."""
+    return str(_epg_cache_dir() / f"epg_{file_part(playlist_id or 'default')}.xml")
 
 
 def prune_epg_caches(keep_ids) -> int:
@@ -208,7 +210,7 @@ def prune_epg_caches(keep_ids) -> int:
     d = _epg_cache_dir()
     if not d.exists():
         return 0
-    keep = {str(i) for i in keep_ids if i} | {"default"}
+    keep = {file_part(i) for i in keep_ids if i} | {"default"}
     removed = 0
     for f in d.glob("epg_*.xml*"):
         name = f.name[4:]  # drop the "epg_" prefix
