@@ -113,6 +113,9 @@ def run_working(parent, title: str, text: str, work: Callable[[], T]) -> T:
     timer.start()
     loop.exec()
     timer.stop()
+    # The loop also ends when the application is told to quit: the work
+    # (seconds at most) is still let finish, whole or not at all.
+    thread.join()
     dlg.done_working = True
     dlg.close()
     dlg.deleteLater()

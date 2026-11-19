@@ -132,6 +132,13 @@ def test_read_says_a_locked_backup_is_locked(tmp_path):
     with pytest.raises(backup.BackupError) as err:
         backup.read(path)
     assert err.value.reason == "locked"
+    # Never waiting to be put in place: the app stages the opened copy, so
+    # a locked file there is refused at the start, and gone.
+    pending = tmp_path / backup.PENDING_NAME
+    os.replace(path, pending)
+    dst = {"main": QSettings(str(tmp_path / "dst.ini"), QSettings.Format.IniFormat)}
+    assert backup.apply_pending(dst, str(pending)) is False and not pending.exists()
+    assert dst["main"].allKeys() == []
 
 
 def test_a_staged_restore_of_a_locked_backup_waits_as_today_and_goes(tmp_path):
