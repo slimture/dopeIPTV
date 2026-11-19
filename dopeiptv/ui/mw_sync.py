@@ -10,6 +10,15 @@ What another computer changed is written to the stores here; a theme and
 shortcuts take effect at once, anything else that needs it with the next
 start (a toast says so). What plays is never touched.
 
+A playlist's connection settings - its proxy, address rewrite, trusted
+certificate and the others that change where its streams go - are never
+among what is written unasked: core/sync.py leaves this computer's as they
+are and keeps what came (State.held). The window says so once, in one card
+of the notices that names the playlists and the settings, and the card's
+Review - or the row Settings > Sync shows while any wait - opens
+ui/sync_review.py: each one here beside the one from sync, Apply or Keep
+mine. Nothing of them is used before that answer.
+
 For everyone, and off until it is started here or joined with the code
 from another computer. The page says plainly what dopeiptv.org gets: bytes
 encrypted here, under a random number - nothing about the person.
@@ -49,6 +58,10 @@ _STUCK = ("refused", "newer", "read", "big", "full")
 #: The chips' words: the app's own names for what they sync.
 _CHIP_TEXT = {"favorites": "nav_favorites", "settings": "settings_title",
               "sources": "tab_playlists", "history": "sync_cat_history"}
+#: The notices' key of the one card for connection settings that wait.
+HELD_KEY = "sync_held"
+#: The playlists that card names before it goes on with "…".
+_HELD_NAMES = 3
 
 
 def state_path() -> Path:
@@ -100,6 +113,16 @@ def seen_by(keys: set[str], active: str | None) -> set[str]:
     return out
 
 
+def held_words(changes: list[sync.HeldChange]) -> str:
+    """The card's words for the connection settings that wait (core/sync.
+    held_changes): the playlists by name - a few, then "…" - and each
+    setting once, in the app's own words for it."""
+    from .sync_review import label
+    names = [c.name for c in changes[:_HELD_NAMES]] + ["…"] * (len(changes) > _HELD_NAMES)
+    settings = dict.fromkeys(s for c in changes for s in c.settings)
+    return tr("sync_held", name=", ".join(names), what=", ".join(label(s) for s in settings))
+
+
 def _ignore(_result: object = None) -> None:
     """The result of work done for its side effect."""
 
@@ -126,6 +149,7 @@ class _SyncMixin:
         self._sync_seen_at = time.monotonic()
         self._sync_sent: str | None = None
         self._sync_unwritten = False
+        self._sync_held_said = False
         self._sync_timer = QTimer(self)
         self._sync_timer.setInterval(TICK_MS)
         self._sync_timer.timeout.connect(self._sync_tick)
@@ -146,16 +170,21 @@ class _SyncMixin:
         own = getattr(self, "_own", None)
         return own(settings) if own is not None else settings
 
-    def _sync_ctx(self) -> sync.Context:
+    def _sync_ctx(self, state: sync.State | None = None) -> sync.Context:
         """What syncs: every profile's own (core/profiles.py) - the first
         profile's under the names it always had, the others' under their
-        ids - and the household's settings and sources."""
+        ids - and the household's settings and sources; with the
+        connection settings that wait for the person (*state*'s, else the
+        state in use: core/sync.State.held)."""
         from ..core import profiles
         st, rs = self.settings, getattr(self, "_resume_settings", None)
         store = getattr(self, "playlist_store", None)
         reg = getattr(self, "profiles", None)
+        if state is None:
+            state = self._sync_state_now()
+        held = state.held if state is not None else {}
         if not isinstance(st, profiles.ProfileSettings) or reg is None:
-            return sync.Context(st, rs, store)
+            return sync.Context(st, rs, store, held=held)
 
         def pin(s, pid):
             return profiles.pinned(s, pid) if s is not None else None
@@ -164,7 +193,7 @@ class _SyncMixin:
             return pin(st, pid), pin(rs, pid)
 
         ctx = sync.Context(pin(st, profiles.MAIN_ID), pin(rs, profiles.MAIN_ID), store,
-                           registry=reg, pin=views)
+                           registry=reg, pin=views, held=held)
         ctx.refresh_others()
         return ctx
 
@@ -178,6 +207,12 @@ class _SyncMixin:
         if st is None or st.slot != slot:
             st = self._sync_state = sync.State.load(self._sync_path(), slot)
         return st
+
+    def _sync_state_now(self) -> sync.State | None:
+        """This computer's sync state while sync is on (read from its file
+        the first time it is asked for), else None."""
+        raw = sync.code_of(self.settings)
+        return self._sync_state_for(sync.derive(raw)[0]) if raw is not None else None
 
     def _sync_set_status(self, kind: str, size: int = 0) -> None:
         self._sync_status = (kind, size)
@@ -262,7 +297,7 @@ class _SyncMixin:
         slot, key = sync.derive(raw)
         state = self._sync_state_for(slot)
         cats = sync.chosen(self.settings)
-        ctx = self._sync_ctx()
+        ctx = self._sync_ctx(state)
         try:
             snap = sync.collect(ctx, cats)
             self._sync_sent = sync.digest(ctx, cats)
@@ -302,11 +337,13 @@ class _SyncMixin:
         _gen, snap, cats, state = job
         if isinstance(result, sync.SyncError):
             self._sync_failed(result)
+            # What waited from before is still said once, offline too.
+            self._sync_tell_held(self._sync_state)
             return
         if not isinstance(result, sync.RoundResult):
             self._sync_failed(sync.SyncError("fail"))
             return
-        ctx = self._sync_ctx()
+        ctx = self._sync_ctx(state)
         try:
             here = sync.collect(ctx, cats)
             applied, keep = sync.apply(ctx, result, snap, here, cats)
@@ -344,6 +381,8 @@ class _SyncMixin:
                 self._sync_show_applied(applied)
             except Exception:
                 log.warning("sync: window not refreshed", exc_info=True)
+        # A playlist's connection settings the round did not put in place.
+        self._sync_tell_held(state, new=bool(applied.held))
 
     def _sync_failed(self, err: sync.SyncError) -> None:
         kind = err.kind
@@ -430,6 +469,83 @@ class _SyncMixin:
         if hasattr(self, "_refresh_places"):
             self._refresh_places("sync")
 
+    # -- connection settings that wait ---------------------------------------------
+
+    def _sync_held_changes(self, state: sync.State | None = None) -> list[sync.HeldChange]:
+        """The connection settings sync brought and did not put in place
+        (core/sync.held_changes), of *state* or the state in use."""
+        store = getattr(self, "playlist_store", None)
+        if state is None:
+            state = self._sync_state_now()
+        if state is None or store is None or not state.held:
+            return []
+        return sync.held_changes(store, state.held)
+
+    def _sync_tell_held(self, state: sync.State | None, new: bool = False) -> None:
+        """One card for them, with Review: when a round held *new* ones
+        back, and once a session while any still wait - not again for the
+        same ones (the Sync page goes on offering them). None waiting: no
+        card."""
+        hub = hub_of(self)
+        changes = self._sync_held_changes(state) if state is not None else []
+        if not changes:
+            self._sync_held_said = False
+            hub.dismiss_key(HELD_KEY)
+            return
+        if self._sync_held_said and not new:
+            return
+        self._sync_held_said = True
+        hub.post(held_words(changes), level="warning", key=HELD_KEY, decide=True,
+                 action=self._sync_review_held, action_label=tr("sync_held_review"))
+
+    def _sync_review_held(self, parent=None) -> None:
+        """The card's Review, and the Sync page's: each setting here beside
+        the one from sync, then the person's answer carried out - Apply
+        stores them as a round stores a playlist (in use as a synced change
+        is: what plays goes on as it was), Keep mine forgets them, so this
+        computer's own go to the others with the next round. Closed without
+        an answer they wait on. Only what was looked at: values a round
+        brought while the window was open are asked about again."""
+        state = self._sync_state_now()
+        store = getattr(self, "playlist_store", None)
+        if state is None or store is None:
+            return
+        # A kids profile gets here as it gets to Settings: with a grown-up's
+        # PIN (from the Sync page it was given already).
+        unlock = getattr(self, "_kids_settings_unlock", None)
+        if parent is None and callable(unlock) and not unlock():
+            return
+        if sync.settle_held(store, state.held):
+            self._sync_write_state(state)
+        changes = sync.held_changes(store, state.held)
+        if not changes:
+            self._sync_tell_held(state)
+            return
+        from .sync_review import SyncReviewDialog
+        dlg = SyncReviewDialog(parent if parent is not None else self, changes)
+        dlg.exec()
+        choice = dlg.choice
+        dlg.deleteLater()
+        if choice not in ("apply", "keep") or self._sync_state_now() is not state:
+            return                  # no answer - or sync was stopped meanwhile
+        if choice == "apply":
+            done = sync.take_held(store, state.held, changes)
+        else:
+            done = sync.drop_held(state.held, changes)
+        self._sync_write_state(state)
+        if done and choice == "apply":
+            if hasattr(self, "_update_playlist_btn"):
+                self._update_playlist_btn()
+            toast = getattr(self, "_show_toast", None)
+            if toast is not None:
+                in_use = str(getattr(store, "active_id", "") or "") in done
+                toast(tr("sync_applied_restart" if in_use else "sync_applied"), 6000)
+        # Any left were not the ones looked at: asked about again.
+        self._sync_tell_held(state, new=True)
+        self._sync_set_status(self._sync_status[0])
+        if done:
+            self._sync_soon(1)
+
     # -- on, off -------------------------------------------------------------------
 
     def _sync_begin(self, code: str, joining: bool) -> None:
@@ -448,6 +564,7 @@ class _SyncMixin:
         if not joining:
             # The first computer: what it has is the start, not a newcomer's.
             state.seen = set(sync.chosen(self.settings))
+        self._sync_tell_held(None)          # another code's card goes with it
         self._sync_fails = 0
         self._sync_sent = None
         self._sync_set_status("idle")
@@ -476,6 +593,7 @@ class _SyncMixin:
         # Again after a write still queued: it holds the copy just forgotten.
         run_async(self._sync_pool, sync.forget, _ignore, None, path)
         self._sync_state = None
+        self._sync_tell_held(None)          # what waited is forgotten with the copy
         self._sync_timer.stop()
         self._sync_soon_timer.stop()
         self._sync_set_status("idle")
@@ -618,6 +736,15 @@ class _SyncCard(QObject):
         self.problem.setStyleSheet(f"color:{P['error']}; font-size:12px;")
         card.shown_if(card.widget(self.problem), self.has_problem)
 
+        # A playlist's connection settings that sync brought and did not put
+        # in place: the way back to them after the card.
+        self.held_btn = QPushButton(tr("sync_held_review"))
+        self.held_btn.clicked.connect(self.review_held)
+        self.held_row = card.row(tr("sync_review_title"), self.held_btn, "…",
+                                 search="sync proxy rewrite certificate connection review")
+        self.held_row.hint_label.setTextFormat(Qt.TextFormat.PlainText)     # playlists' names
+        card.shown_if(self.held_row, self.has_held)
+
         stop_btn = QPushButton(tr("btn_stop"))
         stop_btn.clicked.connect(self.stop)
         card.shown_if(card.row(tr("sync_stop"), stop_btn, tr("sync_stop_hint"),
@@ -633,9 +760,15 @@ class _SyncCard(QObject):
     def has_problem(self) -> bool:
         return bool(self.problem.text())
 
+    def has_held(self) -> bool:
+        return self._on() and bool(self.win._sync_held_changes())
+
     def refresh(self) -> None:
         if sip.isdeleted(self.card) or sip.isdeleted(self.problem):
             return
+        waiting = self.win._sync_held_changes() if self._on() else []
+        if waiting and self.held_row.hint_label is not None:
+            self.held_row.hint_label.setText(held_words(waiting))
         code = str(self.win.settings.value(sync.K_CODE, "") or "")
         if self.code_row.hint_label is not None:
             self.code_row.hint_label.setText(
@@ -686,6 +819,10 @@ class _SyncCard(QObject):
 
     def sync_now(self) -> None:
         self.win.sync_now(manual=True)
+        self.refresh()
+
+    def review_held(self) -> None:
+        self.win._sync_review_held(self.dlg)
         self.refresh()
 
     def stop(self) -> None:

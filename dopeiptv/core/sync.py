@@ -59,6 +59,28 @@ since then gets the time it was found. A computer that joins starts with
 the time 0 on all of its own, so what the others had wins where both differ
 and the rest is added.
 
+What sync never puts in place by itself. A playlist's options that send its
+connections elsewhere - its proxy, extra headers, address rewrite, udpxy,
+catch-up address, backup addresses, own DNS server and trusted certificate
+(core/backup.RISKY_SOURCE: the list a restored backup shows before it is
+taken) - are worth more to whoever holds the sync code than anything else
+in the copy: changed there, every stream of the playlist goes where they
+say, and nothing on this computer would have said so. So where the copy has
+one of them otherwise than this computer does, the rest of the playlist is
+taken as ever and those stay as they are here - a playlist new here comes
+without them (hold_back). What the copy has waits in this computer's state
+(State.held), the window asks once (Applied.held; ui/mw_sync.py,
+ui/sync_review.py), and only the person's answer moves it: taken
+(take_held) or left (drop_held). While one waits, this computer's snapshot
+of the playlist has the copy's value for it, so its own is not sent as a
+change and the copy stays as it was; left, its own is the newer change, goes
+to the others, and they are asked the same. A newer value from the copy
+takes the waiting one's place, one the copy no longer has otherwise is
+forgotten, and the computer that made a change is asked nothing about it.
+An ``options`` that is no set of options - a list of pairs reads as one
+where options are used - is never stored. The values are not logged, only
+which they are: a proxy's can hold a login.
+
 Plain data and the network only: nothing here touches a widget, and the
 round trip (round_trip) runs on a worker thread. The window (ui/mw_sync.py)
 reads and writes the stores on its own thread (collect, apply).
@@ -86,6 +108,9 @@ from . import build_check
 from . import chacha20poly1305 as aead
 from . import profiles as _profiles
 from . import shortcut_keys
+from .backup import RISKY_SOURCE
+from .cert_pin import KEY as _PIN
+from .cert_pin import KEY_FOR as _PIN_FOR
 from .log import log
 from .stores import FavoriteStore, HistoryStore
 
@@ -509,6 +534,10 @@ class Context:
     pin: Any = None
     #: This computer's system (sys.platform): whose keyboard shortcuts.
     platform: str = sys.platform
+    #: What the copy has of a playlist's connection settings that waits for
+    #: the person, by the playlist's id here (State.held: the state's own
+    #: mapping, so what a round holds back is kept with it).
+    held: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def refresh_others(self) -> None:
         """The other profiles as the registry has them now."""
@@ -692,13 +721,290 @@ class SourceIds:
             self.settings.setValue(K_SOURCE_IDS, json.dumps(self.to_entry, sort_keys=True))
 
 
+# -- a playlist's connection settings: never taken unasked ---------------------------
+
+#: With one of RISKY_SOURCE, what is one setting with it: the address a
+#: trusted certificate is for, how a catch-up address is used, the choice
+#: that puts an own DNS server in use. They wait and are taken together, so
+#: a playlist never has half a setting (a DNS choice without its server
+#: fails every lookup).
+_HELD_WITH: dict[str, tuple[str, ...]] = {
+    _PIN: (_PIN_FOR,), "catchup_template": ("catchup_mode",), "dns_url": ("dns",)}
+#: Per setting, by its RISKY_SOURCE name: the options whose difference holds
+#: it back, and the options that wait with it.
+_UNITS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = tuple(
+    (key, (key, _PIN_FOR) if key == _PIN else (key,), (key, *_HELD_WITH.get(key, ())))
+    for key in RISKY_SOURCE)
+#: Every option that can wait.
+HELD_KEYS = frozenset(k for _name, _why, keys in _UNITS for k in keys)
+#: A companion's value that goes without saying beside its setting.
+_IMPLIED = {"dns": "custom", "catchup_mode": "auto"}
+#: In what waits for a playlist: the copy's has no options at all - not even
+#: an empty set - so this computer's snapshot of it has none either.
+_BARE = "~"
+#: The most of one value that is shown (a copy can hold megabytes of it).
+SHOWN_MAX = 2000
+#: Rewrite rules longer than this are shown as they are stored, not read.
+_RULES_MAX = 64 * 1024
+
+
+def _options(p: Any) -> dict[str, Any]:
+    """A playlist's options: a set of them, or none. Anything else under
+    that name is none - a list of pairs reads as options where they are
+    used (dict(options, ...)), and came past every check of a set."""
+    o = p.get("options") if isinstance(p, dict) else None
+    return o if isinstance(o, dict) else {}
+
+
+def _plain(value: Any) -> str:
+    """An option as it counts where it is used: its text without the space
+    round it, "" for none (not there, empty, false)."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float)):
+        return str(value)
+    return _canon(value)
+
+
+def hold_back(theirs: dict, mine: dict | None = None) -> tuple[dict, dict[str, Any]]:
+    """The copy's playlist *theirs* as this computer takes it by itself, and
+    what of it waits for the person (State.held's for it; empty for
+    nothing). Of the settings that send a playlist's connections elsewhere
+    (_UNITS), each one the copy has otherwise than *mine* - this computer's
+    playlist, None for one new here - stays as it is here, and the copy's
+    options for it wait (None: the copy has none). Everything else is
+    *theirs*, as ever. An ``options`` that is no set of them is left out."""
+    raw = theirs.get("options")
+    there, here = _options(theirs), _options(mine)
+    waits: dict[str, Any] = {}
+    for _name, why, keys in _UNITS:
+        if any(_plain(there.get(k)) != _plain(here.get(k)) for k in why):
+            waits.update((k, there.get(k)) for k in keys)
+    if not waits and (raw is None or isinstance(raw, dict)):
+        return theirs, waits
+    opts = dict(there)
+    for k in waits:
+        if k in here:
+            opts[k] = here[k]
+        else:
+            opts.pop(k, None)
+    taken = dict(theirs)
+    if opts or isinstance(raw, dict):
+        taken["options"] = opts
+    else:
+        taken.pop("options", None)
+    if waits and not isinstance(raw, dict):
+        waits[_BARE] = 1
+    return taken, waits
+
+
+def _with_held(p: dict, waits: dict[str, Any] | None) -> dict:
+    """Playlist *p* with the copy's values in the options that wait
+    (*waits*) - the playlist as the copy has it. It is what goes into this
+    computer's snapshot, so that its own values for them are no change to
+    send while the person has not answered; and what take_held() stores."""
+    if not waits:
+        return p
+    opts = dict(_options(p))
+    for k, v in waits.items():
+        if k not in HELD_KEYS:
+            continue
+        if v is None:
+            opts.pop(k, None)
+        else:
+            opts[k] = v
+    out = dict(p)
+    if opts or not waits.get(_BARE):
+        out["options"] = opts
+    else:
+        out.pop("options", None)
+    return out
+
+
+def _values(waits: dict[str, Any]) -> str:
+    """The options that wait, as one text to compare."""
+    return _canon({k: v for k, v in waits.items() if k in HELD_KEYS})
+
+
+def _still_waits(p: Any, waits: dict[str, Any]) -> list[str]:
+    """The settings (their RISKY_SOURCE names) of *waits* that playlist *p*
+    still has otherwise than the copy."""
+    here = _options(p)
+    return [name for name, why, _keys in _UNITS
+            if name in waits and any(_plain(waits.get(k)) != _plain(here.get(k)) for k in why)]
+
+
+def _put(store: Any, p: dict, new: dict) -> None:
+    """*new* in the place of playlist *p*. A new dict, not this one changed:
+    the playlist in use is held by what plays now, which goes on as it was
+    until the next start."""
+    store.items[store.items.index(p)] = new
+    store.update(str(new.get("id")))
+
+
+def _hold(ctx: Context, pid: str, waits: dict[str, Any], out: Applied) -> None:
+    """What the copy has for playlist *pid* that this computer did not take:
+    kept in place of what waited for it before (a newer value from sync),
+    or nothing left waiting. Only which settings is logged, never a value."""
+    if not waits:
+        ctx.held.pop(pid, None)
+        return
+    was = ctx.held.get(pid)
+    ctx.held[pid] = waits
+    if was is not None and _values(was) == _values(waits):
+        return                      # the same ones as before: no news
+    out.held.add(pid)
+    log.info("sync: a playlist's connection settings were not taken from the copy - "
+             "they wait for the person: %s",
+             ", ".join(name for name, _why, _keys in _UNITS if name in waits))
+
+
+def settle_held(store: Any, held: dict[str, dict[str, Any]]) -> bool:
+    """What waits for nothing any more, forgotten: a playlist's that is gone
+    from this computer, and values this computer now has itself. True when
+    anything went."""
+    went = False
+    for pid in list(held):
+        p = store.get(pid) if store is not None else None
+        if not isinstance(p, dict) or not _still_waits(p, held[pid]):
+            del held[pid]
+            went = True
+    return went
+
+
+@dataclass
+class HeldChange:
+    """What the copy has of one playlist's connection settings that this
+    computer has not taken. *rows*: per setting (its RISKY_SOURCE name) how
+    it is here and how the copy has it, as text for the person ("" for
+    none; never to be read as markup). *waits*: what it was made from, so an
+    answer is about what was looked at."""
+    pid: str
+    name: str
+    rows: list[tuple[str, str, str]] = field(default_factory=list)
+    waits: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def settings(self) -> list[str]:
+        return [name for name, _here, _there in self.rows]
+
+
+def _cut(text: str, most: int = SHOWN_MAX) -> str:
+    return text if len(text) <= most else text[:most - 1] + "…"
+
+
+def _text(value: Any) -> str:
+    return _plain(value) if not isinstance(value, str) else value.strip()
+
+
+def _rules_text(value: Any) -> str:
+    """Rewrite rules as lines, "find  →  replace" (a regular expression
+    marked as its editor marks one); what does not read as rules as it is
+    stored."""
+    if isinstance(value, str) and len(value) > _RULES_MAX:
+        return _text(value)
+    from . import url_rewrite
+    try:
+        rules = url_rewrite.parse(value)
+    except (RecursionError, ValueError, TypeError):
+        rules = []
+    if not rules:
+        return _text(value)
+    return "\n".join(f"{r.find}  →  {r.replace}" + ("  (.*)" if r.regex else "")
+                     for r in rules)
+
+
+def _shown(name: str, values: dict[str, Any]) -> str:
+    """One setting's options (*values*) as text to read: "" for none, cut at
+    SHOWN_MAX."""
+    if name == "rewrite":
+        return _cut(_rules_text(values.get(name)))
+    if name == _PIN:
+        from .cert_pin import normal, pretty
+        fp = normal(_text(values.get(name)))
+        return _cut(" · ".join(x for x in (_text(values.get(_PIN_FOR)),
+                                           pretty(fp) if fp else _text(values.get(name))) if x))
+    parts = [_text(values.get(name))]
+    parts += [x for k in _HELD_WITH.get(name, ())
+              if (x := _text(values.get(k))) and x != _IMPLIED.get(k)]
+    return _cut(" · ".join(x for x in parts if x))
+
+
+def held_changes(store: Any, held: dict[str, dict[str, Any]]) -> list[HeldChange]:
+    """What waits (*held*), per playlist of *store* in their order, for the
+    window to ask about: only the settings this computer still has
+    otherwise than the copy."""
+    out: list[HeldChange] = []
+    for p in (getattr(store, "items", None) or []):
+        if not isinstance(p, dict):
+            continue
+        pid = str(p.get("id") or "")
+        waits = held.get(pid)
+        if not pid or not waits:
+            continue
+        here, still = _options(p), _still_waits(p, waits)
+        rows = [(name, _shown(name, {k: here.get(k) for k in keys}),
+                 _shown(name, {k: waits.get(k) for k in keys}))
+                for name, _why, keys in _UNITS if name in still]
+        if rows:
+            name = p.get("name") if isinstance(p.get("name"), str) else ""
+            server = p.get("server") if isinstance(p.get("server"), str) else ""
+            out.append(HeldChange(pid, _cut(" ".join((name or server or "?").split()), 60),
+                                  rows, dict(waits)))
+    return out
+
+
+def _looked_at(held: dict[str, dict[str, Any]], changes: list[HeldChange]) -> list[str]:
+    """The playlists of *changes* whose waiting values are still the ones
+    that were looked at (a round can bring newer ones meanwhile: those wait
+    on, to be looked at first)."""
+    return [c.pid for c in changes
+            if c.pid in held and _values(held[c.pid]) == _values(c.waits)]
+
+
+def take_held(store: Any, held: dict[str, dict[str, Any]],
+              changes: list[HeldChange]) -> set[str]:
+    """The person's "apply": what waits for the playlists of *changes* -
+    exactly what was looked at - put in their options as the copy has it,
+    stored the way a round stores a playlist, and no longer waiting.
+    Returns the playlists (their ids) changed."""
+    done: set[str] = set()
+    for pid in _looked_at(held, changes):
+        waits = held.pop(pid)
+        p = store.get(pid) if store is not None else None
+        if not isinstance(p, dict):
+            continue
+        _put(store, p, _with_held(p, waits))
+        done.add(pid)
+    if done:
+        log.info("sync: connection settings from the copy taken for %d playlist(s), "
+                 "as the person said", len(done))
+    return done
+
+
+def drop_held(held: dict[str, dict[str, Any]], changes: list[HeldChange]) -> set[str]:
+    """The person's "keep mine": what waits for the playlists of *changes*
+    forgotten. This computer's own values are then what its snapshot has -
+    the newer change, sent with the next round. Returns the playlists."""
+    done = set(_looked_at(held, changes))
+    for pid in done:
+        del held[pid]
+    if done:
+        log.info("sync: connection settings from the copy left for %d playlist(s) - "
+                 "this computer's are kept", len(done))
+    return done
+
+
 def _collect_sources(ctx: Context) -> dict[str, Any]:
     out: dict[str, Any] = {}
     ids = SourceIds(ctx.playlists)
     srcs = ctx.sources()
     for p in srcs:
-        e = ids.entry_of(str(p["id"]))
-        out[_eid("s", e)] = dict(p, id=e)
+        pid = str(p["id"])
+        e = ids.entry_of(pid)
+        out[_eid("s", e)] = dict(_with_held(p, ctx.held.get(pid)), id=e)
     out[_eid("o")] = [ids.entry_of(str(p["id"])) for p in srcs]
     return out
 
@@ -746,6 +1052,9 @@ def digest(ctx: Context, cats: tuple[str, ...] | list[str]) -> str:
         store = getattr(ctx.playlists, "settings", None)
         if store is not None:
             take(store, K_SOURCE_IDS)
+        if ctx.held:
+            # A snapshot has the copy's values where one waits (_with_held).
+            h.update(_canon(ctx.held).encode("utf-8", "replace") + b"\4")
     for label, view, resume in ctx.views():
         h.update(label.encode("utf-8", "replace") + b"\3")
         if "favorites" in cats:
@@ -1146,6 +1455,10 @@ class Applied:
     #: playlist that kept its own after its id was taken): the next round
     #: soon, not in half an hour.
     again: bool = False
+    #: Playlists (their ids here) whose connection settings the copy has
+    #: otherwise and this round did not take: new, or other than the ones
+    #: that waited (State.held has them; the window asks).
+    held: set[str] = field(default_factory=set)
 
     def any(self) -> bool:
         return bool(self.settings or self.favorites or self.history or self.sources)
@@ -1376,17 +1689,19 @@ def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
         if v is None:
             if _eid("s", e) not in old:
                 continue
+            ctx.held.pop(pid, None)         # the copy has nothing of it to wait for
             if pid == str(store.active_id):
                 log.info("sync: playlist removed elsewhere kept - it is in use here")
                 continue
             store.remove(pid)
             ids.forget(pid)
             out.sources = True
-        elif _canon(dict(v, id=pid)) != _canon(p):
-            # A new dict, not this one changed: the playlist in use is held
-            # by what plays now, which goes on as it was until the next start.
-            store.items[store.items.index(p)] = dict(v, id=pid)
-            store.update(pid)
+            continue
+        # Its connection settings stay this computer's own (hold_back).
+        taken, waits = hold_back(v, p)
+        _hold(ctx, pid, waits, out)
+        if _canon(dict(taken, id=pid)) != _canon(p):
+            _put(store, p, dict(taken, id=pid))
             out.sources = True
     for e, v in wanted.items():
         if e in here or source_fp(v) in fps_here:
@@ -1395,7 +1710,10 @@ def _apply_sources(ctx: Context, new: dict[str, Any], old: dict[str, Any],
         if store.get(pid) is not None or ids.local_of(e) is None:
             while store.get(pid) is not None or pid in ids.to_entry or pid in wanted:
                 pid = secrets.token_hex(4)
-        store.add(dict(v, id=pid))
+        # New here: without the connection settings the copy has for it.
+        taken, waits = hold_back(v)
+        store.add(dict(taken, id=pid))
+        _hold(ctx, pid, waits, out)
         if pid != e:
             ids.set(pid, e)
         fps_here.add(source_fp(v))
@@ -1453,6 +1771,8 @@ def apply(ctx: Context, result: RoundResult, before: Snapshot, now_here: Snapsho
                              ctx.places(), out)
         elif cat == "history":
             _apply_history(ctx, new, old, ctx.places(), out)
+    if ctx.held and ctx.playlists is not None:
+        settle_held(ctx.playlists, ctx.held)
     return out, keep
 
 
@@ -1482,6 +1802,11 @@ class State:
         #: This computer has written the slot with its credential, so the
         #: site holds the slot bound to it (round_trip's *bind*).
         self.bound = False
+        #: Per playlist (its id here): the connection settings the copy has
+        #: for it that this computer has not taken - its options as the copy
+        #: has them, None for one it has not (hold_back). They wait for the
+        #: person; nothing uses them meanwhile.
+        self.held: dict[str, dict[str, Any]] = {}
 
     @classmethod
     def load(cls, path: Path, slot: str) -> State:
@@ -1503,6 +1828,12 @@ class State:
         st.fresh = bool(data.get("fresh"))
         st.joining = bool(data.get("joining"))
         st.bound = bool(data.get("bound"))
+        held = data.get("held")
+        for pid, waits in (held.items() if isinstance(held, dict) else ()):
+            kept = ({k: v for k, v in waits.items() if k in HELD_KEYS or k == _BARE}
+                    if isinstance(waits, dict) else {})
+            if kept:
+                st.held[str(pid)] = kept
         seen = data.get("seen")
         st.seen = {str(c) for c in seen} if isinstance(seen, list) else set()
         return st
@@ -1510,7 +1841,8 @@ class State:
     def dump(self) -> str:
         return json.dumps({"slot": self.slot, "version": self.version,
                            "fresh": self.fresh, "joining": self.joining,
-                           "bound": self.bound, "seen": sorted(self.seen), "doc": self.doc},
+                           "bound": self.bound, "held": self.held,
+                           "seen": sorted(self.seen), "doc": self.doc},
                           ensure_ascii=False, separators=(",", ":"))
 
 

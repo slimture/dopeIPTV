@@ -168,6 +168,8 @@ class Computer:
         self.state = sync.State(tmp / f"{name}-state.json", slot)
 
     def round(self, remote, key, cats=ALL, now=None):
+        # What waits for the person is the state's (as the window keeps it).
+        self.ctx.held = self.state.held
         snap = sync.collect(self.ctx, cats)
         result = sync.round_trip(remote, key, self.state.doc, snap, cats, now=now,
                                  fresh=self.state.fresh, joining=self.state.joining,
@@ -1326,4 +1328,226 @@ def test_the_first_round_binds_the_slot_even_with_nothing_new():
             older.get()
     finally:
         site.close()
+
+
+# -- a playlist's connection settings: the window asks, sync never takes them -------------------
+
+PROXY = "http://10.8.0.1:3128"
+
+
+def _two_windows_one_playlist(tmp_path, site):
+    """Two windows that sync their playlists: A has one, B has joined - and
+    A has just given it a proxy, which reached the copy."""
+    from dopeiptv.ui.notices import NoticeHub
+
+    a, b = _window(tmp_path, "a", site), _window(tmp_path, "b", site)
+    for w in (a, b):
+        sync.set_chosen(w.settings, ALL)
+        w.notices = NoticeHub(w)
+    pid = a.playlist_store.add(dict(PROVIDER))["id"]
+    code = a._sync_start_here()
+    assert _settle(a) and b._sync_join(code) and _settle(b)
+    assert b.playlist_store.get(pid) is not None and b.playlist_store.active_id == pid
+    a.playlist_store.update(pid, options={"proxy": PROXY})
+    _round(a)
+    return a, b, pid
+
+
+def _round(w):
+    assert w.sync_now(manual=True) and _settle(w)
+
+
+def _cards(w):
+    from dopeiptv.ui.notices import hub_of
+    return [m for m in hub_of(w).decisions() if m.key == "sync_held"]
+
+
+def _answer(monkeypatch, choice, seen=None, meanwhile=None):
+    """The review window answered *choice* the moment it opens; *seen* gets
+    the words it showed."""
+    from dopeiptv.ui.sync_review import SyncReviewDialog
+
+    def exec_(dlg):
+        if seen is not None:
+            seen.append([lbl.text().replace("​", "") for lbl in dlg.shown])
+        if meanwhile is not None:
+            meanwhile()
+        dlg.choice = choice
+        return 1
+    monkeypatch.setattr(SyncReviewDialog, "exec", exec_)
+
+
+def _click_review(w):
+    """The card's Review, clicked."""
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.ui.notices import hub_of
+    (card,) = _cards(w)
+    hub_of(w).activate(card.id)
+    QApplication.processEvents()            # its action runs after the click's event
+    w._sync_soon_timer.stop()               # the tests start the next round themselves
+
+
+def _done(*windows):
+    for w in windows:
+        w._sync_forget()
+        w._sync_pool.waitForDone(2000)
+
+
+def test_the_window_asks_before_a_synced_proxy_is_used_and_apply_puts_it_in(
+        tmp_path, site, qapp, monkeypatch):
+    """A proxy set on one computer is never in use on the other before the
+    person there has seen it: one card that names the playlist and the
+    setting, Review, Apply."""
+    a, b, pid = _two_windows_one_playlist(tmp_path, site)
+    assert not _cards(a) and a._sync_state.held == {}, "its own change: nothing to ask"
+    _round(b)
+    assert not b.playlist_store.get(pid).get("options"), "not in use"
+    (card,) = _cards(b)
+    assert card.action_label == tr("sync_held_review") and card.level == "warning"
+    assert PROVIDER["name"] in card.title and tr("nerd_proxy") in card.title
+    assert PROXY not in card.text, "which setting, not its value"
+    kept = json.loads(b._sync_state_file.read_text(encoding="utf-8"))
+    assert kept["held"] == {pid: {"proxy": PROXY}}
+    _round(b)
+    assert len(_cards(b)) == 1                              # the same ones: one card
+    seen = []
+    _answer(monkeypatch, "apply", seen)
+    _click_review(b)
+    assert PROVIDER["name"] in seen[0] and PROXY in seen[0]
+    assert tr("sync_review_none") in seen[0]                 # beside what is here: none
+    assert b.playlist_store.get(pid)["options"] == {"proxy": PROXY}
+    assert PlaylistStore(b.settings).get(pid)["options"] == {"proxy": PROXY}
+    assert not _cards(b) and b._sync_state.held == {}
+    assert b.toasts[-1] == tr("sync_applied_restart")       # the playlist in use: next start
+    b._sync_pool.waitForDone(2000)
+    assert json.loads(b._sync_state_file.read_text(encoding="utf-8"))["held"] == {}
+    # Nothing is left to send or to ask, here or there.
+    puts = site.puts()
+    for w in (b, a, b):
+        _round(w)
+    assert site.puts() == puts and not _cards(a) and not _cards(b)
+    assert a.playlist_store.get(pid)["options"] == {"proxy": PROXY}
+    _done(a, b)
+
+
+def test_keep_mine_leaves_them_and_the_computer_that_set_them_is_asked(
+        tmp_path, site, qapp, monkeypatch):
+    a, b, pid = _two_windows_one_playlist(tmp_path, site)
+    _round(b)
+    _answer(monkeypatch, "keep")
+    _click_review(b)
+    assert not b.playlist_store.get(pid).get("options") and b._sync_state.held == {}
+    assert not _cards(b)
+    _round(b)                       # B's own - no proxy - is the newer change now
+    _round(a)
+    assert a.playlist_store.get(pid)["options"] == {"proxy": PROXY}, "A's stays until A says"
+    assert len(_cards(a)) == 1 and a._sync_state.held == {pid: {"proxy": None}}
+    _done(a, b)
+
+
+def test_the_card_comes_once_and_the_sync_page_goes_on_offering_the_review(
+        tmp_path, site, qapp, monkeypatch):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QDialog
+
+    from dopeiptv.ui.mw_sync import _SyncCard
+    from dopeiptv.ui.notices import NoticeHub, hub_of
+    from dopeiptv.ui.settings_ui import SettingsPage
+
+    a, b, pid = _two_windows_one_playlist(tmp_path, site)
+    dlg = QDialog()
+    card = SettingsPage("sync", "Sync").card("Sync")
+    ui = _SyncCard(b, card, dlg)
+    assert tr("sync_review_title") not in _shown_rows(card)      # nothing waits: no row
+    _round(b)
+    hub_of(b).dismiss(_cards(b)[0].id)                           # ✕: not now
+    _round(b)
+    assert not _cards(b), "said once - not again with every round"
+    assert b._sync_state.held == {pid: {"proxy": PROXY}}         # they wait on
+    assert tr("sync_review_title") in _shown_rows(card)
+    hint = ui.held_row.hint_label
+    assert hint.textFormat() == Qt.TextFormat.PlainText          # a playlist's name
+    assert PROVIDER["name"] in hint.text() and tr("nerd_proxy") in hint.text()
+    opened = []
+    monkeypatch.setattr(b, "_sync_review_held", lambda parent=None: opened.append(parent))
+    ui.held_btn.click()
+    assert opened == [dlg]
+    # The next start: once more, while they still wait.
+    b._sync_pool.waitForDone(2000)
+    again = _window(tmp_path, "b", site)
+    again.notices = NoticeHub(again)
+    _round(again)
+    assert len(_cards(again)) == 1 and not again.playlist_store.get(pid).get("options")
+    # Sync stopped: the copy's are forgotten with it, and the card goes.
+    again._sync_stop(False)
+    assert not _cards(again) and not again._sync_held_changes()
+    again._sync_pool.waitForDone(2000)
+    dlg.deleteLater()
+    _done(a, b)
+
+
+def test_values_that_came_while_the_review_was_open_are_never_taken_unseen(
+        tmp_path, site, qapp, monkeypatch):
+    a, b, pid = _two_windows_one_playlist(tmp_path, site)
+    _round(b)
+    newer = {"proxy": "http://attacker.evil:8080"}
+    _answer(monkeypatch, "apply",
+            meanwhile=lambda: b._sync_state.held.__setitem__(pid, dict(newer)))
+    _click_review(b)
+    assert not b.playlist_store.get(pid).get("options"), "what was shown is not what waits now"
+    assert b._sync_state.held == {pid: newer}
+    assert len(_cards(b)) == 1                                  # asked again, about those
+    _done(a, b)
+
+
+def test_a_kids_profile_reviews_them_only_with_a_grown_ups_pin(
+        tmp_path, site, qapp, monkeypatch):
+    a, b, pid = _two_windows_one_playlist(tmp_path, site)
+    _round(b)
+    seen = []
+    _answer(monkeypatch, "apply", seen)
+    b._kids_settings_unlock = lambda: False                     # no PIN given
+    b._sync_review_held()
+    assert not seen and b._sync_state.held and not b.playlist_store.get(pid).get("options")
+    b._kids_settings_unlock = lambda: True
+    b._sync_review_held()
+    assert seen and b.playlist_store.get(pid)["options"] == {"proxy": PROXY}
+    b._sync_soon_timer.stop()
+    _done(a, b)
+
+
+def test_the_review_shows_a_playlists_name_and_every_value_as_words(qapp):
+    """A playlist's name and its options are whatever another computer - or
+    whoever has the sync code - wrote: words, never markup."""
+    from PyQt6.QtCore import Qt
+
+    from dopeiptv import i18n
+    from dopeiptv.core import backup
+    from dopeiptv.ui import sync_review
+    from dopeiptv.ui.mw_sync import held_words
+
+    hostile = 'IPTV <img src="/tmp/x.png"><span style="font-size:200px">'
+    change = sync.HeldChange("p1", hostile, [("proxy", "", hostile), ("headers", hostile, "")])
+    dlg = sync_review.SyncReviewDialog(None, [change])
+    assert len(dlg.shown) == 5                      # the name, and two values a setting
+    assert all(lbl.textFormat() == Qt.TextFormat.PlainText for lbl in dlg.shown)
+    texts = [lbl.text().replace("​", "") for lbl in dlg.shown]
+    assert texts.count(hostile) == 3 and texts.count(tr("sync_review_none")) == 2
+    # Taking them is a deliberate click, never Enter's; closed is no answer.
+    assert dlg.choice == "" and dlg.keep.isDefault() and not dlg.apply.isDefault()
+    dlg.apply.click()
+    assert dlg.choice == "apply"
+    dlg.deleteLater()
+    # Every setting that can wait has the app's own words.
+    assert sync_review.labels_known()
+    for name in backup.RISKY_SOURCE:
+        assert sync_review._LABELS[name] in i18n._STRINGS and sync_review.label(name) != name
+    # The card: a few playlists by name, each setting once.
+    many = [sync.HeldChange(str(i), f"List {i}",
+                            [("proxy", "", "x")] + [("rewrite", "", "y")] * (i % 2))
+            for i in range(5)]
+    words = held_words(many)
+    assert "List 0, List 1, List 2, …" in words and "List 3" not in words
+    assert words.count(tr("nerd_proxy")) == 1 and tr("nerd_src_rewrite") in words
 
