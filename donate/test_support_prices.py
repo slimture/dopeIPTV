@@ -174,6 +174,12 @@ def test_every_page_has_the_one_footer():
         foot = en.split("<footer>", 1)[1]
         assert foot.count('class="foot-col"') == 3
         assert 'href="/payments/"' in foot and 'href="/about/"' in foot and "data-feedback" in foot
+        # Each legal page its own link under the words its tab has: one
+        # "Privacy & terms" that opened only the privacy page hid the terms.
+        for path, word in (("/privacy/", "Privacy"), ("/terms/", "Terms"), ("/payments/", "Payment terms")):
+            assert f'<a href="{path}">{word}</a>' in foot, path
+            assert f'<a href="{path}">{word}</a>' in en.split("<footer>", 1)[0] or path == "/payments/", path
+        assert "Privacy &amp; terms" not in en
         assert foot.count("No channels or content included.") == 1
         assert '<p class="foot-note">No channels or content included.</p>' in foot
         assert "© " in foot and "Solecraft AB</a>" in foot

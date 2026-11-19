@@ -266,7 +266,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | mrow(" navdonate" + mcur("support"); "/support/"; t("support_nav"); $ICON.heart; macur("support")) as $menudonate
     # Under the rows, small: feedback and the rules, without scrolling to
     # the footer.
-    | ("          <div class=\"navmenu-foot\"><a href=\"#feedback\" data-feedback>\(t("foot_feedback") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/privacy/\">\(t("foot_privacy_terms") | h)</a></div>\n") as $menufoot
+    | ("          <div class=\"navmenu-foot\"><a href=\"#feedback\" data-feedback>\(t("foot_feedback") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/privacy/\">\(t("foot_privacy") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/terms/\">\(t("foot_terms") | h)</a></div>\n") as $menufoot
     # ...and on a phone, where the links fold into the menu, a heart of its
     # own in the header, one tap from anywhere.
     | "      <a class=\"navheart\" href=\"/support/\" aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
@@ -319,7 +319,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         [["#feedback", t("foot_feedback"), " data-feedback"], ["/about/", t("foot_about")]]
         + (if $SUPPORT_ON then [["/support/", t("support_nav")]] else [] end))
     + foot_group(t("foot_h_legal");
-        [["/privacy/", t("foot_privacy_terms")], ["/payments/", t("foot_payments")]])
+        [["/privacy/", t("foot_privacy")], ["/terms/", t("foot_terms")], ["/payments/", t("foot_payments")]])
     + "      </nav>\n"
     + "    </div>\n"
     + "    <div class=\"foot-base\">\n"
