@@ -1,9 +1,9 @@
 #!/bin/sh
-# dopeiptv.org's security headers, limits and log lines into the TLS-front
-# proxy's own server files - what proxy-dopeiptv.org.conf and
-# proxy-iptv.dope.rs.conf in this repo show - keeping each file's own
-# addresses (CONTENT_HOST) and certificates as they are. In the webproxy
-# jail:
+# dopeiptv.org's security headers, limits, log lines and what it keeps off
+# the disk into the TLS-front proxy's own server files - what
+# proxy-dopeiptv.org.conf and proxy-iptv.dope.rs.conf in this repo show -
+# keeping each file's own addresses (CONTENT_HOST) and certificates as they
+# are. In the webproxy jail:
 #
 #     sh proxy-headers.sh
 #
@@ -90,7 +90,8 @@ MAIN='dopeiptv.org +ssl'
 {
     printf '%s\n' "$LOGS" | want "$MAIN"
     want "$MAIN" < "$TMP/headers"
-    printf '%s\n' 'client_max_body_size    256k;' 'client_body_buffer_size 256k;' | want "$MAIN"
+    printf '%s\n' 'client_max_body_size    256k;' 'client_body_buffer_size 256k;' \
+        'proxy_max_temp_file_size 0;' | want "$MAIN"
     printf '%s\n' 'client_body_buffer_size 3m;' 'limit_conn dopeiptv_sync_put 8;' | want "$MAIN|location ^~ /sync/"
     printf '%s\n' 'client_body_buffer_size 4k;' | want "$MAIN|location ^~ /together/"
     { printf '%s\n' "$LOGS"; cat "$TMP/www"; } | want 'www.dopeiptv.org +ssl'

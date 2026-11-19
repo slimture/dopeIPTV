@@ -1,12 +1,14 @@
 """The content server's nginx file (deploy/content-iptv.dope.rs.conf), read
-as nginx reads it - nginx itself is not here. A small reader of its syntax
-(blocks, directives, quotes, comments) and of how a request finds its
-location and a map its value, then what the file promises: nothing of a
-request in its logs but what the statistics read, each limit where it says
-it is - and one that applies -, a zone's key never changed under its name
-(a reload keeps the old configuration then, DEPLOY.md), bodies kept in
-memory up to what the service takes, nothing served that was never meant
-to be."""
+as nginx reads it. A small reader of its syntax (blocks, directives, quotes,
+comments) and of how a request finds its location and a map its value, then
+what the file promises: nothing of a request in its logs but what the
+statistics read, each limit where it says it is - and one that applies -, a
+zone's key never changed under its name (a reload keeps the old
+configuration then, DEPLOY.md), bodies kept in memory up to what the service
+takes, no answer in a temporary file (the front proxy's file too), no
+symbolic link followed, nothing served that was never meant to be. Where
+nginx is installed, nginx -t takes the file with the jail's nginx.conf, and
+the proxy's files, as they are in the repository."""
 from __future__ import annotations
 
 import os
@@ -16,6 +18,9 @@ import subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CONF = os.path.join(ROOT, "deploy", "content-iptv.dope.rs.conf")
+PROXY = os.path.join(ROOT, "deploy", "proxy-dopeiptv.org.conf")
+OLD_PROXY = os.path.join(ROOT, "deploy", "proxy-iptv.dope.rs.conf")
+JAIL = os.path.join(ROOT, "deploy", "nginx-dopeiptv-jail.conf")
 
 
 # -- nginx's syntax ---------------------------------------------------------------
@@ -308,6 +313,151 @@ def _locations(blocks: list[Block]):
         if b.name == "location":
             yield b
             yield from _locations(b.body)
+
+
+def _proxies(block: Block) -> bool:
+    return bool(block.all("proxy_pass")) or any(_proxies(b) for b in block.body or [] if b.body is not None)
+
+
+def test_no_answer_is_written_to_a_temporary_file():
+    # An answer larger than nginx's buffers in memory went to a file in
+    # /var/tmp, to be sent from there - and a sync copy is up to 2 MB. Now
+    # it is passed on as it comes, in both servers: every server that hands
+    # a request on says so, and no location takes it back or keeps answers
+    # on disk another way (a cache, a store, a temp folder of its own).
+    servers = [_server(conf())] + conf(PROXY).all("server") + conf(OLD_PROXY).all("server")
+    handing_on = [s for s in servers if _proxies(s)]
+    assert [s.values("server_name") for s in handing_on] == [["dopeiptv.org iptv.dope.rs"], ["dopeiptv.org"]]
+    for srv in handing_on:
+        assert srv.values("proxy_max_temp_file_size") == ["0"], srv
+        for b in [srv] + list(_locations(srv.body)):
+            for name in ("proxy_cache", "proxy_store", "proxy_temp_path", "client_body_in_file_only"):
+                assert not b.all(name), (b, name)
+            if b is not srv:
+                assert not b.all("proxy_max_temp_file_size"), b
+    content = _server(conf())
+    for uri in ("/sync/" + "ab" * 32, "/feedback/report", "/feedback/export", "/admin/stats", "/donate/config",
+                "/support/key", "/admin/auth/password"):
+        assert any(b.all("proxy_pass") for b in locate(content, uri)), uri
+        assert _effective(content, uri, "proxy_max_temp_file_size") == "0", uri
+    (site,) = [s for s in conf(PROXY).all("server") if s.values("server_name") == ["dopeiptv.org"]]
+    for uri in ("/", "/sync/x", "/style.css", "/admin/"):
+        assert _effective(site, uri, "proxy_max_temp_file_size") == "0", uri
+
+
+def test_no_symbolic_link_is_followed_and_the_site_has_none():
+    srv = _server(conf())
+    assert srv.values("disable_symlinks") == ["on from=$document_root"]
+    assert srv.values("root") == ["/usr/local/www/iptv/public"]
+    # A location with a word of its own on links, or a root or alias of its
+    # own, would put it aside there.
+    for loc in _locations(srv.body):
+        for name in ("disable_symlinks", "root", "alias"):
+            assert not loc.all(name), (loc, name)
+    # Nothing the site serves is a link: none in git, none in this checkout,
+    # and sync-releases.sh - which fills public/ on the server - makes none.
+    for top in ("public", "site"):
+        for where, dirs, files in os.walk(os.path.join(ROOT, top)):
+            for name in dirs + files:
+                assert not os.path.islink(os.path.join(where, name)), os.path.join(where, name)
+    listed = subprocess.run(["git", "-C", ROOT, "ls-files", "-s", "--", "public", "site"],
+                            capture_output=True, text=True)
+    if listed.returncode == 0:
+        assert listed.stdout and not [ln for ln in listed.stdout.splitlines() if ln.startswith("120000 ")]
+    with open(os.path.join(ROOT, "sync-releases.sh"), encoding="utf-8") as fh:
+        code = [ln for ln in fh.read().splitlines() if not ln.lstrip().startswith("#")]
+    assert len(code) > 100
+    made = [ln for ln in code if re.search(r"(?:^|[;&|(]|\bthen|\bdo|\belse)\s*ln\s", ln) or "symlink" in ln]
+    assert made == []
+
+
+# -- nginx -t, where nginx is here -------------------------------------------------
+
+def _nginx() -> str:
+    import shutil
+    import pytest
+    found = shutil.which("nginx") or next(
+        (p for p in ("/usr/sbin/nginx", "/usr/local/sbin/nginx") if os.access(p, os.X_OK)), None)
+    if not found:
+        pytest.skip("no nginx here")
+    return found
+
+
+def _prefix(tmp_path, top: str, http: str) -> tuple:
+    """A folder for nginx -t of its own: its logs, temp folders and pid file
+    in it, nothing of the machine's. nginx.conf from *top* and *http* (the
+    http block's own lines), the server files in conf.d/."""
+    log, confd = tmp_path / "log", tmp_path / "conf.d"
+    for folder in (log, confd, tmp_path / "tmp"):
+        folder.mkdir()
+    (tmp_path / "mime.types").write_text("types {\n    text/html html;\n    text/css css;\n"
+                                          "    application/javascript js;\n}\n")
+    temps = "".join(f"    {name}_temp_path {tmp_path / 'tmp' / name};\n"
+                    for name in ("client_body", "proxy", "fastcgi", "uwsgi", "scgi"))
+    main = f"pid {tmp_path / 'nginx.pid'};\n" + top.replace("http {\n", "http {\n" + temps + http, 1)
+    main = main.replace("/var/log/nginx/", f"{log}/").replace("/usr/local/etc/nginx/conf.d/", f"{confd}/")
+    assert temps in main and "/var/log/" not in main and "/usr/local/etc/" not in main, main
+    (tmp_path / "nginx.conf").write_text(main)
+    return log, confd
+
+
+def _nginx_t(nginx: str, tmp_path) -> subprocess.CompletedProcess:
+    return subprocess.run([nginx, "-t", "-q", "-p", f"{tmp_path}/", "-c", str(tmp_path / "nginx.conf"),
+                           "-e", str(tmp_path / "log" / "startup.log")],
+                          capture_output=True, text=True, timeout=60)
+
+
+def test_nginx_takes_the_content_servers_file_with_the_jails_nginx_conf(tmp_path):
+    nginx = _nginx()
+    with open(JAIL, encoding="utf-8") as fh:
+        log, confd = _prefix(tmp_path, fh.read(), "")
+    with open(CONF, encoding="utf-8") as fh:
+        site = fh.read().replace("/var/log/nginx/", f"{log}/")
+    assert "/var/log" not in site
+    (confd / "iptv.dope.rs.conf").write_text(site)
+    # The allow list is the server's own (a documentation address here).
+    (tmp_path / "iptv-only-from-proxy.conf").write_text("allow 192.0.2.1;\ndeny all;\n")
+    run = _nginx_t(nginx, tmp_path)
+    assert run.returncode == 0, run.stderr
+    # Without the list nginx does not start: the port is never open to all.
+    (tmp_path / "iptv-only-from-proxy.conf").unlink()
+    run = _nginx_t(nginx, tmp_path)
+    assert run.returncode != 0 and "iptv-only-from-proxy.conf" in run.stderr, run.stderr
+
+
+def test_nginx_takes_the_proxys_files(tmp_path):
+    import shutil
+    import pytest
+    nginx = _nginx()
+    if not shutil.which("openssl"):
+        pytest.skip("no openssl here")
+    cert, key = tmp_path / "cert.pem", tmp_path / "key.pem"
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+                    "-nodes", "-keyout", str(key), "-out", str(cert), "-days", "1", "-subj", "/CN=dopeiptv.test"],
+                   check=True, capture_output=True, timeout=60)
+    # What the proxy's own nginx.conf gives the site's files (not in the
+    # repository): the CSP's row - csp.snippet.txt's -, the allowance for
+    # pages and the connection limit.
+    with open(os.path.join(ROOT, "deploy", "csp.snippet.txt"), encoding="utf-8") as fh:
+        row = re.search(r'^\s*("dopeiptv\.org" "[^"]*";)', fh.read(), re.M).group(1)
+    http = (f"    map $server_name $csp_policy {{\n        default \"\";\n        {row}\n    }}\n"
+            "    limit_req_zone $binary_remote_addr zone=general:1m rate=10r/s;\n"
+            "    limit_conn_zone $binary_remote_addr zone=conn_limit:1m;\n"
+            f"    include {tmp_path}/conf.d/*.conf;\n")
+    log, confd = _prefix(tmp_path, "error_log /var/log/nginx/error.log crit;\nevents {\n}\nhttp {\n}\n", http)
+    version = re.search(r"nginx/(\d+)\.(\d+)\.(\d+)", subprocess.run([nginx, "-v"], capture_output=True,
+                                                                      text=True).stderr)
+    for name, path in (("dopeiptv.org.conf", PROXY), ("iptv.dope.rs.conf", OLD_PROXY)):
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read().replace("CONTENT_HOST", "127.0.0.1").replace("/var/log/nginx/", f"{log}/")
+        text = re.sub(r"/usr/local/etc/letsencrypt/live/[^/]+/fullchain\.pem", str(cert), text)
+        text = re.sub(r"/usr/local/etc/letsencrypt/live/[^/]+/privkey\.pem", str(key), text)
+        if version and tuple(int(n) for n in version.groups()) < (1, 25, 1):
+            text = text.replace("    http2 on;\n", "")         # nginx 1.25.1's: older ones say it on listen
+        assert "/var/log" not in text and "letsencrypt/live" not in text
+        (confd / name).write_text(text)
+    run = _nginx_t(nginx, tmp_path)
+    assert run.returncode == 0, run.stderr
 
 
 def _named(srv: Block, name: str) -> Block:

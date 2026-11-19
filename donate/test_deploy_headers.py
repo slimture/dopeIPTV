@@ -3,7 +3,8 @@ every answer (always), the CSP named again in the server - nginx gives a
 server the http block's add_header lines only while it has none of its own -
 and the address kept to the site on the admin, support and Trakt pages; no
 version and no log in any of the site's servers, the old name's too; a body
-held in memory, a few sync copies at once. And deploy/proxy-headers.sh,
+held in memory, a few sync copies at once, no answer in a temporary file.
+And deploy/proxy-headers.sh,
 which puts into the live files what they lack of all that, keeping their
 own addresses: from a file before any of it, and from one an earlier run
 made."""
@@ -204,7 +205,8 @@ def test_the_script_puts_in_what_the_file_shows_and_keeps_the_rest(tmp_path):
     want = open(CONF, encoding="utf-8").read()
     for line in [ln for ln in want.splitlines() if not ln.lstrip().startswith("#")
                  and re.search(r"add_header|proxy_hide_header|no-referrer|same-origin|server_tokens"
-                               r"|client_body_buffer_size|client_max_body_size|_log |limit_conn", ln)]:
+                               r"|client_body_buffer_size|client_max_body_size|proxy_max_temp_file_size"
+                               r"|_log |limit_conn", ln)]:
         assert line.replace("CONTENT_HOST", "10.0.0.5") in got, line
     assert _shape(got) == _wanted()
     assert '    add_header X-Global "1";' in _servers(got)["dopeiptv.org"]
