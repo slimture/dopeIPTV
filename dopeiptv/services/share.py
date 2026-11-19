@@ -7,8 +7,10 @@ Each channel in the playlist is an address on this app
 (/stream/<source>/<channel>) that sends the player on to the source's own
 address at the moment it asks: a Stalker portal's link is made then, an
 Xtream address is the usual one. The player fetches the stream itself.
-Only channels the app listed can be asked for; nothing in a request is
-handed to a source unchecked.
+Only channels the app listed can be asked for, and of those only what it
+hands out - never one hidden, in a hidden or locked category or for adults,
+as server mode's lineup (``kept_out``); nothing in a request is handed to a
+source unchecked.
 """
 
 from __future__ import annotations
@@ -36,16 +38,33 @@ def _attr(value: Any) -> str:
     return re.sub(r"[\s\"]+", " ", str(value or "")).strip()
 
 
+#: A source's filters for what is handed out: (the categories hidden or
+#: locked, the channels hidden by hand, ...) - a host's ``filters(pid)``.
+Filters = Callable[[str], tuple[set[str], set[str], Any]]
+
+
+def kept_out(row: dict, cats: dict[str, str], excluded: set[str], hidden: set[str]) -> bool:
+    """Whether a channel is never handed to another device - server mode's
+    lineup and the remote API's share alike: in a hidden or locked category
+    (*excluded*: a locked one even while it is unlocked here), hidden by hand
+    (*hidden*), or for adults (marked so, or in an adult category)."""
+    from ..core.profiles import adult_category, adult_item
+    cid = str(row.get("category_id"))
+    return (cid in excluded or str(row.get("stream_id")) in hidden or adult_item(row)
+            or adult_category(cats.get(cid, "")))
+
+
 class Share:
     LIST_TTL = 600.0
 
     def __init__(self, sources: Callable[[], list[dict]],
                  make_client: Callable[[dict], Any] | None = None,
                  guide_path: Callable[[str], str] | None = None,
-                 ttl: float = LIST_TTL) -> None:
+                 ttl: float = LIST_TTL, filters: Filters | None = None) -> None:
         self._sources = sources
         self._make = make_client
         self._guide_path = guide_path
+        self._filters = filters
         self.ttl = ttl
         self._lock = threading.Lock()
         self._clients: dict[str, tuple[str, Any]] = {}
@@ -92,6 +111,16 @@ class Share:
             self._lists[pid] = (time.monotonic(), rows, cats)
         return rows, cats
 
+    def handed_out(self, pl: dict) -> tuple[list[dict], dict[str, str]]:
+        """A source's channels another device may have (``kept_out``), with
+        *filters*; all of ``channels`` without. A filter that cannot be read
+        raises: the source is left out rather than handed out whole."""
+        rows, cats = self.channels(pl)
+        if self._filters is None:
+            return rows, cats
+        excluded, hidden, _numbers = self._filters(str(pl["id"]))
+        return [r for r in rows if not kept_out(r, cats, excluded, hidden)], cats
+
     # -- the playlist ------------------------------------------------------------
     def m3u(self, base: str, token: str) -> str:
         sources = self.shared_sources()
@@ -101,7 +130,7 @@ class Share:
         for pl in sources:
             name = _attr(pl.get("name") or pl.get("server") or pl.get("id"))
             try:
-                rows, cats = self.channels(pl)
+                rows, cats = self.handed_out(pl)
             except Exception as e:
                 log.info("share: %s left out (%s)", name, e)
                 continue
@@ -123,11 +152,12 @@ class Share:
         return "\n".join(out) + "\n"
 
     def stream_url(self, source_id: str, stream_id: str) -> str | None:
-        """The source's own address for a channel this app listed, or None."""
+        """The source's own address for a channel this app listed and hands
+        out (``handed_out``), or None."""
         pl = next((p for p in self.shared_sources() if str(p.get("id")) == source_id), None)
         if pl is None:
             return None
-        rows, _cats = self.channels(pl)
+        rows, _cats = self.handed_out(pl)
         row = next((r for r in rows if str(r.get("stream_id")) == stream_id), None)
         if row is None:
             return None

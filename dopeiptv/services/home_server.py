@@ -62,7 +62,7 @@ from ..core.phone_remote import RateLimiter, cross_site
 from ..core.remote_api import lan_addresses
 from ..core.restream import BOX, NO_DATA, TUNERS, VPN, Busy, Restreamer, ffmpeg_opener, is_hls
 from .guide_keeper import GuideKeeper
-from .share import Share, lineup_guide, public_logo
+from .share import Share, kept_out, lineup_guide, public_logo
 
 DEFAULT_PORT = 3675             # the remote API's 3673, the phone remote's 3674, and one
 MAX_TUNERS = 64
@@ -365,7 +365,6 @@ class HomeServer:
             held = self._lineup
             if held is not None and time.monotonic() - held[0] < LINEUP_TTL:
                 return held[1]
-        from ..core.profiles import adult_category, adult_item
         picked: list[tuple[str | None, dict, dict, str]] = []
         for pl in self.served():
             pid = str(pl["id"])
@@ -379,8 +378,7 @@ class HomeServer:
             for r in rows:
                 cid = str(r.get("category_id"))
                 sid = str(r.get("stream_id"))
-                if (cid in excluded or sid in hidden or adult_item(r)
-                        or adult_category(cats.get(cid, "")) or (wanted and cid not in wanted)):
+                if kept_out(r, cats, excluded, hidden) or (wanted and cid not in wanted):
                     continue
                 own = numbers.get(sid)
                 num = str(own if own is not None else (r.get("_num_own", r.get("num")) or "")).strip()
