@@ -41,10 +41,7 @@ def test_import(mod):
 
 @pytest.mark.parametrize("mod", MODULES_NEED_DISPLAY)
 def test_import_gui(mod):
-    try:
-        importlib.import_module(mod)
-    except ImportError:
-        pytest.skip("display or Qt not available")
+    importlib.import_module(mod)
 
 
 def _relative_import_targets():
