@@ -7,6 +7,97 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.7]
+
+### Fixed
+
+- Settings -> Reset all: the follow file and a staged restore were left;
+  the cache (pictures, guides and their indexes, the local library's
+  index, frames, subtitle copies, the popular chart, rewind buffers), the
+  logs and the app's own yt-dlp are now emptied too (core/reset.py) - on
+  the window's way out once the player and workers have let go, and again
+  at the next start before anything opens them (a `reset-pending` marker
+  beside the settings files carries what to keep). Only a folder of the
+  app's own is touched, links are never followed, and the recordings'
+  folder is kept wherever it is.
+- Posters: a card switching from the provider's picture to TMDB's showed
+  the fallback for a moment, then the same picture again; it keeps the
+  picture it shows until the new one is loaded (media_cards.card_picture).
+- Settings: a card made again (Profiles after a removal, Nerd's lists, a
+  source's page) left deleted controls in its page's column, and the next
+  page built failed with "wrapped C/C++ object ... has been deleted" (an
+  error report from 1.6.6).
+- macOS: each .dmg's Info.plist names the oldest macOS it runs on (15.0
+  Apple Silicon, 14.0 Intel) instead of 11.0, so Finder no longer opens it
+  on a Mac where it then fails.
+
+### Security
+
+- core/settings_files.py: dopeiptv.conf and the resume, follow and cache
+  files are narrowed to 0600 and the app's folder to 0700 at start (the
+  window and `--server`), a missing file made empty at 0600 first; modes
+  are only narrowed, never a macOS plist, nothing on Windows.
+- core/instance.py: without $XDG_RUNTIME_DIR the single-instance socket
+  lived in the shared /tmp under a guessable name, and a Windows pipe is
+  the machine's - another account could take the name and hear a second
+  start's command. Linux now uses a 0700 folder of the user's own in
+  their cache (one another account owns is not listened in); Windows'
+  pipe name carries a random word kept in the user's local app data.
+- Server mode: `own_networks` leaves out tunnels (point-to-point, Ppp,
+  Virtual; tun, tap, wg, ppp, utun, ipsec, tailscale, zt by name) and
+  `LocalNetworks` keeps only the home's (RFC 1918, link-local, ULA, a /16
+  or /48 at most), so a VPN's subnet, a public network or carrier NAT no
+  longer reach the tokenless tuner; the tuner refuses an Origin or a
+  cross-site/same-site Sec-Fetch-Site and is answered before the lock-out,
+  which never counts this computer or a web page (the phone remote's too);
+  `.fritz.box` and `.ts.net` join the home suffixes, a refused name logged
+  once.
+- services/share.py: the remote API's `/playlist.m3u` and `/stream/...`
+  leave out hidden, locked and adult channels through one rule with server
+  mode's lineup (`kept_out`); a source whose filters cannot be read is left
+  out.
+- Outside addresses (a `dopeiptv://` link, `--play`, the remote API's url,
+  Open address…) are played and cast without the active source's Nerd
+  headers, referer, user agent, proxy or route unless on its own server
+  (`nerd.same_server`, play's `outside`, `set_cast_source`'s `outside`).
+- providers/epg.py: a DOCTYPE with an internal subset is refused wherever
+  it sits in the prolog (expat reads it up to the root), and a download
+  or its gunzip is cut off past 2 GiB (`GUIDE_DOWNLOAD_MAX`,
+  `GUIDE_UNPACKED_MAX`, `GuideTooLarge`).
+- core/updates.py: the Releases channel refuses a test build from the
+  site's releases.json (GitHub asked instead) and from anywhere in
+  `fetch_update`.
+- Labels showing a provider's, guide's, box's or server's words are
+  `PlainText` (a title with markup could resize panels or show a picture
+  from the disk); `widgets.plain_text` for what has no plain mode.
+- AirPlay: a run's folder names its copy (`airplay-<pid>-...`) and the
+  sweep ends only a gone copy's ffmpeg, never another running copy's cast.
+
+### Added
+
+- Send feedback and the error report window link to the privacy policy
+  (`feedback_dialogs.privacy_link`).
+
+### Changed
+
+- Module splits, no behaviour change: the Settings pages' builders
+  (ui/set_watch.py, set_content.py, set_services.py, set_system.py,
+  ui/about.py), the lists, timeshift, the local library, the queue, the
+  guide's loading, the pane following what plays, the cast window and its
+  dialogs, going back during a cast, multiview's cell and window, the
+  feedback and backup windows; dead code and 35 unused strings removed.
+- The window's build: `_build_ui` calls its parts in their old order, made
+  in ui/mw_build.py and ui/mw_build_detail.py (main_window.py 4818 -> 3656
+  lines).
+- The player: the pop-out mirror, the overlays over the picture, the
+  visualiser, equaliser and night mode, the sleep timer and number entry,
+  stats for nerds, and tracks and subtitles are mixins of their own
+  (media/popout_mirror.py, player_overlays.py, control_icons.py,
+  audio_effects.py, sleep_timer.py, stats_overlay.py, tracks.py;
+  embedded.py 4628 -> 2638 lines).
+- CI installs ffmpeg and desktop-file-utils, so the tests that need them
+  run there too.
+
 ## [1.6.6]
 
 ### Fixed

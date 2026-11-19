@@ -1,3 +1,34 @@
+## dopeIPTV 1.6.7
+
+**Safer on a shared computer and on the home network, and Reset all now removes everything.**
+
+### Fixed
+
+- **Reset all settings** removes everything: the followed series and a backup waiting to be restored too, and the app's saved pictures, downloaded guides, the local library's index, its log files and its own copy of yt-dlp - when the app closes, and once more at the next start. Your recordings stay where they are. The question before it says so.
+- **Posters** no longer blink when a better picture arrives: a card keeps the one it shows until the new one is ready.
+- **Settings:** after a profile was removed, the next page could fail to open.
+- **macOS:** a Mac too old for the app no longer opens it only to have it fail - each download names the oldest macOS it runs on (15 for Apple Silicon, 14 for Intel).
+
+### Security
+
+- **Your settings files are yours alone** on Linux and macOS: they hold every login and token, and another account on the computer could read them.
+- **A second start** hands its command to the copy running over a channel no other account on the computer can take over.
+- **Server mode's tuner** answers only your home's own networks - a VPN's tunnel, a public network or a provider's shared address range no longer count - and a web page in your browser can neither drive it nor shut anyone out; the same for the phone remote. The tuner also answers under a Fritz!Box name (`.fritz.box`) or a Tailscale name (`.ts.net`), and the log says why a name is refused.
+- **Sharing over the remote API** leaves out hidden, locked and adult channels, as server mode always did.
+- **An address from outside** - a `dopeiptv://` link, `--play`, Open address…, the remote API - is never played or cast with your source's own headers, user agent, proxy or route, unless it is on that source's server.
+- **Programme guides:** a guide built to swell in memory is refused wherever it hides it, and a download or its unpacking stops at 2 GB.
+- **Updates on the Releases channel** never install a test build.
+- **Names from a provider, guide, box or server** are shown as plain words, never as formatting or pictures.
+- **AirPlay (macOS):** starting a cast in one copy of the app no longer ends a cast in another.
+
+### New
+
+- **Send feedback and error reports** link to the privacy policy, and dopeiptv.org has a new page, **Privacy, behind the scenes**: each privacy promise with the code that keeps it, an example made by that code, and a way to ask any AI to check it.
+
+### Changed
+
+- **Under the hood:** the largest files - the main window, the player and Settings - are split into smaller parts. Nothing you see changes.
+
 ## dopeIPTV 1.6.6
 
 **The Flatpak starts again.**
