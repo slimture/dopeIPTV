@@ -57,6 +57,34 @@ def test_a_text_is_kept_to_what_its_sender_can_send_counted_in_bytes():
     assert _lines(d)[-1]["text"] == plain.strip()
 
 
+def test_the_cleaning_reads_no_more_than_a_report_can_keep():
+    # A request may carry four times what is kept (donate.py takes 200 000
+    # bytes): it is cut first, at a line's end, with room for what the
+    # cleaning shortens - never cleaned whole and then cut.
+    d = _fresh()
+    read = []
+    real = feedback.scrub
+    feedback.scrub = lambda text: read.append(len(text)) or real(text)
+    try:
+        long = ("12:04:31 INFO player: opening http://line.example-tv.net:8080/live/kalle/pw/4711.ts\n"
+                * 2500)                          # 200 000 characters, every address a long one
+        assert feedback.accept(d, {**_body(long), "kind": "error"}, "official")[0] == 200
+    finally:
+        feedback.scrub = real
+    assert read and max(read) <= 2 * feedback.MAX_TEXT
+    kept = _lines(d)[-1]["text"]
+    # Cleaned to its end, then cut to what is kept: whole lines, cleaned,
+    # and the start of the next.
+    assert "line.example-tv.net" not in kept and "kalle" not in kept
+    clean = "12:04:31 INFO player: opening http://<address>"
+    *whole, last = kept.split("\n")
+    assert set(whole) == {clean} and clean.startswith(last) and len(kept) == feedback.MAX_TEXT
+    # As long as the app sends (MAX_TEXT), it is read and kept whole as before.
+    assert feedback._head("a\nb", 10) == "a\nb"
+    assert feedback._head("x" * 9 + "\n" + "y" * 10, 15) == "x" * 9
+    assert feedback._head("x" * 30, 15) == "x" * 15
+
+
 def test_a_follow_up_is_kept_short_in_bytes_too():
     d = _fresh()
     assert feedback.accept(d, _body("It stops after a while.", reply=CODE), "official")[0] == 200

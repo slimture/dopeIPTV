@@ -123,6 +123,13 @@ _HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\
                         r"(?::\d{1,5})?/[^\s'\"<>()\[\]]*", re.IGNORECASE)
 _VERSION = re.compile(r"^[0-9A-Za-z.+_-]{1,40}$")
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
+# A home folder's name is the person's account name: /home/<x>/, /Users/<x>/,
+# C:\Users\<x>\ (a backslash doubled, as Python and JSON write it, too; a
+# name of a few words where a folder follows it). The app writes ~ and
+# <user> in their place; an older app or a hand-made request may not.
+_HOME = re.compile(r"(?i)(?<![\w.~-])((?:[a-z]:)?(\\\\|[\\/])(?:home|users)\2)"
+                   r"((?:[^\\/\s\"'<>|:*?]{1,64} ){1,3}[^\\/\s\"'<>|:*?]{1,64}(?=[\\/])"
+                   r"|[^\\/\s\"'<>|:*?]{1,64}(?=[\\/\s\"'<>|:]|$))")
 
 
 def _hide_value(m: re.Match) -> str:
@@ -133,6 +140,7 @@ def _hide_value(m: re.Match) -> str:
 
 def scrub(text: str) -> str:
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
+    out = _HOME.sub(lambda m: f"{m.group(1)}<user>", out)
     out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
     out = _HOST_PATH.sub("<address>", out)
@@ -157,7 +165,14 @@ def signature(kind: str, text: str) -> str:
     if kind == "crash":
         head = next((ln for ln in lines if ln.startswith("Fatal Python error")), "Crash")
         frame = next((ln for ln in lines if ln.startswith('File "')), "")
-        frame = re.sub(r'File ".*[\\/]', 'File "', frame)
+        # The folder before the file's name set aside: what the pattern
+        # File ".*[\\/] took, found in one look each way - the pattern took
+        # time with the line's square (48 000 characters of File " held
+        # the service for seconds).
+        i = frame.find('File "')
+        j = max(frame.rfind("/"), frame.rfind("\\"))
+        if i >= 0 and j >= i + 6:
+            frame = frame[:i] + 'File "' + frame[j + 1:]
         return f"{head} | {frame}"[:300]
     exc = ""
     for ln in lines:
@@ -182,6 +197,21 @@ def _cut(text: str, most: int) -> str:
     """*text* in at most *most* bytes of UTF-8, never half a letter."""
     raw = text.encode("utf-8")
     return text if len(raw) <= most else raw[:most].decode("utf-8", "ignore")
+
+
+def _head(text: str, most: int) -> str:
+    """*text* to at most *most* characters before it is cleaned, so the
+    cleaning never reads more than a report can keep (a request may carry
+    four times as much). Ended at a line's end where there is one, else at
+    a space: nothing the cleaning looks for spans a line, so nothing is
+    left cut in two where it would no longer be found."""
+    if len(text) <= most:
+        return text
+    text = text[:most]
+    end = text.rfind("\n")
+    if end < most // 2:
+        end = max(text.rfind(" "), text.rfind("\t"))
+    return text[:end] if end >= most // 2 else text
 
 
 def _memory(stats_dir: str, now: float) -> dict:
@@ -234,7 +264,10 @@ def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dic
         version = "?"
     system = re.sub(r"[^A-Za-z0-9 ._-]", "", str(body.get("os") or ""))[:24] or "?"
     site = kind == "feedback" and not thread and body.get("from") == "site"
-    text = _cut(scrub(str(body.get("text") or "")).strip()[:THREAD_TEXT if thread else MAX_TEXT],
+    most = THREAD_TEXT if thread else MAX_TEXT
+    # Cut before it is cleaned, with room for what the cleaning shortens
+    # (an address to <address>), then again to what is kept.
+    text = _cut(scrub(_head(str(body.get("text") or "").lstrip(), 2 * most)).strip()[:most],
                 THREAD_BYTES if thread else SITE_BYTES if site else MAX_BYTES)
     if not text:
         return 400, {"error": "empty"}

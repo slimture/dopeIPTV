@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """The server's second cleaning of a report (feedback.scrub): the patterns
 the app's core/report.py removes - addresses, IPv4 and IPv6, MAC, e-mail,
-a supporter key, name=value logins - removed here too, for an old app or a
-hand-made request; what only looks like one (a time, a version, a C++ name)
-left as it is.
+a supporter key, name=value logins, a home folder's name - removed here
+too, for an old app or a hand-made request; what only looks like one (a
+time, a version, a C++ name) left as it is. And a crash's first frame
+found in time, however its line is made (feedback.signature).
 
 Plain Python: ``python3 donate/test_feedback_scrub.py`` runs them all
 (pytest finds them too).
@@ -55,6 +56,42 @@ def test_logins_in_quotes_json_headers_and_addresses_without_a_scheme_go():
     for keep in ('File "~/dopeIPTV/dopeiptv/ui/main_window.py", line 42', "lib/python3.12/site-packages/x.py",
                  "dopeIPTV 1.6.7/notes", "localhost:3673"):
         assert feedback.scrub(keep) == keep, keep
+
+
+def test_a_home_folders_name_goes():
+    cases = {
+        'File "/home/kalle/.local/lib/x.py", line 3': 'File "/home/<user>/.local/lib/x.py", line 3',
+        "HOME=/home/kalle": "HOME=/home/<user>",
+        "/home/kalle is not writable": "/home/<user> is not writable",
+        "/Users/anna/Library/Logs": "/Users/<user>/Library/Logs",
+        'File "C:\\Users\\Kalle Anka\\AppData\\x.py"': 'File "C:\\Users\\<user>\\AppData\\x.py"',
+        "'C:\\\\Users\\\\kalle\\\\AppData'": "'C:\\\\Users\\\\<user>\\\\AppData'",
+        "c:/users/bob/x": "c:/users/<user>/x",
+    }
+    for text, scrubbed in cases.items():
+        assert feedback.scrub(text) == scrubbed, (text, feedback.scrub(text))
+    for keep in ("/mnt/home/x/y", "/home/<user>/y", 'File "~/dopeIPTV/x.py"', "/home//x"):
+        assert feedback.scrub(keep) == keep, keep
+
+
+def test_a_crashs_first_frame_is_found_in_time_and_as_before():
+    import re
+    import time
+    # What the pattern File ".*[\\/] made of a frame - it took time with the
+    # line's square: 48 000 characters of File " held the service seconds.
+    def before(kind, text):
+        lines = [ln.strip() for ln in text.splitlines()]
+        head = next((ln for ln in lines if ln.startswith("Fatal Python error")), "Crash")
+        frame = re.sub(r'File ".*[\\/]', 'File "', next((ln for ln in lines if ln.startswith('File "')), ""))
+        return f"{head} | {frame}"[:300]
+    t = time.perf_counter()
+    feedback.signature("crash", 'File "' * 8000)
+    assert time.perf_counter() - t < 0.1
+    for text in ('Fatal Python error: Segmentation fault\n\nCurrent thread:\n'
+                 '  File "/usr/lib/python3/dist-packages/PyQt6/x.py", line 12 in run\n',
+                 '  File "C:\\Program Files\\dopeIPTV\\_internal\\mpv.py", line 9 in play\n',
+                 'File "<string>", line 1', 'File "a/b" File "c', 'File "x/', 'File "', "no frame"):
+        assert feedback.signature("crash", text) == before("crash", text), text
 
 
 if __name__ == "__main__":
