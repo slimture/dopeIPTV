@@ -45,6 +45,33 @@ website/
 └── deploy/                 nginx + CSP config templates (two roles)
 ```
 
+## One look everywhere
+
+The site is one design. The header, the narrow-window menu, the footer, the
+pages and the dialogs are made of the same pieces, and a change to one of
+them is carried to the others in the same commit - a header that looks
+different from the menu it opens, or a footer from the page above it, is a
+bug.
+
+- **Colours** only from `style.css`'s tokens (`--text`, `--muted`, `--faint`,
+  `--surface`, `--line`, `--accent`, `--heart`, `--brand`), in both themes.
+- **One set of icons**: 24-unit line icons, a 1.8 stroke, round caps (the
+  menu's in `render.jq`, `nav`: features, download, send, help; the heart
+  filled). The same thing has the same icon wherever it shows.
+- **One idea of a control**: the header's square buttons (44 x 40, a 12px
+  radius); panels that open from the header (the menu, the language picker)
+  16px round with rows of a finger's height, an icon in a tinted square and
+  a chevron; hover is the accent's light tint everywhere.
+- **The page you are on** is marked the same way everywhere: the accent, on
+  its light wash.
+- **The same words for the same thing**: a link reuses the key the other
+  places use (`nav_help`, `support_nav`, `foot_payments`...) rather than a
+  phrase of its own.
+- **Every reader**: mirrored right to left, calm for reduced motion, a
+  phone's tap target 44px or more.
+- **Before it goes out**: look at it on a phone and a computer, in light and
+  dark, and in one right-to-left language.
+
 ## Architecture
 
 Two nginx roles (adapt to your own setup):
