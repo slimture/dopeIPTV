@@ -42,6 +42,8 @@ class RestoreBackupDialog(QDialog):
                      "nerd_remote": ("nerd_remote",),
                      "nerd_share": ("nerd_share",),
                      "nerd_mqtt_commands": ("nerd_card_mqtt", "nerd_mqtt_commands"),
+                     "nerd_server": ("nerd_card_server", "nerd_server"),
+                     "sync_code": ("sync_title", "sync_code"),
                      # A playlist's own options.
                      "proxy": ("nerd_proxy",),
                      "headers": ("nerd_headers",),
@@ -52,6 +54,16 @@ class RestoreBackupDialog(QDialog):
                      "nerd_dns_url": ("nerd_card_dns", "nerd_dns_url"),
                      "dns_url": ("nerd_card_dns", "nerd_dns_url"),
                      "cert_pin": ("cert_row",)}
+
+    #: What is shown as on, not with a value: the switches that let others
+    #: in, and the sync a backup joins this computer to (never its code).
+    _SWITCHES = frozenset({"nerd_remote", "nerd_share", "nerd_mqtt_commands", "nerd_server",
+                           "sync_code"})
+    #: What a switch says beside itself for the setting that widens it.
+    _WIDER = {"nerd_remote_lan": "nerd_remote_home", "nerd_server_adult": "srv_adult"}
+    #: What runs something on this computer: shown whole, up to _WHOLE.
+    _RUNS = frozenset({"nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir"})
+    _WHOLE = 4000
 
     @classmethod
     def _label(cls, key: str) -> str:
@@ -64,11 +76,15 @@ class RestoreBackupDialog(QDialog):
         that lets others in with who, a playlist with its options."""
         lines = []
         for key, value in risky:
-            if key in ("nerd_remote", "nerd_share", "nerd_mqtt_commands"):
-                lines.append(cls._label(key) + (" · " + tr("nerd_remote_home")
-                                                if value else ""))
+            if key in cls._SWITCHES:
+                wider = cls._WIDER.get(value)
+                lines.append(cls._label(key) + (" · " + tr(wider) if wider else ""))
             else:
-                lines.append(tr("backup_count", what=cls._label(key), n=cls._short(value)))
+                # What runs something is shown whole: a command cut at 90
+                # characters hid whatever came after them.
+                most = cls._WHOLE if key in cls._RUNS else 90
+                lines.append(tr("backup_count", what=cls._label(key),
+                                n=cls._short(value, most)))
         for name, keys in sources:
             lines.append(tr("restore_risky_source", name=cls._short(name, 40),
                             what=", ".join(cls._label(k) for k in keys)))

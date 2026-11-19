@@ -134,9 +134,17 @@ RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy
          "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
          "nerd_mqtt_host", "nerd_dns_url")
 #: Switches that let others in or send out what is played: shown when on.
-RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands")
+#: Server mode among them: it serves the channels to the home network, its
+#: tuner without a token.
+RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands", "nerd_server")
 #: Those of them that the home network choice (nerd_remote_lan) opens wider.
 _LAN_ON = ("nerd_remote", "nerd_share")
+#: Server mode's channels for adults: said with its switch when both are on.
+_SERVER_ADULT = "nerd_server_adult"
+#: The sync code: a backup that has one joins this computer to that sync -
+#: whoever made the file reads what is synced from here on. Shown as set,
+#: never its value (core/sync.K_CODE).
+SYNC_CODE = "sync_code"
 #: A playlist's own options that do the same for its connections (its
 #: backup addresses, a certificate trusted for it, its own DNS server).
 RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
@@ -568,13 +576,19 @@ def _shown(key: str, value: str) -> str:
 
 def risky(b: Backup) -> list[tuple[str, str]]:
     """(key, what to show) of the RISKY settings *b* sets and the RISKY_ON
-    switches it turns on ("" for a switch, or "nerd_remote_lan" when it
-    also opens them to the home network)."""
+    switches it turns on ("" for a switch, or the setting that widens it:
+    "nerd_remote_lan" when it also opens them to the home network,
+    "nerd_server_adult" when server mode hands out channels for adults),
+    and (SYNC_CODE, "") when it joins this computer to a sync."""
     main = _taken(b, "main")
     out = [(key, shown) for key in RISKY
            if isinstance(main.get(key), str) and (shown := _shown(key, main[key]))]
     lan = "nerd_remote_lan" if _on(main.get("nerd_remote_lan")) else ""
-    out += [(key, lan if key in _LAN_ON else "") for key in RISKY_ON if _on(main.get(key))]
+    adult = _SERVER_ADULT if _on(main.get(_SERVER_ADULT)) else ""
+    out += [(key, lan if key in _LAN_ON else adult if key == "nerd_server" else "")
+            for key in RISKY_ON if _on(main.get(key))]
+    if isinstance(main.get(SYNC_CODE), str) and main[SYNC_CODE].strip():
+        out.append((SYNC_CODE, ""))
     return out
 
 
