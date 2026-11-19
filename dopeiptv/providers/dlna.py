@@ -40,7 +40,7 @@ from urllib.parse import quote, urljoin, urlparse
 from xml.sax.saxutils import escape
 
 from .. import APP_NAME, VERSION
-from ..core import home_net
+from ..core import home_net, safe_xml
 from ..core._lazy_requests import requests
 from ..core.log import log
 from ..core.privacy import url_for_log
@@ -241,10 +241,10 @@ _left: set[tuple[str, str]] = set()
 def _parse_xml(body: bytes) -> ET.Element:
     """Parse what a device on the network sent. A device description never
     needs a DTD or entities, so a document carrying one is refused rather
-    than expanded."""
-    if len(body) > MAX_XML or b"<!DOCTYPE" in body or b"<!ENTITY" in body:
+    than expanded - however it is written (core/safe_xml.py)."""
+    if len(body) > MAX_XML:
         raise ValueError("not a device description")
-    root = ET.fromstring(body)
+    root = safe_xml.fromstring(body, "A device's description")
     for el in root.iter():
         if isinstance(el.tag, str) and "}" in el.tag:
             el.tag = el.tag.split("}", 1)[1]

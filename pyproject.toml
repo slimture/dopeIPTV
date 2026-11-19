@@ -182,6 +182,7 @@ files = [
     "dopeiptv/core/discord_rpc.py",
     "dopeiptv/core/instance.py",
     "dopeiptv/providers/dlna.py",
+    "dopeiptv/core/safe_xml.py",
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",
     "dopeiptv/core/video_mode.py",

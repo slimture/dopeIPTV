@@ -21,6 +21,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape, quoteattr
 
+from ..core import safe_xml
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
@@ -35,7 +36,6 @@ USER_AGENT = "dopeIPTV/1.0"
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 _C1 = re.compile(r"[\x80-\x9f]")
 _DECL = re.compile(r"^\s*<\?xml[^>]*\?>", re.S)
-_DOCTYPE = re.compile(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?\s*>", re.S | re.I)
 _ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding=[\"']([A-Za-z0-9._-]+)")
 
 
@@ -56,7 +56,9 @@ def clean_text(value: Any, lines: bool = False) -> str:
 def parse_xml(content: bytes) -> ET.Element:
     """A box's XML answer, whatever it got wrong: a declared charset that is
     not what was sent, bytes that are not UTF-8, control characters XML does
-    not allow. A DOCTYPE (entities) is dropped before the parse."""
+    not allow. A DOCTYPE (entities) is dropped before the parse, and what is
+    parsed is proven to declare none (core/safe_xml.py): a DTD left in is a
+    parse error, as a broken answer is."""
     m = _ENCODING.match(content or b"")
     declared = m.group(1).decode("ascii", "replace") if m else "utf-8"
     text = None
@@ -68,7 +70,11 @@ def parse_xml(content: bytes) -> ET.Element:
             continue
     if text is None:
         text = content.decode("utf-8", errors="replace")
-    text = _BAD_XML.sub("", _DOCTYPE.sub("", _DECL.sub("", text.lstrip("﻿"), count=1)))
+    text = safe_xml.drop_dtd(_BAD_XML.sub("", _DECL.sub("", text.lstrip("﻿"), count=1)))
+    try:
+        safe_xml.refuse_dtd(text, "A box's answer")
+    except ValueError as e:
+        raise ET.ParseError(str(e)) from None
     return ET.fromstring(text)
 
 

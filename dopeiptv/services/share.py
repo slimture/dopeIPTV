@@ -24,6 +24,7 @@ import time
 import zlib
 from typing import Any, Callable, Iterator
 
+from ..core import safe_xml
 from ..core.log import log, redact_url
 from ..core.remote_api import stream_path
 
@@ -252,10 +253,14 @@ def lineup_guide(guides: list[tuple[str, str]], channels: list[dict]) -> Iterato
             continue
         found: dict[str, list[dict]] = {}   # the guide's channel id -> lineup channels
         parser: ET.XMLPullParser = ET.XMLPullParser(events=("start", "end"))
+        # A guide kept as it was downloaded (guide_keeper) is the provider's
+        # word: one with a DTD of its own is not parsed (core/safe_xml.py).
+        prolog = safe_xml.Prolog("A shared guide")
         depth = 0
         root: Any = None
         try:
             for chunk in plain_chunks(path):
+                prolog.feed(chunk)
                 parser.feed(chunk)
                 out: list[bytes] = []
                 events: Any = parser.read_events()

@@ -24,6 +24,31 @@ def _calls(name: str):
                 yield path.relative_to(PKG).as_posix(), node.lineno, node
 
 
+def _modules() -> list[tuple[str, ast.Module]]:
+    """(file, its tree) of every module in the package."""
+    out = []
+    for path in sorted(PKG.rglob("*.py")):
+        rel = path.relative_to(PKG).as_posix()
+        out.append((rel, ast.parse(path.read_text(encoding="utf-8"), rel)))
+    return out
+
+
+def _dotted(f: ast.AST) -> str:
+    if isinstance(f, ast.Attribute):
+        inner = _dotted(f.value)
+        return f"{inner}.{f.attr}" if inner else f.attr
+    return f.id if isinstance(f, ast.Name) else ""
+
+
+def _calls_in(tree: ast.AST, fn: ast.AST | None = None):
+    """Every call in *tree*: (its dotted name, the function it is in, the call)."""
+    for child in ast.iter_child_nodes(tree):
+        inner = child if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else fn
+        if isinstance(child, ast.Call):
+            yield _dotted(child.func), inner, child
+        yield from _calls_in(child, inner)
+
+
 # -- a kids profile: a category for adults by the provider's own name too ------------
 
 #: Where a category's name is the provider's own already (server mode's
@@ -63,3 +88,60 @@ def test_links_and_folders_are_opened_through_core_xdg_alone():
         if any(isinstance(n, ast.Attribute) and n.attr == "as_uri" for n in ast.walk(call)):
             found.append(f"{rel}:{line} (a file address)")
     assert not found, "opened around core/xdg.py: " + ", ".join(found)
+
+
+# -- rule 5: XML from outside, without a DTD of its own -------------------------------
+
+#: What parses XML. Every one reads somebody else's document.
+XML_PARSERS = {"fromstring", "XML", "iterparse", "XMLPullParser", "XMLParser", "ParserCreate",
+               "parseString", "fromstringlist"}
+#: Where one may be called: (module, function) -> the check that runs first
+#: in that function ("" for the check itself), and why it is the place.
+XML_ALLOWED = {
+    ("core/safe_xml.py", "fromstring"): ("refuse_dtd", "the shared check's own parse"),
+    ("core/safe_xml.py", "__init__"): ("", "the check itself: expat reading the prolog"),
+    ("providers/boxes.py", "parse_xml"): ("refuse_dtd", "a box's answer, its DTD dropped first"),
+    ("providers/epg.py", "parse_xmltv"): ("refuse_entities", "a guide, checked as it is parsed"),
+    ("services/share.py", "lineup_guide"): ("Prolog", "a cached guide, checked as it streams"),
+    ("core/svg_safe.py", "_written_again"): ("", "an SVG written out again from what expat "
+                                                 "read; its own EntityDeclHandler refuses an "
+                                                 "entity that names another or is long"),
+}
+#: Where "<!ENTITY" or "<!DOCTYPE" may be looked for in the bytes, and why.
+ENTITY_BYTES_OK = {
+    "core/safe_xml.py": "drop_dtd finds where a box's DOCTYPE starts; refuse_dtd decides",
+    "core/svg_safe.py": "a fast path taken only for a plain ASCII-compatible encoding; "
+                        "anything else is read by expat",
+}
+
+
+def test_every_xml_parse_of_outside_data_takes_the_safe_check():
+    """Rule 5: XML is parsed only after core/safe_xml.py's check (no DTD of
+    its own) - through safe_xml.fromstring, boxes.parse_xml or the places
+    listed above, each calling the check in the same function."""
+    found = []
+    for rel, tree in _modules():
+        for name, fn, call in _calls_in(tree):
+            if name.rsplit(".", 1)[-1] not in XML_PARSERS or name.startswith("safe_xml."):
+                continue
+            where = (rel, getattr(fn, "name", ""))
+            if where not in XML_ALLOWED:
+                found.append(f"{rel}:{call.lineno} {name}() in {where[1] or 'the module'}")
+                continue
+            guard = XML_ALLOWED[where][0]
+            if guard and not any(n.rsplit(".", 1)[-1] == guard for n, _f, _c in _calls_in(fn)):
+                found.append(f"{rel}:{call.lineno} {name}() without {guard}() first")
+    assert not found, "XML parsed without core/safe_xml.py's check:\n" + "\n".join(found)
+
+
+def test_no_module_decides_on_entities_from_the_bytes():
+    """Rule 5: a look at the bytes for <!ENTITY or <!DOCTYPE misses UTF-16
+    and a declared UTF-7 - the check is expat's (core/safe_xml.py)."""
+    found = []
+    for rel, tree in _modules():
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, str)):
+                v = node.value if isinstance(node.value, str) else node.value.decode("latin-1")
+                if v in ("<!ENTITY", "<!DOCTYPE") and rel not in ENTITY_BYTES_OK:
+                    found.append(f"{rel}:{node.lineno}")
+    assert not found, found

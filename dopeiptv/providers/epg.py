@@ -19,10 +19,10 @@ from bisect import bisect_left, bisect_right
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
-from xml.parsers import expat
 
 from PyQt6.QtCore import QStandardPaths
 
+from ..core import safe_xml
 from ..core.log import log
 from .client import XtreamClient
 
@@ -244,41 +244,15 @@ def prune_epg_caches(keep_ids) -> int:
     return removed
 
 
-class _Root(Exception):
-    """The root element began: the prolog, the only place for a DTD, is over."""
-
-
 def refuse_entities(data: bytes) -> None:
     """Raise ValueError when a guide declares a DTD of its own - where
     entities are declared, a "billion laughs" bomb that balloons memory in
-    the parse (and the Linux bundle takes the system's expat, which may have
-    no amplification limit). Expat reads the prolog up to the root element,
-    however long it is: a comment of any length may come first. Real XMLTV
-    carries at most <!DOCTYPE tv SYSTEM "xmltv.dtd">, with no internal
+    the parse. Expat reads the prolog up to the root element, however long
+    it is (core/safe_xml.py, the check every XML from outside takes). Real
+    XMLTV carries at most <!DOCTYPE tv SYSTEM "xmltv.dtd">, with no internal
     subset, which is left to parse; a document that is no XML is left to the
     parse to refuse."""
-    p = expat.ParserCreate()
-
-    def doctype(_name: str, _sysid: Any, _pubid: Any, internal: int) -> None:
-        if internal:
-            raise ValueError("XMLTV declares a DTD of its own (entities); refusing to parse")
-
-    def entity(*_args: Any) -> None:
-        raise ValueError("XMLTV declares internal entities; refusing to parse")
-
-    def root(*_args: Any) -> None:
-        raise _Root
-
-    p.StartDoctypeDeclHandler = doctype
-    p.EntityDeclHandler = entity
-    p.StartElementHandler = root
-    view = memoryview(data)
-    try:
-        for i in range(0, len(view), _ZLIB_STEP):
-            p.Parse(bytes(view[i:i + _ZLIB_STEP]), False)
-        p.Parse(b"", True)
-    except (_Root, expat.ExpatError):
-        pass
+    safe_xml.refuse_dtd(data, "XMLTV")
 
 
 def parse_xmltv(data: bytes, keep_past_days: int

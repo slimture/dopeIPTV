@@ -73,7 +73,7 @@ from typing import Any, Iterable
 from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 
-from ..core import rtsp, tuners
+from ..core import rtsp, safe_xml, tuners
 from ..core._lazy_requests import requests
 from ..core.log import log
 from ..i18n import LocalizedError, tr
@@ -143,13 +143,17 @@ def _local(tag: Any) -> str:
 def parse_description(content: bytes, location: str) -> dict | None:
     """A device description, when it is a SAT>IP server's: {"name",
     "model", "manufacturer", "udn", "caps", "m3u" (absolute, or ""),
-    "location"}; None for anything else (a router's, a TV's)."""
-    if not content or len(content) > MAX_XML or b"<!ENTITY" in content:
+    "location"}; None for anything else (a router's, a TV's), and for one
+    that declares a DTD of its own (core/safe_xml.py). Its list is taken
+    over http or https on the server's own host (*location*'s) - never a
+    file of this computer, nor another host (providers/device_urls.py)."""
+    if not content or len(content) > MAX_XML:
         return None
     try:
         root = parse_xml(content)
     except (ET.ParseError, ValueError):
         return None
+        safe_xml.refuse_dtd(content, "A SAT>IP description")
     for el in root.iter():
         el.tag = _local(el.tag)
     base = (root.findtext("URLBase") or "").strip() or location
