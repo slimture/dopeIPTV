@@ -196,6 +196,20 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   names a non-text encoding, and unpacks a cached guide a slice at a time.
 - A number no real source sends no longer drops a whole source; a bouquet
   backup and `--port` are bounded.
+- Words from a provider, guide, box, cast device or backup are shown as
+  words everywhere - labels, tooltips, questions and messages; an
+  `<img src="file:///...">` there could load a local file (on Windows a
+  network path could leak the login hash).
+- providers/enigma2.py, ui/box_tools.py: an Enigma2 box's screenshot is
+  read up to 64 MB and decoded off the window's thread, only as the JPEG,
+  PNG or BMP it says it is, refused before decoding when it claims a huge
+  size.
+- core/stream_address.py: yt-dlp never runs on a `ytdl://` address from a
+  provider, box or web playlist; web streams opened by the person work as
+  before.
+- docs/SECURITY.md: the threat model - what is protected, who could attack
+  and what stops each, the honest limits with their reasons, and how it is
+  kept; SECURITY.md says how to report and what follows a report.
 ## [1.6.8]
 
 ### Security

@@ -69,6 +69,10 @@ assessment of each. The findings, and what came of them:
 | Patterns | Quadratic regular expressions froze the app on hostile playlist text (proven) | medium | 1.6.9: linear patterns, compared with the old on real and made-up input |
 | Cache | A source id from a backup or sync could name a file outside the cache folder | medium | 1.6.9: `core/source_files.file_part` |
 | Discovery | Redirects followed and whole answers read; a crafted HDHomeRun reply ended the search | low | 1.6.9: no redirect, short reads, deadlines |
+| Markup | Words from outside reached labels, tooltips and message boxes as rich text (ui sweep; proven on five sinks) | medium | 1.6.9: plain text everywhere, enforced by a whole-code-base test |
+| Boxes | An Enigma2 box's screenshot was read and decoded whole on the window's thread | low | 1.6.9: 64 MB, three formats, size from the header, off the window's thread |
+| Stream addresses | A provider's `ytdl://` address ran yt-dlp | low | 1.6.9: refused from a source |
+| Threat model | The rules had no written threat model behind them | info | 1.6.9: docs/SECURITY.md |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round
