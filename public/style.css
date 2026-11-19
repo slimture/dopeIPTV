@@ -912,6 +912,7 @@ body.searching .help-sec-more { display: none; }
 .help-stuck p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 74ch; }
 .help-stuck a { color: var(--accent); }
 .help-stuck b { color: var(--text); font-weight: 600; }
+.help-stuck .help-stuck-act { margin-top: 16px; }
 /* While filtering, sections lose their headings' distance - the list should
    read as results, not as a table of contents with gaps in it. */
 body.searching .help-sec { margin-bottom: 26px; }

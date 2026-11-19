@@ -152,3 +152,15 @@ def test_the_processor_choice_needs_no_script_and_the_rows_line_up():
     # A card's other formats close on a click elsewhere or Escape, side by side.
     js = open(os.path.join(PUBLIC, "app.js"), encoding="utf-8").read()
     assert ".dlx-more" in js and '"Escape"' in js
+
+
+def test_the_help_page_offers_feedback_where_it_says_what_to_do_when_stuck(release, monkeypatch):
+    # The help page's last box (templates/help.html, .help-stuck): besides
+    # the app's way and GitHub, the footer's own feedback dialog at once -
+    # its title as the button, in every language.
+    src = open(os.path.join(SITE, "templates", "help.html"), encoding="utf-8").read()
+    box = re.search(r'<aside class="help-stuck">(.*?)</aside>', src, re.S).group(1)
+    assert '<a class="btn ghost" href="#feedback" data-feedback>{{h:fbs_title}}</a>' in box
+    import glob
+    for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
+        assert json.load(open(f, encoding="utf-8")).get("fbs_title"), f
