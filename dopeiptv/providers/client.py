@@ -1279,12 +1279,114 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
     # A whole address the source gave outside these calls (a channel's own
     # catch-up address, ui/mw_timeshift.py): judged as these are.
     client.played_from_source = theirs
+    if internet:
+        _keep_pictures(client)
 
 
 def _is_remote(kind: str, server: str) -> bool:
     """Whether a source's addresses come over the network: every kind but a
     playlist file on this computer (core/stream_address.py)."""
     return kind != "m3u" or server.strip().lower().startswith(("http://", "https://"))
+
+
+#: Where a row or an info answer names a picture the lists fetch: a logo, a
+#: poster, a backdrop, a still - by the app's own names for them and the
+#: panels' and portals' that come through as they are.
+PICTURE_KEYS = frozenset((
+    "stream_icon", "cover", "cover_big", "movie_image", "backdrop_path", "backdrop",
+    "screenshot_uri", "poster", "poster_path", "poster_url", "logo", "icon", "icon_url",
+    "thumb", "image", "still", "still_path", "profile_path"))
+#: The calls whose answers carry a source's pictures.
+_PICTURE_CALLS = ("live_streams", "vod_streams", "series_list", "series_info", "vod_info",
+                  "held_series", "resume_items")
+#: How deep an info answer is looked through (a series: its episodes by
+#: season, each with its info).
+_PICTURE_DEPTH = 6
+
+
+def _picture_kept(value: Any) -> Any:
+    """*value* (an address or a list of them) without what names this
+    computer or a link-local host (core/stream_address.picture_refusal)."""
+    if isinstance(value, str):
+        return "" if value and stream_address.picture_refusal(value) else value
+    if isinstance(value, list):
+        kept = [v for v in value if not (isinstance(v, str) and v
+                                         and stream_address.picture_refusal(v))]
+        return kept if len(kept) != len(value) else value
+    return value
+
+
+def _row_pictures(row: dict) -> None:
+    for key in row.keys() & PICTURE_KEYS:
+        value = row[key]
+        kept = _picture_kept(value)
+        if kept is not value:
+            row[key] = kept
+
+
+def _deep_pictures(found: Any, depth: int = 0) -> None:
+    """An info answer's pictures, at any depth (a series' seasons and its
+    episodes' own)."""
+    if depth > _PICTURE_DEPTH:
+        return
+    if isinstance(found, dict):
+        _row_pictures(found)
+        found = found.values()
+    elif not isinstance(found, (list, tuple)):
+        return
+    for value in found:
+        if isinstance(value, (dict, list, tuple)):
+            _deep_pictures(value, depth + 1)
+
+
+def _pictures_kept(found: Any) -> Any:
+    """*found* - a list of rows, an info answer - with every picture a
+    source on the internet named on this computer or a link-local host
+    taken out, in place: the app itself fetches a row's pictures, and such
+    an address had it send requests to this computer's or the cloud's
+    services. A private address of the home network stays (a box's picon).
+    A list's rows are looked at for their own pictures; an info answer
+    through and through."""
+    if isinstance(found, dict):
+        _deep_pictures(found)
+    elif isinstance(found, (list, tuple)):
+        for item in found:
+            if isinstance(item, dict):
+                _row_pictures(item)
+            elif isinstance(item, (list, tuple)):
+                _pictures_kept(item)
+    return found
+
+
+def _picture_call(call: Any) -> Any:
+    """*call* with what it answers through _pictures_kept - a list the
+    source's cache hands out again as it was looked at once."""
+    last: dict[Any, Any] = {}
+
+    def kept(*args: Any, **kwargs: Any) -> Any:
+        got = call(*args, **kwargs)
+        key: Any = (args, tuple(sorted(kwargs.items())))
+        try:
+            if last.get(key) is got:
+                return got
+        except TypeError:
+            key = None
+        _pictures_kept(got)
+        if key is not None:
+            if len(last) >= 64:
+                last.clear()
+            last[key] = got
+        return got
+    return kept
+
+
+def _keep_pictures(client: Any) -> None:
+    """A source on the internet's lists and pages handed out with their
+    pictures through _pictures_kept."""
+    for name in _PICTURE_CALLS:
+        call = getattr(client, name, None)
+        if call is not None:
+            setattr(client, name, _picture_call(call))
 
 
 def _on_internet(kind: str, server: str, options: dict) -> bool:

@@ -454,3 +454,67 @@ def test_a_channels_own_catchup_address_from_the_internet_is_the_sources_word(wa
     finally:
         nerd.set_source(None)
         nerd.install(None)
+
+
+# -- a source on the internet's pictures: the same host rule --------------------------
+
+def test_an_internet_sources_pictures_never_name_this_computer(monkeypatch):
+    """The app fetches a row's logo and poster itself: from a source on the
+    internet, one on this computer or a link-local host would have it send
+    requests there. A private address of the home network stays (a picon on
+    the box), and a home network's or a playlist file's pictures as before."""
+    internet = _odd("http://tv.example/list.m3u", monkeypatch)
+    assert [r["stream_icon"] for r in internet.live_streams()] == [
+        "", "http://192.168.1.1/picon/2.png", "", "", "http://logos.example/5.png", ""]
+    for server in ("http://192.168.1.10/list.m3u", "/home/u/list.m3u"):
+        own = _odd(server, monkeypatch)
+        assert [r["stream_icon"] for r in own.live_streams()] == [
+            "http://127.0.0.1:631/printers", "http://192.168.1.1/picon/2.png", "http://[::1]/x.png",
+            "http://169.254.169.254/x.png", "http://logos.example/5.png", "http://localhost/6.png"], server
+    for spelt in SPELLINGS:
+        if spelt.startswith("http"):
+            assert stream_address.picture_refusal(spelt), spelt
+    for fine in ("http://logos.example/a.png", "https://image.tmdb.org/t/p/w500/x.jpg",
+                 "http://192.168.1.1/picon/1.png", "/home/u/picons/1.png", ""):
+        assert stream_address.picture_refusal(fine) == "", fine
+
+
+class _Pictured(_Fake):
+    """A client whose lists and pages carry pictures."""
+
+    def __init__(self, picture: str) -> None:
+        super().__init__("http://tv.example/1.ts")
+        self.picture = picture
+
+    def vod_streams(self, category_id=None):
+        return [{"stream_id": 1, "stream_icon": self.picture, "cover": self.picture}]
+
+    def series_list(self, category_id=None):
+        return [{"series_id": 1, "cover": self.picture, "backdrop_path": [self.picture, "http://b.example/1"]}]
+
+    def series_info(self, series_id):
+        return {"info": {"cover": self.picture, "backdrop_path": [self.picture]},
+                "seasons": [{"cover": self.picture, "cover_big": self.picture}],
+                "episodes": {"1": [{"id": 5, "info": {"movie_image": self.picture}}]}}
+
+    def vod_info(self, vod_id):
+        return {"info": {"movie_image": self.picture, "cover_big": self.picture,
+                         "backdrop_path": self.picture}}
+
+
+def test_every_list_and_page_of_an_internet_source_is_looked_at_for_pictures():
+    c = _Pictured("http://127.0.0.1:631/x.png")
+    client_mod._nerd_lists(c, {"_kind": "xtream", "_server": "http://tv.example"}, "p1")
+    assert c.vod_streams() == [{"stream_id": 1, "stream_icon": "", "cover": ""}]
+    assert c.series_list() == [{"series_id": 1, "cover": "", "backdrop_path": ["http://b.example/1"]}]
+    assert c.series_info(1) == {"info": {"cover": "", "backdrop_path": []},
+                                "seasons": [{"cover": "", "cover_big": ""}],
+                                "episodes": {"1": [{"id": 5, "info": {"movie_image": ""}}]}}
+    assert c.vod_info(1) == {"info": {"movie_image": "", "cover_big": "", "backdrop_path": ""}}
+    # The home network's own, on this computer too: as before.
+    for picture, server in (("http://127.0.0.1:8096/Items/1/Images/Primary", "http://127.0.0.1:8096"),
+                            ("http://192.168.1.5/picon.png", "http://tv.example")):
+        c = _Pictured(picture)
+        client_mod._nerd_lists(c, {"_kind": "jellyfin", "_server": server}, "p1")
+        assert c.vod_streams()[0]["stream_icon"] == picture
+        assert c.series_info(1)["episodes"]["1"][0]["info"]["movie_image"] == picture

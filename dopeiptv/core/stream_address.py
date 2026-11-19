@@ -44,6 +44,13 @@ An address the person's own rewrite rules made, or their udpxy, is theirs
 (providers/client.py ``_nerd_lists``): the source's word is judged first,
 what the person made of it after.
 
+A source's pictures (logos, posters, stills) are fetched by the app itself,
+so a source on the internet that lists one on this computer or a link-local
+host would have the app send requests there: the same host rule takes them
+out of its rows (:func:`picture_refusal`, providers/client.py
+``_pictures_kept``) - a home network's or a playlist file's pictures, and an
+internet source's on a private address of the home network, as before.
+
 A refused address is no address: the channel stays in its list and does
 not play, as one the source gave no address for. Nothing here asks the
 network or the disk: a host is read as written, never looked up - a name
@@ -53,6 +60,7 @@ not seen here (docs/SECURITY.md).
 
 from __future__ import annotations
 
+import functools
 import ipaddress
 import socket
 import unicodedata
@@ -247,6 +255,24 @@ def host_refusal(address: str) -> str:
         if kind in kinds:
             return kind
     return ""
+
+
+@functools.lru_cache(maxsize=4096)
+def _head_refusal(head: str) -> str:
+    return host_refusal(head)
+
+
+def picture_refusal(address: str) -> str:
+    """host_refusal for a picture's address from a source on the internet
+    (a logo, a poster), the same rule as a stream's: THIS_COMPUTER,
+    LINK_LOCAL or "". Asked for every row of a list, so kept per scheme and
+    host part - everything before the first "/" or "?" after "://", where
+    every reader's host lies (_HOST_ENDS, urlsplit's)."""
+    start = address.find("://")
+    if start < 0:
+        return ""
+    ends = [i for i in (address.find("/", start + 3), address.find("?", start + 3)) if i >= 0]
+    return _head_refusal(address[:min(ends)] if ends else address)
 
 
 def on_internet(address: str) -> bool:
