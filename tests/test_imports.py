@@ -73,10 +73,12 @@ _ABOVE = {"core": ("providers", "services", "media", "ui"),
           "media": ("services", "ui"),
           "services": ("ui",)}
 # The one cross-edge the architecture names: the player overlays' colours
-# (the player itself, its loading indicator and its visualiser).
+# (the player itself, its loading indicator, its visualiser and the number
+# typed in the picture's corner).
 _CROSS_EDGES = {("dopeiptv.media.embedded", "dopeiptv.ui.theme"),
                 ("dopeiptv.media.loading_overlay", "dopeiptv.ui.theme"),
-                ("dopeiptv.media.audio_effects", "dopeiptv.ui.theme")}
+                ("dopeiptv.media.audio_effects", "dopeiptv.ui.theme"),
+                ("dopeiptv.media.sleep_timer", "dopeiptv.ui.theme")}
 
 
 def test_no_layer_imports_one_above_it():

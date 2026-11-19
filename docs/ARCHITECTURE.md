@@ -283,6 +283,8 @@ dopeiptv/
                        scrubber, TIMESHIFT pill, Next episode, fullscreen UI
     control_icons.py   The player's control glyphs, drawn
     audio_effects.py   The visualiser, the equaliser and night mode on the core
+    sleep_timer.py     The sleep timer's countdown and the number typed, in
+                       the picture's corner
     popout_mirror.py   The pop-out's picture: the mirror (raster, GL or the
                        picture's own thread), the docked placeholder
     seek_slider.py     The seek bar slider: click, drag, hover time
@@ -591,8 +593,9 @@ Import direction is one-way: `ui` may use `services`, `media`, `core`
 and `providers`; `services` builds on `providers`/`core` but never
 imports `ui`; `media` and `providers` may use `core`; `core` depends on
 nothing above it.  (The one cross-edge is the player's overlays -
-`media.embedded`, `media.loading_overlay` and `media.audio_effects` (the
-visualiser) - -> `ui.theme` for their colours, which is why
+`media.embedded`, `media.loading_overlay`, `media.audio_effects` (the
+visualiser) and `media.sleep_timer` (the number typed) - -> `ui.theme`
+for their colours, which is why
 `ui/__init__` exposes `MainWindow` lazily so touching `ui.theme` never
 drags in the window.)
 
