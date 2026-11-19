@@ -22,7 +22,7 @@ def test_every_answer_of_the_site_carries_its_security_headers():
     site = _servers(text)["dopeiptv.org"]
     for line in ("add_header Content-Security-Policy   $csp_policy always;",
                  "add_header Content-Security-Policy   \"frame-ancestors 'none'\" always;",
-                 'add_header Strict-Transport-Security "max-age=31536000" always;',
+                 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;',
                  'add_header X-Content-Type-Options    "nosniff" always;',
                  'add_header X-Frame-Options           "DENY" always;',
                  "add_header Referrer-Policy           $dopeiptv_referrer always;",
@@ -31,7 +31,8 @@ def test_every_answer_of_the_site_carries_its_security_headers():
     # A location with an add_header of its own would lose them all.
     for loc in re.findall(r"location [^{]+\{(.*?)\n    \}", site, re.S):
         assert "add_header" not in loc
-    assert 'add_header Strict-Transport-Security "max-age=31536000" always;' in _servers(text)["www.dopeiptv.org"]
+    assert 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;' \
+        in _servers(text)["www.dopeiptv.org"]
     refer = re.search(r"map \$uri \$dopeiptv_referrer \{(.*?)\}", text, re.S).group(1)
     for path in ("/admin", "/support", "/trakt/"):
         assert re.search(r"~\^%s\S*\s+\"no-referrer\";" % re.escape(path), refer), path

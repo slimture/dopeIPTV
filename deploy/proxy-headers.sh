@@ -47,16 +47,24 @@ done < "$TMP/includes"
 {
     echo '    add_header Content-Security-Policy   $csp_policy always;'
     echo "    add_header Content-Security-Policy   \"frame-ancestors 'none'\" always;"
-    echo '    add_header Strict-Transport-Security "max-age=31536000" always;'
+    echo '    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;'
     echo '    add_header X-Content-Type-Options    "nosniff" always;'
     echo '    add_header X-Frame-Options           "DENY" always;'
     echo '    add_header Referrer-Policy           $dopeiptv_referrer always;'
     echo '    proxy_hide_header Referrer-Policy;'
 } > "$TMP/headers"
+echo '    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;' > "$TMP/www"
 while read -r line; do
     case $line in
         *Content-Security-Policy*'$csp_policy'*) ;;
-        *Strict-Transport-Security*|*X-Content-Type-Options*|*X-Frame-Options*|*Referrer-Policy*)
+        *Strict-Transport-Security*)
+            # The http block's own is kept: it may promise more (subdomains, preload).
+            say "kept from the http block, in place of the site's own: $line"
+            grep -v 'Strict-Transport-Security' "$TMP/headers" > "$TMP/h2"
+            printf '    %s\n' "$line" >> "$TMP/h2"
+            mv "$TMP/h2" "$TMP/headers"
+            printf '    %s\n' "$line" > "$TMP/www" ;;
+        *X-Content-Type-Options*|*X-Frame-Options*|*Referrer-Policy*)
             say "replaced by this site's own: $line" ;;
         *) say "kept from the http block: $line"; printf '    %s\n' "$line" >> "$TMP/headers" ;;
     esac
@@ -72,7 +80,6 @@ map $uri $dopeiptv_referrer {
     ~^/trakt/            "no-referrer";
 }
 EOF
-echo '    add_header Strict-Transport-Security "max-age=31536000" always;' > "$TMP/www"
 
 awk -v mapf="$TMP/map" -v hdrf="$TMP/headers" -v wwwf="$TMP/www" -v countf="$TMP/count" '
     function put(f,   l) { while ((getline l < f) > 0) print l; close(f) }
