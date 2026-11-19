@@ -31,48 +31,91 @@ NEXT = {
     ("updates", "signed"): ["_HOPS", "DOWNLOAD_MAX", "_get_https"],
 }
 
+#: Excerpts whose markers the next release no longer has: (part, block,
+#: file, a marker still there in the released code, the names to show instead).
+MOVED = [
+    ("together", "replay", "dopeiptv/core/together.py", r"self\._last_n\[msg\.sender\] = msg\.n",
+     ["Identity", "encode", "open_message", "Room.receive"]),
+]
+
 #: The rest of the app: what to ask, and the files to read (at the commit).
 WHOLE = [
     ("servers", "the servers the app runs on this computer and the home network",
      "Who can reach each one, and is every request checked - the token (and compared in constant "
      "time), the Host header against DNS rebinding, the Origin against a web page's requests, "
-     "sizes and time limits? Can a page in the browser, another program or another user on the "
-     "same computer, or another device on the network use one to read anything, play or record "
-     "something, or make the app fetch an address of its choosing?",
+     "sizes, connection counts and time limits? Can a page in the browser, another program or "
+     "another user on the same computer, or another device on the network use one to read "
+     "anything, play or record something, or make the app fetch an address of its choosing?",
      ["dopeiptv/core/remote_api.py", "dopeiptv/core/phone_remote.py", "dopeiptv/core/phone_browse.py",
-      "dopeiptv/services/home_server.py", "dopeiptv/core/hdhr.py", "dopeiptv/core/restream.py",
-      "dopeiptv/core/dvr_server.py", "dopeiptv/core/net_bridge.py", "dopeiptv/providers/cast_bridge.py",
-      "dopeiptv/providers/airplay_bridge.py", "dopeiptv/providers/oauth_loopback.py",
-      "dopeiptv/core/instance.py", "dopeiptv/core/exclusive_bind.py", "dopeiptv/core/home_net.py"]),
-    ("processes", "the programs the app starts (ffmpeg, mpv, yt-dlp, the command after a recording)",
+      "dopeiptv/services/home_server.py", "dopeiptv/services/share.py", "dopeiptv/core/hdhr.py",
+      "dopeiptv/core/restream.py", "dopeiptv/core/dvr_server.py", "dopeiptv/core/net_bridge.py",
+      "dopeiptv/providers/cast_bridge.py", "dopeiptv/providers/airplay_bridge.py",
+      "dopeiptv/providers/oauth_loopback.py", "dopeiptv/core/exclusive_bind.py",
+      "dopeiptv/core/home_net.py"]),
+    ("processes", "the programs the app starts (ffmpeg, mpv, VLC, yt-dlp, the command after a recording)",
      "Can text from a provider, a guide or a file name - a title, an address - inject options or "
-     "commands, make ffmpeg read local files or other protocols, or write outside the folder it "
-     "should? Is anything run through a shell?",
-     ["dopeiptv/core/recording.py", "dopeiptv/core/rec_mp4.py", "dopeiptv/core/rec_extras.py",
-      "dopeiptv/core/ytdlp.py", "dopeiptv/media/players.py", "dopeiptv/core/player_exec.py",
-      "dopeiptv/core/xdg.py"]),
-    ("input", "everything it reads from providers, boxes, media servers, guides and subtitles",
+     "commands, make ffmpeg or mpv read local files or other protocols, or write outside the folder "
+     "it should? Is anything run through a shell? Look at every place a program is started.",
+     ["dopeiptv/core/player_exec.py", "dopeiptv/media/players.py", "dopeiptv/core/recording.py",
+      "dopeiptv/core/rec_mp4.py", "dopeiptv/core/rec_extras.py", "dopeiptv/core/rec_view.py",
+      "dopeiptv/core/ytdlp.py", "dopeiptv/core/xdg.py", "dopeiptv/providers/cast_feed.py"]),
+    ("input", "everything it reads from providers, boxes, media servers, guides, pictures and subtitles",
      "Treat every answer as hostile: is each one size-limited, parsed safely (XML entities, deep "
-     "nesting, huge numbers, slow regular expressions), and shown as plain text rather than HTML? "
-     "Can a provider or a device on the network crash the app, fill the disk or memory, or make "
-     "it open a file or an internal address?",
-     ["dopeiptv/providers/client.py", "dopeiptv/providers/stalker.py", "dopeiptv/providers/epg.py",
-      "dopeiptv/providers/enigma2.py", "dopeiptv/providers/satip.py", "dopeiptv/providers/dlna.py",
-      "dopeiptv/providers/lan_scan.py", "dopeiptv/providers/mdns.py", "dopeiptv/providers/jellyfin.py",
-      "dopeiptv/providers/plex.py", "dopeiptv/core/workers.py", "dopeiptv/ui/widgets.py"]),
-    ("secrets", "the logins, tokens and codes it keeps, and its logs",
-     "Where are passwords, tokens, the sync code and room codes kept, who can read them, and do "
-     "any of them end up in a log file, an error report, a backup or a crash file? Is TLS "
-     "certificate checking on wherever the app talks to a service?",
+     "nesting, huge numbers, slow regular expressions, pickle), and shown as plain text rather than "
+     "HTML? Which addresses from a provider may reach the player? Can a provider or a device on the "
+     "network crash the app, fill the disk or memory, make it read a local file or a network share "
+     "(a Windows login hash), or make it open an internal address?",
+     ["dopeiptv/core/stream_address.py", "dopeiptv/core/picture_files.py", "dopeiptv/core/svg_safe.py",
+      "dopeiptv/core/_lazy_requests.py", "dopeiptv/core/workers.py", "dopeiptv/providers/client.py",
+      "dopeiptv/providers/stalker.py", "dopeiptv/providers/epg.py", "dopeiptv/providers/boxes.py",
+      "dopeiptv/providers/enigma2.py", "dopeiptv/providers/satip.py", "dopeiptv/providers/lan_scan.py",
+      "dopeiptv/providers/jellyfin.py", "dopeiptv/providers/plex.py", "dopeiptv/ui/widgets.py"]),
+    ("secrets", "the logins, tokens and codes it keeps, its logs, backups and error reports",
+     "Where are passwords, tokens, the sync code and room codes kept, who can read them, and do any "
+     "of them end up in a log file, an error report, a backup or a crash file? What does restoring "
+     "someone else's backup turn on? Is TLS certificate checking on wherever the app talks to a "
+     "service?",
      ["dopeiptv/core/settings_files.py", "dopeiptv/core/stores.py", "dopeiptv/core/log.py",
-      "dopeiptv/core/backup.py", "dopeiptv/core/report.py", "dopeiptv/core/net_adapter.py",
-      "dopeiptv/core/cert_pin.py"]),
+      "dopeiptv/core/backup.py", "dopeiptv/ui/backup_dialogs.py", "dopeiptv/core/report.py",
+      "dopeiptv/core/net_adapter.py", "dopeiptv/core/cert_pin.py", "dopeiptv/core/sync.py",
+      "dopeiptv/ui/sync_review.py"]),
+    ("links", "how other programs reach the app: dopeiptv:// links, a second start, drops, Discord, LIRC and the media controls",
+     "Can a web page, another program or another user of the computer make the app start a server, "
+     "play an address, load a plugin or run code through a link or a second start? Are the local "
+     "sockets the app talks to or listens on this user's own? What goes on the session bus?",
+     ["dopeiptv/core/commands.py", "dopeiptv/app.py", "dopeiptv/launcher.py", "dopeiptv/core/instance.py",
+      "dopeiptv/ui/mw_commands.py", "dopeiptv/ui/mw_queue.py", "dopeiptv/core/discord_rpc.py",
+      "dopeiptv/core/tv_input.py", "dopeiptv/services/mpris.py", "dopeiptv/services/media_session.py"]),
+    ("casting", "casting to TVs and finding devices on the network (Chromecast, DLNA, Kodi, AirPlay)",
+     "What does each kind of device get from the app (an address, a login, headers)? Can a device on "
+     "the network send the app's requests elsewhere, pose as a TV the person used before, or take a "
+     "cast meant for another? Are the bridges the app serves to a TV locked to it?",
+     ["dopeiptv/providers/casting.py", "dopeiptv/providers/chromecast.py", "dopeiptv/providers/dlna.py",
+      "dopeiptv/providers/kodi.py", "dopeiptv/providers/mdns.py", "dopeiptv/providers/cast_devices.py",
+      "dopeiptv/ui/cast_dialog.py", "dopeiptv/providers/cast_bridge.py", "dopeiptv/providers/airplay_bridge.py"]),
+    ("profiles", "profiles, PINs, the parental lock and kids profiles",
+     "How is a PIN kept and how many tries does guessing take? Can a kids profile or someone without "
+     "the PIN reach a locked category's or an adult title - through History, Continue watching, "
+     "search, the phone remote, a rename, Settings or Nerd?",
+     ["dopeiptv/core/pins.py", "dopeiptv/core/profiles.py", "dopeiptv/core/stores.py",
+      "dopeiptv/ui/mw_profiles.py", "dopeiptv/ui/mw_lists.py", "dopeiptv/ui/mw_phone_browse.py",
+      "dopeiptv/core/mitt.py", "dopeiptv/ui/mw_search.py"]),
+    ("privacyall", "private viewing across the whole app",
+     "Private viewing promises that nothing is kept or sent about what plays. Check every place that "
+     "keeps or sends something about a playback - history, resume points, statistics, Trakt, Simkl, "
+     "media servers, Discord, events, MQTT, the media controls, the remote API, TMDB lookups, the "
+     "rewind buffer on disk, logs - and whether each asks about that very playback.",
+     ["dopeiptv/core/privacy.py", "dopeiptv/ui/mw_privacy.py", "dopeiptv/ui/main_window.py",
+      "dopeiptv/ui/mw_trakt.py", "dopeiptv/ui/mw_mpris.py", "dopeiptv/ui/mw_remote.py",
+      "dopeiptv/core/events.py", "dopeiptv/core/dvr_pool.py", "dopeiptv/providers/metadata.py"]),
     ("build", "how a release is built, signed and checked",
-     "Could someone who takes over a dependency, a GitHub Action, the website or the release "
-     "key's storage get a changed build to users? What is pinned, what is checked, and what is "
-     "only trusted?",
-     [".github/workflows/release.yml", ".github/workflows/ci.yml", "requirements.txt",
-      "dopeiptv/core/build_check.py", "dopeiptv/core/selfupdate.py", "dopeiptv/core/update_keys.py"]),
+     "Could someone who takes over a dependency, a GitHub Action, the website or the release key's "
+     "storage get a changed build to users? What is pinned, what is checked, and what is only "
+     "trusted?",
+     [".github/workflows/release.yml", ".github/workflows/ci.yml", ".github/workflows/nightly.yml",
+      "packaging/build-inputs.json", "tools/build_inputs.py", "tools/audit_deps.py",
+      "requirements.txt", "dopeiptv/core/build_check.py", "dopeiptv/core/selfupdate.py",
+      "dopeiptv/core/update_keys.py"]),
 ]
 
 #: The question over all the parts at once - the page's "copy everything".
@@ -122,13 +165,35 @@ def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
                     leaf = n.split(".")[-1]
                     if n not in block["names"] and re.search(rf"^\s*(def|class)?\s*{re.escape(leaf)}\b", src, re.M):
                         block["names"].append(n)
+    # Where the app at *ref* has moved on from the excerpt's markers (the next
+    # release), the excerpt follows it by name instead.
+    for part, bid, path, marker, names in MOVED:
+        src = open(os.path.join(app, path), encoding="utf-8").read()
+        if re.search(marker, src, re.M):
+            continue
+        for block in transparency.CODE.get(part, []):
+            if block["id"] != bid:
+                continue
+            for w in block.get("with", []):
+                if w.get("path") == path and w.get("to") and not re.search(w["to"], src, re.M):
+                    w.pop("from", None)
+                    w.pop("to", None)
+                    w["names"] = list(names)
     code = transparency.code_of(app, ref, site, site_ref)
     with open(os.path.join(site, "site", "transparency", lang + ".html"), encoding="utf-8") as fh:
         page = fh.read()
     titles = {k: _text(v) for k, v in _H2.findall(page)}
+    asks = {p: _text(a) for p, a in _ASK.findall(page) if p != "all"}
+    with_code = {p for p, _b in _CODE.findall(page)}
     out = []
-    for part, ask in _ASK.findall(page):
-        chunks = [_text(ask)]
+    # Every part of the page in its order: its own question, or - for a part
+    # that shows code but asks nothing of its own - the plain one.
+    for part in [k for k in titles if k in asks or k in with_code]:
+        ask = asks.get(part) or (
+            f"Below is the part of dopeIPTV's transparency page called \"{titles[part]}\", with the code "
+            f"it is about. Explain in plain English what the code does, then review it as an attacker "
+            f"would: does the code do what the page says, and where does it fall short?")
+        chunks = [ask]
         for p, bid in _CODE.findall(page):
             if p != part:
                 continue
@@ -171,6 +236,25 @@ def main(argv: list[str]) -> int:
             fh.write(text + "\n")
     with open(os.path.join(a.out, "ALL.txt"), "w", encoding="utf-8") as fh:
         fh.write(head + "\n\n" + "\n\n\n".join(t for _p, t in parts) + "\n")
+    # For an assistant that cannot open links: each part about the rest of
+    # the app with its files' whole source in it, one file per part.
+    full = os.path.join(a.out, "full")
+    os.makedirs(full, exist_ok=True)
+    for part, what, ask, files in WHOLE:
+        blocks = []
+        for f in files:
+            path = os.path.join(app, f)
+            if os.path.exists(path):
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    blocks.append(f"--- {f} (dopeIPTV @ {ref}) {transparency.REPO}/blob/{ref}/{f} ---\n{fh.read()}")
+        with open(os.path.join(full, f"{part}.txt"), "w", encoding="utf-8") as fh:
+            fh.write(f"## {what[0].upper() + what[1:]}\n\nBelow is the whole source of the files that "
+                     f"matter for this part of dopeIPTV, an open-source TV player - {what} - at commit "
+                     f"{ref}. Explain in plain English what the code does. Then review it critically, as "
+                     f"an attacker would: {ask} Point out weaknesses with the file and line, how bad each "
+                     f"is (critical, high, medium, low), who could use it and how to fix it. Do not guess: "
+                     f"say so if something depends on code that is not included, and do not take the "
+                     f"comments' word for what the code does.\n\n" + "\n\n".join(blocks) + "\n")
     print(f"{a.out}: {len(parts)} parts, app {ref[:12]}")
     return 0
 
