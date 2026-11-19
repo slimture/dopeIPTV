@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 from ..core.log import log
 from ..i18n import tr
 from .boxes import BoxClient, build_xmltv, clean_text
+from . import device_urls
 
 GUIDE_API = "https://api.hdhomerun.com/api/guide.php"
 DISCOVER_PORT = 65001
@@ -181,7 +182,7 @@ def parse_reply(data: bytes, ip: str) -> dict | None:
         pos += ln
     dev_type = struct.unpack(">I", tags[0x01])[0] if len(tags.get(0x01, b"")) == 4 else 0
     dev_id = tags.get(0x02, b"")
-    base = tags.get(0x2A, b"").decode("utf-8", "replace").strip()
+    base = device_urls.on_host(tags.get(0x2A, b"").decode("utf-8", "replace").strip(), ip)
     return {"server": base or f"http://{ip}", "kind": "hdhomerun",
             "device_id": dev_id.hex().upper() if len(dev_id) == 4 else "",
             "storage": dev_type == 5}

@@ -636,7 +636,7 @@ def parse_discovery(data: bytes, ip: str, flavor: str) -> dict | None:
             port = u.port
         except ValueError:
             host, port, u = "", None, None
-        if u is not None and host:
+        if u is not None and host and u.scheme.lower() in ("http", "https"):
             private = is_home_host(host) and "." in host
             netloc = (f"{ip}:{port}" if port else ip) if private and host != ip else u.netloc
             server = urlunsplit((u.scheme or "http", netloc, u.path, "", ""))
