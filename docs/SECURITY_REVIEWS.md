@@ -64,6 +64,11 @@ assessment of each. The findings, and what came of them:
 | Parental lock | A locked category's title played without the PIN from History, Continue, Recently watched and Mine; a kids profile could rename an adult category past its filter; the sidebar search named locked channels (ui sweep; proven) | medium | 1.6.9: one lock filter for every reader; the provider's own name counts; names only |
 | Settings from outside | A nav colour from sync or a backup was pasted into a style sheet, and a bad one stopped the app starting | medium | 1.6.9: `#rrggbb` only |
 | Links | A sign-in page or a download from a service's answer was opened whatever its scheme | low | 1.6.9: https only (and this computer's http) |
+| Devices | A SAT>IP server's description could name a local file or a share on another host as its channel list (providers sweep; proven) | high | 1.6.9: http(s) on the server's own host only |
+| XML | The entity defences were bypassed by a `]` in a declaration, UTF-16 or UTF-7 | medium | 1.6.9: one shared check, expat reads the prolog (`core/safe_xml.py`) |
+| Patterns | Quadratic regular expressions froze the app on hostile playlist text (proven) | medium | 1.6.9: linear patterns, compared with the old on real and made-up input |
+| Cache | A source id from a backup or sync could name a file outside the cache folder | medium | 1.6.9: `core/source_files.file_part` |
+| Discovery | Redirects followed and whole answers read; a crafted HDHomeRun reply ended the search | low | 1.6.9: no redirect, short reads, deadlines |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round

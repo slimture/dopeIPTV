@@ -179,6 +179,23 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - core/xdg.py: only https addresses, or server mode's page on this
   computer, are opened in the browser - a service's answer cannot open
   `file:` or another program's scheme.
+- providers/satip.py: a SAT>IP server can no longer make the app read a
+  file of this computer, or a share on another host, as its channel list.
+- core/safe_xml.py: no XML from a box, device or guide can declare
+  entities, however it is encoded (UTF-16, UTF-7, a `]` inside a
+  declaration).
+- A provider's or device's text can no longer freeze the app with
+  patterns that take quadratic time (M3U lines, titles, channel names,
+  portal answers, guide fields).
+- core/source_files.py: a source id from a backup or sync can no longer
+  name files outside the cache folder.
+- Find on my network follows no redirects and reads only short answers; a
+  crafted HDHomeRun reply no longer ends the search, and discovery reads
+  end on time.
+- services/share.py: the shared guide no longer breaks on a guide that
+  names a non-text encoding, and unpacks a cached guide a slice at a time.
+- A number no real source sends no longer drops a whole source; a bouquet
+  backup and `--port` are bounded.
 ## [1.6.8]
 
 ### Security
