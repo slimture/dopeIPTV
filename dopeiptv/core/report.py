@@ -44,8 +44,26 @@ _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
 # A supporter key pasted into a report would be the one thing that could tie it to a donation.
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
+# A login written name=value or name: value - a quoted name or value too, as
+# JSON and config files write them ("password": "x y"); the quotes stay.
 _KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|apikey|secret|"
-                     r"auth|sid|session|mac|play_token|login)(\s*[=:]\s*)([^\s&'\",;]+)")
+                     r"auth|sid|session|mac|play_token|login|host)([\"']?\s*[=:]\s*)"
+                     r"(\"[^\"\n]{0,200}\"|'[^'\n]{0,200}'|[^\s&'\",;]+)")
+# A header that carries a login, to the end of its line, and a bearer token
+# wherever it stands.
+_AUTH_LINE = re.compile(r"(?i)\b((?:proxy-)?authorization|(?:set-)?cookie)([\"']?\s*[:=]\s*)[^\r\n]*")
+_BEARER = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
+# A server written without its scheme ("iptv.example.com/live/..."): a name
+# with a dot and a top-level domain, then a path. Not a file's path (one
+# after a slash or a dot is part of it) and not a version (no letters).
+_HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}"
+                        r"(?::\d{1,5})?/[^\s'\"<>()\[\]]*", re.IGNORECASE)
+
+
+def _hide_value(m: re.Match[str]) -> str:
+    value = m.group(3)
+    quote = value[0] if value[:1] in ("'", '"') else ""
+    return f"{m.group(1)}{m.group(2)}{quote}<hidden>{quote}"
 
 
 def _not_an_address(text: str) -> bool:
@@ -65,10 +83,13 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
         out = re.sub(re.escape(value), "<private>", out, flags=re.IGNORECASE)
     out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
+    out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
     out = _IPV6.sub("<ip>", out)
     out = _IPV4.sub(lambda m: m.group(0) if _not_an_address(m.group(0)) else "<ip>", out)
-    out = _KEYVAL.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
+    out = _AUTH_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
+    out = _BEARER.sub(lambda m: f"{m.group(1)} <hidden>", out)
+    out = _KEYVAL.sub(_hide_value, out)
     home = os.path.expanduser("~")
     if len(home) > 1:
         out = out.replace(home, "~")
@@ -203,13 +224,25 @@ def build(kind: str, message: str = "", trace: str = "", with_log: bool = True,
 MAX_BODY = 56_000
 
 
+def _over_https(url: str) -> str:
+    """*url* if it is https - or this computer, for the tests' own servers;
+    anything else is refused before a connection is made."""
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    if parts.scheme == "https" or (parts.scheme == "http"
+                                   and parts.hostname in ("127.0.0.1", "localhost", "::1")):
+        return url
+    raise ValueError("reports go over https only")
+
+
 def _post(url: str, body: bytes, timeout: float) -> tuple[int, bytes]:
     """POST JSON with requests, whose certificates (certifi) travel with the
     app: urllib asks the system's OpenSSL for them, and a bundled Python on
-    macOS has none, so every report failed there."""
+    macOS has none, so every report failed there. Over https only, and to
+    that address only: a redirect is not followed."""
     from .. import __version__
     from ._lazy_requests import requests
-    r = requests.post(url, data=body, timeout=timeout, headers={
+    r = requests.post(_over_https(url), data=body, timeout=timeout, allow_redirects=False, headers={
         "Content-Type": "application/json; charset=utf-8",
         "User-Agent": f"dopeIPTV/{__version__}", "X-Dopeiptv-Report": "1",
         **build_check.headers()})
@@ -224,8 +257,9 @@ def _fit(text: str, room: int) -> str:
 
 def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
          extra: dict | None = None) -> bool:
-    """POST the report as the person left it. True when it arrived - never
-    from a modified build (its reports go to whoever made it)."""
+    """POST the report as the person left it - scrubbed once more on its way
+    out (send_status). True when it arrived - never from a modified build
+    (its reports go to whoever made it)."""
     return 200 <= send_status(kind, text, timeout, endpoint, extra) < 300
 
 
@@ -241,7 +275,10 @@ def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | Non
     extra = extra or {}
     fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
               "version": __version__, "os": platform.system(),
-              "text": (text or "")[:MAX_TEXT]}
+              # Scrubbed again here, whoever called: the window scrubs with
+              # what it knows is the person's own; this pass is the last,
+              # with the patterns alone, so no way out skips them.
+              "text": scrub(text or "")[:MAX_TEXT]}
     # What feedback is about (a topic, an area, how often) and "supporter":
     # "yes" from a supporter (read first): single words from a short list.
     fields.update({k: v for k, v in extra.items()
