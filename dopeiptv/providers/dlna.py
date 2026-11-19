@@ -12,6 +12,7 @@ with.
 """
 from __future__ import annotations
 
+import hmac
 import os
 import re
 import secrets
@@ -32,7 +33,7 @@ from ..core.log import log
 from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from .cast_bridge import lan_address
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 
 SSDP_ADDR = ("239.255.255.250", 1900)
 SEARCH_TARGETS = ("urn:schemas-upnp-org:device:MediaRenderer:1",
@@ -350,7 +351,11 @@ class _FileHandler(IdleTimeoutMixin, BaseHTTPRequestHandler):
 
     def _target(self) -> tuple[str, int] | None:
         srv = self.server
-        if self.path.split("?", 1)[0] != srv.url_path:  # type: ignore[attr-defined]
+        # The address holds the cast's token: compared in the same time
+        # whatever a guess got right.
+        asked = self.path.split("?", 1)[0].encode("utf-8", "replace")
+        own = str(srv.url_path).encode("utf-8")         # type: ignore[attr-defined]
+        if not hmac.compare_digest(asked, own):
             self.send_error(404)
             return None
         path = srv.file_path                            # type: ignore[attr-defined]
@@ -423,7 +428,7 @@ class _FileHandler(IdleTimeoutMixin, BaseHTTPRequestHandler):
             log.info("dlna: serving the file stopped (%s)", e)
 
 
-class _FileServer(ExclusiveBindMixin, ThreadingHTTPServer):
+class _FileServer(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
 
     def handle_error(self, request, client_address) -> None:
@@ -441,7 +446,7 @@ class FileShare:
         name = quote(re.sub(r"[^\w.-]+", "_", os.path.basename(path))[-80:]
                      or "media")
         srv = _FileServer(("0.0.0.0", 0), _FileHandler)
-        srv.url_path = f"/{secrets.token_urlsafe(12)}/{name}"  # type: ignore[attr-defined]
+        srv.url_path = f"/{secrets.token_urlsafe(18)}/{name}"  # type: ignore[attr-defined]
         srv.file_path = path                                    # type: ignore[attr-defined]
         srv.mime = mime_for(path)                               # type: ignore[attr-defined]
         threading.Thread(target=srv.serve_forever,

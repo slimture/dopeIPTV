@@ -47,7 +47,7 @@ from typing import Any, Callable
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
                           cast_cache_dir, ffmpeg_path, lan_address,
@@ -420,7 +420,7 @@ _TYPES = {".m3u8": "application/vnd.apple.mpegurl", ".m4s": "video/iso.segment",
           ".mp4": "video/mp4"}
 
 
-class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
+class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     bridge: "AirPlayBridge"
 

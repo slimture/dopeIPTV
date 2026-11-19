@@ -29,6 +29,7 @@ provider nothing (the segments go on being written).
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import secrets
@@ -44,7 +45,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 
 # What a Cast receiver decodes. Anything outside these has to be re-encoded;
@@ -852,7 +853,21 @@ def _autoselect_subtitles(body: bytes, lang: str = "") -> bytes:
     return b"\n".join(out)
 
 
-class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
+def _same(given: str, own: str | None) -> bool:
+    """Whether *given* (off the network) is *own* - an address with the
+    run's token in it - compared in the same time whatever the two share:
+    how soon a comparison stops says how much of a guess was right."""
+    if not own:
+        return False
+    return hmac.compare_digest(given.encode("utf-8", "replace"), own.encode("utf-8"))
+
+
+def _under(path: str, prefix: str | None) -> bool:
+    """Whether *path* starts with the run's *prefix* (its token)."""
+    return bool(prefix) and _same(path[:len(prefix or "")], prefix)
+
+
+class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     """The bridge's own HTTP server, with the shouting turned off.
 
     A Chromecast opens connections, probes them and drops them as a matter
@@ -928,7 +943,7 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self) -> None:
-        if self.path != self.server.bridge.path:
+        if not _same(self.path, self.server.bridge.path):
             self.send_error(404)
             return
         self._headers()
@@ -1009,10 +1024,10 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         bridge = self.server.bridge
-        if bridge.hls and self.path.startswith(bridge.prefix or "\0"):
+        if bridge.hls and _under(self.path, bridge.prefix):
             self._serve_hls()
             return
-        if self.path != bridge.path:
+        if not _same(self.path, bridge.path):
             self.send_error(404)
             return
         proc, spool = bridge.first_frames()
@@ -1200,7 +1215,7 @@ class CastBridge:
         self.feed = feed
         if feed is not None:
             self.subs, self.hls, self.start_at = None, True, 0.0
-        self.prefix = f"/{secrets.token_urlsafe(12)}/"
+        self.prefix = f"/{secrets.token_urlsafe(18)}/"
         if self.hls:
             self.hls_dir = os.path.join(self._tmpdir(), "hls")
             os.makedirs(self.hls_dir, exist_ok=True)

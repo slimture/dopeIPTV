@@ -55,7 +55,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 from ..core import connections, hdhr, home_net
 from ..core.dvr_pool import DvrPool
 from ..core.dvr_session import DvrSession
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from ..core.log import log, redact_url
 from ..core.nerd_check import FAIL, OK, WARN, Check
 from ..core.phone_remote import RateLimiter, cross_site
@@ -77,6 +77,15 @@ K_ADULT = "nerd_server_adult"
 MAX_BODY = 64 * 1024
 #: A stream whose client reads nothing for this long is let go.
 STREAM_WRITE_TIMEOUT = 30.0
+#: Any other answer (a page, the lineup, the guide) and a request's body: a
+#: client that takes or sends nothing for this long is let go, with what was
+#: made for it.
+ANSWER_TIMEOUT = 60.0
+#: The tuner's endpoints need no token, so no wrong one ever shuts an address
+#: out: each address may ask them this often instead (a second, and at
+#: once). A media server asks a few times a minute, and once per stream.
+TUNER_RATE = 10.0
+TUNER_BURST = 60.0
 #: The lineup is built again after this long (a source's list is kept longer).
 LINEUP_TTL = 60.0
 HDHR_PATHS = ("/discover.json", "/lineup.json", "/lineup_status.json", "/device.xml",
@@ -257,6 +266,8 @@ class HomeServer:
         self.guides = GuideKeeper(self.served, self.share._client,
                                   kept=getattr(host, "guides_kept", None), guide_path=guide_path)
         self.limiter = RateLimiter()
+        #: How often one address may ask what needs no token.
+        self.tuner_rate = RateLimiter(rate=TUNER_RATE, burst=TUNER_BURST)
         #: Who may use the endpoints that need no token.
         self.local = home_net.LocalNetworks()
         self.ledger = connections.Ledger()
@@ -557,9 +568,14 @@ class HomeServer:
 
     # -- the addresses -----------------------------------------------------------------------
     def base(self, host_header: str | None = None, client: str = "") -> str:
-        """The server's address as *client* reaches it."""
-        if host_header and _host_ok(host_header):
-            return f"http://{host_header}"
+        """The server's address as *client* reaches it: under the name it
+        asked by when that is a home network's (home_net.host_for_addresses),
+        else by this computer's address on the way to it - never under
+        whatever Host a request carries, since the playlist's addresses made
+        from it hold the token."""
+        named = home_net.host_for_addresses(host_header)
+        if named:
+            return f"http://{named}"
         ip = hdhr.address_towards(client) if client else (lan_addresses() or ["127.0.0.1"])[0]
         return f"http://{ip}:{self.port}"
 
@@ -591,7 +607,10 @@ class HomeServer:
         served = {str(p["id"]) for p in self.served()}
         return {"port": self.port, "tuners": self.config.tuners, "auto_tuners": self.auto_tuners(),
                 "adult": self.config.adult, "command": launch_command(),
-                "sources": [{"id": str(p["id"]), "name": str(p.get("name") or p.get("server") or ""),
+                # A source without a name is told by its address - without
+                # the login an M3U's address carries in it.
+                "sources": [{"id": str(p["id"]),
+                             "name": str(p.get("name") or redact_url(p.get("server") or "")),
                              "kind": str(p.get("kind") or "xtream"), "served": str(p["id"]) in served,
                              "categories": (chosen.get(str(p["id"])) or None)} for p in everything]}
 
@@ -643,19 +662,8 @@ def _ffmpeg() -> str | None:
     return RecordingManager.ffmpeg()
 
 
-def _host_ok(host: str) -> bool:
-    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:[]")
-    return 0 < len(host) <= 255 and all(c in allowed for c in host)
-
-
-#: Name endings a home network's own names have: RFC 6762's .local (mDNS),
-#: RFC 8375's home.arpa, ICANN's .internal for private use, the routers'
-#: usual .lan, .home and .localdomain, AVM's .fritz.box (a Fritz!Box answers
-#: names under it itself) and Tailscale's MagicDNS .ts.net (answered inside
-#: the tailnet). A deliberate list, kept short: a DNS rebinding needs a name
-#: whose answers a web page's owner sets, and these are answered at home.
-HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain",
-                 ".fritz.box", ".ts.net")
+#: The name endings a home network's own names have (core/home_net.py).
+HOME_SUFFIXES = home_net.HOME_SUFFIXES
 #: Refused names logged (``refused_name``), so a flood of them stays small.
 REFUSED_NAMES_MAX = 64
 
@@ -663,35 +671,12 @@ REFUSED_NAMES_MAX = 64
 def tuner_host_ok(host: str | None) -> bool:
     """Whether the ``Host`` a tuner endpoint was asked under is a name of
     the home network: none (an HTTP/1.0 client), an IP address, localhost,
-    this computer's own name, a name without a dot, or a home suffix. The
-    tuner's endpoints need no token, so a web page whose own name a DNS
-    rebinding pointed at this computer must not reach them: its Host is its
-    own public name. Plex, Jellyfin, Channels and the rest ask by address."""
-    if not host:
-        return True
-    name = host.strip().lower()
-    if name.startswith("["):                       # [IPv6]:port
-        end = name.find("]")
-        if end < 0:
-            return False
-        name = name[1:end]
-    elif name.count(":") == 1:
-        name = name.rsplit(":", 1)[0]
-    name = name.rstrip(".")
-    if not name:
-        return False
-    try:
-        ipaddress.ip_address(name)
-        return True
-    except ValueError:
-        pass
-    if name == "localhost" or "." not in name or name.endswith(HOME_SUFFIXES):
-        return True
-    try:
-        own = socket.gethostname().lower().rstrip(".")
-    except OSError:
-        own = ""
-    return bool(own) and name == own
+    this computer's own name, a name without a dot, or a home suffix
+    (home_net.home_host). The tuner's endpoints need no token, so a web
+    page whose own name a DNS rebinding pointed at this computer must not
+    reach them: its Host is its own public name. Plex, Jellyfin, Channels
+    and the rest ask by address."""
+    return True if not host else home_net.home_host(host)
 
 
 def _loopback(address: str) -> bool:
@@ -710,7 +695,7 @@ def _own(handler: BaseHTTPRequestHandler) -> str:
         return ""
 
 
-class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
+class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
@@ -734,6 +719,9 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
         # -- answers -----------------------------------------------------------
         def _send(self, code: int, body: bytes, ctype: str,
                   extra: dict[str, str] | None = None) -> None:
+            # The answer has its time too (ANSWER_TIMEOUT): a client that
+            # asked and then reads nothing no longer holds it for good.
+            self._idle_limit(ANSWER_TIMEOUT)
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
@@ -796,6 +784,12 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                         # Not a home name: a web page's own, rebound here.
                         server.refused_name(self.headers.get("Host"))
                         self._text(403, "ask the tuner by this computer's address")
+                        return
+                    if not server.tuner_rate.allow(who):
+                        # No token to get wrong here: how often it asks
+                        # is all there is to hold an address to.
+                        self._text(429, "asked too often - try again in a moment",
+                                   {"Retry-After": "5"})
                         return
                     self._hdhomerun(path, method)
                     return
@@ -887,6 +881,7 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                     length = -1
                 if not 0 < length <= MAX_BODY:
                     raise ValueError("the body is a JSON object")
+                self._idle_limit(ANSWER_TIMEOUT)       # a body that never comes
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError("the body is a JSON object")
@@ -906,9 +901,12 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                 self._json(404, {"error": "not found"})
 
         def _chunks(self, ctype: str, chunks: Iterator[bytes]) -> None:
+            self._idle_limit(ANSWER_TIMEOUT)
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "no-store")
+            for k, v in {**SAFE_HEADERS, MARK: server.mark}.items():
+                self.send_header(k, v)
             self.end_headers()
             if self.command == "HEAD":
                 return
