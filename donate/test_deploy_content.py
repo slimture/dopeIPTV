@@ -301,3 +301,58 @@ def test_a_body_is_held_in_memory_and_nothing_taken_today_is_refused():
     assert _effective(srv, "/sync/x", "client_max_body_size") == "3m"
     assert _effective(srv, "/feedback/report", "client_max_body_size") == "256k"
     assert _effective(srv, "/together/x", "client_max_body_size") == "4k"
+
+
+def _locations(blocks: list[Block]):
+    for b in blocks:
+        if b.name == "location":
+            yield b
+            yield from _locations(b.body)
+
+
+def _named(srv: Block, name: str) -> Block:
+    return next(b for b in srv.all("location") if b.args == [name])
+
+
+def test_every_limit_is_checked_before_the_answer():
+    # A location's return runs in nginx's rewrite phase, before the phase
+    # limit_req is checked in: a limit beside a return never applied - which
+    # /hit's had not, since it was written. The answer comes from a named
+    # location that try_files hands on to, after the limit.
+    srv = _server(conf())
+    for loc in _locations(srv.body):
+        if loc.all("limit_req"):
+            assert not loc.all("return") and not any(i.all("return") for i in loc.all("if")), loc
+    for uri, zone, named, log in (("/dl.php", "iptv_dl", "@iptv_dl", "iptv.dope.rs-downloads.log iptv_dl"),
+                                  ("/hit", "iptv_hit", "@iptv_hit", "iptv.dope.rs-stats.log iptv_stats")):
+        loc = find_location(srv, uri)
+        assert loc.args == ["=", uri] and loc.values("limit_req") == [f"zone={zone} burst=60 nodelay"]
+        assert loc.values("limit_req_status") == ["429"]
+        tried = loc.values("try_files")[0].split()
+        assert tried[-1] == named and not os.path.exists(os.path.join(ROOT, "public", tried[0].lstrip("/")))
+        answer = _named(srv, named)
+        assert answer.values("access_log") == [f"/var/log/nginx/{log} if=$iptv_count"]
+        assert not loc.all("access_log")           # a refused one is not written down
+    assert _zones(conf())["iptv_dl"] == "$http_x_real_ip"
+    assert [b.args for b in conf().all("limit_req_zone") if "zone=iptv_dl:1m" in b.args] == [
+        ["$http_x_real_ip", "zone=iptv_dl:1m", "rate=120r/m"]]
+    # Its answers as before: the file, a test build on GitHub, else Not found.
+    dl = _named(srv, "@iptv_dl")
+    assert dl.values("return") == ["302 /files/$iptv_dl_file"]
+    assert [i.values("return") for i in dl.all("if")] == [
+        ['404 Not found'], ["302 https://github.com/slimture/dopeIPTV/releases/download/$iptv_dl_nightly/$iptv_dl_file"],
+        ['404 Not found']]
+    assert _named(srv, "@iptv_hit").values("return") == ["204"]
+
+
+def test_a_download_name_is_at_most_120_characters():
+    top = conf()
+    name = "dopeIPTV-1.6.8-x86_64.AppImage"
+    assert map_value(top, "$iptv_dl_file", name) == name
+    assert map_value(top, "$iptv_dl_file", "a/b/" + name) == name
+    assert map_value(top, "$iptv_dl_file", ".hidden") == ""
+    longest = "dopeIPTV-1.6.8.90-" + "x" * 102
+    assert len(longest) == 120 and map_value(top, "$iptv_dl_file", longest) == longest
+    assert map_value(top, "$iptv_dl_file", longest + "x") == ""
+    assert map_value(top, "$iptv_dl_nightly", map_value(top, "$iptv_dl_file", longest)) == "nightly-1.6.8.90"
+    assert map_value(top, "$iptv_dl_nightly", map_value(top, "$iptv_dl_file", longest + "x")) == ""

@@ -125,6 +125,34 @@ def test_a_release_whose_tag_is_not_a_version_is_never_used(base, tmp_path):
     assert "</script><script" not in (b / "public" / "i18n" / "en" / "index.html").read_text(encoding="utf-8")
 
 
+def test_a_download_is_a_key_of_its_own_only_when_the_site_knows_its_name(base, tmp_path):
+    # nginx sends any name shaped like a test build's on to GitHub (302), so
+    # a made-up one would be a key in downloads.json for good: it is summed
+    # under "other", and the total is what was downloaded.
+    b, env = base
+    (b / "public" / "files").mkdir()
+    (b / "public" / "files" / "dopeIPTV-1.6.6-x86_64.AppImage").write_bytes(b"x")
+    (b / "public" / "nightly.json").write_text(json.dumps(
+        {"version": "1.6.8.90", "assets": [{"name": "dopeIPTV-1.6.8.90-x86_64.AppImage"}]}))
+    (b / "downloads.json").write_text(json.dumps({"dopeIPTV-1.6.5-x86_64.AppImage": 40, "other": 2}))
+    ua = "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0"
+
+    def line(name: str, status: int = 302, agent: str = ua) -> str:
+        return (f'10.0.1.1 - - [19/Nov/2026:12:00:00 +0100] "GET /dl.php?f={name} HTTP/1.1" {status} 0 '
+                f'"" "{agent}" "203.0.113.5"\n')
+    log = tmp_path / "downloads.log"
+    log.write_text(line("dopeIPTV-1.6.6-x86_64.AppImage") + line("dopeIPTV-1.6.5-x86_64.AppImage")
+                   + line("dopeIPTV-1.6.8.90-x86_64.AppImage")
+                   + line("dopeIPTV-9.9.9.1-made-up") + line("dopeIPTV-9.9.9.2-made-up")
+                   + line("nothing-here", 404) + line("dopeIPTV-1.6.6-x86_64.AppImage", agent="dopeIPTV/1.6.5 (Linux; x86_64)"))
+    run = _run(b, dict(env, IPTV_DOWNLOAD_LOG=str(log)))
+    assert run.returncode == 0, run.stderr
+    assert "counted 5 download(s)" in run.stderr
+    assert json.loads((b / "downloads.json").read_text()) == {
+        "dopeIPTV-1.6.5-x86_64.AppImage": 41, "other": 4,
+        "dopeIPTV-1.6.6-x86_64.AppImage": 1, "dopeIPTV-1.6.8.90-x86_64.AppImage": 1}
+
+
 # -- a release mirrored only as its signed checksum list says ------------------------
 
 def _github(tmp_path, b, env, seed: bytes, change=None, extra=None):

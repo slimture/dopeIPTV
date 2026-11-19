@@ -164,9 +164,24 @@ count_downloads() {
             say "$COUNTS is not a JSON object - counts left alone until it is fixed"
             return 0
         fi
-        jq -n --indent 4 --slurpfile old "$old" --rawfile new "$TMP/counted.tsv" '
-            reduce ($new | split("\n")[] | select(. != "") | split("\t")) as [$k, $n]
-                ($old[0] // {}; .[$k] = ((.[$k] // 0) + ($n | tonumber)))' > "$TMP/downloads.json"
+        # A name is a key of its own only when the site knows it: counted
+        # before, a file mirrored here, or the newest test build's. nginx
+        # sends any name shaped like a test build's on to GitHub, so a
+        # made-up one would have been a key here for good; it is summed
+        # under "other" instead, and the total stays what was downloaded.
+        (cd "$FILES" 2>/dev/null && ls -A) | jq -R . | jq -s . > "$TMP/files.json"
+        known_nightly=$PUB/nightly.json
+        [ -s "$known_nightly" ] && jq -e 'type == "object"' "$known_nightly" >/dev/null 2>&1 \
+            || known_nightly=/dev/null
+        jq -n --indent 4 --slurpfile old "$old" --rawfile new "$TMP/counted.tsv" \
+            --slurpfile files "$TMP/files.json" --slurpfile nightly "$known_nightly" '
+            ($old[0] // {}) as $was
+            | ([($files[0] // [])[] | strings]
+               + [($nightly[0] // {}) | .assets? // [] | .[]? | .name? | strings]
+               | map({(.): true}) | add // {}) as $here
+            | reduce ($new | split("\n")[] | select(. != "") | split("\t")) as [$k, $n]
+                ($was; (if ($was | has($k)) or $here[$k] then $k else "other" end) as $key
+                       | .[$key] = ((.[$key] // 0) + ($n | tonumber)))' > "$TMP/downloads.json"
         cp "$TMP/downloads.json" "$COUNTS.part"
         mv -f "$COUNTS.part" "$COUNTS"
         say "counted $(awk -F "$TAB" '{ s += $2 } END { print s }' "$TMP/counted.tsv") download(s)"
