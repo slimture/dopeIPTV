@@ -1712,6 +1712,7 @@
   "report_include": "Technische Details mitsenden (Versionen, der Fehler, das letzte Protokoll)",
   "report_what_is_sent": "Genau das wird gesendet – ändere oder lösche, was du willst:",
   "report_privacy": "Adressen, IP- und MAC-Adressen, Logins, die Namen deiner Quellen, Sender und was du geschaut hast, werden entfernt, bevor du das siehst. Nichts wird gesendet, bis du auf Senden drückst.",
+  "fb_privacy_link": "Datenschutzerklärung",
   "report_send": "Senden",
   "report_sent": "Danke – der Bericht wurde gesendet.",
   "report_not_sent": "Der Bericht konnte nicht gesendet werden. Er liegt in der Zwischenablage – du kannst ihn in ein Issue auf GitHub einfügen.",

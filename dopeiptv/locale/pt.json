@@ -1712,6 +1712,7 @@
   "report_include": "Incluir detalhes técnicos (versões, o erro, o log recente)",
   "report_what_is_sent": "Exatamente o que é enviado – altere ou apague o que quiser:",
   "report_privacy": "Endereços, endereços IP e MAC, logins, nomes das suas fontes, canais e o que você assistiu são removidos antes de você ver isto. Nada é enviado até você tocar em Enviar.",
+  "fb_privacy_link": "Política de privacidade",
   "report_send": "Enviar",
   "report_sent": "Obrigado – o relatório foi enviado.",
   "report_not_sent": "Não foi possível enviar o relatório. Ele está na área de transferência – você pode colá-lo em uma issue no GitHub.",

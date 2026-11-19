@@ -1712,6 +1712,7 @@
   "report_include": "附上技术信息（版本、错误、最近的日志）",
   "report_what_is_sent": "将发送的确切内容——可随意修改或删除：",
   "report_privacy": "地址、IP 和 MAC 地址、登录信息、你的来源名称、频道和观看记录在你看到之前已被移除。在你点击“发送”之前不会发送任何内容。",
+  "fb_privacy_link": "隐私政策",
   "report_send": "发送",
   "report_sent": "谢谢——报告已发送。",
   "report_not_sent": "报告无法发送。它已在剪贴板中——你可以把它粘贴到 GitHub 的 issue 里。",

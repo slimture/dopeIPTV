@@ -1712,6 +1712,7 @@
   "report_include": "Uključi tehničke detalje (verzije, grešku, nedavni dnevnik)",
   "report_what_is_sent": "Tačno ono što se šalje – izmeni ili obriši šta god hoćeš:",
   "report_privacy": "Adrese, IP i MAC adrese, prijave, imena tvojih izvora, kanali i ono što si gledao uklanjaju se pre nego što ovo vidiš. Ništa se ne šalje dok ne pritisneš Pošalji.",
+  "fb_privacy_link": "Politika privatnosti",
   "report_send": "Pošalji",
   "report_sent": "Hvala – izveštaj je poslat.",
   "report_not_sent": "Izveštaj nije mogao da se pošalje. U privremenoj je memoriji – možeš da ga nalepiš u prijavu na GitHubu.",

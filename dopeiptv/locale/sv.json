@@ -1712,6 +1712,7 @@
   "report_include": "Ta med tekniska detaljer (versioner, felet, senaste loggen)",
   "report_what_is_sent": "Exakt det som skickas – ändra eller ta bort vad du vill:",
   "report_privacy": "Adresser, IP- och MAC-adresser, inloggningar, dina källors namn, kanaler och det du tittat på tas bort innan du ser detta. Inget skickas förrän du trycker Skicka.",
+  "fb_privacy_link": "Integritetspolicy",
   "report_send": "Skicka",
   "report_sent": "Tack – rapporten skickades.",
   "report_not_sent": "Rapporten kunde inte skickas. Den ligger i urklipp – du kan klistra in den i ett ärende på GitHub.",

@@ -1696,6 +1696,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "report_include": {"en": "Include technical details (versions, the error, recent log)"},
     "report_what_is_sent": {"en": "Exactly what is sent - change or delete anything:"},
     "report_privacy": {"en": "Addresses, IP and MAC addresses, logins, your sources' names, channels and what you watched are taken out before you see this. Nothing is sent until you press Send."},
+    "fb_privacy_link": {"en": "Privacy policy"},
     "report_send": {"en": "Send"},
     "report_sent": {"en": "Thank you - the report was sent."},
     "report_not_sent": {"en": "The report could not be sent. It is on the clipboard - you can paste it in an issue on GitHub."},

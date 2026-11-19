@@ -1712,6 +1712,7 @@
   "report_include": "Includi i dettagli tecnici (versioni, l'errore, il registro recente)",
   "report_what_is_sent": "Esattamente ciò che viene inviato: modifica o elimina ciò che vuoi:",
   "report_privacy": "Indirizzi, indirizzi IP e MAC, accessi, nomi delle tue sorgenti, canali e ciò che hai guardato vengono tolti prima che tu veda questo. Nulla viene inviato finché non premi Invia.",
+  "fb_privacy_link": "Informativa sulla privacy",
   "report_send": "Invia",
   "report_sent": "Grazie, la segnalazione è stata inviata.",
   "report_not_sent": "Non è stato possibile inviare la segnalazione. È negli appunti: puoi incollarla in una segnalazione su GitHub.",

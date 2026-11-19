@@ -1712,6 +1712,7 @@
   "report_include": "Sertakan detail teknis (versi, kesalahan, log terbaru)",
   "report_what_is_sent": "Persis yang dikirim – ubah atau hapus apa pun:",
   "report_privacy": "Alamat, alamat IP dan MAC, info masuk, nama sumbermu, saluran, dan yang kamu tonton dihapus sebelum kamu melihat ini. Tidak ada yang dikirim sampai kamu menekan Kirim.",
+  "fb_privacy_link": "Kebijakan privasi",
   "report_send": "Kirim",
   "report_sent": "Terima kasih – laporan sudah dikirim.",
   "report_not_sent": "Laporan tidak bisa dikirim. Laporan ada di papan klip – kamu bisa menempelkannya di issue di GitHub.",

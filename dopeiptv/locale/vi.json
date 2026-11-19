@@ -1712,6 +1712,7 @@
   "report_include": "Kèm chi tiết kỹ thuật (phiên bản, lỗi, nhật ký gần đây)",
   "report_what_is_sent": "Chính xác những gì được gửi – sửa hoặc xóa tùy ý:",
   "report_privacy": "Địa chỉ, địa chỉ IP và MAC, thông tin đăng nhập, tên nguồn, kênh và những gì bạn đã xem được xóa trước khi bạn thấy nội dung này. Không gì được gửi cho đến khi bạn bấm Gửi.",
+  "fb_privacy_link": "Chính sách quyền riêng tư",
   "report_send": "Gửi",
   "report_sent": "Cảm ơn – báo cáo đã được gửi.",
   "report_not_sent": "Không gửi được báo cáo. Nội dung đã nằm trong bộ nhớ tạm – bạn có thể dán vào một issue trên GitHub.",

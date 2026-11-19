@@ -1712,6 +1712,7 @@
   "report_include": "Dołącz szczegóły techniczne (wersje, błąd, ostatni dziennik)",
   "report_what_is_sent": "Dokładnie to zostanie wysłane – zmień lub usuń, co chcesz:",
   "report_privacy": "Adresy, adresy IP i MAC, loginy, nazwy twoich źródeł, kanały i to, co oglądałeś, są usuwane, zanim to zobaczysz. Nic nie zostanie wysłane, dopóki nie naciśniesz Wyślij.",
+  "fb_privacy_link": "Polityka prywatności",
   "report_send": "Wyślij",
   "report_sent": "Dziękujemy – raport został wysłany.",
   "report_not_sent": "Nie udało się wysłać raportu. Jest w schowku – możesz wkleić go w zgłoszeniu na GitHubie.",

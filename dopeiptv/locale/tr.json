@@ -1712,6 +1712,7 @@
   "report_include": "Teknik ayrıntıları ekle (sürümler, hata, son günlük)",
   "report_what_is_sent": "Tam olarak gönderilecek olan – istediğini değiştir ya da sil:",
   "report_privacy": "Adresler, IP ve MAC adresleri, oturum bilgileri, kaynaklarının adları, kanallar ve izlediklerin sen bunu görmeden önce çıkarılır. Gönder'e basana kadar hiçbir şey gönderilmez.",
+  "fb_privacy_link": "Gizlilik politikası",
   "report_send": "Gönder",
   "report_sent": "Teşekkürler – rapor gönderildi.",
   "report_not_sent": "Rapor gönderilemedi. Panoda duruyor – GitHub'da bir issue'ya yapıştırabilirsin.",

@@ -1310,6 +1310,27 @@ class AnswersDialog(QDialog):
         self._fit()
 
 
+#: The privacy policy's part on the app - what a report and feedback hold
+#: and what dopeiptv.org keeps of them. ?ref=: from the app, for the site's
+#: statistics (see mw_updates).
+PRIVACY_URL = "https://dopeiptv.org/privacy/?ref=app-feedback#app"
+
+
+def privacy_link() -> QPushButton:
+    """A small link under a report's or feedback's fine print: the privacy
+    policy, in the browser."""
+    from ..core.xdg import open_url
+    btn = QPushButton(tr("fb_privacy_link"))
+    btn.setFlat(True)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setToolTip(PRIVACY_URL.split("?")[0])
+    btn.setStyleSheet(f"QPushButton {{ border:none; background:transparent; padding:0;"
+                      f" color:{P['accent']}; font-size:12px; font-weight:600; }}"
+                      f" QPushButton:hover {{ text-decoration:underline; }}")
+    btn.clicked.connect(lambda: open_url(PRIVACY_URL))
+    return btn
+
+
 class FeedbackDialog(QDialog):
     """Feedback, asked the way the answers are useful: what it is about,
     for something that does not work where and how often, the person's
@@ -1462,6 +1483,7 @@ class FeedbackDialog(QDialog):
         col.addWidget(note)
         self.answers.setVisible(not copy_only)
         note.setVisible(not copy_only)
+        col.addWidget(privacy_link(), 0, Qt.AlignmentFlag.AlignLeft)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -1702,6 +1724,7 @@ class ReportDialog(QDialog):
         privacy.setWordWrap(True)
         privacy.setStyleSheet(f"font-size:12px; color:{P['muted']};")
         col.addWidget(privacy)
+        col.addWidget(privacy_link(), 0, Qt.AlignmentFlag.AlignLeft)
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))
