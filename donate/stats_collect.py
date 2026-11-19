@@ -65,7 +65,9 @@ whole they are made k-anonymous (k_anonymous, K_ANON = 5): pages and time
 in a few steps, and a visit unlike four others of its month in everything
 kept is told less - its site, channel, language, browser and so on, field
 by field, its day as its week - until it is like them, or left out (its
-counts stay in the day's). Those, and the counts per day, are kept for good.
+counts stay in the day's). Each combination kept is then shared by at
+least five visits - visits, not people: one person who came five times is
+five of them. Those, and the counts per day, are kept for good.
 
 Each update the app fetched for itself goes to STATS_DIR/updates/<day>.json
 for the same log: the hour it came in, the file, the version it came from,
@@ -1436,7 +1438,9 @@ def freeze_months(uniques: dict, kinds: dict, frozen: dict, today: date) -> int:
 
 
 #: Each visit kept for good is like at least K_ANON - 1 others of its month
-#: in every field kept (k_anonymous).
+#: in every field kept (k_anonymous): each combination of them is shared by
+#: at least K_ANON visits - visits, not people, as one person who came five
+#: times is five visits alike.
 K_ANON = 5
 #: The fields a kept visit could be told by, together.
 _QI = ("day", "country", "browser", "os", "device", "lang", "channel", "site", "pages",

@@ -150,8 +150,8 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "site", "path": _CONTENT, "nginx": ["server > listen", "server > include"]},
                   {"repo": "site", "path": _CONTENT, "nginx": ["server > location = /feedback/report"]},
                   {"repo": "site", "path": "deploy/iptv_donate",
-                   "from": r"^: \$\{iptv_donate_enable", "to": r"^: \$\{iptv_donate_log"},
-                  {"repo": "site", "path": "donate/donate.py", "names": ["main"]}]},
+                   "from": r"^: \$\{iptv_donate_enable", "to": r"^\}$"},
+                  {"repo": "site", "path": "donate/donate.py", "names": ["SOCKET_GROUP", "open_to_nginx", "main"]}]},
         {"id": "nolog", "repo": "site", "path": _PROXY, "nginx": ["server > access_log off", "server > error_log"],
          "with": [{"repo": "site", "path": _OLD_PROXY, "nginx": ["server > access_log off", "server > error_log"]},
                   {"repo": "site", "path": _CONTENT, "nginx": ["server > access_log off", "server > error_log"]},
@@ -558,8 +558,9 @@ import stats_collect as s
 from datetime import date
 state = {"_keys": s.MonthKeys(None, date(2026, 11, 19), {"2026-11": "0" * 64})}
 ip, ua = "203.0.113.7", "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0"
-line = {"ip": ip, "t": "2026-11-19T21:04:31+01:00", "m": "GET", "u": "/hit?p=help&ev=view",
-        "s": 204, "r": "https://duckduckgo.com/", "a": ua, "l": "sv"}
+line = {"ip": ip, "t": "2026-11-19T21:04:31+01:00", "m": "POST",
+        "u": "/hit?p=%2Fhelp%2F&ev=view&t=&x=&n=&s=&l=sv&bl=sv-SE&w=1920&h=1080&hl=&r=https%3A%2F%2Fduckduckgo.com%2F",
+        "s": 204, "r": "https://dopeiptv.org/help/", "a": ua, "l": "sv"}
 class Geo:
     def country(self, addr): return "SE"
 class Visits:

@@ -147,6 +147,29 @@ def test_the_page_reads_nginx_as_the_content_servers_test_does():
         assert _shape(transparency.nginx_tree(text, path)) == _their_shape(parse(text)), path
 
 
+def test_every_log_on_the_server_is_named_on_the_page_and_in_the_policy():
+    # Each log the site's newsyslog file turns over (DEPLOY.md), and nginx's
+    # error log, in part 7 and the privacy policy of both languages - with
+    # what it holds and how long, beside it.
+    with open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8") as fh:
+        deploy = fh.read()
+    whole = re.search(r"<<'LOGS'\n(.*?)\nLOGS\n", deploy, re.S).group(1)
+    names = {os.path.basename(line.split()[0]) for line in whole.splitlines()} | {"error.log"}
+    assert len(names) == 6
+    words = _words()
+    for lang in ("en", "sv"):
+        page = words[lang]
+        part = page[page.index('<h2 id="webservers">'):page.index('<h2 id="hosts">')]
+        with open(os.path.join(ROOT, "site", "legal", lang, "privacy.html"), encoding="utf-8") as fh:
+            policy = fh.read()
+        for name in names:
+            assert f"<code>{name}</code>" in part, (lang, name)
+            assert f"<code>{name}</code>" in policy, (lang, name)
+        # The try-it list sends nobody to the admin page's sign-in.
+        for box in re.findall(r'<pre class="tp-cmd"><code>(.*?)</code></pre>', part, re.S):
+            assert "/admin" not in box, lang
+
+
 def test_a_block_is_found_by_its_words_and_whole_with_its_comments():
     text = ("# the zones\n"
             "limit_req_zone $a zone=one:1m rate=1r/s;\n"

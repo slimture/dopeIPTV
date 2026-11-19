@@ -472,7 +472,8 @@ How it counts, so the numbers are honest:
   there was a download or the donate dialog - and kept for good, as are the
   counts per day; once a month is whole they are made k-anonymous (each
   like at least four others of the month, a rarer one told less field by
-  field or left out: `k_anonymous`). Countries come from DB-IP's free database
+  field or left out: `k_anonymous`) - each combination kept is shared by at
+  least five visits, which need not be five people. Countries come from DB-IP's free database
   (CC BY 4.0), fetched once a month by the quarter-hour run and looked up
   on the server - nothing is sent anywhere.
 - What visitors do on a page (`public/events.js`, since November 2026):
