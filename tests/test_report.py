@@ -93,18 +93,18 @@ def test_sent_as_the_person_left_it(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     inbox = Inbox()
     try:
-        assert report.send("feedback", "Love the guide.", endpoint=inbox.url)
+        assert report.send("feedback", "Love the guide.", personal=(), endpoint=inbox.url)
         path, headers, body = inbox.got[-1]
         from dopeiptv import __version__
         assert path == "/feedback/report" and body["text"] == "Love the guide."
         assert body["kind"] == "feedback" and body["version"] == __version__ and body["os"]
         assert headers["X-Dopeiptv-Report"] == "1" and headers["User-Agent"] == f"dopeIPTV/{__version__}"
         assert set(body) == {"kind", "version", "os", "text"}          # nothing else rides along
-        report.send("whatever", "x", endpoint=inbox.url)
+        report.send("whatever", "x", personal=(), endpoint=inbox.url)
         assert inbox.got[-1][2]["kind"] == "feedback"
     finally:
         inbox.close()
-    assert not report.send("error", "x", endpoint="http://127.0.0.1:9/none", timeout=3)
+    assert not report.send("error", "x", personal=(), endpoint="http://127.0.0.1:9/none", timeout=3)
 
 
 def test_the_crash_file_is_read_once_and_emptied(tmp_path):
@@ -408,7 +408,7 @@ def test_only_the_short_answers_go_with_feedback():
         return 200, b"{}"
     real, report._post = report._post, fake
     try:
-        assert report.send("feedback", "hi", endpoint="http://127.0.0.1:9/x",
+        assert report.send("feedback", "hi", personal=(), endpoint="http://127.0.0.1:9/x",
                            extra={"topic": "bug", "area": "guide", "often": "once", "supporter": "yes",
                                   "name": "Anna", "topicx": "y", "area2": "z", "often_": "a b",
                                   "key": "DS1-abc"})
@@ -504,7 +504,7 @@ def test_a_long_report_is_cut_to_what_the_site_takes():
         return 200, b"{}"
     real, report._post = report._post, fake
     try:
-        assert report.send("feedback", "Någon åt äpplet – ж" * 4000)
+        assert report.send("feedback", "Någon åt äpplet – ж" * 4000, personal=())
     finally:
         report._post = real
     assert len(sent[0]) <= report.MAX_BODY
@@ -515,7 +515,7 @@ def test_a_long_report_is_cut_to_what_the_site_takes():
 def test_a_refused_report_is_not_called_sent():
     real, report._post = report._post, lambda url, body, timeout: (400, b'{"error": "empty"}')
     try:
-        assert not report.send("feedback", "hello")
+        assert not report.send("feedback", "hello", personal=())
         assert report.fetch_replies(["x"]) is None
     finally:
         report._post = real
@@ -570,13 +570,26 @@ def test_the_last_scrub_is_in_send_itself_and_it_goes_over_https_only(monkeypatc
             return Answer()
 
     monkeypatch.setattr(lazy, "requests", Requests)
-    assert report.send_status("feedback", "it broke at token=abc123 on iptv.example.com/live/1",
+    assert report.send_status("feedback", "it broke at token=abc123 on iptv.example.com/live/1", personal=(),
                               endpoint="https://dopeiptv.org/feedback/report") == 200
     url, kw = calls[-1]
     body = json.loads(kw["data"])
     assert body["text"] == "it broke at token=<hidden> on <address>"
     assert kw["allow_redirects"] is False
     calls.clear()
-    assert report.send_status("error", "x", endpoint="http://example.com/feedback/report") == 0
+    assert report.send_status("error", "x", personal=(), endpoint="http://example.com/feedback/report") == 0
     assert report.fetch_replies(["a" * 32], endpoint="http://example.com/feedback/replies") is None
     assert calls == [], "nothing goes over plain http to another computer"
+    # Nor over https to any host but dopeiptv.org.
+    for url in ("https://example.com/feedback/report", "https://dopeiptv.org.example.net/x",
+                "https://evil.dopeiptv.org/feedback/report"):
+        assert report.send_status("error", "x", personal=(), endpoint=url) == 0
+    assert calls == []
+    # The last pass knows what is the person's own as well as the patterns -
+    # and a way out cannot leave it out.
+    assert report.send_status("feedback", "SVT1 HD froze for Kalle", personal=["SVT1 HD", "Kalle"],
+                              endpoint="https://dopeiptv.org/feedback/report") == 200
+    assert "SVT1" not in json.loads(calls[-1][1]["data"])["text"]
+    assert "Kalle" not in json.loads(calls[-1][1]["data"])["text"]
+    with pytest.raises(TypeError):
+        report.send_status("feedback", "x")                       # type: ignore[call-arg]

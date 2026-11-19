@@ -252,19 +252,21 @@ def _fit(text: str, room: int) -> str:
     return text if len(raw) <= room else raw[:max(0, room)].decode("utf-8", "ignore")
 
 
-def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
-         extra: dict | None = None) -> bool:
+def send(kind: str, text: str, *, personal: Iterable[str], timeout: float = 15.0,
+         endpoint: str | None = None, extra: dict | None = None) -> bool:
     """POST the report as the person left it - scrubbed once more on its way
     out (send_status). True when it arrived - never from a modified build
     (its reports go to whoever made it)."""
-    return 200 <= send_status(kind, text, timeout, endpoint, extra) < 300
+    return 200 <= send_status(kind, text, personal=personal, timeout=timeout,
+                              endpoint=endpoint, extra=extra) < 300
 
 
-def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
-                extra: dict | None = None) -> int:
+def send_status(kind: str, text: str, *, personal: Iterable[str], timeout: float = 15.0,
+                endpoint: str | None = None, extra: dict | None = None) -> int:
     """send(), with the site's answer: its HTTP status - 409 for a reply to
     an answer whose thread is closed - or 0 when nothing reached it (never
-    from a modified build)."""
+    from a modified build). *personal*: what is the person's own
+    (personal_values()) - required, so no way out sends without it."""
     from .. import __version__
     if not build_check.allowed():
         log.info("report: not sent - not an official build")
@@ -272,10 +274,10 @@ def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | Non
     extra = extra or {}
     fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
               "version": __version__, "os": platform.system(),
-              # Scrubbed again here, whoever called: the window scrubs with
-              # what it knows is the person's own; this pass is the last,
-              # with the patterns alone, so no way out skips them.
-              "text": scrub(text or "")[:MAX_TEXT]}
+              # Scrubbed again here, whoever called, with the patterns and
+              # what is the person's own: the last pass, so no way out
+              # skips either.
+              "text": scrub(text or "", personal)[:MAX_TEXT]}
     # What feedback is about (a topic, an area, how often) and "supporter":
     # "yes" from a supporter (read first): single words from a short list.
     fields.update({k: v for k, v in extra.items()

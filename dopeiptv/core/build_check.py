@@ -422,18 +422,26 @@ def headers() -> dict[str, str]:
     return {HEADER: kind()}
 
 
+#: Where dopeiptv.org's services are - and the only place secure() lets a
+#: report, a synced copy or a room's message go.
+SERVICE_HOST = "dopeiptv.org"
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
 def secure(url: str) -> bool:
     """Whether a request to one of dopeiptv.org's services may go to *url*:
-    https - or this computer, for the tests' own servers. Anything else is
-    refused before a connection is made (a changed endpoint, a typo)."""
+    https to dopeiptv.org itself - or this computer, for the tests' own
+    servers. Anything else is refused before a connection is made (a
+    changed endpoint, a typo, another host)."""
     from urllib.parse import urlsplit
     try:
         parts = urlsplit(str(url))
-        host = parts.hostname
+        host = (parts.hostname or "").lower()
     except ValueError:
         return False
-    return parts.scheme == "https" or (
-        parts.scheme == "http" and host in ("127.0.0.1", "localhost", "::1"))
+    if host in _LOOPBACK:
+        return parts.scheme in ("http", "https")
+    return parts.scheme == "https" and host == SERVICE_HOST
 
 
 class NotOfficial(RuntimeError):

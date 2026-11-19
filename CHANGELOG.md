@@ -7,6 +7,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Security
+
+- core/build_check.py: `secure` lets a service's address through only over
+  https to dopeiptv.org itself (`SERVICE_HOST`; loopback for the tests) -
+  an address on another host, or a name that only ends in it, is refused.
+- core/report.py: `send` and `send_status` take the person's own values
+  (`personal`) as a required argument, so the last scrub before anything
+  leaves knows the source's names, logins and addresses as well as the
+  patterns, whichever way a report was put together.
+
 ## [1.6.8]
 
 ### Security

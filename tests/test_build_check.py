@@ -364,7 +364,7 @@ def net(monkeypatch):
 def test_every_request_to_dopeiptv_org_says_the_build(net):
     from dopeiptv.core import report, selfupdate, sync, updates
     updates.fetch_site_release()
-    assert report.send("feedback", "Nice.")
+    assert report.send("feedback", "Nice.", personal=())
     report.fetch_replies(["code"])
     sync.Remote("slot").get()
     for method, url, headers in net:
@@ -410,7 +410,7 @@ def test_a_modified_build_asks_nothing_of_the_site(net):
     for mod in (selfupdate, winupdate, macupdate):
         with pytest.raises(build_check.NotOfficial):
             mod.install({"tag": "v9.9.9", "assets": []}, "1.0.0")
-    assert not report.send("error", "trace")
+    assert not report.send("error", "trace", personal=())
     assert report.fetch_replies(["code"]) is None
     with pytest.raises(sync.SyncError) as e:
         sync.Remote("slot").get()
@@ -696,3 +696,16 @@ def test_the_start_never_waits_for_the_verdict_on_the_window_s_thread(monkeypatc
         app.processEvents()
         time.sleep(0.01)
     assert len(asked) == 1 and offered == ["crash"], (asked, offered)
+
+
+def test_the_services_go_to_dopeiptv_org_alone():
+    """build_check.secure: https to dopeiptv.org, or this computer for the
+    tests' own servers - never another host, whatever its scheme."""
+    for ok in ("https://dopeiptv.org/sync/ab", "https://DOPEIPTV.ORG/together/x",
+               "http://127.0.0.1:8080/x", "http://localhost/x", "http://[::1]:9/x"):
+        assert build_check.secure(ok), ok
+    for bad in ("http://dopeiptv.org/sync/", "https://www.dopeiptv.org/sync/",
+                "https://dopeiptv.org.evil.net/", "https://evil.net/dopeiptv.org",
+                "ftp://dopeiptv.org/", "dopeiptv.org/sync/", "", "https://user@evil.net/"):
+        assert not build_check.secure(bad), bad
+
