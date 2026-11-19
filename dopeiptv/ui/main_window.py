@@ -14,8 +14,7 @@ from PyQt6.QtCore import (
     QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QGuiApplication, QIcon, QKeySequence, QPainter,
-    QPixmap, QShortcut,
+    QColor, QGuiApplication, QIcon, QPainter, QPixmap,
 )
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QMainWindow, QMenu, QMessageBox, QWidget,
@@ -514,113 +513,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         il = self._build_info_column(det, dl)
         self._build_detail_header(il)
         self._build_detail_lists(il)
-
-        root.addWidget(side)
-        root.addWidget(mid)
-        root.addWidget(det)
-        root.setSizes([220, 560, 380])
-        root.setCollapsible(0, False)
-        root.setCollapsible(1, False)
-        root.setCollapsible(2, False)
-        root.setStretchFactor(0, 0)
-        root.setStretchFactor(1, 1)
-        root.setStretchFactor(2, 0)
-        # Save the panel layout every time the user drags a divider, so it
-        # persists even if closeEvent doesn't run (Ctrl+C, force quit, sudden
-        # kill). The window geometry is saved via moveEvent/resizeEvent below.
-        root.splitterMoved.connect(self._schedule_save_layout)
-        # Dragging the side divider inward past a threshold collapses the
-        # sidebar to the icon rail. Pinning the rail's max width (in
-        # _apply_sidebar_collapsed) is what makes this stick mid-drag - a hard
-        # width constraint the splitter honours, unlike a setSizes() call.
-        root.splitterMoved.connect(self._maybe_collapse_on_drag)
-        # The middle pane's width also changes with divider drags, not just
-        # window resizes, so keep its control strip's compact mode in sync.
-        root.splitterMoved.connect(self._update_mid_compact)
-        # The "+ Add provider" hint is absolutely positioned over the middle
-        # pane, so it has to follow divider drags too - otherwise it drifts off
-        # centre (or off-pane) whenever the columns are resized.
-        root.splitterMoved.connect(self._position_provider_hint)
-        # When collapsed the rail's width is pinned (so it can't stretch), which
-        # freezes its divider handle - so watch the handle for a rightward drag
-        # to re-expand it without reaching for the ☰ button.
-        self._side_handle = root.handle(1)
-        if self._side_handle is not None:
-            self._side_handle.installEventFilter(self)
-        # Floor wide enough that the docked player's full control row (transport
-        # + options + pop-out + fullscreen + mute + volume) always fits, so
-        # dragging the divider in never crushes the buttons or drops the slider.
-        # The pane's 20px side margins mean the player is 40px narrower than the
-        # pane, so the floor is the ~340px bar plus those margins.
-        det.setMinimumWidth(380)
-        # Keep the content list from being squeezed away: dragging the sidebar
-        # divider far right used to swallow the whole middle column (leaving
-        # sidebar + player and no list, which just looks broken). A floor plus
-        # non-collapsible keeps it always present.
-        mid.setMinimumWidth(240)
-        self._side, self._mid, self._det = side, mid, det
-        self._root = root
-        # A base minimum window size: below this the three columns can't hold
-        # the docked player plus its info without overlapping (the info would
-        # creep up into the video). Width = rail + middle + detail floors;
-        # height fits the docked player (which scales with screen width) plus
-        # its control bar, the pane chrome and a little info.
-        # Height fits the docked player (fixed box + control bar) plus the
-        # info column's small floor and chrome. Overlap is impossible at ANY
-        # size - everything under the video lives in the info scroll column -
-        # so this floor is about usability, not correctness.
-        # player(box_h+~52) + pane margins(40) + spacing(12) + info floor(96)
-        # + menu bar/chrome ≈ box_h + 240.
-        box_h = getattr(self.player, "VIDEO_BOX_HEIGHT", 260) if self.player else 0
-        min_h = (min(box_h, 180) + 240) if self.player else 320
-        self._base_min = QSize(700, min_h)
-        self.setMinimumSize(self._base_min)
-        # The notices' corner (mw_busy, ui/notices.py), a free child of the
-        # window itself, not the splitter: a QSplitter treats every child
-        # widget as a pane and overrides its geometry.
-        self._init_notices()
-
-        self.tick = QTimer(self)
-        self.tick.timeout.connect(self._refresh_progress)
-        self.tick.start(60_000)
-
-        # Keep the timeshift live-timeline marker current (no-op unless a
-        # timeshift channel is on screen).
-        self._ts_segment_start = None
-        self._ts_timeline_timer = QTimer(self)
-        self._ts_timeline_timer.timeout.connect(self._update_ts_timeline)
-        self._ts_timeline_timer.start(1000)
-
-        # Poll EPG reminders so one fires close to its programme's start.
-        self._reminder_timer = QTimer(self)
-        self._reminder_timer.timeout.connect(self._check_reminders)
-        self._reminder_timer.start(30_000)
-
-        # Periodically remember the playback position of movies/episodes so
-        # they can be resumed later even if the app is closed abruptly.
-        self._resume_timer = QTimer(self)
-        self._resume_timer.timeout.connect(self._save_resume_position)
-        self._resume_timer.start(12_000)
-        # High-water playback progress (percent) of the current title. Kept
-        # up to date by the resume timer because mpv stops reporting a
-        # position once the file has ended - without this, a title watched
-        # to the very end would read as 0% at auto-mark time.
-        self._playback_max_pct = 0.0
-        self._current_epg = None
-        self._player_fs = False
-        # macOS: mini-player "maximize" goes fullscreen through the mirror
-        # pop-out (a frameless window covers the screen instantly, no native
-        # fullscreen Space animation - the reason the pop-out felt smoother).
-        self._fs_via_popout = False
-        self._fs_exiting = False
-
-        # Escape and Delete are structural/context-sensitive, so they stay
-        # fixed; everything else is user-rebindable (see _install_shortcuts).
-        QShortcut(QKeySequence(Qt.Key.Key_Escape), self,
-                  activated=self._on_escape)
-        QShortcut(QKeySequence(Qt.Key.Key_Delete), self,
-                  activated=self._delete_pressed)
-        self._install_shortcuts()
+        self._build_columns(root, side, mid, det)
+        self._build_timers()
+        self._build_shortcuts()
         # The desktop's media controls and the keyboard's media keys.
         self._start_media_session()
         self._report_init()
