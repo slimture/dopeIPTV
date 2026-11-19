@@ -380,13 +380,23 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # address, and the checksum shown on hover.
   def dl_size: ((.sub // "") | tostring
       | (capture("(?<s>[0-9.]+[ \\t\\n\\x0B\\f\\r]?(?:KB|MB|GB|B))[ \\t\\n\\x0B\\f\\r]*$"; "i").s // ""));
+  # The decimal sign: a comma where thousands are grouped with a point or a
+  # space (formats.json), Persian its own.
+  def dl_dec:
+    ((($F.formats[$lang] // {}).group) // ",") as $g
+    | if $lang == "fa" then "٫" elif $g == "," then "." else "," end;
+  # A size in the reader's own way of writing a number: 157,3 MB in Swedish.
+  def dl_size_l:
+    dl_size as $s
+    | ((($F.formats[$lang] // {}).digits) // "0123456789") as $digits
+    | if $s == "" then "" else ($s | sub("\\."; dl_dec) | localdigits($digits)) end;
   def dl_href: ((.name // "" | tostring) as $name
       | (if $name != "" then "/dl.php?f=" + ($name | @uri) else (.url // "#") end));
   # Everything about a file that has no room on the page, for its tooltip.
   def dl_title:
     (._m as $m
      | dl_n(.name // "" | tostring) as $n
-     | [$m.title, $m.arch, dl_size,
+     | [$m.title, $m.arch, dl_size_l,
         (if $n > 0 then "↓ \(fmt_count($n)) \(t("dl_tip_row"))" else empty end),
         (if (.sha256 | truthy) then "SHA-256: \(.sha256)" else empty end)]
      | map(select(type == "string" and . != "")) | join(" · ")
@@ -400,12 +410,22 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "          <span class=\"go\">\(t("dl_open") | h)</span>\n"
     + "        </a>\n"
     + "      </div>\n";
-  # A card per system, side by side, each with one thing to press - on a
-  # Mac two, since a browser cannot tell Apple Silicon from Intel - and its
-  # other formats as a line of small links under it, in plain sight.
-  # app.js marks the visitor's own system; without it the three are equal.
-  def dl_alt:
-    "<a href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)>\(._m.short | h)\(if ._m.cpu != "" then " <span>\(._m.cpu | h)</span>" else "" end)</a>";
+  # A card per system, side by side, all built alike so their rows line up:
+  # its name, how it installs, the processor (Intel / AMD or ARM; a Mac's
+  # Apple Silicon or Intel - a browser cannot tell), one button for that
+  # file with its size, the format under it, and the system's other formats
+  # in a list that folds out. app.js marks the visitor's own system; without
+  # it the three are equal. Without :has() both files' buttons show.
+  def dl_chip:
+    if ._m.short == ".dmg" then ._m.cpu elif ._m.cpu == "ARM64" then "ARM" else "Intel / AMD" end;
+  def dl_row:
+    ._m as $m
+    # The line under it without the file's ending, which its name says
+    # (".zip — unzip & run"; a right-to-left language's mark before it,
+    # Chinese's "——" without spaces).
+    | ($m.fmt | sub("^\u200e?\\.[A-Za-z0-9]+[[:space:]]*—+[[:space:]]*"; "")) as $what
+    | (if $m.cpu == "" then "" else dl_chip end) as $cpu
+    | "<li><a href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)><b>\($m.title | h)</b><span>\([$what, ($cpu | h)] | map(select(. != "")) | join(" · "))</span><em>\(dl_size_l | h)</em></a></li>";
   def downloads($version; $reldate):
     ($R.assets // []) as $assets
     | ($assets | map(. + {_m: dl_meta(.name // "" | tostring)})) as $A
@@ -413,34 +433,40 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | [("Linux", "macOS", "Windows") as $os
        | ($A | map(select(._m.os == $os)) | sort_by(._m.rank)) as $g
        | select($g | length > 0)
-       | ($g | map(select(._m.short == ".dmg"))) as $dmg
-       | (if $os == "macOS" and ($dmg | length) > 0 then $dmg
-          else ($g | map(select(._m.rec)) | .[:1]) end) as $hero
-       | (if ($hero | length) == 0 then $g[:1] else $hero end) as $hero
-       | [$hero[] | .name] as $heronames
-       | {os: $os, id: $ids[$os], g: $g, hero: $hero,
-          rest: ($g | map(select(.name as $nm | $heronames | any(. == $nm) | not)))}] as $groups
+       | $g[0]._m.short as $main
+       | ($g | map(select(._m.short == $main)) | .[:2]) as $pick
+       | [$pick[] | .name] as $picknames
+       | {os: $os, id: $ids[$os], g: $g, pick: $pick,
+          rest: ($g | map(select(.name as $nm | $picknames | any(. == $nm) | not)))}] as $groups
     | (t("dl_go") | sub("[[:space:]]*[→←][[:space:]]*$"; "")) as $btn
     | if ($groups | length) == 0 then dl_github else
         "      <div class=\"dlx\" data-how-more=\"\(t("dl_how_more") | h)\" data-close=\"\(t("lb_close") | h)\">\n"
         + "        <div class=\"dlx-cards\">\n"
         + ([$groups[] | . as $grp
-            | (($grp.hero | length) > 1) as $many
-            | $grp.hero[0]._m as $m
             | "          <article class=\"dlx-card\" data-os=\"\($grp.id)\">\n"
               + "            <span class=\"badge dlx-yours\">\(t("dl_yours") | h)</span>\n"
-              + "            <span class=\"dlx-ico\" aria-hidden=\"true\">\($grp.g[0]._m.icon | h)</span>\n"
               + "            <h3>\($grp.os | h)</h3>\n"
-              + "            <p class=\"dlx-sub\">\($m.fmt)</p>\n"
+              + "            <p class=\"dlx-sub\">\(t("dl_s_\($grp.id)") | h)</p>\n"
+              + "            <div class=\"dlx-pick\" role=\"radiogroup\" aria-label=\"\(t("dl_pick") | h)\">"
+              + ([$grp.pick | to_entries[] | .key as $k | .value
+                  | "<input type=\"radio\" name=\"arch-\($grp.id)\" id=\"arch-\($grp.id)-\($k)\"\(if $k == 0 then " checked" else "" end)><label for=\"arch-\($grp.id)-\($k)\">\(dl_chip | h)</label>"] | add)
+              + "</div>\n"
               + "            <div class=\"dlx-btns\">\n"
-              + ([$grp.hero | to_entries[] | .key as $k | .value
-                  | "              <a class=\"dlx-big\(if $k > 0 then " alt" else "" end)\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)>\(dl_icon)<span>\(if $many then (._m.cpu | h) else ($btn | h) end)</span>\(if $many and (._m.req // "") != "" then "<small>\(._m.req | h)</small>" else "" end)</a>\n"] | add)
+              + ([$grp.pick | to_entries[] | .key as $k | .value
+                  | "              <a class=\"dlx-big\" data-k=\"\($k)\" href=\"\(dl_href | h)\" rel=\"nofollow\"\(dl_title)>\(dl_icon)<span>\($btn | h)</span><small>\(dl_size_l | h)</small></a>\n"] | add)
               + "            </div>\n"
-              + "            <p class=\"dlx-meta\">\(if $many then (t("dl_which_mac") | h) else ([$m.title, $m.arch, ($grp.hero[0] | dl_size)] | map(select(. != "")) | map(h) | join(" · ")) end)</p>\n"
+              + "            <div class=\"dlx-meta\">"
+              + ([$grp.pick | to_entries[] | .key as $k | .value._m as $m
+                  | "<p data-k=\"\($k)\">\((if $m.short == ".dmg" then [$m.short, ($m.req // "")] else [$m.short, $m.arch] end) | map(select(. != "")) | map(h) | join(" · "))</p>"] | add)
+              + "</div>\n"
+              + "            <div class=\"dlx-foot\">\n"
               + (if ($grp.rest | length) > 0 then
-                   "            <p class=\"dlx-alt\"><span>\(t("dl_other") | h)</span>\([$grp.rest[] | dl_alt] | join(""))</p>\n"
+                   "              <details class=\"dlx-more\"><summary>\(t("dl_other") | h) <span class=\"n\">\($grp.rest | length | fmt_count(.))</span></summary><ul>\([$grp.rest[] | dl_row] | join(""))</ul></details>\n"
+                 elif $grp.pick[0]._m.short == ".dmg" then
+                   "              <p class=\"dlx-hint\">\(t("dl_which_mac") | h)</p>\n"
                  else "" end)
-              + "            <a class=\"dlx-how\" href=\"/help/#start-\($grp.id)\" data-how=\"\($grp.id)\">\(t("dl_how") | h)</a>\n"
+              + "              <a class=\"dlx-how\" href=\"/help/#start-\($grp.id)\" data-how=\"\($grp.id)\">\(t("dl_how") | h)</a>\n"
+              + "            </div>\n"
               + "          </article>\n"] | add)
         + "        </div>\n"
         # The help page's install answers, for the dialog "How to install"

@@ -59,10 +59,17 @@ bug.
   menu's in `render.jq`, `nav`: features, download, send, help; the heart
   filled). The same thing has the same icon wherever it shows.
 - **One idea of a control**: the header's square buttons (44 x 40, a 12px
-  radius); panels that open from the header (the menu, the language picker)
-  16px round with rows of a finger's height and an icon in a tinted square,
-  no chevron (in a menu it says a submenu opens; every row goes straight to
-  its page); hover is the accent's light tint everywhere.
+  radius); panels that open over the page (the menu, the language picker, a
+  download card's other formats) 16px round with rows of a finger's height
+  and an icon in a tinted square, no chevron (in a menu it says a submenu
+  opens; every row goes straight to its page); hover is the accent's light
+  tint everywhere.
+- **The downloads**: a card per system, all built alike so their rows line
+  up - name, how it installs, the processor (chosen without script), one
+  button with the file's size in the reader's own numbers, its format, the
+  other formats in that panel, how to install. On a phone one card instead:
+  where to download, and "Send the link to your computer" first, the menu's
+  own words (`menu_send_link`); the downloads fold out per system behind it.
 - **The page you are on** is marked the same way everywhere: the accent, on
   its light wash.
 - **The same words for the same thing**: a link reuses the key the other

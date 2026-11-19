@@ -139,9 +139,11 @@
            (send the link to yourself; the downloads anyway) and folds the
            downloads away; without script the note is all that changes. -->
       <div class="dl-phone">
+        <span class="dl-phone-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2.5 19h19"/></svg></span>
+        <h3>{{h:dl_phone_h}}</h3>
         <p>{{h:dl_phone_p}}</p>
         <div class="dl-phone-act">
-          <button type="button" class="btn primary" id="dlShare" hidden data-copied="{{h:dl_phone_copied}}">{{h:dl_phone_share}}</button>
+          <button type="button" class="btn primary" id="dlShare" hidden data-copied="{{h:dl_phone_copied}}">{{h:menu_send_link}}</button>
           <button type="button" class="btn ghost" id="dlShow" hidden aria-expanded="false" aria-controls="download">{{h:dl_phone_show}}</button>
         </div>
       </div>

@@ -10,6 +10,27 @@
   var phone = /iPhone|iPad|iPod|Android|Mobile/i.test(ua) ||
               (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   if (phone) { phonePage(); return; }
+  // A card's other formats open as a panel over the page side by side
+  // (style.css .dlx-more): a click elsewhere or Escape closes it, as the
+  // header's menus close. One open at a time.
+  var wide = window.matchMedia && window.matchMedia("(min-width: 861px)");
+  var mores = document.querySelectorAll(".dlx-more");
+  var shut = function (except) {
+    [].forEach.call(mores, function (d) { if (d !== except && d.open) { d.open = false; } });
+  };
+  [].forEach.call(mores, function (d) {
+    d.addEventListener("toggle", function () { if (d.open && wide && wide.matches) { shut(d); } });
+  });
+  document.addEventListener("click", function (e) {
+    if (!wide || !wide.matches) { return; }
+    var inside = e.target.closest && e.target.closest(".dlx-more");
+    shut(inside);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || !wide || !wide.matches) { return; }
+    var open = document.querySelector(".dlx-more[open]");
+    if (open) { open.open = false; open.querySelector("summary").focus(); }
+  });
   if (/Mac/i.test(ua)) { os = "macOS"; }
   else if (/Windows/i.test(ua)) { os = "Windows"; }
   else if (/Linux|X11|CrOS/i.test(ua)) { os = "Linux"; }
@@ -58,6 +79,22 @@
         show.setAttribute("aria-expanded", open ? "true" : "false");
       });
     }
+    // Opened, each system is a row that folds out: on a phone the downloads
+    // are for a look, and three full cards were a long way down.
+    [].forEach.call(document.querySelectorAll(".dlx-card > h3"), function (h) {
+      var card = h.parentNode;
+      h.setAttribute("role", "button");
+      h.tabIndex = 0;
+      h.setAttribute("aria-expanded", "false");
+      var flip = function () {
+        var open = card.classList.toggle("is-open");
+        h.setAttribute("aria-expanded", open ? "true" : "false");
+      };
+      h.addEventListener("click", flip);
+      h.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); }
+      });
+    });
     if (!share) { return; }
     var url = window.location.origin + "/";
     var label = share.textContent;
