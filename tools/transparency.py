@@ -53,6 +53,7 @@ REPO = "https://github.com/slimture/dopeIPTV"
 _PROXY = "deploy/proxy-dopeiptv.org.conf"          # the TLS-front proxy, dopeiptv.org
 _OLD_PROXY = "deploy/proxy-iptv.dope.rs.conf"      # ...and the old name, sent on
 _CONTENT = "deploy/content-iptv.dope.rs.conf"      # the content server behind it
+_JAIL = "deploy/nginx-dopeiptv-jail.conf"          # ...and its jail's own nginx.conf
 _CSP = "deploy/csp.snippet.txt"                    # the CSP's row in the proxy's nginx.conf
 _MAIN = "server[server_name dopeiptv.org]"         # the proxy's server of the site itself
 CODE: dict[str, list[dict]] = {
@@ -153,16 +154,17 @@ CODE: dict[str, list[dict]] = {
                   {"repo": "site", "path": "donate/donate.py", "names": ["main"]}]},
         {"id": "nolog", "repo": "site", "path": _PROXY, "nginx": ["server > access_log off", "server > error_log"],
          "with": [{"repo": "site", "path": _OLD_PROXY, "nginx": ["server > access_log off", "server > error_log"]},
-                  {"repo": "site", "path": _CONTENT, "nginx": ["server > access_log off", "server > error_log"]}]},
+                  {"repo": "site", "path": _CONTENT, "nginx": ["server > access_log off", "server > error_log"]},
+                  {"repo": "site", "path": _JAIL, "nginx": ["error_log", "http > access_log off"]}]},
         {"id": "logs", "repo": "site", "path": _CONTENT,
          "nginx": ["map $arg_f", "map $http_referer", "map $request_method", "map $http_user_agent",
                    "map $request_uri", "map $iptv_log_uri_kept", "log_format", "map $cookie_iptv_nostats",
                    "server > location = /", "server > location = /help/", "server > location = /dl.php",
                    "server > location @iptv_dl", "server > location = /hit", "server > location @iptv_hit"]},
         {"id": "kept", "repo": "site", "path": "DEPLOY.md",
-         "from": r"^cat > /usr/local/etc/newsyslog\.conf\.d/iptv\.dope\.rs\.conf <<'LOGS'$", "to": r"^LOGS$",
-         "with": [{"repo": "site", "path": "DEPLOY.md", "from": r"^chmod 600 /var/log/iptv-sync\.log",
-                   "to": r"^chmod 600 /var/log/nginx/error\.log$"}]},
+         "from": r"^cat > \S*/usr/local/etc/newsyslog\.conf\.d/iptv\.dope\.rs\.conf <<'LOGS'$", "to": r"^LOGS$",
+         "with": [{"repo": "site", "path": "DEPLOY.md", "from": r"^jexec dopeiptv sh -c 'chmod 600 /var/log/iptv-sync",
+                   "to": r"^jexec dopeiptv sh -c 'chgrp iptv /var/log/nginx/"}]},
         {"id": "limits", "repo": "site", "path": _CONTENT,
          "nginx": ["limit_req_zone", "map $cookie_iptv_admin", "map $http_sec_fetch_mode|$http_accept",
                    "server > client_max_body_size", "server > client_body_buffer_size"],

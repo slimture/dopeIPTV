@@ -1294,11 +1294,11 @@ the proxy's address, the live allow-list and nginx.conf stay on the
 server.
 
 The page quotes this file in two places - the site's whole newsyslog file
-and the logs narrowed by hand, both under "Every log on the server" (the
-three lines it quoted before, in "10. Log rotation", "Statistics and the
-admin page" and "Hardening, November 2026", until that round) - found by
-their words: change those, and change `CODE` in `tools/transparency.py`
-with them. `python3 -m pytest donate/test_transparency.py` fails once a
+and the logs narrowed by hand, both in "This round's deploy" under "Every
+log, and port 8081 closed" (until that round the three lines in "10. Log
+rotation", "Statistics and the admin page" and "Hardening, November
+2026") - found by their words: change those, and change `CODE` in
+`tools/transparency.py` with them. `python3 -m pytest donate/test_transparency.py` fails once a
 block the page shows is gone from its file. After a change to a file the
 page shows, once it is on GitHub:
 
@@ -1322,24 +1322,83 @@ seventh "The servers behind dopeiptv.org" (`?lang=sv`: "Servrarna bakom
 dopeiptv.org"), and its *Copy the code and the question* gives the question
 with the proxy's `location /` first.
 
+## The dopeiptv jail
+
+Since 19 November 2026 the site's content server, its service and its
+cron jobs run in a Bastille thin jail of their own, `dopeiptv`, which
+holds nothing else: nginx, the Python service (`iptv_donate`, as `iptv`)
+and `/etc/crontab`'s jobs (`sync-releases.sh` and `stats_collect.py`, as
+`iptv`). `pontusweb`, where they ran beside unrelated PHP, MySQL and Redis
+sites, no longer serves the site and is cleaned up later; the sections
+above that say pontusweb are how it got here.
+
+- **What may reach it, and what it may reach.** The host's pf lets into
+  the jail only the TLS-front proxy's jail, on port 8081, and out of it
+  only DNS and https - which the service and the scripts use for Stripe,
+  GitHub, the browsers' push services and DB-IP's download (and `git
+  pull`). No ssh, no port 80, nothing else. The rules hold the server's
+  addresses and are not in the repository. nginx's own allow list
+  (`/usr/local/etc/nginx/iptv-only-from-proxy.conf`: `allow <the proxy>;
+  deny all;`, never in git) is a second lock behind the firewall.
+- **Its nginx.conf** is the jail's own, and small:
+  `deploy/nginx-dopeiptv-jail.conf`, at `/usr/local/etc/nginx/nginx.conf`
+  - no access log, an error log for what stops nginx alone (`crit`), no
+  version in an answer, and `conf.d/*.conf` - the content server's file -
+  for the rest. nginx's workers run as `www`, nginx's own default.
+- **Everything is run from the host**: `jexec`, `service -j`, `sysrc -j`
+  and `pkg -j`. The checkout is `/root/dopeiptv` inside the jail, and the
+  jail's root, from the host, `/usr/local/bastille/jails/dopeiptv/root`.
+- **The logs the service and the cron jobs write** are made before they
+  first run, `iptv`'s and 600: `daemon -o` and cron's `>>` run as `iptv`,
+  who cannot make a file in `/var/log`. `install` over a log that is there
+  would empty it, hence the `test -e`:
+
+```sh
+jexec dopeiptv sh -c 'test -e /var/log/iptv-donate.log || install -o iptv -g iptv -m 600 /dev/null /var/log/iptv-donate.log'
+jexec dopeiptv sh -c 'test -e /var/log/iptv-stats.log || install -o iptv -g iptv -m 600 /dev/null /var/log/iptv-stats.log'
+jexec dopeiptv sh -c 'test -e /var/log/iptv-sync.log || install -o iptv -g iptv -m 600 /dev/null /var/log/iptv-sync.log'
+```
+
+**The standard deploy** (host) - the code, the service, the pages
+rendered now as `iptv` rather than at the next quarter-hour:
+
+```sh
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+service -j dopeiptv iptv_donate restart
+jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
+```
+
+A change to the content server's nginx file (host) - a new zone key needs
+a new zone name, or the reload keeps the old configuration ("A reload that
+did nothing"):
+
+```sh
+cp /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+jexec dopeiptv nginx -t && service -j dopeiptv nginx reload
+```
+
+The jail's nginx.conf the same way, from `deploy/nginx-dopeiptv-jail.conf`
+to `/usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/nginx.conf`.
+
 ## Every log, and port 8081 closed
 
 What a second review of the site found, and what changed (each commit
 says it in full). Nothing changes for a visitor, for the app - 1.6.7, 1.6.8
 and newer sync, send feedback, watch together, update and tip as before -
-or for the admin page.
+or for the admin page. Written for the dopeiptv jail (above).
 
 - **Port 8081 closed to all but the proxy.** The content server's file
   includes `iptv-only-from-proxy.conf` by its plain name now: without the
   file `nginx -t` fails and nginx does not start. Before, a pattern
   (`.con[f]`) matched nothing while the file was missing, and the port
   answered whoever reached it - and believed the X-Real-IP they said. The
-  file lets in the proxy alone: nothing in pontusweb itself asks for 8081
+  file lets in the proxy alone: nothing in the jail itself asks for 8081
   (`sync-releases.sh` fetches only from GitHub; the service and
   `stats_collect.py` only from Stripe, the push services, GitHub and
   DB-IP), so it has no `allow 127.0.0.1;`. A location that only answers
   with a redirect or a "not found" answers before nginx asks the list, and
-  gives nothing but that.
+  gives nothing but that. The file is in the dopeiptv jail already, so for
+  the running site nothing changes; the difference is the day it is gone.
 - **The service's socket is nginx's and the service's alone.** It was 0666
   in a folder anyone could pass through: any program in the jail could
   connect, and say any X-Real-IP or X-Admin-User header (the admin pages
@@ -1353,9 +1412,8 @@ or for the admin page.
   the group. Where the group does not exist (another system, a typo), the
   socket is 0666 as before - nginx still reaches it whoever it runs as -
   in a folder of the service's own that others can only pass through
-  (0711), and the start line says so. Note what is left: Nextcloud's
-  php-fpm runs as `www` in this jail too, so it can reach the socket as
-  nginx can; no other user can.
+  (0711), and the start line says so. In the dopeiptv jail only nginx
+  (`www`) and the service (`iptv`) run, so the socket is theirs alone.
 - **The logs keep less of the address asked for.** A page view (`/`,
   `/help/`) keeps its path, never its query - `?fbclid=`, `?utm_...`,
   whatever a link carried; a `?lang=` the line's `l` says already, and
@@ -1373,63 +1431,59 @@ or for the admin page.
   who may read it - not "two days" where a log keeps more. The site's
   newsyslog file is written whole (below): `iptv-sync.log` 600 (it was
   644), `iptv-stats.log` turned over at all (it never was) and 600. nginx's
-  error log in each jail is narrowed to 600 (nginx makes it 644). The two
-  access logs stay 640 `root:iptv`: nginx makes a log its workers' user's
+  error log in both jails is narrowed to 600 (nginx makes it 644). The two
+  access logs are 640 `root:iptv`: nginx makes a log its workers' user's
   (`www`) when it reopens it, and `stats_collect.py` and `sync-releases.sh`
-  read them as `iptv` - through the group; 600 would lock them out. So
-  `www` - Nextcloud's php-fpm with nginx - can read them, as it always
-  could; the transparency page says so.
+  read them as `iptv` - through the group; 600 would lock them out. In the
+  dopeiptv jail `www` is nginx alone.
 
 ### Every log on the server
 
 | Log | Jail | What it holds | Kept | Mode |
 |---|---|---|---|---|
-| `/var/log/nginx/iptv.dope.rs-stats.log` | pontusweb | Page views (`/`, `/help/`) and `/hit`: the visitor's address, time, method, the page's path - for `/hit` its twelve fields -, status, the page that linked without its query, the browser's name (1024 characters), the page's language | turned over at midnight, the day before kept: two days at the most (`1 * @T00`) | 640 `www:iptv` (newsyslog makes it `root:iptv`, nginx's reopen gives it to its workers' user) |
-| `/var/log/nginx/iptv.dope.rs-downloads.log` | pontusweb | `/dl.php`: the proxy's address, time, method, the file's name, protocol, status, size, the page that linked without its query, the browser's name, the visitor's address | the same | the same |
-| `/var/log/nginx/error.log` | pontusweb | nginx's, shared with Nextcloud; the site's server writes `crit` only: what stops nginx - a file it cannot open, the service's socket gone or refused. Such a line names the request (its line - a sync slot, say) and the proxy's address, not the visitor's | not turned over by any line of this site: until removed by hand | 600 from this round (nginx makes it 644) |
+| `/var/log/nginx/iptv.dope.rs-stats.log` | dopeiptv | Page views (`/`, `/help/`) and `/hit`: the visitor's address, time, method, the page's path - for `/hit` its twelve fields -, status, the page that linked without its query, the browser's name (1024 characters), the page's language | turned over at midnight, the day before kept: two days at the most (`1 * @T00`) | 640 `www:iptv` (newsyslog makes it `root:iptv`, nginx's reopen gives it to its workers' user) |
+| `/var/log/nginx/iptv.dope.rs-downloads.log` | dopeiptv | `/dl.php`: the proxy's address, time, method, the file's name, protocol, status, size, the page that linked without its query, the browser's name, the visitor's address | the same | the same |
+| `/var/log/nginx/error.log` | dopeiptv | the jail's nginx, the site's alone; `crit` only, in its nginx.conf and in the server: what stops nginx - a file it cannot open, the service's socket gone or refused. Such a line names the request (its line - a sync slot, say) and the proxy's address, not the visitor's | not turned over by any line of the site's: until removed by hand | 600 from this round (nginx makes it 644) |
 | `/var/log/nginx/error.log` | webproxy | the proxy's, shared with the other sites behind it; the site's servers write `crit` only - a TLS handshake nginx cannot make sense of, a worker out of files. There the address on a line is the visitor's | the same | 600 from this round |
-| `/var/log/iptv-donate.log` | pontusweb | the service's (daemon `-o`): its start line and set-up, files it narrowed, a fault by its kind and file:line (never its words), Stripe's refusals in Stripe's fixed codes (a tip that could not even start: Stripe's sentence about the site's own settings), a push that failed and the push service's host, an admin sign-in refused and why (an admin's name, never what was typed or from where), once a day how many sync copies, rooms, reports and modified builds' requests came and went, sync's space; the statistics' own lines when the admin page brings them up to date. Never an address, a request or its path, nor anything a visitor sent | five old copies of up to 1 MB (`5 1024 *`): until 5 MB more are written - at its pace months, perhaps years | 600 `iptv` |
-| `/var/log/iptv-stats.log` | pontusweb | `stats_collect.py`'s from cron: the country database fetched (its address) or why not, how many log lines could not be read (a count, never a line), a day that held as many visits as a day may, a `STATS_IGNORE` name not found (yours), Python's error should a run break. Nothing of a visit | five old copies of up to 1 MB from this round (before: never turned over) - years at its pace | 600 `iptv` from this round (it was 640) |
-| `/var/log/iptv-sync.log` | pontusweb | `sync-releases.sh`'s - the release mirroring and page rendering, nothing to do with settings sync: GitHub's release, each file fetched or already current, how many downloads counted (a number), the pages rendered, nightly.json | five old copies of up to 1 MB: a few lines every five minutes, so months | 600 `iptv` from this round (it was 644) |
+| `/var/log/iptv-donate.log` | dopeiptv | the service's (daemon `-o`): its start line and set-up, files it narrowed, a fault by its kind and file:line (never its words), Stripe's refusals in Stripe's fixed codes (a tip that could not even start: Stripe's sentence about the site's own settings), a push that failed and the push service's host, an admin sign-in refused and why (an admin's name, never what was typed or from where), once a day how many sync copies, rooms, reports and modified builds' requests came and went, sync's space; the statistics' own lines when the admin page brings them up to date. Never an address, a request or its path, nor anything a visitor sent | five old copies of up to 1 MB (`5 1024 *`): until 5 MB more are written - at its pace months, perhaps years | 600 `iptv` |
+| `/var/log/iptv-stats.log` | dopeiptv | `stats_collect.py`'s from cron: the country database fetched (its address) or why not, how many log lines could not be read (a count, never a line), a day that held as many visits as a day may, a `STATS_IGNORE` name not found (yours), Python's error should a run break. Nothing of a visit | five old copies of up to 1 MB from this round (before: never turned over) - years at its pace | 600 `iptv` |
+| `/var/log/iptv-sync.log` | dopeiptv | `sync-releases.sh`'s - the release mirroring and page rendering, nothing to do with settings sync: GitHub's release, each file fetched or already current, how many downloads counted (a number), the pages rendered, nightly.json | five old copies of up to 1 MB: a few lines every five minutes, so months | 600 `iptv` (it was 644) |
 
 Beside them only FreeBSD's own (cron, messages, auth.log...), which hold
 nothing of a request. Nothing else writes a log: the content server's
-other requests none (`access_log off`), the proxy's servers for the site
-none, the service none of a request (`log_message` says nothing).
+other requests none (`access_log off`, in the server and in the jail's
+nginx.conf), the proxy's servers for the site none, the service none of a
+request (`log_message` says nothing).
 
-**pontusweb (jail)** - `bastille console pontusweb`, then `sh`. First the
-allow list, before the content server's new file, which nginx no longer
-loads without it. `PROXY_ADDRESS` in the first line is the proxy's address
-as pontusweb sees it - `jls -j webproxy ip4.addr` on the host, or
-`ifconfig` in webproxy for a VNET jail: put it in before running the line
-(left as it is, `nginx -t` below refuses it with `invalid parameter`).
-Nothing of it goes to git.
+### This round's deploy (host)
+
+The allow list - it should be there; two lines, `allow` with the proxy's
+address and `deny all;`:
 
 ```sh
-printf 'allow %s;\ndeny all;\n' PROXY_ADDRESS > /usr/local/etc/nginx/iptv-only-from-proxy.conf
-cat /usr/local/etc/nginx/iptv-only-from-proxy.conf
+jexec dopeiptv cat /usr/local/etc/nginx/iptv-only-from-proxy.conf
 ```
 
-The files and the tests:
+Were it missing, it is made before anything else, or nginx stops at the
+new file below. `PROXY_ADDRESS` is the proxy's address as the jail sees
+it: put it in before running the line (left as it is, `nginx -t` refuses
+it with `invalid parameter`). Nothing of it goes to git:
 
 ```sh
-cd ~/dopeiptv
-git checkout website
-git pull origin website
-python3 -m pytest -q -p no:cacheprovider donate/
+printf 'allow %s;\ndeny all;\n' PROXY_ADDRESS > /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/iptv-only-from-proxy.conf
 ```
 
-The service, with its new rc file - its socket's folder is made again at
-the start:
+The files, and the service with its new rc file - its socket's folder is
+made again at the start:
 
 ```sh
-cp -R donate /usr/local/www/iptv/
-install -m 555 deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
-service iptv_donate restart
-ls -ld /var/run/iptv_donate
-ls -l /var/run/iptv_donate/
-tail -n 1 /var/log/iptv-donate.log
-python3 -I /usr/local/www/iptv/donate/donate.py --check
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+jexec dopeiptv install -m 555 /root/dopeiptv/deploy/iptv_donate /usr/local/etc/rc.d/iptv_donate
+service -j dopeiptv iptv_donate restart
+jexec dopeiptv ls -ld /var/run/iptv_donate
+jexec dopeiptv ls -l /var/run/iptv_donate/
+jexec dopeiptv tail -n 1 /var/log/iptv-donate.log
+jexec dopeiptv python3 -I /usr/local/www/iptv/donate/donate.py --check
 ```
 
 `drwxr-x---  2 iptv  www` for the folder; in it `srw-rw----  1 iptv  www
@@ -1438,83 +1492,79 @@ log's last line `[donate] listening on
 unix:/var/run/iptv_donate/donate.sock (0660, group www), Stripe set up,
 ...`; `--check` (as root) answers `200 {"stripe": true, ...}`. A line with
 `0666: no group 'www' here` means the group is named otherwise in this
-jail: `pw groupshow www`, and `SOCKET_GROUP=` in
-`/usr/local/etc/iptv-donate.conf` with `sysrc
-iptv_donate_socket_group=` set to the group nginx's workers run as.
+jail: `jexec dopeiptv pw groupshow www`, then `SOCKET_GROUP=` in the
+jail's `/usr/local/etc/iptv-donate.conf` and `sysrc -j dopeiptv
+iptv_donate_socket_group=`, both the group nginx's workers run as.
 
-The content server's file - no zone's key changed, so a reload takes it:
+The content server's file - no zone's key changed, so a reload takes it -
+and a look at the jail's nginx.conf against the repo's copy (the same
+directives; the layout may differ):
 
 ```sh
-diff /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf deploy/content-iptv.dope.rs.conf
-cp /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.before-logs
-cp deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
-nginx -t && service nginx reload
-ps -axo pid,lstart,command | grep "[n]ginx: worker"
-grep -n emerg /var/log/nginx/error.log | tail -3
-curl -sI https://dopeiptv.org/ | head -1
+diff /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/content-iptv.dope.rs.conf
+cp /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.before-logs
+cp /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+jexec dopeiptv nginx -t && service -j dopeiptv nginx reload
+jexec dopeiptv ps -axo pid,lstart,command | grep "[n]ginx: worker"
+jexec dopeiptv grep -n emerg /var/log/nginx/error.log | tail -3
+jexec dopeiptv sh -c 'nginx -T 2>/dev/null | grep -E "^(allow|deny) "'
+diff /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/nginx.conf /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/nginx-dopeiptv-jail.conf
 ```
 
-`HTTP/2 200`. A 403 means the proxy comes from another address than the
-file says: load a page, then `netstat -an -p tcp | grep '\.8081 '` in
-pontusweb names it (the foreign address), put that one in with the
-`printf` line and `service nginx reload`. To go back meanwhile: `rm
-/usr/local/etc/nginx/iptv-only-from-proxy.conf`, `cp
+Workers started just now, no `emerg`, and the allow list's two lines as
+nginx has loaded them. If `nginx -t` complains, `cp
 /root/iptv.dope.rs.conf.before-logs
-/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf`, `service nginx reload`.
+/usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf`
+puts the old file back - nginx was never reloaded with the new one.
 
 The pages - the transparency page and the privacy policy say all of it:
 
 ```sh
-cp -R site /usr/local/www/iptv/
-cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
+jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
 ```
 
 The site's newsyslog file, whole (`iptv-stats.log` new, `iptv-sync.log`
 600; the downloads' and statistics' logs turned over at midnight with the
 day before kept uncompressed, `P`, for the readers to finish; 30 is
-SIGUSR1, nginx's reopen; the service's line sends daemon(8) its SIGHUP):
+SIGUSR1, nginx's reopen; the service's line sends daemon(8) its SIGHUP,
+which its `-H` takes) - the `cp` says there is no such file if the jail
+had none yet, and then there is nothing to keep:
 
 ```sh
-cp /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf /root/newsyslog-iptv.dope.rs.conf.before-logs
-cat > /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'LOGS'
+mkdir -p /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/newsyslog.conf.d
+cp /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf /root/newsyslog-iptv.dope.rs.conf.before-logs
+cat > /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'LOGS'
 /var/log/nginx/iptv.dope.rs-downloads.log    root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
 /var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
 /var/log/iptv-sync.log                       iptv:iptv      600  5     1024 *    JN
 /var/log/iptv-stats.log                      iptv:iptv      600  5     1024 *    JN
 /var/log/iptv-donate.log                     iptv:iptv      600  5     1024 *    J     /var/run/iptv_donate/iptv_donate.pid
 LOGS
-diff /root/newsyslog-iptv.dope.rs.conf.before-logs /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
-newsyslog -nv 2>&1 | grep iptv
+jexec dopeiptv sh -c 'newsyslog -nv 2>&1 | grep iptv'
 ```
 
-`diff` shows the old header line gone, `iptv-sync.log`'s 644 as 600 and
-`iptv-stats.log`'s line new (and the service's, if the last round's line
-was not added yet - it may be: the rc file with `-H` is in place since
-then). `newsyslog -nv` lists the five, rotating none. newsyslog sets the
-mode of a log it makes anew; the ones there now are narrowed by hand:
+`newsyslog -nv` lists the five, rotating none (the jail's own cron runs
+newsyslog every hour). newsyslog sets the mode of a log it makes anew; the
+ones there now are narrowed by hand - the service's and the scripts' to
+`iptv` alone, nginx's error log to nginx, its two access logs to nginx and
+the `iptv` group:
 
 ```sh
-chmod 600 /var/log/iptv-sync.log* /var/log/iptv-stats.log* /var/log/iptv-donate.log*
-chmod 600 /var/log/nginx/error.log
-ls -l /var/log/iptv-* /var/log/nginx/
+jexec dopeiptv sh -c 'chmod 600 /var/log/iptv-sync.log* /var/log/iptv-stats.log* /var/log/iptv-donate.log* /var/log/nginx/error.log'
+jexec dopeiptv sh -c 'chgrp iptv /var/log/nginx/iptv.dope.rs-*.log && chmod 640 /var/log/nginx/iptv.dope.rs-*.log'
+jexec dopeiptv sh -c 'ls -l /var/log/iptv-* /var/log/nginx/'
 ```
 
-**webproxy (jail)** - `bastille console webproxy`, then `sh`. Only the
-error log's mode; neither of the proxy's files changes:
+The webproxy jail - only its error log's mode; neither of the proxy's
+files changes:
 
 ```sh
-ls -l /var/log/nginx/error.log
-chmod 600 /var/log/nginx/error.log
-ls -l /var/log/nginx/error.log
+jexec webproxy ls -l /var/log/nginx/error.log
+jexec webproxy chmod 600 /var/log/nginx/error.log
+jexec webproxy ls -l /var/log/nginx/error.log
 ```
 
-**Check.** From the host and from a jail other than webproxy:
-
-```sh
-fetch -T 5 -o /dev/null http://10.0.1.2:8081/
-```
-
-says `Forbidden`; from anywhere, the site, Sync now, Send feedback and a
+**Check.** From anywhere, the site, Sync now, Send feedback and a
 watch-together room in the app, and the admin page work as before. Then
 the logs: open `https://dopeiptv.org/?utm_source=check&fbclid=x` in a
 private window (no admin cookie there), and from anywhere
@@ -1523,11 +1573,11 @@ private window (no admin cookie there), and from anywhere
 curl -sI 'https://dopeiptv.org/dl.php?f=SHA256SUMS&utm_source=check' | head -1
 ```
 
-and in pontusweb:
+and on the host:
 
 ```sh
-tail -n 4 /var/log/nginx/iptv.dope.rs-stats.log
-tail -n 1 /var/log/nginx/iptv.dope.rs-downloads.log
+jexec dopeiptv tail -n 4 /var/log/nginx/iptv.dope.rs-stats.log
+jexec dopeiptv tail -n 1 /var/log/nginx/iptv.dope.rs-downloads.log
 ```
 
 Among the last lines, the page's says `"u":"/"` and its `/hit`'s

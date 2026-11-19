@@ -439,11 +439,36 @@ def test_the_port_is_kept_to_the_proxy_and_nginx_will_not_start_without_the_list
     assert not os.path.exists(os.path.join(ROOT, "deploy", "iptv-only-from-proxy.conf"))
     deploy = open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8").read()
     assert not re.search(r"allow\s+(?!127\.)\d{1,3}(?:\.\d{1,3}){3}", deploy)
-    # The deploy makes it before it copies the file that needs it.
+    # The deploy (from the host, into the dopeiptv jail) looks at it, or
+    # makes it, before it copies the file that needs it.
+    jail = "/usr/local/bastille/jails/dopeiptv/root"
     section = deploy[deploy.index("## Every log, and port 8081 closed"):]
-    line = next(ln for ln in section.splitlines() if ln.endswith("> /usr/local/etc/nginx/iptv-only-from-proxy.conf"))
+    looked = section.index("jexec dopeiptv cat /usr/local/etc/nginx/iptv-only-from-proxy.conf")
+    line = next(ln for ln in section.splitlines()
+                if ln.endswith(f"> {jail}/usr/local/etc/nginx/iptv-only-from-proxy.conf"))
     assert line.startswith("printf 'allow %s;\\ndeny all;\\n' PROXY_ADDRESS >"), line
-    assert section.index(line) < section.index("cp deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/")
+    copied = section.index(f"cp {jail}/root/dopeiptv/deploy/content-iptv.dope.rs.conf "
+                           f"{jail}/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf")
+    assert looked < section.index(line) < copied
+    assert "jexec dopeiptv nginx -t && service -j dopeiptv nginx reload" in section[copied:]
+
+
+def test_the_jails_own_nginx_conf_writes_nothing_but_what_stops_nginx():
+    # The dopeiptv jail's nginx.conf (DEPLOY.md, "The dopeiptv jail"): no
+    # access log, crit, no version, the content server's file from conf.d -
+    # and nginx's own default user, www, the socket's group.
+    jail = conf(os.path.join(ROOT, "deploy", "nginx-dopeiptv-jail.conf"))
+    assert jail.values("error_log") == ["/var/log/nginx/error.log crit"]
+    assert not jail.all("user") and not jail.all("server")
+    http = jail.one("http")
+    assert http.values("access_log") == ["off"] and http.values("server_tokens") == ["off"]
+    assert http.values("include")[-1] == "/usr/local/etc/nginx/conf.d/*.conf"
+    assert not http.all("server") and not http.all("error_log")
+    assert _server(conf()).values("error_log") == jail.values("error_log")
+    deploy = open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8").read()
+    assert "`deploy/nginx-dopeiptv-jail.conf`, at `/usr/local/etc/nginx/nginx.conf`" in deploy
+    src = open(os.path.join(HERE, "donate.py"), encoding="utf-8").read()
+    assert 'CONF.get("SOCKET_GROUP", "www")' in src
 
 
 _ROTATION = re.compile(r"(/var/log/[\w./-]+)\s+(\w+:\w+)\s+(\d{3})\s+(\d+)\s+(\d+|\*)\s+(@T\d\d|\*)\s+([A-Z]+)")

@@ -208,25 +208,25 @@ new install:
 Written down because it has cost time twice, and neither time was the
 setup's fault - it was not knowing the setup.
 
-**The site lives inside a Bastille jail called `pontusweb`, not on the
-host.** Every path below is the jail's own view of the filesystem:
+**The site lives inside a Bastille thin jail of its own called `dopeiptv`,
+not on the host** (since 19 November 2026; before, in `pontusweb` beside
+other sites). It holds nginx, the service and the cron jobs, nothing else;
+the host's firewall lets in only the TLS-front proxy, on 8081, and out only
+DNS and https. Every path below is the jail's own view of the filesystem:
 
 | | |
 |---|---|
 | host | `slimfree` |
-| jail | `pontusweb` |
-| jail root, from the host | `/usr/local/bastille/jails/pontusweb/root` (ZFS `iris-data/...`) |
+| jail | `dopeiptv` |
+| jail root, from the host | `/usr/local/bastille/jails/dopeiptv/root` |
 | site, inside the jail | `/usr/local/www/iptv/` |
-| checkout, inside the jail | `~/dopeiptv` — lower case; the host's is `~/dopeIPTV` |
+| checkout, inside the jail | `/root/dopeiptv` - lower case; the host's is `~/dopeIPTV` |
+| nginx.conf, inside the jail | `/usr/local/etc/nginx/nginx.conf` - the jail's own, `deploy/nginx-dopeiptv-jail.conf` |
 
-So `/usr/local/www/iptv/` typed on the HOST is not the live site. Get into
-the jail first, and note that `bastille console` opens an interactive
-shell - anything pasted after it on the same line is swallowed by the
-host's shell and never runs:
-
-```sh
-bastille console pontusweb     # opens a shell; type the rest INSIDE it
-```
+So `/usr/local/www/iptv/` typed on the HOST is not the live site.
+Everything is run from the host with `jexec dopeiptv ...`, `service -j
+dopeiptv ...`, `sysrc -j dopeiptv ...` and `pkg -j dopeiptv ...` (the jail
+has no ssh); DEPLOY.md, "The dopeiptv jail".
 
 **The sync's cron line is in `/etc/crontab`, with a user field**, not in
 anybody's personal crontab:
@@ -241,19 +241,16 @@ looks exactly like "there is no cron job" and is not. The sync runs as
 
 ## Updating the site
 
-Copy the code, never the live data, and render at once. Inside the jail:
+Copy the code, never the live data, and render at once - from the host:
 
 ```sh
-bastille console pontusweb
-cd ~/dopeiptv
-git checkout website          # the site is NOT on main or testing
-git pull origin website
-cp -R public/. /usr/local/www/iptv/public/
-cp -R site donate sync-releases.sh /usr/local/www/iptv/
-cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+service -j dopeiptv iptv_donate restart
+jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
 ```
 
-When `donate/` changed, `service iptv_donate restart` as well.
+The checkout is on `website` - the site is NOT on main or testing. The
+restart is needed only when `donate/` changed, and harmless otherwise.
 
 The last line puts a change on the pages now rather than at the next
 quarter-hour; its last words say how many pages changed
@@ -268,16 +265,9 @@ go out, in the same moment, so the order of the copies above does not matter.
 on FreeBSD puts the directory inside the target instead, giving you
 `public/public/`.
 
-Or from the host, without entering the jail - same commands, one prefix:
-
-```sh
-J=$(jls -j pontusweb path)
-cp -R public/. "$J/usr/local/www/iptv/public/"
-```
-
-(Prefer doing it inside the jail. `chown iptv:iptv` from the host resolves
-`iptv` out of the HOST's passwd, which does not have it; inside the jail it
-cannot be wrong.)
+(`chown iptv:iptv` typed on the host resolves `iptv` out of the HOST's
+passwd, which does not have it: `jexec dopeiptv chown ...`, inside the
+jail, cannot be wrong.)
 
 These are live data that the repo does not carry, and a deploy must leave
 them alone:
@@ -297,7 +287,7 @@ mirror with "Permission denied". Plain `cp -R` overwrites file contents and
 leaves existing directories' ownership alone. If it has already happened:
 
 ```sh
-chown -R iptv:iptv /usr/local/www/iptv
+jexec dopeiptv chown -R iptv:iptv /usr/local/www/iptv
 ```
 
 `--delete` (rsync) is likewise never right here: the live data is absent from
