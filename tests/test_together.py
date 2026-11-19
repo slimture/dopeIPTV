@@ -640,9 +640,16 @@ def _pair():
 
 
 def _close(*wins) -> None:
+    links = [w._together_link for w in wins]
     for w in wins:
         w.together_leave(quiet=True)
         w.pool.waitForDone(3000)
+    # The links' threads end before the windows go: one still telling a
+    # window that was gone of its news crashed the suite under load.
+    for link in links:
+        for t in getattr(link, "_threads", ()):
+            t.join(10)
+            assert not t.is_alive(), "a together link's thread did not end"
 
 
 def test_two_windows_watch_a_film_together():
