@@ -110,6 +110,15 @@ class _CommandsMixin:
         self._start_playback(url, title, None, url, "live", record=False,
                              own_buffer=False)
 
+    def _from_outside(self, url: str) -> bool:
+        """Whether an address opened by hand (_play_address and its
+        reconnect) is from outside the source in use: not on its server
+        (core/nerd.same_server), so none of its Nerd settings go with it."""
+        from ..core import nerd
+        active = getattr(self, "_active_source", None)
+        pl = active() if callable(active) else None
+        return not nerd.same_server(url, str((pl or {}).get("server") or ""))
+
     def _play_channel_named(self, name: str) -> None:
         client = self.client
 

@@ -158,7 +158,7 @@ class _CastMixin:
         if (self._vpn_guard_blocks(source) or not self._cast_pin_ok(url, source, source_id=src)
                 or not self._conn_ok_cast(source, source_id=src)):
             return
-        self._cast_route_from(src)
+        self._cast_route_from(src, outside=bool(it.get("_outside")))
         # Remember what is being cast, not just where to. Pausing a live
         # channel is answered from the provider's archive, and that needs the
         # channel's own id long after this dialog is gone.
@@ -495,12 +495,13 @@ class _CastMixin:
         active = getattr(store, "active", None)
         return active() if callable(active) else None
 
-    def _cast_route_from(self, source_id: str = "") -> None:
+    def _cast_route_from(self, source_id: str = "", outside: bool = False) -> None:
         """A cast starts from *source_id* (the one in use when ""): Kodi and
         an Apple TV take that source's user agent, headers and proxy (core/
-        nerd.py), not the one in use's."""
+        nerd.py), not the one in use's - and no source's for an address
+        from *outside* its lists (mw_commands._from_outside)."""
         from ..core import nerd
-        nerd.set_cast_source(self._cast_playlist(source_id))
+        nerd.set_cast_source(self._cast_playlist(source_id), outside=outside)
 
     def _cast_pin_ok(self, *urls: str, source_id: str = "") -> bool:
         """Nerd: the source trusts one certificate for its server. A TV,
@@ -590,6 +591,11 @@ class _CastMixin:
             # wrong half of the feature.
             it = {"name": getattr(self, "_detail_name", "") or "dopeIPTV",
                   "_url": p.current_url, "_cast_url": p.current_url}
+            # An address opened by hand, from outside the source: on the TV
+            # with none of its Nerd settings either, as in the player.
+            last = getattr(self, "_last_playback", None) or {}
+            if not last.get("own_buffer", True) and last.get("url") == p.current_url:
+                it["_outside"] = self._from_outside(p.current_url)
         self._open_cast_dialog(it, src or None)
 
     def can_cast_playing(self) -> bool:

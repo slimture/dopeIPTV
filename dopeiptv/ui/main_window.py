@@ -5552,10 +5552,15 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             if before is not None:
                 before()
             self._arm_loading(icon_url, reconnect)
+            # own_buffer False is an address opened by hand (a dopeiptv://
+            # link, --play, the remote API, Open address…): the source's
+            # Nerd headers only on the source's own server.
+            outside = not own_buffer and self._from_outside(url)
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,
-                                web=kind == "web", own_buffer=own_buffer):
+                                web=kind == "web", own_buffer=own_buffer,
+                                outside=outside):
                 self.wake.acquire(tr("wake_playing", title=title))
                 self._health_begin(key, title, item, kind, catchup)
                 self._events_started(key, title, item, kind, catchup)

@@ -20,6 +20,7 @@ import socket
 import sys
 import weakref
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 from . import hls_cap as _hls
 from .log import log
@@ -501,12 +502,27 @@ def source() -> dict | None:
     return _source
 
 
-def set_cast_source(playlist: dict | None) -> None:
+def set_cast_source(playlist: dict | None, outside: bool = False) -> None:
     """The source a cast starting now is from (what plays from another
     source than the one in use - started before a switch, by failover or
-    from the Search page - keeps its own); None: the source playing."""
+    from the Search page - keeps its own); None: the source playing.
+    *outside*: an address from outside (``same_server``), no source's."""
     global _cast_source
-    _cast_source = _options_of(playlist)
+    _cast_source = {} if outside else _options_of(playlist)
+
+
+def same_server(url: str, server: str) -> bool:
+    """Whether *url* is on the host of a source's *server* (the address it
+    was added with). An address from outside the source's lists - a
+    dopeiptv:// link, --play, the remote API, Open address… - gets that
+    source's user agent, headers, referer, proxy and route only then: they
+    often hold the provider's token, which another host must never see."""
+    try:
+        a = (urlsplit(str(url or "")).hostname or "").lower().rstrip(".")
+        b = (urlsplit(str(server or "")).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return bool(a) and a == b
 
 
 def cast_source() -> dict | None:

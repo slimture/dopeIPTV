@@ -3111,15 +3111,18 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
     def play(self, url: str, title: str, start: float = 0.0,
              *, local_buffer: bool = False,
              buffer_key: str | None = None, web: bool = False,
-             own_buffer: bool = True) -> bool:
+             own_buffer: bool = True, outside: bool = False) -> bool:
         # local_buffer: a live channel, which gets the rewind buffer unless
         # Settings turned it off. own_buffer False: never dopeIPTV's own
         # (an address opened by hand, which need not be a stream at all) -
-        # mpv opens it, with mpv's own rewind.
+        # mpv opens it, with mpv's own rewind. outside: an address from
+        # outside the source's lists, not on its server - none of its Nerd
+        # headers, user agent, proxy or route (core/nerd.same_server).
         # What a fallback of the video surface plays again (_video_fallback).
         self._play_args = (url, title, start, {"local_buffer": local_buffer,
                                                "buffer_key": buffer_key, "web": web,
-                                               "own_buffer": own_buffer})
+                                               "own_buffer": own_buffer,
+                                               "outside": outside})
         live = local_buffer
         # Nerd: the channel this is (set_channel, one-shot) and the settings
         # of its own it plays with - none for anything else.
@@ -3245,9 +3248,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             # while Nerd is off and never was; the defaults back once it was).
             try:
                 from ..core import live_latency, nerd
-                # A web page is no source's: not its proxy or headers.
+                # A web page is no source's: not its proxy or headers; nor
+                # an address from outside its lists.
                 self._nerd_applied = nerd.apply_stream(
-                    m, None if web else nerd.source(),
+                    m, None if web or outside else nerd.source(),
                     getattr(self, "_nerd_applied", False),
                     url=url, opened=source or url)
                 # Nerd: low latency for a live channel the player takes
