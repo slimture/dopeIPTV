@@ -32,10 +32,10 @@ servers at home, a full **EPG**, rewinding live TV, and an
 - **Your provider, and the boxes and servers at home** — Xtream Codes logins, M3U playlists and Stalker / Ministra portals (portal address + MAC; *experimental*); Enigma2 receivers (VU+, Dreambox, Zgemma, ...), Tvheadend, HDHomeRun, SAT>IP servers (a Fritz!Box Cable, Octopus NET, minisatip, ...), VDR, DVBViewer, NextPVR and MythTV with their channels, guide and recordings; and Jellyfin, Emby and Plex with your own films and series, their resume points and watched marks. **Find on my network** looks for them, and each source has a page of its own in Settings
 - **TV, Movies & Series** — every series with a page of its own (seasons in a row, episodes as cards with their progress, one button that plays on), favorites, history, resume where you stopped, and **one search across all your sources** (channels, the guides, movies and series) — and `Ctrl`+`K` (`⌘`+`K` on a Mac) finds an action, a setting, a channel or a programme from one field
 - **Profiles** — one per person in the household, each with its own favorites, history, Continue watching, watched marks and theme; "Who's watching?" at start, a PIN if you like, and kids profiles that never see a locked or adult category
-- **TV mode and a phone remote** — a full-screen layout for the sofa (`Ctrl`+`Shift`+`T`), run from a remote, a game controller or LIRC: Home, channels with what is on, the guide, movies and series in posters, search with an on-screen keyboard. And your phone as a remote over the home network: scan a code, and it plays channels and favorites, shows what is on now and next, and in TV mode turns into a d-pad or a touchpad — on its home screen as *dopeIPTV Remote*, with nothing to install
+- **TV mode and a phone remote** — a full-screen layout for the sofa (`Ctrl`+`Shift`+`T`), run from a remote, a game controller or LIRC: Home, channels with what is on, the guide, movies and series in posters, search with an on-screen keyboard. And your phone as a remote over the home network: scan a code, and it plays channels, favorites, films, a series' episodes, your files, radio and recordings, shows what is on now and next, rewinds live TV, records, picks the sound track and subtitles and sets a sleep timer, and in TV mode turns into a d-pad or a touchpad — on its home screen as *dopeIPTV Remote*, with nothing to install
 - **Multiview** — watch 2/4/6/9 live channels at once in a separate grid, each an independent stream (even from different playlists), with per-window audio/subtitles, click-to-focus audio and a real timeshift timeline on catch-up channels
 - **Rewind live TV** — pause and go back in the channel you are watching, even without your provider's catch-up: a few minutes in memory, up to 6 hours on disk, or (*experimental*) **dopeIPTV's own buffer**, which goes on downloading while you pause, comes back to live without reconnecting, keeps each channel's history for when you return and records from the buffer
-- **Mine, TV, Movies and Series** — the sidebar is the app, and it opens where you left off. Mine holds what is yours: continue watching with the time left, your favourite channels live now in the order you usually watch them, favourite films and series, Watch later as a queue, new episodes of the series you follow (with a notification) and History by day; TV shows the channels with what is on and next; Movies and Series show this week's popular titles your provider has, Continue, and a page for every film and series
+- **Mine, TV, Movies and Series** — the sidebar is the app, and it opens where you left off. Mine holds what is yours: continue watching with the time left, your favourite channels live now in the order you usually watch them, favourite films and series, Watch later as a queue, new episodes of the series you follow (with a notification) and History by day; TV shows the channels with what is on and next; Movies and Series show this week's popular titles your provider has and Continue; every series has a page of its own, and a film shows its plot, cast and a Continue button in the column beside the list
 - **Watch together** — start a room, share its code, and friends watch the same film, episode or channel in step, each from their own source; the messages are encrypted with a key made from the code, so dopeiptv.org only passes them on
 - **27 languages** — from English, Svenska and Español to 中文, 日本語, हिन्दी and العربية, with full right-to-left support (Arabic, Persian, Hebrew, Urdu) — switchable live in Settings
 - **Local files** — point it at a folder (or a mounted network share) and browse your own videos beside the provider's: a folder view and a library view that builds series with seasons out of the file names, TMDB posters, resume, History, Trakt, casting and multiview. Music gets album art and a play queue that advances on its own
@@ -44,7 +44,7 @@ servers at home, a full **EPG**, rewinding live TV, and an
 - **TMDB metadata** — posters, ratings (linked to IMDb), and a clickable cast list that finds an actor's other titles in your playlist
 - **Recording & Timeshift** — record on a timer/schedule (single-connection friendly) or a whole series by its title or a word (or a reminder for each airing instead), and watch catch-up archives from the EPG; recordings can be saved as MP4, and reminders and recordings to come export to your calendar
 - **Subtitles and teletext** — find subtitles on OpenSubtitles for the film or episode you are watching, remembered for next time, or load a file; a channel's DVB subtitles and teletext subtitle pages in the subtitle menu by language; and, with dopeIPTV's own rewind buffer on, a teletext viewer (`T`) with the colour keys, subpages, hold and reveal
-- **Cast to a Chromecast, a smart TV or Kodi** — Samsung, LG, Sony and other DLNA/UPnP TVs and Kodi show up beside the Chromecasts, and on macOS an Apple TV through AirPlay; pause, seek and volume from the app, a channel picked while casting goes to the same TV, and a device on another part of the network can be added by its address
+- **Cast to a Chromecast, a smart TV or Kodi** — Samsung, LG, Sony and other DLNA/UPnP TVs and Kodi show up beside the Chromecasts, and on macOS an Apple TV through AirPlay; a card in the video's place shows what plays and on which TV, with pause, seek and volume (on an Apple TV a channel plays live, and its own remote sets the volume), a TV stuck buffering is sent the stream again by itself, a channel picked while casting goes to the same TV, and a device on another part of the network can be added by its address
 - **Enigma2 from the app** — the box's signal, a screenshot of its TV, its remote control and its recordings; its channel lists edited from the computer, with a backup first; its AutoTimer rules beside the app's series rules; and it asks first when a stream would cut off a recording or what the box's TV shows
 - **System media controls** — the keyboard's media keys and the system's own controls pause, play and skip, and show what is playing: GNOME/KDE media controls, headphone buttons and KDE Connect on Linux (MPRIS), Control Center, the lock screen and AirPods on macOS (Now Playing), the media box by the volume and the lock screen on Windows
 - **Trakt and Simkl** scrobbling, **Discord status** if you want it, **multiple playlists** (drag to reorder, export/import, or drop an M3U file or link on the window), parental control, content manager and editable channel lists
@@ -244,7 +244,7 @@ hand costs nothing either.
 
 | Action | How |
 |---|---|
-| Play | Double-click, or the **▶ Play** button in the detail panel |
+| Play | Double-click or `Enter`, or the **▶** on the picture in the detail panel |
 | Pause / stop / volume | The player bar buttons + the volume slider & mute |
 | Seek (movies/series/catch-up) | Hover the video for the scrubber, or click the video and use ← / → (tap = ±10s, hold = continuous) |
 | Resume where you left off | Prompted automatically when you replay a movie/episode |
@@ -262,12 +262,14 @@ hand costs nothing either.
 | Switch between rewind and catch-up | **DVR \| TIMESHIFT** at the left of the bar, on a channel with the provider's catch-up |
 | Watch a programme from the start | Right-click a ⏪ channel → Timeshift |
 | Browse the full guide | **Guide** in the sidebar (↻ in the guide refreshes it, **Pop out** gives it a window of its own) |
-| Search | Type in the search field at the top |
+| Filter the list you are in | The filter field in the place's header |
+| Find a category | The 🔍 over the categories in the sidebar (by its name, or a channel, film or series in it) |
+| Search every source | **Search** in the sidebar, or `Ctrl`+`Shift`+`F`: channels, the guides, movies and series |
 | Find an action, a setting, a channel or a programme | `Ctrl`+`K` (`⌘`+`K` on a Mac) |
-| Cast to a TV | Right-click → Cast to TV… (or the player's ⚙ menu) |
-| Use your phone as a remote | Menu → Phone remote… and scan the code |
-| TV mode for the sofa | Menu → TV mode, or `Ctrl`+`Shift`+`T` |
-| Switch playlist / provider | The playlist menu at the top of the sidebar, or Settings → Sources |
+| Cast to a TV | The cast button in the player bar, or right-click → Cast to TV… |
+| Use your phone as a remote | View → Phone remote… and scan the code |
+| TV mode for the sofa | View → TV mode, or `Ctrl`+`Shift`+`T` |
+| Switch source (playlist, provider, box) | The button with your source's initials at the foot of the sidebar, or Settings → Sources |
 
 ## Keyboard shortcuts
 
@@ -296,6 +298,7 @@ hand costs nothing either.
 | `R` | Record |
 | `I` | Stats for nerds |
 | `T` | Teletext (while a live channel plays) |
+| `F5` | Rescan Local files (while it shows) |
 | `Delete` | Remove the selected item (recordings / history) |
 | `Esc` | Leave fullscreen / close a dialog |
 
