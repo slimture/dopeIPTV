@@ -33,7 +33,8 @@ class Fake:
                 n = int(self.headers.get("Content-Length") or 0)
                 fake.asked.append((self.command, self.path, self.rfile.read(n) if n else b"",
                                    dict(self.headers)))
-                status, body, headers = fake.routes.get(self.path, (404, b"", {}))
+                status, body, headers = fake.routes.get(
+                    self.path, fake.routes.get("*", (404, b"", {})))
                 data = body.encode() if isinstance(body, str) else body
                 self.send_response(status)
                 for k, v in headers.items():
@@ -93,6 +94,22 @@ def test_a_broadcast_answer_names_no_address_but_a_web_one():
     body = struct.pack(">HH", 3, len(payload)) + payload
     got = hdhomerun.parse_reply(body + struct.pack("<I", zlib.crc32(body)), "192.168.1.50")
     assert got["server"] == "http://192.168.1.50:5004"
+
+
+def test_find_on_my_network_follows_no_redirect_and_reads_no_long_answer(fake):
+    from dopeiptv.providers import lan_scan
+    said = ('{"sw_version": "4.2", "Id": "x", "ServerName": "Den", "DeviceID": "1053ABCD",'
+            ' "vdr": {"version": "2.6"}, "String": "mythbox",'
+            ' "MediaContainer": {"machineIdentifier": "m1"}}')
+    elsewhere = fake({"*": (200, said, {})})
+    box = fake({"*": (302, b"", {"Location": f"http://localhost:{elsewhere.port}/x"})})
+    ports = dict.fromkeys(lan_scan.PORTS, box.port)
+    assert lan_scan.probe(LOOP, ports, {box.port}) == [] and elsewhere.asked == []
+    box.routes["*"] = (200, said[:-1] + " " * lan_scan.SHORT_ANSWER + "}", {})
+    assert lan_scan.probe(LOOP, ports, {box.port}) == []
+    box.routes["*"] = (200, said, {})
+    kinds = {d["kind"] for d in lan_scan.probe(LOOP, ports, {box.port})}
+    assert kinds == {"tvheadend", "emby", "plex", "hdhomerun", "vdr", "mythtv"}
 
 
 def _satip_description(m3u: str) -> str:
