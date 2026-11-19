@@ -301,6 +301,10 @@ preview, SEO) and `DEPLOY.md` (the server). In short:
 - Texts: `site/lang/<code>.json` (27 languages; English is the fallback),
   the help page's topics in `site/help.json`, templates in
   `site/templates/`. A new string needs its key in every language file.
+- **One look everywhere** (its README, "One look everywhere"): the header,
+  the menu, the footer, the pages and the dialogs share one set of colours,
+  icons, controls and words, and the page you are on is marked one way; a
+  change to one is carried to the others in the same commit.
 - The help shows the settings page an answer is about as the app draws
   it, scrolled to the row it names, in each of the 27 languages:
   `public/help-shots/<lang>/<id>.webp`, listed in `site/i18n.json`
