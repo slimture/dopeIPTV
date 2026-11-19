@@ -1,33 +1,36 @@
-"""The guide's index on disk is read as an index and as nothing else.
+"""The guide's index on disk is plain data, read as nothing else.
 
-It is a pickle, and a pickle may name any callable and call it: a file in
+It was a pickle, and a pickle may name any callable and call it: a file in
 the cache folder that something else wrote ran as the app the moment the
-guide was read (providers/epg.py read_index_blob). The loader takes the two
-names an index holds - array's own, for its time columns - and refuses the
-rest; what it reads is then checked to be an index. Anything else is a
-cache miss: the guide is parsed again from its XML, and nothing is run."""
+guide was read. A restricted unpickler held that off; now there is no
+pickle at all (providers/epg.py index_blob, read_index_blob): a header
+with its sizes, the texts, and arrays' bytes read with array.frombytes and
+checked against the header. An index an older app wrote - a pickle,
+whatever it holds - is a cache miss: the guide is parsed again from its
+XML, and nothing is run."""
 from __future__ import annotations
 
 import gzip
 import io
-import logging
 import os
 import pickle
-import pickletools
-import subprocess
+import struct
 import sys
 from array import array
 
-import pytest
-
-from dopeiptv.core.log import log
 from dopeiptv.providers import epg
 from dopeiptv.providers.epg import XmltvGuide
 
-XML = (b'<?xml version="1.0" encoding="UTF-8"?>\n'
-       b'<tv><channel id="svt1.se"><display-name>SVT1</display-name></channel>'
-       b'<programme channel="svt1.se" start="20990101120000 +0000" '
-       b'stop="20990101130000 +0000"><title>Rapport</title><desc>News</desc></programme></tv>')
+XML = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+       '<tv><channel id="svt1.se"><display-name>SVT1</display-name></channel>'
+       '<channel id="svt2.se"><display-name>SVT2</display-name></channel>'
+       '<programme channel="svt1.se" start="20990101120000 +0000" '
+       'stop="20990101130000 +0000"><title>Rapport</title><desc>Nyheter, åäö</desc></programme>'
+       '<programme channel="svt1.se" start="20990101130000 +0000" '
+       'stop="20990101140000 +0000"><title>Sport</title><desc></desc></programme>'
+       '<programme channel="svt2.se" start="20990101120000 +0000" '
+       'stop="20990101130000 +0000"><title>Rapport</title><desc>Nyheter, åäö</desc></programme>'
+       '</tv>').encode()
 
 
 class _Run:
@@ -44,121 +47,136 @@ def _touch_command(marker) -> str:
     return f'"{sys.executable}" -c "open(r\'{marker}\', \'w\').close()"'
 
 
-def _blob(*objects, packed: bool = True) -> bytes:
-    """An index file's bytes holding *objects*, one pickle after another."""
+def _old_index(*objects, packed: bool = True) -> bytes:
+    """An index as an app up to 1.6.8 wrote it: pickles one after another."""
     buf = io.BytesIO()
-    # One pickler for them all, as index_blob has: its memo runs on from
-    # one pickle to the next, and so does the reader's.
     p = pickle.Pickler(buf, protocol=pickle.HIGHEST_PROTOCOL)
     for obj in objects:
         p.dump(obj)
     return gzip.compress(buf.getvalue()) if packed else buf.getvalue()
 
 
-@pytest.fixture
-def warnings():
-    seen: list[str] = []
-
-    class Catch(logging.Handler):
-        def emit(self, record):
-            if record.levelno >= logging.WARNING:
-                seen.append(record.getMessage())
-    h = Catch()
-    log.addHandler(h)
-    yield seen
-    log.removeHandler(h)
-
-
-def test_an_index_that_calls_os_system_is_refused_logged_and_never_run(tmp_path, warnings):
-    marker = tmp_path / "ran"
-    head = {"v": epg._INDEX_VERSION, "pieces": 1, "by_name": {}}
-    for packed in (True, False):
-        for blob in (_blob(_Run(os.system, _touch_command(marker)), packed=packed),
-                     # Hidden behind a head that looks right, in a piece.
-                     _blob(head, {"c": _Run(os.system, _touch_command(marker))}, packed=packed),
-                     _blob(head, {"c": _Run(subprocess.getoutput, _touch_command(marker))}, packed=packed)):
-            assert epg.read_index_blob(blob) is None
-    assert not marker.exists(), "the command in the index ran"
-    assert warnings and all("refused" in w for w in warnings), warnings
-    assert any("system" in w for w in warnings), warnings
+def test_an_index_reads_back_as_the_guide_it_was_made_of():
+    by_id, by_name = epg.parse_xmltv(XML, 1)
+    blob = epg.index_blob(by_id, by_name)
+    assert blob[:2] == b"\x1f\x8b"
+    got = epg.read_index_blob(blob)
+    assert got == (by_id, by_name)
+    starts, stops, titles, descs = got[0]["svt1.se"]
+    assert type(starts) is array and starts.typecode == "q" and type(stops) is array
+    assert titles == ("Rapport", "Sport") and descs == ("Nyheter, åäö", "")
+    # A text shared by channels is one text after loading, as it was kept.
+    assert got[0]["svt2.se"][2][0] is titles[0]
+    # Unpacked too, and an empty guide.
+    assert epg.read_index_blob(gzip.decompress(blob)) == (by_id, by_name)
+    assert epg.read_index_blob(epg.index_blob({}, {})) == ({}, {})
+    # A NUL (which XML cannot carry) never shifts the texts after it.
+    q = array("q", [1, 2])
+    got = epg.read_index_blob(epg.index_blob({"c": (q, q, ("a\x00b", "c"), ("", "d"))}, {"n": "c"}))
+    assert got == ({"c": (q, q, ("a�b", "c"), ("", "d"))}, {"n": "c"})
 
 
-def test_no_other_name_gets_through_the_ones_an_index_holds():
-    for fn, args in ((eval, ("1+1",)), (getattr, ("x", "upper")), (__import__, ("os",)),
-                     (exec, ("pass",)), (open, (os.devnull,)), (pickle.loads, (b"N.",)),
-                     (bytearray, (8,)), (io.BytesIO, ())):
-        assert epg.read_index_blob(_blob(_Run(fn, *args))) is None, fn
-    # An old-style global and an instance made without a call.
-    assert epg.read_index_blob(b"cos\nsystem\n(S'true'\ntR.") is None
-    assert epg.read_index_blob(b"(S'true'\nios\nsystem\n.") is None
-    # A persistent id and an extension code are no part of an index either.
-    assert epg.read_index_blob(b"\x80\x02U\x01xQ.") is None
-    assert epg.read_index_blob(b"\x80\x02\x82\x01.") is None
-
-
-def test_an_index_this_app_wrote_names_only_what_the_loader_takes():
+def test_an_index_holds_no_code_path_at_all():
+    """The format names no type and no callable: a header, NUL-ended texts
+    and numbers - nothing a reader could be told to run."""
     by_id, by_name = epg.parse_xmltv(XML, 1)
     raw = gzip.decompress(epg.index_blob(by_id, by_name))
-    names: set[tuple[str, str]] = set()
-    pos = 0
-    while pos < len(raw):
-        strings: list[str] = []
-        end = pos
-        for op, arg, at in pickletools.genops(raw[pos:]):
-            if isinstance(arg, str):
-                strings.append(arg)
-            if op.name == "STACK_GLOBAL":
-                names.add((strings[-2], strings[-1]))
-            elif op.name in ("GLOBAL", "INST"):
-                names.add(tuple(str(arg).split(" ", 1)))
-            assert op.name not in ("EXT1", "EXT2", "EXT4", "PERSID", "BINPERSID")
-            end = pos + at + 1
-        pos = end
-    assert names == set(epg._INDEX_GLOBALS)
+    head = epg._HEAD.unpack(raw[:epg._HEAD.size])
+    words = ["svt1", "svt1.se", "svt2", "svt2.se", "Rapport", "Sport", "Nyheter, åäö", ""]
+    text = "".join(w + "\0" for w in words).encode()
+    assert head == (epg._INDEX_MAGIC, epg._INDEX_VERSION, 8, 4, 2, 2, len(words), 3, len(text))
+    rest = raw[epg._HEAD.size:]
+    assert rest[:len(text)] == text
+    # Then only numbers, exactly as many as the header says: the names' and
+    # the channel table's pairs, each channel's starts, stops and texts.
+    numbers = rest[len(text):]
+    assert len(numbers) == 2 * 2 * 4 + 2 * 2 * 4 + 3 * (8 + 8 + 4 + 4)
+    assert array("I" if array("I").itemsize == 4 else "L", numbers[:16]).tolist() == [0, 1, 2, 3]
 
 
-def test_today_s_index_still_reads_and_what_is_no_index_is_a_miss():
+def test_an_older_apps_pickled_index_is_never_unpickled(tmp_path):
+    marker = tmp_path / "ran"
+    head = {"v": 3, "pieces": 1, "by_name": {}}
     by_id, by_name = epg.parse_xmltv(XML, 1)
-    got = epg.read_index_blob(epg.index_blob(by_id, by_name))
-    assert got is not None
-    assert got[1] == {"svt1": "svt1.se"}
-    starts, stops, titles, descs = got[0]["svt1.se"]
-    assert isinstance(starts, array) and starts.typecode == "q" and titles == ("Rapport",)
-    assert descs == ("News",) and len(stops) == 1
+    for packed in (True, False):
+        for blob in (_old_index(_Run(os.system, _touch_command(marker)), packed=packed),
+                     _old_index(head, {"c": _Run(os.system, _touch_command(marker))}, packed=packed),
+                     # Even a harmless one of the old format: no longer an index.
+                     _old_index({"v": 3, "pieces": 1, "by_name": by_name}, by_id, packed=packed)):
+            assert epg.read_index_blob(blob) is None
+    assert not marker.exists(), "the command in the index ran"
 
-    def head(pieces: int = 1, by_name=None):
-        return {"v": epg._INDEX_VERSION, "pieces": pieces, "by_name": by_name or {}}
-    q = array("q", [1])
+
+def _sections(by_id=None, by_name=None) -> list[bytes]:
+    """A real index's raw bytes cut into its header and the rest."""
+    if by_id is None:
+        by_id, by_name = epg.parse_xmltv(XML, 1)
+    raw = gzip.decompress(epg.index_blob(by_id, by_name or {}))
+    return [raw[:epg._HEAD.size], raw[epg._HEAD.size:]]
+
+
+def _with_head(raw_rest: bytes, **changes) -> bytes:
+    head, rest = _sections()
+    fields = list(epg._HEAD.unpack(head))
+    names = ("magic", "version", "time_size", "ref_size", "channels", "names", "texts",
+             "programmes", "text_bytes")
+    for k, v in changes.items():
+        fields[names.index(k)] = v
+    return epg._HEAD.pack(*fields) + (raw_rest if raw_rest is not None else rest)
+
+
+def test_what_is_no_index_of_the_apps_is_a_miss():
+    head, rest = _sections()
+    whole = head + rest
+    assert epg.read_index_blob(whole) is not None
     for wrong in (
-            _blob(head(), {"c": (q, q, ("t",))}),                    # three columns
-            _blob(head(), {"c": (q, q, ("t",), ("d", "e"))}),         # not the same length
-            _blob(head(), {"c": (array("d", [1.0]), q, ("t",), ("d",))}),
-            _blob(head(), {"c": ([1], q, ("t",), ("d",))}),
-            _blob(head(), {"c": (q, q, (b"t",), ("d",))}),            # a title that is no text
-            _blob(head(), {"c": (q, q, ("t",), (None,))}),
-            _blob(head(), {7: (q, q, ("t",), ("d",))}),
-            _blob(head(), ["c"]),
-            _blob(head(by_name={"a": 1}), {"c": (q, q, ("t",), ("d",))}),
-            _blob(head(by_name=["a"]), {"c": (q, q, ("t",), ("d",))}),
-            _blob(head(pieces=2), {"c": (q, q, ("t",), ("d",))}),     # ends early
-            _blob(head(pieces="1"), {"c": (q, q, ("t",), ("d",))})):
+            b"", b"\x00" * 10, head,                                    # nothing, or a header alone
+            whole[:-1], whole[:len(whole) // 2],                       # cut short
+            whole + b"\x00",                                           # more than it says
+            _with_head(None, magic=b"dpIPTVgX"),
+            _with_head(None, version=3), _with_head(None, version=5),
+            _with_head(None, time_size=4), _with_head(None, ref_size=8),
+            _with_head(None, texts=7), _with_head(None, texts=9),      # texts it does not hold
+            _with_head(None, programmes=4),                            # the table says three
+            _with_head(None, channels=3), _with_head(None, names=3),
+            _with_head(None, text_bytes=1 << 40),                       # past any guide
+            _with_head(None, programmes=1 << 40), _with_head(None, channels=1 << 30)):
         assert epg.read_index_blob(wrong) is None
-    assert epg.read_index_blob(_blob(head(), {"c": (q, q, ("t",), ("d",))})) is not None
+        assert epg.read_index_blob(gzip.compress(wrong)) is None
+    # A text that is no UTF-8, one not ended, one megabytes long.
+    texts_end = epg._HEAD.unpack(head)[8]
+    assert epg.read_index_blob(head + b"\xff" + rest[1:]) is None
+    no_end = rest[:texts_end - 1] + b"x" + rest[texts_end:]
+    assert epg.read_index_blob(head + no_end) is None
+    long_text = b"x" * (epg._LONGEST_TEXT + 2 * epg._READ_STEP) + b"\x00"
+    assert epg.read_index_blob(_with_head(long_text, texts=1, text_bytes=len(long_text), names=0,
+                                          channels=0, programmes=0)) is None
+    # A text's number past the texts.
+    by_name_at = texts_end
+    bad = bytearray(rest)
+    bad[by_name_at:by_name_at + 4] = struct.pack("<I", 1000)
+    assert epg.read_index_blob(head + bytes(bad)) is None
+    # A gzip file whose check sum does not hold.
+    packed = bytearray(gzip.compress(whole))
+    packed[-8] ^= 0xFF
+    assert epg.read_index_blob(bytes(packed)) is None
 
 
-def test_a_planted_index_is_a_cache_miss_and_the_guide_is_read_again(tmp_path, monkeypatch, warnings):
+def test_a_planted_index_is_a_cache_miss_and_the_guide_is_read_again(tmp_path, monkeypatch):
     monkeypatch.setattr(XmltvGuide, "PARSE_ELSEWHERE", False)
     marker = tmp_path / "ran"
     cache = tmp_path / "epg_a.xml"
     cache.write_bytes(gzip.compress(XML))
-    index = tmp_path / "epg_a.xml.pkl"
-    index.write_bytes(_blob(_Run(os.system, _touch_command(marker))))
     later = cache.stat().st_mtime + 5
-    os.utime(index, (later, later))                 # newer than the guide: it is read
     g = XmltvGuide(client=None, cache_path=str(cache))
+    index = g._index_path()
+    old = tmp_path / "epg_a.xml.pkl"            # where an app up to 1.6.8 kept it
+    for path in (index, old):
+        path.write_bytes(_old_index(_Run(os.system, _touch_command(marker))))
+        os.utime(path, (later, later))          # newer than the guide: it is looked at
     assert g._load_from_disk() is True
     assert not marker.exists()
-    assert g._by_id["svt1.se"][2] == ("Rapport",)
-    assert any("refused" in w for w in warnings)
-    # What stands there now is an index of the app's own.
+    assert g._by_id["svt1.se"][2] == ("Rapport", "Sport")
+    # What stands there now is an index of the app's own; the old one is gone.
     assert epg.read_index_blob(index.read_bytes()) is not None
+    assert index.name == "epg_a.xml.idx" and not old.exists()

@@ -5,9 +5,9 @@ from __future__ import annotations
 import gzip
 import io
 import os
-import pickle
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import threading
@@ -17,6 +17,7 @@ import zlib
 from array import array
 from bisect import bisect_left, bisect_right
 from datetime import datetime
+from itertools import chain
 from pathlib import Path
 from typing import Any, Callable
 
@@ -28,22 +29,43 @@ from ..core.source_files import file_part
 from .client import XtreamClient
 
 
-# Bump to invalidate all pickled indexes on disk after a schema change.
-# v2: compact column storage (arrays + deduped strings) instead of one
-# dict per programme - a ~260 MB guide used to cost ~1 GB of RAM.
-# v3: a header, then the channels in pieces (see index_blob).
-_INDEX_VERSION = 3
-_CHANNELS_PER_PIECE = 50
+# The guide's index on disk (index_blob): bump to invalidate every index
+# after a schema change. v2: compact column storage (arrays + deduped
+# strings) instead of one dict per programme - a ~260 MB guide used to cost
+# ~1 GB of RAM. v3: channels in pieces. v4: a plain format of its own, no
+# pickle - v1 to v3 were pickles, and are never read now (a cache miss).
+_INDEX_MAGIC = b"dpIPTVgi"
+_INDEX_VERSION = 4
+#: magic, version, the size of a time and of a text's number, then how many
+#: channels, names, texts and programmes, and the bytes the texts take.
+_HEAD = struct.Struct("<8sHBBIIIQQ")
+_TIME_SIZE, _REF_SIZE = 8, 4
+#: A text's number in the index: an unsigned 32-bit array, whichever of
+#: array's codes is that on this machine.
+_REF = next(code for code in "IL" if array(code).itemsize == _REF_SIZE)
+#: What an index header may say before it is no index the app wrote: more
+#: than any guide has.
+_MOST_CHANNELS = 1 << 22
+_MOST_TEXTS = 1 << 28
+#: The most of one text carried from one slice to the next: a description
+#: megabytes long is none (and carrying more would copy it over and over).
+_LONGEST_TEXT = 1 << 20
+#: Read a slice at a time, so the window runs between slices.
+_READ_STEP = 1 << 20
+_TEXTS_PER_SLICE = 4096
+_INDEX_SUFFIX = ".idx"
+#: The pickled index of an app up to 1.6.8, beside the guide: deleted.
+_OLD_INDEX_SUFFIX = ".pkl"
 
 # The command line that makes the app a guide parser (see index_main).
 INDEX_FLAG = "--epg-index"
 
 Schedule = tuple[array, array, tuple, tuple]
 
-# zlib's one-shot calls and pickle.loads hold the interpreter for their
-# whole run - unpacking a 140 MB guide in one call stopped the window, and
-# the player's frames with it, for 0.8 s. Fed a slice at a time, the window
-# runs between slices.
+# zlib's one-shot calls hold the interpreter for their whole run -
+# unpacking a 140 MB guide in one call stopped the window, and the player's
+# frames with it, for 0.8 s. Fed a slice at a time, the window runs between
+# slices.
 _ZLIB_STEP = 1 << 18
 # What one unpacking call may give at most, so a slice of a gzip bomb never
 # turns into hundreds of MB at once.
@@ -95,10 +117,17 @@ def read_capped(r: Any, on_chunk: Callable[[int], None] | None = None,
 
 def gzip_gently(data: bytes, level: int = 5) -> bytes:
     """gzip.compress(), a slice at a time."""
+    return _gzip_parts([data], level)
+
+
+def _gzip_parts(parts: list[bytes], level: int = 5) -> bytes:
+    """*parts* one after another as one gzip file, a slice at a time - never
+    joined into one piece first."""
     c = zlib.compressobj(level, zlib.DEFLATED, 31)
-    view = memoryview(data)
-    out = [c.compress(view[i:i + _ZLIB_STEP])
-           for i in range(0, len(view), _ZLIB_STEP)]
+    out: list[bytes] = []
+    for part in parts:
+        view = memoryview(part)
+        out += [c.compress(view[i:i + _ZLIB_STEP]) for i in range(0, len(view), _ZLIB_STEP)]
     out.append(c.flush())
     return b"".join(out)
 
@@ -201,7 +230,7 @@ def epg_cache_path(playlist_id: str | None) -> str:
 
 
 def prune_epg_caches(keep_ids) -> int:
-    """Delete cached EPG guides (compressed XMLTV + parsed .pkl index) for
+    """Delete cached EPG guides (compressed XMLTV + parsed index) for
     playlists that no longer exist. Each playlist caches its whole guide -
     often hundreds of MB - under epg_<id>.xml, and removing a playlist never
     deleted its cache, so over time they pile up into gigabytes. Keeps the
@@ -214,7 +243,7 @@ def prune_epg_caches(keep_ids) -> int:
     removed = 0
     for f in d.glob("epg_*.xml*"):
         name = f.name[4:]  # drop the "epg_" prefix
-        for suffix in (".xml.pkl", ".xml"):
+        for suffix in (".xml" + _INDEX_SUFFIX, ".xml" + _OLD_INDEX_SUFFIX, ".xml"):
             if name.endswith(suffix):
                 pid = name[:-len(suffix)]
                 break
@@ -279,7 +308,7 @@ def parse_xmltv(data: bytes, keep_past_days: int
     # Guides repeat the same titles and descriptions endlessly (reruns,
     # daily shows, episode blurbs); keeping one str object per unique
     # text instead of one per programme cuts the string heap by well
-    # over half - and shrinks the pickle index the same way.
+    # over half - and the index on disk keeps each text once too.
     text_pool: dict[str, str] = {}
 
     def pooled(s: str) -> str:
@@ -322,116 +351,166 @@ def parse_xmltv(data: bytes, keep_past_days: int
     return by_id, by_name
 
 
+def _little(a: array) -> bytes:
+    """*a*'s bytes in little-endian order, the index's on every machine."""
+    if sys.byteorder == "big":
+        a = array(a.typecode, a)
+        a.byteswap()
+    return a.tobytes()
+
+
+def _encoded(words: list[str]) -> bytes:
+    """Texts as the index keeps them: UTF-8, each ended by a NUL (XML has
+    none; one that came another way is kept as U+FFFD)."""
+    if not words:
+        return b""
+    text = "\x00".join(words) + "\x00"
+    if text.count("\x00") != len(words):
+        text = "".join(w.replace("\x00", "\ufffd") + "\x00" for w in words)
+    return text.encode("utf-8", "surrogatepass")
+
+
 def index_blob(by_id: dict[str, Schedule], by_name: dict[str, str]) -> bytes:
-    """The index as stored next to the cached guide, gzipped: a header,
-    then the channels in pieces, one pickle after another, so reading it
-    back never holds the interpreter for the whole guide at once. One
-    pickler for all of them keeps a text shared by channels in different
-    pieces shared after loading."""
-    items = list(by_id.items())
-    pieces = range(0, len(items), _CHANNELS_PER_PIECE)
-    buf = io.BytesIO()
-    p = pickle.Pickler(buf, protocol=pickle.HIGHEST_PROTOCOL)
-    p.dump({"v": _INDEX_VERSION, "pieces": len(pieces), "by_name": by_name})
-    for i in pieces:
-        p.dump(dict(items[i:i + _CHANNELS_PER_PIECE]))
-    return gzip_gently(buf.getvalue())
+    """The index as stored next to the cached guide, gzipped - plain data
+    with no code path at all, read back by read_index_blob:
+
+    - a header (_HEAD): _INDEX_MAGIC, _INDEX_VERSION, the sizes of a time
+      (8 bytes) and of a text's number (4), and how many channels, names,
+      texts and programmes it holds and how many bytes its texts take;
+    - every text once, numbered in order (a title shared by channels stays
+      one text after loading), UTF-8, each ended by a NUL;
+    - the names as pairs of text numbers (name, channel id);
+    - the channel table: each channel's id's text number and how many
+      programmes it has;
+    - for each channel in that order: its starts and its stops (signed
+      64-bit), its titles' and its descriptions' text numbers (unsigned
+      32-bit) - each an array's bytes, little-endian."""
+    schedules = by_id.values()
+    words = list(dict.fromkeys(chain(
+        chain.from_iterable(by_name.items()), by_id,
+        chain.from_iterable(s[2] for s in schedules), chain.from_iterable(s[3] for s in schedules))))
+    number = {w: i for i, w in enumerate(words)}.__getitem__
+    names = array(_REF, map(number, chain.from_iterable(by_name.items())))
+    table = array(_REF)
+    blocks: list[bytes] = []
+    programmes = 0
+    for cid, (starts, stops, titles, descs) in by_id.items():
+        table.append(number(cid))
+        table.append(len(starts))
+        programmes += len(starts)
+        blocks += (_little(starts), _little(stops),
+                   _little(array(_REF, map(number, titles))), _little(array(_REF, map(number, descs))))
+    encoded = [_encoded(words[i:i + _TEXTS_PER_SLICE])
+               for i in range(0, len(words), _TEXTS_PER_SLICE)]
+    head = _HEAD.pack(_INDEX_MAGIC, _INDEX_VERSION, _TIME_SIZE, _REF_SIZE, len(by_id),
+                      len(by_name), len(words), programmes, sum(map(len, encoded)))
+    return _gzip_parts([head, *encoded, _little(names), _little(table), *blocks])
 
 
-#: The names an index holds, and the only ones its loader takes: the start
-#: and stop times are array("q") columns, which pickle as a call of array's
-#: own reconstructor. All else in it is a dict, a tuple, a str or an int,
-#: which pickle names nothing for.
-_INDEX_GLOBALS = frozenset({("array", "_array_reconstructor"), ("array", "array")})
+class _IndexEnds(ValueError):
+    """The index ends before what its header says it holds, or holds what
+    no index the app wrote does."""
 
 
-class IndexRefused(pickle.UnpicklingError):
-    """The index names something no index holds: not one this app wrote."""
+def _take(f: Any, size: int) -> bytes:
+    """Exactly *size* bytes of *f*, read a slice at a time - a size a
+    header says is never set aside before the bytes are there."""
+    parts: list[bytes] = []
+    while size > 0:
+        got = f.read(min(size, _READ_STEP))
+        if not got:
+            raise _IndexEnds("cut short")
+        parts.append(got)
+        size -= len(got)
+    return parts[0] if len(parts) == 1 else b"".join(parts)
 
 
-class _IndexUnpickler(pickle.Unpickler):
-    """Reads an index and nothing else. A pickle may name any callable and
-    call it - os.system as easily as array - so an index file that something
-    else wrote would run as the app the moment the guide was read. Every
-    name outside _INDEX_GLOBALS ends the read here (an extension code comes
-    this way too), and so does a persistent id."""
-
-    def find_class(self, module: str, name: str) -> Any:
-        if (module, name) not in _INDEX_GLOBALS:
-            raise IndexRefused(f"{module}.{name}")
-        return super().find_class(module, name)
-
-    def persistent_load(self, pid: Any) -> Any:
-        raise IndexRefused("a persistent id")
+def _numbers(f: Any, code: str, count: int) -> array:
+    """*count* numbers of array code *code*, little-endian, a slice at a time."""
+    out = array(code)
+    left = count * out.itemsize
+    step = _READ_STEP - _READ_STEP % out.itemsize
+    while left > 0:
+        piece = _take(f, min(left, step))
+        out.frombytes(piece)
+        left -= len(piece)
+    if sys.byteorder == "big":
+        out.byteswap()
+    return out
 
 
-def _only(values: Any, kind: type) -> bool:
-    return set(map(type, values)) <= {kind}
+def _texts(f: Any, size: int) -> list[str]:
+    """The index's texts: *size* bytes of NUL-ended UTF-8, decoded a slice
+    at a time at a NUL (never inside a character)."""
+    texts: list[str] = []
+    rest = b""
+    while size > 0:
+        piece = _take(f, min(size, _READ_STEP))
+        size -= len(piece)
+        piece = rest + piece
+        cut = piece.rfind(b"\x00") + 1
+        if cut:
+            texts += piece[:cut - 1].decode("utf-8", "surrogatepass").split("\x00")
+        rest = piece[cut:]
+        if len(rest) > _LONGEST_TEXT:
+            raise _IndexEnds("a text longer than any")
+    if rest:
+        raise _IndexEnds("a text not ended")
+    return texts
 
 
-def _is_index(by_id: Any, by_name: Any) -> bool:
-    """Whether what was read has an index's shape: channel ids to four
-    columns of one length (two array("q"), two tuples of text), and names
-    to channel ids. The lookups take it as it is, so anything else - a
-    damaged file, one made to look like an index - is no index."""
-    if type(by_id) is not dict or type(by_name) is not dict:
-        return False
-    if not (_only(by_name, str) and _only(by_name.values(), str) and _only(by_id, str)):
-        return False
-    for sched in by_id.values():
-        if type(sched) is not tuple or len(sched) != 4:
-            return False
-        starts, stops, titles, descs = sched
-        if not (type(starts) is array and type(stops) is array
-                and starts.typecode == "q" and stops.typecode == "q"
-                and type(titles) is tuple and type(descs) is tuple
-                and len(starts) == len(stops) == len(titles) == len(descs)
-                and _only(titles, str) and _only(descs, str)):
-            return False
-    return True
+def _read_index(f: Any) -> tuple[dict[str, Schedule], dict[str, str]] | None:
+    magic, version, time_size, ref_size, channels, names, count, programmes, text_bytes = (
+        _HEAD.unpack(_take(f, _HEAD.size)))
+    if (magic, version, time_size, ref_size) != (_INDEX_MAGIC, _INDEX_VERSION, _TIME_SIZE,
+                                                 _REF_SIZE):
+        return None             # an older app's index (a pickle), or none at all
+    if (channels > _MOST_CHANNELS or names > _MOST_CHANNELS or count > _MOST_TEXTS
+            or text_bytes > GUIDE_UNPACKED_MAX
+            or programmes * (2 * _TIME_SIZE + 2 * _REF_SIZE) > GUIDE_UNPACKED_MAX):
+        return None
+    texts = _texts(f, text_bytes)
+    if len(texts) != count:
+        return None
+    text = texts.__getitem__        # a number past the texts: IndexError, no index
+    pairs = _numbers(f, _REF, 2 * names)
+    by_name = dict(zip(map(text, pairs[0::2]), map(text, pairs[1::2]), strict=True))
+    table = _numbers(f, _REF, 2 * channels)
+    if sum(table[1::2]) != programmes:
+        return None
+    by_id: dict[str, Schedule] = {}
+    for i in range(0, len(table), 2):
+        n = table[i + 1]
+        by_id[text(table[i])] = (_numbers(f, "q", n), _numbers(f, "q", n),
+                                 tuple(map(text, _numbers(f, _REF, n))),
+                                 tuple(map(text, _numbers(f, _REF, n))))
+    if len(by_id) != channels or len(by_name) != names:
+        return None             # a channel or a name twice: no index of the app's
+    return by_id, by_name
 
 
 def read_index_blob(data: bytes
                     ) -> tuple[dict[str, Schedule], dict[str, str]] | None:
-    """(by_id, by_name) from index_blob()'s bytes; None when damaged, from
-    another schema version, or not an index at all - one that names
-    anything an index does not hold is refused and logged, never run
-    (_IndexUnpickler)."""
+    """(by_id, by_name) from index_blob()'s bytes - or None: damaged, from
+    another schema version (an older app's pickle among them, never
+    unpickled), or not an index at all. Plain data read into arrays and
+    texts and checked against its header's sizes: nothing in it is run."""
     try:
-        # Index files are gzip-compressed; a plain pickle (proto starts \x80,
-        # never the gzip magic) loads as well. Unpacked as it is read, the
-        # whole of it never sits in memory at once.
+        # Index files are gzip-compressed; a plain one (never the gzip
+        # magic) reads as well. Unpacked as it is read, the whole of it
+        # never sits in memory at once.
         f: io.BufferedIOBase = io.BytesIO(data)
         if data[:2] == b"\x1f\x8b":
             f = gzip.GzipFile(fileobj=f)
-        u = _IndexUnpickler(f)
-        head = u.load()
-        if type(head) is not dict or head.get("v") != _INDEX_VERSION:
+        got = _read_index(f)
+        if got is None or f.read(1):    # the end of the file checks gzip's CRC too
             return None
-        pieces = head.get("pieces")
-        if type(pieces) is not int:
-            return None
-        by_id: dict[str, Schedule] = {}
-        for _ in range(pieces):
-            piece = u.load()
-            if type(piece) is not dict:
-                return None
-            by_id.update(piece)
-        if f.read(1):       # the end of the file checks gzip's CRC too
-            return None
-    except IndexRefused as e:
-        log.warning("EPG: the guide's index names %s, which no index holds - refused, "
-                    "nothing in it was run; the guide is read again", e)
-        return None
+        return got
     except Exception:
         # Any damage at all means "parse the XML again". Letting one
-        # through (zlib.error, a truncated pickle's AttributeError...)
+        # through (zlib.error, a bad gzip CRC, a text that is no UTF-8...)
         # failed the whole guide load instead, and on every start.
         return None
-    by_name = head.get("by_name", {})
-    if not _is_index(by_id, by_name):
-        return None
-    return by_id, by_name
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
@@ -644,7 +723,7 @@ class XmltvGuide:
         forget the loaded guide, so the next load re-fetches from the provider.
         Backs Settings' 'Clear EPG cache' - useful when a guide went stale or
         a provider changed its XMLTV."""
-        for p in (self.cache_path, self._index_path()):
+        for p in (self.cache_path, self._index_path(), self._index_path(_OLD_INDEX_SUFFIX)):
             try:
                 if p is not None and p.exists():
                     p.unlink()
@@ -875,14 +954,24 @@ class XmltvGuide:
         self._note_coverage()
         return True
 
-    # -- pickle index --------------------------------------------------------
+    # -- the index on disk ---------------------------------------------------
 
-    def _index_path(self) -> Path | None:
+    def _index_path(self, suffix: str = _INDEX_SUFFIX) -> Path | None:
         if not self.cache_path:
             return None
-        return self.cache_path.with_suffix(self.cache_path.suffix + ".pkl")
+        return self.cache_path.with_suffix(self.cache_path.suffix + suffix)
+
+    def _drop_old_index(self) -> None:
+        """An older app's pickled index beside the guide is never read: gone."""
+        old = self._index_path(_OLD_INDEX_SUFFIX)
+        try:
+            if old is not None and old.exists():
+                old.unlink()
+        except OSError:
+            pass
 
     def _load_index(self) -> bool:
+        self._drop_old_index()
         p = self._index_path()
         if not p or not p.exists() or not self.cache_path:
             return False

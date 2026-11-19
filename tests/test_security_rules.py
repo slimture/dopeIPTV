@@ -71,6 +71,37 @@ def test_a_category_for_adults_is_judged_by_the_providers_name_too():
     assert any(rel == "ui/mw_lists.py" for rel, _l, _c in _calls("adult_category"))
 
 
+# -- nothing is unpickled: no pickle in the app at all ----------------------------------
+
+#: What reads a pickle (or its kin, which run code the data names as it is read).
+UNPICKLERS = {"pickle", "_pickle", "cPickle", "shelve", "dill", "cloudpickle", "jsonpickle",
+              "marshal"}
+
+
+def test_nothing_in_the_app_reads_a_pickle():
+    """A pickle may name any callable and call it as it is read: what the
+    app keeps on disk is plain data (the guide's index, providers/epg.py,
+    is a header and arrays' bytes). No module imports pickle or its kin -
+    not even behind a restricted unpickler."""
+    found = []
+    for path in sorted(PKG.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
+        rel = path.relative_to(PKG).as_posix()
+        for node in ast.walk(tree):
+            names: list[str] = []
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                names = [node.module]
+            elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                  and node.func.id == "__import__" and node.args
+                  and isinstance(node.args[0], ast.Constant)):
+                names = [str(node.args[0].value)]
+            found += [f"{rel}:{node.lineno} {n}" for n in names
+                      if n.split(".")[0] in UNPICKLERS]
+    assert not found, "a pickle reader in the app: " + ", ".join(found)
+
+
 # -- the browser and the file manager: through core/xdg.py alone ---------------------
 
 def test_links_and_folders_are_opened_through_core_xdg_alone():
