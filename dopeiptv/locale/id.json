@@ -719,7 +719,7 @@
   "rec_cap_title": "Batas penyimpanan tercapai",
   "rec_cap_reached": "Tidak dapat memulai rekaman baru: folder rekaman berada pada batas Anda ({used} dari {cap}). Hapus beberapa rekaman atau naikkan batas di Pengaturan.",
   "settings_reset_all": "Setel ulang semua pengaturan…",
-  "settings_reset_confirm_1": "Ini akan menghapus setiap preferensi dopeIPTV di komputer ini: daftar putar, favorit, riwayat, tema, posisi lanjutan, PIN, kunci Trakt/TMDB, dan tata letak panel Anda.\n\nLanjutkan?",
+  "settings_reset_confirm_1": "Ini akan menghapus setiap preferensi dopeIPTV di komputer ini: daftar putar, favorit, riwayat, tema, posisi lanjutan, PIN, kunci Trakt/TMDB, dan tata letak panel Anda. Gambar tersimpan, panduan acara yang diunduh, dan file log aplikasi juga dihapus. Rekaman Anda tetap disimpan.\n\nLanjutkan?",
   "settings_reset_confirm_2": "Apakah Anda benar-benar yakin? Ini tidak dapat dibatalkan.",
   "settings_reset_done": "Semua pengaturan telah disetel ulang. dopeIPTV akan tutup sekarang — mulai lagi untuk menyiapkan daftar putar pertama Anda.",
   "cat_search_none": "Tidak ada kategori yang cocok",

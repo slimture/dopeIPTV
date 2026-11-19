@@ -11,6 +11,7 @@ handing on to it.
 
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -346,12 +347,18 @@ class _SettingsMixin:
         if not confirm(parent_dialog, tr("settings_reset_all"),
                        tr("settings_reset_confirm_2"), default_yes=False):
             return
-        # Clear() drops every key from a QSettings scope; sync() flushes it to
-        # disk before we tell the user to restart. Watched and Watch Later live
-        # in the separate cache-settings file, and resume positions in the
-        # resume file - clear all three or those survive a "reset all".
+        # The recordings stay wherever they are, also inside a folder the
+        # reset empties - read before the setting that names it goes.
+        rec = getattr(self, "rec", None)
+        keep = [rec.directory()] if rec is not None else []
+        # Clear() drops every key from a QSettings scope - every profile's
+        # (core/profiles.py) - and sync() flushes it to disk before we tell
+        # the user to restart. Watched and Watch Later live in the cache
+        # file, resume positions in the resume file and followed series in
+        # the follow file: clear all four or those survive a "reset all".
         for st in (self.settings,
                    getattr(self, "_resume_settings", None),
+                   getattr(self, "_follow_settings", None),
                    getattr(self, "_cache_settings", None)):
             if st is not None:
                 st.clear()
@@ -362,6 +369,21 @@ class _SettingsMixin:
             resolver.files.clear()
         elif getattr(self, "_cache_settings", None) is not None:
             CacheFiles(self._cache_settings).clear()
+        # A restore staged and not yet put in place would bring it all back
+        # at the next start (core/backup.apply_pending).
+        from ..core import backup
+        from ..core import reset as app_reset
+        try:
+            os.remove(backup.pending_path())
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            log.warning("reset: the staged restore not removed: %s", e)
+        # The folders - the cache, the logs, the app's own yt-dlp - emptied
+        # once the window has let go of them (closeEvent) and again at the
+        # next start (core/reset.py).
+        app_reset.request(os.path.dirname(backup.pending_path()), keep)
+        self._reset_wipe = keep
         # closeEvent persists layout/resume/watched on the way out - skip
         # that during a reset, or the freshly cleared config gets seeded
         # with those keys again.

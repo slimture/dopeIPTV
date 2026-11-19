@@ -719,7 +719,7 @@
   "rec_cap_title": "Đã đạt giới hạn lưu trữ",
   "rec_cap_reached": "Không thể bắt đầu bản ghi mới: thư mục bản ghi đã ở giới hạn của bạn ({used} trên {cap}). Xóa một số bản ghi hoặc nâng giới hạn trong Cài đặt.",
   "settings_reset_all": "Đặt lại tất cả cài đặt…",
-  "settings_reset_confirm_1": "Điều này sẽ xóa mọi tùy chọn dopeIPTV trên máy tính này: danh sách phát, mục yêu thích, lịch sử, giao diện, vị trí tiếp tục, PIN, khóa Trakt/TMDB và bố cục bảng của bạn.\n\nTiếp tục?",
+  "settings_reset_confirm_1": "Điều này sẽ xóa mọi tùy chọn dopeIPTV trên máy tính này: danh sách phát, mục yêu thích, lịch sử, giao diện, vị trí tiếp tục, PIN, khóa Trakt/TMDB và bố cục bảng của bạn. Ảnh đã lưu, lịch phát sóng đã tải và tệp nhật ký của ứng dụng cũng bị xóa. Các bản ghi của bạn vẫn được giữ lại.\n\nTiếp tục?",
   "settings_reset_confirm_2": "Bạn có thực sự chắc chắn không? Điều này không thể hoàn tác.",
   "settings_reset_done": "Tất cả cài đặt đã được đặt lại. dopeIPTV sẽ đóng ngay bây giờ — khởi động lại để thiết lập danh sách phát đầu tiên của bạn.",
   "cat_search_none": "Không có danh mục nào khớp",

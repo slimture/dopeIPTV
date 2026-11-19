@@ -719,7 +719,7 @@
   "rec_cap_title": "Depolama sınırına ulaşıldı",
   "rec_cap_reached": "Yeni bir kayıt başlatılamıyor: kayıtlar klasörü sınırınıza ulaştı ({cap} boyutundan {used}). Bazı kayıtları silin veya Ayarlar'da sınırı yükseltin.",
   "settings_reset_all": "Tüm ayarları sıfırla…",
-  "settings_reset_confirm_1": "Bu, bu bilgisayardaki her dopeIPTV tercihini siler: oynatma listeleriniz, favorileriniz, geçmişiniz, temanız, sürdürme konumlarınız, PIN, Trakt/TMDB anahtarları ve panel düzeni.\n\nDevam edilsin mi?",
+  "settings_reset_confirm_1": "Bu, bu bilgisayardaki her dopeIPTV tercihini siler: oynatma listeleriniz, favorileriniz, geçmişiniz, temanız, sürdürme konumlarınız, PIN, Trakt/TMDB anahtarları ve panel düzeni. Uygulamanın kaydettiği resimler, indirilen yayın akışları ve günlük dosyaları da silinir. Kayıtlarınız korunur.\n\nDevam edilsin mi?",
   "settings_reset_confirm_2": "Gerçekten emin misiniz? Bu geri alınamaz.",
   "settings_reset_done": "Tüm ayarlar sıfırlandı. dopeIPTV şimdi kapanacak — ilk oynatma listenizi kurmak için tekrar başlatın.",
   "cat_search_none": "Eşleşen kategori yok",

@@ -2174,7 +2174,7 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── Settings: reset-to-defaults ───────────────────────────────────────
     "settings_reset_all": {"en": "Reset all settings…"},
-    "settings_reset_confirm_1": {"en": "This will erase every dopeIPTV preference on this computer: your playlists, favorites, history, theme, resume positions, PIN, Trakt/TMDB keys and the panel layout.\n\nContinue?"},
+    "settings_reset_confirm_1": {"en": "This will erase every dopeIPTV preference on this computer: your playlists, favorites, history, theme, resume positions, PIN, Trakt/TMDB keys and the panel layout. The app's saved pictures, downloaded guides and log files go too. Your recordings are kept.\n\nContinue?"},
     "settings_reset_confirm_2": {"en": "Are you really sure? This can't be undone."},
     "settings_reset_done": {"en": "All settings have been reset. dopeIPTV will now close - start it again to set up your first playlist."},
 

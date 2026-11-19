@@ -170,6 +170,7 @@ map and the one-way import rule.
 | `core/ical.py` | Reminders and scheduled recordings as iCalendar (RFC 5545): stable UIDs, DTSTAMP, UTC times, escaping, folding at 75 octets, CRLF |
 | `core/donate_rhythm.py` | When the app asks for a donation, as pure logic with the clock passed in: a 7-day period begun at the first start in a month once the app is used for real (5 hours watched in 30 days across every profile's viewing log, 14 days after the first run, `donate_first_seen`), not within 21 days of the last; its phase (`BRIGHT` the first day, `MUTED` after, `OFF`); the snooze (`donate_until`: 3 months, 12 for I've donated); the period ended by Donate; the old keys migrated once; every key the household's |
 | `core/supporter.py` | The supporter key: signed by dopeiptv.org, checked offline, nothing about the person in it |
+| `core/reset.py` | Settings -> Reset all, the folders' part: the cache (pictures, guides and their indexes, the local library's index, frames, subtitle copies, the popular chart, rewind buffers), the logs and the app's own yt-dlp emptied (`app_folders`, `wipe`) - on the window's way out once the player and the workers have let go, and again at the next start before anything opens them (`request`, `finish`, `MARKER` beside the settings files, with what to keep); only a folder of the app's own (`owned`: dopeiptv near the end of its path, never home or above), links never followed, the recordings' folder kept wherever it is |
 | `core/backup.py` | Full backup and restore: every setting a person would miss in one JSON file (logins included, caches, window layout and machine state left out); a restore over everything waits for the next start (`stage` / `apply_pending`) |
 | `core/sync.py` | Settings sync, for everyone: the sync code, slot and key (HKDF), what syncs (explicit allow/deny lists; keyboard shortcuts only between computers of one system, `entry_of`, `setting_of`, `newcomer`), stamping, merging (last writer per entry, tombstones), the round trip to dopeiptv.org (nothing about the person: no key, no account; never from a modified build), applying what came back; after a restore over everything the next round joins again as a newcomer (`rejoin`); a playlist whose id another computer's playlist had taken - each one's legacy "default" of another provider - kept under another id in the copy (`SourceIds`, `sync_source_ids`) |
 | `core/chacha20poly1305.py` | ChaCha20-Poly1305 (RFC 8439) in plain Python, many blocks at once - what sync encrypts with |
@@ -450,12 +451,15 @@ When making changes:
 **Add a new dialog**: create a class in `ui/dialogs.py`, import it where
 it is used, wire it to a menu action.
 
-**Add a new setting**: add the QSettings key read/write in the relevant
-method in `ui/mw_settings.py` (usually `open_settings`): a `card.row()` or
-`card.toggle()` in the builder of the page it belongs to (`build_<page>`,
-run the first time the page is shown or searched - never as the window
-opens), and the write-back in that page's `commit_<page>(put, changed,
-final)` beside it. Rows are found by the Settings search automatically.
+**Add a new setting**: add the QSettings key read/write in the builder of
+the page it belongs to - `build_<page>(ctx)` in its group's module
+(`ui/set_watch.py`, `ui/set_content.py`, `ui/set_services.py`,
+`ui/set_system.py`; Nerd's in `ui/nerd_settings.py`): a `card.row()` or
+`card.toggle()`, run the first time the page is shown or searched - never
+as the window opens - and the write-back in that page's
+`commit_<page>(put, changed, final)` beside it. What the builders share
+(`own()`, `nerd_link()`, `soon`...) is `SettingsContext` in
+`ui/mw_settings.py`. Rows are found by the Settings search automatically.
 Never show a widget before it is in a row (`setVisible(True)` on one with
 no parent is a window of its own: on GNOME the pointer spins for seconds);
 `tests/test_settings_lazy.py` fails on one. A number takes a `Stepper` (not a bare `QSpinBox`), a
@@ -548,7 +552,7 @@ QT_QPA_PLATFORM=offscreen pytest -q
   url_rewrite, hls_cap, ts_scramble, teletext, teletext_subs, ts_analysis,
   remote_api, exclusive_bind, events, mqtt, mqtt_control, phone_remote,
   phone_page, phone_browse, qr, ical, report, supporter, sync, chacha20poly1305,
-  discord_rpc, together, backup, doh, cert_pin, net_route, net_adapter,
+  discord_rpc, together, backup, reset, doh, cert_pin, net_route, net_adapter,
   net_bridge, live_latency, ytdlp, tv_input, tv_nav, restream, hdhr,
   server_page) and `services/` (failover, search_sources, together, share, home_server, guide_keeper, resume,
   coverart, reminders, mpris, media_session, media_macos, media_windows,

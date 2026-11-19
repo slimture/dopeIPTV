@@ -232,6 +232,17 @@ def _watch_link_events(app, window) -> None:
     app.installEventFilter(window._link_filter)
 
 
+def _finish_reset() -> None:
+    """The second half of Settings -> Reset all (core/reset.finish): the
+    cache, the logs and the app's yt-dlp emptied again before anything opens
+    them. Never in the way of starting."""
+    try:
+        from .core import backup, reset
+        reset.finish(os.path.dirname(backup.pending_path()))
+    except Exception as e:
+        log.warning("reset: folders not emptied: %s", e)
+
+
 def _put_restore_in_place() -> bool | None:
     """A backup staged in Settings put in place (core/backup.apply_pending):
     None when none waited, else whether it went in. Never in the way of
@@ -512,6 +523,9 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG)
     app.setApplicationDisplayName(APP_NAME)
+    # A Reset all's folders emptied again, now that their names are known
+    # and before anything opens them (core/reset.finish).
+    _finish_reset()
     # The window's app_id: "dopeiptv", or the name of the entry this run was
     # started from when that is a copy of ours (see launched_app_id).
     try:

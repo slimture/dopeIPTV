@@ -719,7 +719,7 @@
   "rec_cap_title": "Speicherlimit erreicht",
   "rec_cap_reached": "Neue Aufnahme nicht möglich: der Ordner hat dein Limit erreicht ({used} von {cap}). Lösche Aufnahmen oder erhöhe das Limit in den Einstellungen.",
   "settings_reset_all": "Alle Einstellungen zurücksetzen…",
-  "settings_reset_confirm_1": "Dies löscht alle dopeIPTV-Einstellungen auf diesem Rechner: Playlists, Favoriten, Verlauf, Design, Fortsetzungspositionen, PIN, Trakt-/TMDB-Schlüssel und das Panel-Layout.\n\nFortfahren?",
+  "settings_reset_confirm_1": "Dies löscht alle dopeIPTV-Einstellungen auf diesem Rechner: Playlists, Favoriten, Verlauf, Design, Fortsetzungspositionen, PIN, Trakt-/TMDB-Schlüssel und das Panel-Layout. Auch die von der App gespeicherten Bilder, geladenen TV-Guides und Protokolldateien werden gelöscht. Aufnahmen bleiben erhalten.\n\nFortfahren?",
   "settings_reset_confirm_2": "Bist du wirklich sicher? Das lässt sich nicht rückgängig machen.",
   "settings_reset_done": "Alle Einstellungen wurden zurückgesetzt. dopeIPTV wird jetzt beendet - starte es erneut, um deine erste Playlist einzurichten.",
   "cat_search_none": "Keine passenden Kategorien",

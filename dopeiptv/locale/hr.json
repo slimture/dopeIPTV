@@ -719,7 +719,7 @@
   "rec_cap_title": "Dosegnuto ograničenje pohrane",
   "rec_cap_reached": "Nije moguće pokrenuti novo snimanje: mapa snimki je na tvom ograničenju ({used} od {cap}). Izbriši neke snimke ili povećaj ograničenje u Postavkama.",
   "settings_reset_all": "Poništi sve postavke…",
-  "settings_reset_confirm_1": "Ovo će izbrisati svaku dopeIPTV postavku na ovom računalu: tvoje popise, favorite, povijest, temu, pozicije nastavka, PIN, Trakt/TMDB ključeve i raspored ploča.\n\nNastaviti?",
+  "settings_reset_confirm_1": "Ovo će izbrisati svaku dopeIPTV postavku na ovom računalu: tvoje popise, favorite, povijest, temu, pozicije nastavka, PIN, Trakt/TMDB ključeve i raspored ploča. Brišu se i spremljene slike, preuzeti TV vodiči i datoteke zapisnika aplikacije. Snimke ostaju.\n\nNastaviti?",
   "settings_reset_confirm_2": "Jesi li stvarno siguran? Ovo se ne može poništiti.",
   "settings_reset_done": "Sve postavke su poništene. dopeIPTV će se sada zatvoriti — pokreni ga ponovno za postavljanje prvog popisa.",
   "cat_search_none": "Nema odgovarajućih kategorija",

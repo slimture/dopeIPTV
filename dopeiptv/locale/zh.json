@@ -719,7 +719,7 @@
   "rec_cap_title": "已达存储上限",
   "rec_cap_reached": "无法开始新录制：录制文件夹已达上限（{used} / {cap}）。请删除部分录制或在设置中提高上限。",
   "settings_reset_all": "重置所有设置……",
-  "settings_reset_confirm_1": "这将删除这台计算机上的所有 dopeIPTV 设置：播放列表、收藏、历史、主题、续播位置、PIN、Trakt/TMDB 密钥和面板布局。\n\n继续吗？",
+  "settings_reset_confirm_1": "这将删除这台计算机上的所有 dopeIPTV 设置：播放列表、收藏、历史、主题、续播位置、PIN、Trakt/TMDB 密钥和面板布局。应用保存的图片、下载的节目指南和日志文件也会被删除。录像会保留。\n\n继续吗？",
   "settings_reset_confirm_2": "你真的确定吗？此操作无法撤销。",
   "settings_reset_done": "所有设置已重置。dopeIPTV 现在将关闭 — 请重新启动以设置你的第一个播放列表。",
   "cat_search_none": "没有匹配的分类",

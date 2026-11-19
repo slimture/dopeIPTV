@@ -719,7 +719,7 @@
   "rec_cap_title": "Lagringsgräns nådd",
   "rec_cap_reached": "Kan inte starta en ny inspelning: inspelningsmappen har nått din gräns ({used} av {cap}). Radera några inspelningar eller höj gränsen i Inställningar.",
   "settings_reset_all": "Återställ alla inställningar…",
-  "settings_reset_confirm_1": "Detta raderar alla dopeIPTV-inställningar på den här datorn: dina spellistor, favoriter, historik, tema, återupptagnings-positioner, PIN, Trakt/TMDB-nycklar och panellayouten.\n\nFortsätt?",
+  "settings_reset_confirm_1": "Detta raderar alla dopeIPTV-inställningar på den här datorn: dina spellistor, favoriter, historik, tema, återupptagnings-positioner, PIN, Trakt/TMDB-nycklar och panellayouten. Appens sparade bilder, nedladdade tablåer och loggfiler försvinner också. Dina inspelningar behålls.\n\nFortsätt?",
   "settings_reset_confirm_2": "Är du verkligen säker? Detta kan inte ångras.",
   "settings_reset_done": "Alla inställningar är återställda. dopeIPTV stängs nu - starta om appen för att lägga upp din första spellista.",
   "cat_search_none": "Inga matchande kategorier",

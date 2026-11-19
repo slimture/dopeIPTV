@@ -6542,6 +6542,15 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if casting:
             cast_stop.join(2.0)
         self._events_join(1.0)
+        # Settings -> Reset all: the app's folders emptied now that the
+        # player and the workers have let go of them (core/reset.py).
+        keep = getattr(self, "_reset_wipe", None)
+        if keep is not None:
+            try:
+                from ..core import reset as app_reset
+                app_reset.wipe(keep=keep)
+            except Exception as e:
+                log.warning("reset: folders not emptied: %s", e)
         super().closeEvent(event)
         # Only fall back to os._exit if workers are still active - at
         # that point the interpreter would segfault emitting Qt
