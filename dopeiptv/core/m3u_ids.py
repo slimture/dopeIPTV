@@ -62,17 +62,27 @@ def channel_key(tvg_id: str, name: str) -> str:
 def stable_ids(keys: Iterable[str]) -> list[int]:
     """Each channel's id from its key (channel_key) and which of the
     channels with that key it is, in list order. Two keys that hash alike
-    take the next free id in list order."""
-    taken: set[int] = set()
+    take the next free id in list order.
+
+    The next free id is found through *after* - a taken id to the one to
+    look at next, every id between them taken, shortened as it is walked -
+    not by trying each id in turn: a list made to hash alike (CRC-32 is
+    easily steered) would take a step for every channel before it, each
+    time. The ids are the same either way."""
+    after: dict[int, int] = {}
     seen: dict[str, int] = {}
     out: list[int] = []
     for key in keys:
         n = seen.get(key, 0)
         seen[key] = n + 1
         sid = LINE_MAX | (zlib.crc32(f"{key}\x1f{n}".encode()) & (LINE_MAX - 1))
-        while sid in taken:
-            sid = LINE_MAX | ((sid + 1) & (LINE_MAX - 1))
-        taken.add(sid)
+        walked = []
+        while sid in after:
+            walked.append(sid)
+            sid = after[sid]
+        for w in walked:
+            after[w] = sid
+        after[sid] = LINE_MAX | ((sid + 1) & (LINE_MAX - 1))
         out.append(sid)
     return out
 
