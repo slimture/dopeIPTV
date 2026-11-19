@@ -7,9 +7,11 @@
 #
 #     sh proxy-headers.sh
 #
-# Every line of those that the live file lacks is put in where it belongs:
-# a server's own after its server_name, a location's after its first line,
-# a map or a zone before the first server. Nothing already there is changed
+# (the files are conf.d/dopeiptv.org.conf and conf.d/iptv.dope.rs.conf;
+# other paths as the first and second argument). Every line of those that
+# the live file lacks is put in where it belongs: a server's own after its
+# server_name, a location's after its first line, a map or a zone before
+# the first server. Nothing already there is changed
 # or put in twice - a header or a size the live file has with a value of
 # its own is kept, and said - so a file from before any of it gets all of
 # it, one from an earlier run what is new, and a second run changes
@@ -155,11 +157,11 @@ EOF
 FILL='
 function norm(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+#.*$/, "", s); sub(/[ \t]+$/, "", s)
                    gsub(/[ \t]+/, " ", s); return s }
-function ident(s,   w) {
-    split(s, w, " ")
-    if (w[1] == "add_header" && w[2] == "Content-Security-Policy") return s
-    if (w[1] == "add_header" || w[1] == "proxy_hide_header" || w[1] == "limit_conn") return w[1] " " w[2]
-    return w[1]
+function ident(s,   word) {
+    split(s, word, " ")
+    if (word[1] == "add_header" && word[2] == "Content-Security-Policy") return s
+    if (word[1] == "add_header" || word[1] == "proxy_hide_header" || word[1] == "limit_conn") return word[1] " " word[2]
+    return word[1]
 }
 function opens(s,   t) { t = s; sub(/#.*/, "", t); return gsub(/\{/, "", t) }
 function closes(s,   t) { t = s; sub(/#.*/, "", t); return gsub(/\}/, "", t) }
@@ -249,6 +251,8 @@ if [ -f "$OLD" ]; then
     else
         say "no https server \"server_name iptv.dope.rs;\" in $OLD - left as it is"
     fi
+else
+    say "no $OLD - the old name's file is left out (give its path as the second argument)"
 fi
 while IFS= read -r note; do say "$note"; done < "$TMP/notes"
 if [ "$site" = no ] && [ "$old" = no ]; then
