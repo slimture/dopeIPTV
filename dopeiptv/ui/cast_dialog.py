@@ -73,6 +73,23 @@ def known_ident(settings, name: str) -> str:
     return str(ids.get(name) or "") if isinstance(ids, dict) else ""
 
 
+def same_device(known: str, now: str) -> bool:
+    """Whether two of CastHub.ident's "kind:id@address" are one device: by
+    its own id where it has one - a TV the router gave another address is
+    still that TV - else by its address."""
+    def parts(ident: str) -> tuple[str, str, str]:
+        head, _, address = ident.rpartition("@")
+        kind, _, own = head.partition(":")
+        return kind, own, address
+    k_kind, k_own, k_addr = parts(known)
+    n_kind, n_own, n_addr = parts(now)
+    if k_kind != n_kind:
+        return False
+    if k_own or n_own:
+        return k_own == n_own
+    return k_addr == n_addr
+
+
 def last_first(names: list[str], last: str) -> list[str]:
     """*names* with *last* at the top - when it is there: a TV that is gone
     is just not offered first."""
@@ -488,7 +505,7 @@ class CastDialog(QDialog):
         announce itself as "Living room TV"."""
         known = known_ident(self.window.settings, name)
         now = self._hub_says("ident", name)
-        return bool(known and now and now != known)
+        return bool(known and now and not same_device(known, now))
 
     def _add_device(self, name: str) -> None:
         """*name* in the list, its address in its tooltip: which device the

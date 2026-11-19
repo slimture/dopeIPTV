@@ -89,11 +89,19 @@ def test_a_picture_s_address_with_a_login_in_it_is_not_said_on_the_bus():
     assert art_of("http://anna:pw@box.lan/logo.png") is None
     assert art_of("http://iptv.example:8080/live/anna/hunter2/12.png") is None
     assert art_of("https://emby.lan/Items/7/Images/Primary?api_key=abcdef0123") is None
-    # A plain logo's address is said as it always was; so is a local copy.
+    # A plain logo's address is said as it always was; so is a local copy
+    # where the app's own pictures are (core/picture_files.py) - never a
+    # file elsewhere.
     assert art_of("https://image.tmdb.org/t/p/w500/abc.jpg") == "https://image.tmdb.org/t/p/w500/abc.jpg"
-    assert art_of("file:///home/u/.cache/dopeiptv/images/ab12.png") == \
-        "file:///home/u/.cache/dopeiptv/images/ab12.png"
-    assert art_of("/home/u/Music/cover.jpg") == "file:///home/u/Music/cover.jpg"
+    from dopeiptv.core import picture_files
+    picture_files.trust("test-mpris", ["/home/u/.cache/dopeiptv/images", "/home/u/Music"])
+    try:
+        assert art_of("file:///home/u/.cache/dopeiptv/images/ab12.png") == \
+            "file:///home/u/.cache/dopeiptv/images/ab12.png"
+        assert art_of("/home/u/Music/cover.jpg") == "file:///home/u/Music/cover.jpg"
+        assert art_of("/home/u/secret/cover.jpg") is None
+    finally:
+        picture_files.trust("test-mpris", [])
     assert art_of("javascript:alert(1)") is None
 
 

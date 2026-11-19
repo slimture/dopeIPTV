@@ -601,3 +601,15 @@ def test_only_so_many_devices_are_remembered(window):
     window.settings.setValue(cast_dialog.LAST_DEVICE_KEY, json.dumps({"any": "Old TV"}))
     assert cast_dialog.last_device(window.settings, True) == "Old TV"
     assert cast_dialog.known_ident(window.settings, "Old TV") == ""
+
+
+def test_a_tv_the_router_moved_is_still_that_tv():
+    """A device is one by its own id where it has one: a new address from
+    the router does not make it a stranger; a new id under the same name
+    does. Without an id (a Kodi added by hand) the address decides."""
+    from dopeiptv.ui.cast_dialog import same_device
+    assert same_device("chromecast:uuid-1@192.168.1.20", "chromecast:uuid-1@192.168.1.31")
+    assert not same_device("chromecast:uuid-1@192.168.1.20", "chromecast:uuid-2@192.168.1.20")
+    assert not same_device("chromecast:uuid-1@192.168.1.20", "dlna:uuid-1@192.168.1.20")
+    assert same_device("kodi:@192.168.1.9", "kodi:@192.168.1.9")
+    assert not same_device("kodi:@192.168.1.9", "kodi:@192.168.1.10")
