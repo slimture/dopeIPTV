@@ -89,10 +89,13 @@ def _classes(route: Route, resolve: bool) -> dict[str, type]:
 
 
 def adapter(route: Route) -> Any:
-    """A requests adapter for *route*."""
-    from requests.adapters import HTTPAdapter
+    """A requests adapter for *route* - on the app's capped adapter
+    (core/_lazy_requests.py), so an answer read whole has its ceiling on a
+    route too."""
+    from ._lazy_requests import capped_adapter
+    base: Any = capped_adapter()
 
-    class NetAdapter(HTTPAdapter):
+    class NetAdapter(base):  # type: ignore[misc]
         def __init__(self) -> None:
             self.route = route
             super().__init__()
@@ -117,6 +120,7 @@ def mount(session: Any, route: Route) -> bool:
     if not route.active:
         return False
     a = adapter(route)
+    a.max_response = getattr(session, "max_response", None)
     session.mount("http://", a)
     session.mount("https://", a)
     return True
@@ -129,9 +133,11 @@ def remount(session: Any, route: Route) -> None:
         mount(session, route)
         return
     if type(session.get_adapter("https://x/")).__name__ == "NetAdapter":
-        from requests.adapters import HTTPAdapter
-        session.mount("http://", HTTPAdapter())
-        session.mount("https://", HTTPAdapter())
+        from ._lazy_requests import capped_adapter
+        for scheme in ("http://", "https://"):
+            plain = capped_adapter()()
+            plain.max_response = getattr(session, "max_response", None)
+            session.mount(scheme, plain)
 
 
 _sessions: dict[Route, Any] = {}

@@ -498,7 +498,9 @@ class ConnTest:
         return client.live_url(row["stream_id"], fmt) or "", str(row.get("name") or "")
 
     def _stream_session(self, url: str) -> Any:
-        import requests
+        # The app's own session: what it reads whole (a playlist of an
+        # adaptive stream) has a ceiling (core/_lazy_requests.py).
+        from ._lazy_requests import requests
         n = self._nerd
         session = requests.Session()
         session.headers["User-Agent"] = n.user_agent(self.opts)

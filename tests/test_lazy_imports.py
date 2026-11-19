@@ -34,4 +34,7 @@ def test_lazy_requests_proxy_resolves_the_real_module():
     assert requests.Session is not None
     assert issubclass(requests.RequestException, Exception)
     import requests as real
-    assert requests.get is real.get
+    assert requests.RequestException is real.RequestException and requests.auth is real.auth
+    # Its calls and sessions are the stand-in's own, on requests': what they
+    # read whole has a ceiling (tests/test_response_cap.py).
+    assert requests.get is not real.get and issubclass(requests.Session, real.Session)

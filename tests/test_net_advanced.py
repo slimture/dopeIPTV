@@ -452,7 +452,8 @@ def test_make_client_mounts_the_route_and_hands_it_to_the_guide():
     nerd.install(S(nerd_enabled="false", nerd_dns="quad9"))
     c = make_client({"kind": "m3u", "server": "http://provider.example/list.m3u"})
     assert not c.net_route.active
-    assert type(c.session.get_adapter("https://provider.example/")).__name__ == "HTTPAdapter"
+    # The app's own adapter on requests' (core/_lazy_requests.py): no route.
+    assert type(c.session.get_adapter("https://provider.example/")).__name__ == "CappedAdapter"
 
 
 def test_a_settings_change_reaches_the_clients_session():
@@ -462,8 +463,8 @@ def test_a_settings_change_reaches_the_clients_session():
     assert type(s.get_adapter("https://x/")).__name__ == "HTTPAdapter"
     net_adapter.remount(s, Route(family="ipv4"))
     assert type(s.get_adapter("https://x/")).__name__ == "NetAdapter"
-    net_adapter.remount(s, Route())                     # off again: requests' own back
-    assert type(s.get_adapter("http://x/")).__name__ == "HTTPAdapter"
+    net_adapter.remount(s, Route())                     # off again: no route's adapter
+    assert type(s.get_adapter("http://x/")).__name__ == "CappedAdapter"
 
 
 def test_a_restore_shows_a_trusted_certificate_and_an_own_dns_server():

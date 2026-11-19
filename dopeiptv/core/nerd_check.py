@@ -233,7 +233,7 @@ def check_ip_family(url: str, family: str, timeout: float = 4.0) -> Check:
 
 def check_udpxy(url: str, timeout: float = 5.0) -> Check:
     """udpxy's status page: there and answering."""
-    import requests
+    from ._lazy_requests import requests
     base = url.strip().rstrip("/")
     if "://" not in base:
         base = "http://" + base

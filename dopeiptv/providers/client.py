@@ -827,8 +827,18 @@ class M3UClient(OfflineClient):
             from urllib.parse import urlparse
             from urllib.request import url2pathname
             url = url2pathname(urlparse(url).path)
+        from ..core import picture_files
+        from ..core._lazy_requests import LIST_MAX
         with open(url, "rb") as fh:
-            raw = fh.read()
+            # As far as a playlist from the network is read, and no further
+            # (a path that is no file - a device - never ends).
+            raw = fh.read(LIST_MAX + 1)
+        if len(raw) > LIST_MAX:
+            raise ValueError(f"the playlist is larger than {LIST_MAX >> 20} MB")
+        # A playlist file of the person's own may name logos beside it:
+        # its folder is one the image loader reads pictures from
+        # (core/picture_files.py).
+        picture_files.trust_also("playlists", os.path.dirname(os.path.abspath(url)))
         try:
             return raw.decode("utf-8-sig")
         except UnicodeDecodeError:
@@ -1140,6 +1150,10 @@ def make_client(playlist: dict):
     route = net_route.route_for(source)
     session = getattr(client, "session", None)
     if session is not None:
+        # A source's lists and playlists are the largest answers there are:
+        # their own ceiling, above any real one (core/_lazy_requests.py).
+        from ..core._lazy_requests import LIST_MAX
+        session.max_response = LIST_MAX
         nerd.current().apply_session(session, source)
         if route.active:
             from ..core import net_adapter
