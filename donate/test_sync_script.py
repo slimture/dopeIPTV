@@ -123,3 +123,111 @@ def test_a_release_whose_tag_is_not_a_version_is_never_used(base, tmp_path):
     assert "the latest release's tag is not a version number" in run.stderr
     assert json.loads((b / "public" / "releases.json").read_text())["version"] == "1.6.6"
     assert "</script><script" not in (b / "public" / "i18n" / "en" / "index.html").read_text(encoding="utf-8")
+
+
+# -- a release mirrored only as its signed checksum list says ------------------------
+
+def _github(tmp_path, b, env, seed: bytes, change=None, extra=None):
+    """A stand-in GitHub serving a release of three installers and its
+    SHA256SUMS signed with *seed*; the site's check carries the public half
+    of a test key. *change*: a file whose bytes GitHub serves (with its own
+    digest) differing from the list; *extra*: a file left off the list."""
+    import base64
+    import sys
+    sys.path.insert(0, HERE)
+    import ed25519
+    test_seed = b"\x07" * 32
+    (b / "donate").mkdir()
+    shutil.copy(os.path.join(HERE, "ed25519.py"), b / "donate" / "ed25519.py")
+    src = open(os.path.join(HERE, "release_sums.py"), encoding="utf-8").read()
+    real = re.search(r'KEYS: tuple\[str, \.\.\.\] = \(\n    "([^"]+)",', src).group(1)
+    (b / "donate" / "release_sums.py").write_text(
+        src.replace(real, base64.b64encode(ed25519.public_key(test_seed)).decode()))
+    srv = tmp_path / "srv"
+    srv.mkdir()
+    names = ["dopeIPTV-1.6.7-x86_64.AppImage", "dopeIPTV-1.6.7-macOS-arm64.dmg",
+             "dopeIPTV-1.6.7-windows-x64-setup.exe"]
+    if extra:
+        names.append(extra)
+    sums = ""
+    for n in names:
+        data = f"the bytes of {n}\n".encode()
+        (srv / n).write_bytes(data)
+        if n != extra:
+            sums += f"{hashlib.sha256(data).hexdigest()}  {n}\n"
+    (srv / "SHA256SUMS").write_text(sums)
+    (srv / "SHA256SUMS.sig").write_text(base64.b64encode(ed25519.sign(seed, sums.encode())).decode() + "\n")
+    if change:
+        (srv / change).write_bytes(b"something else entirely\n")
+    assets = [{"name": n, "size": (srv / n).stat().st_size, "state": "uploaded",
+               "browser_download_url": f"https://gh.test/{n}",
+               "digest": "sha256:" + hashlib.sha256((srv / n).read_bytes()).hexdigest()}
+              for n in [*names, "SHA256SUMS", "SHA256SUMS.sig"]]
+    (srv / "latest.json").write_text(json.dumps({"tag_name": "v1.6.7", "published_at": "2026-11-20T10:00:00Z",
+                                                 "body": "Notes.", "html_url": "https://github.com/x",
+                                                 "assets": assets}))
+    (tmp_path / "bin" / "fetch").write_text(
+        "#!/bin/sh\nout=\nprev=\nfor a in \"$@\"; do\n  [ \"$prev\" = -o ] && out=$a\n  prev=$a\ndone\n"
+        f"case \"$a\" in\n  */releases/latest) cp {srv}/latest.json \"$out\" ;;\n"
+        f"  https://gh.test/*) cp \"{srv}/${{a##*/}}\" \"$out\" ;;\n  *) exit 1 ;;\nesac\n")
+    (b / "public" / "files").mkdir(exist_ok=True)
+    return test_seed, _run(b, env)
+
+
+def _version(b) -> str:
+    return json.loads((b / "public" / "releases.json").read_text())["version"]
+
+
+def test_a_release_signed_with_the_key_is_mirrored_with_its_signed_checksums(base, tmp_path):
+    b, env = base
+    _seed, run = _github(tmp_path, b, env, b"\x07" * 32)
+    assert run.returncode == 0, run.stderr
+    assert _version(b) == "1.6.7", run.stderr
+    files = sorted(p.name for p in (b / "public" / "files").iterdir())
+    assert files == ["SHA256SUMS", "dopeIPTV-1.6.7-macOS-arm64.dmg", "dopeIPTV-1.6.7-windows-x64-setup.exe",
+                     "dopeIPTV-1.6.7-x86_64.AppImage"]
+    rel = json.loads((b / "public" / "releases.json").read_text())
+    assert rel["sha256sums"] == (tmp_path / "srv" / "SHA256SUMS").read_text()
+    assert rel["sha256sums_sig"].strip()
+
+
+def test_a_release_not_signed_with_the_key_never_reaches_the_site(base, tmp_path):
+    b, env = base
+    _seed, run = _github(tmp_path, b, env, b"\x09" * 32)
+    assert "not signed with dopeIPTV's release key - keeping the site as it is" in run.stderr
+    assert _version(b) == "1.6.6" and not list((b / "public" / "files").iterdir())
+
+
+def test_a_file_unlike_the_signed_list_or_not_on_it_keeps_the_release_out(base, tmp_path):
+    b, env = base
+    _seed, run = _github(tmp_path, b, env, b"\x07" * 32, change="dopeIPTV-1.6.7-macOS-arm64.dmg")
+    assert "dopeIPTV-1.6.7-macOS-arm64.dmg: GitHub's checksum is not the signed one" in run.stderr
+    assert _version(b) == "1.6.6"
+    assert not (b / "public" / "files" / "dopeIPTV-1.6.7-macOS-arm64.dmg").exists()
+
+
+def test_a_file_left_off_the_signed_list_keeps_the_release_out(base, tmp_path):
+    b, env = base
+    _seed, run = _github(tmp_path, b, env, b"\x07" * 32, extra="dopeIPTV-1.6.7-windows-x64.zip")
+    assert "dopeIPTV-1.6.7-windows-x64.zip is not on the signed checksum list" in run.stderr
+    assert _version(b) == "1.6.6"
+
+
+def test_the_check_says_why_a_list_is_refused():
+    import base64
+    import sys
+    sys.path.insert(0, HERE)
+    import ed25519
+    import release_sums
+    seed = b"\x05" * 32
+    key = (base64.b64encode(ed25519.public_key(seed)).decode(),)
+    good = b"%s  dopeIPTV-1.6.7.flatpak\n" % (b"a" * 64)
+    sig = base64.b64encode(ed25519.sign(seed, good))
+    assert release_sums.why_not(good, sig, key) == ""
+    assert "no SHA256SUMS" in release_sums.why_not(b"", sig, key)
+    assert "not base64" in release_sums.why_not(good, b"%%%", key)
+    assert "not signed" in release_sums.why_not(good + b"\n", sig, key)
+    assert "not signed" in release_sums.why_not(good, sig)          # the real key: not this one
+    odd = b"%s  ../../etc/passwd\n" % (b"a" * 64)
+    assert "not a checksum and a file name" in release_sums.why_not(
+        odd, base64.b64encode(ed25519.sign(seed, odd)), key)

@@ -93,7 +93,12 @@ What the PHP version worked out on every request is split in two:
 
 - **Once per sync**, every 15 minutes: `sync-releases.sh` mirrors the release
   and renders every page for every language into `public/i18n/<lang>/`, plus
-  the sitemap. Download counts come from nginx's log of `/dl.php`.
+  the sitemap. Download counts come from nginx's log of `/dl.php`. A release
+  is mirrored only when its tag is a version number and its `SHA256SUMS` is
+  signed with dopeIPTV's release key (`donate/release_sums.py`, the public
+  half as in the app's `dopeiptv/core/update_keys.py` - a new key goes in
+  both), and only files on that list with its checksum; otherwise the
+  release already here stays.
 - **Per request**, in `deploy/content-iptv.dope.rs.conf`: nginx picks the
   language - `?lang=` (remembered in a cookie for a year), else the cookie,
   else the first language in the browser's `Accept-Language` that the site

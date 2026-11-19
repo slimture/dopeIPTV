@@ -39,6 +39,9 @@ DL_LOG=${IPTV_DOWNLOAD_LOG:-/var/log/nginx/iptv.dope.rs-downloads.log}
 LOG_STATE=$BASE/.downloads-log.state
 REPO=slimture/dopeIPTV
 UA=dopeiptv-site-sync
+# The donation service's Python (deploy/iptv_donate), for the release check.
+PY=${IPTV_PYTHON:-/usr/local/bin/python3}
+[ -x "$PY" ] || PY=python3
 TAB=$(printf '\t')
 US=$(printf '\037')   # field separator that is not whitespace: empty fields stay fields
 
@@ -282,6 +285,18 @@ missing=$(jq -r '
 if [ -n "$missing" ]; then
     say "v$version incomplete (missing $missing); still building - keeping the current release, retry next run"
 else
+    # ---- The signed checksum list ------------------------------------------------
+    # SHA256SUMS signed with dopeIPTV's release key (release.yml, the key in
+    # donate/release_sums.py as in the app's core/update_keys.py), checked
+    # before anything is fetched: only a file on that list, with that
+    # checksum, goes out - so a release published by someone without the key
+    # never reaches the site, as the app never installs one.
+    fetch_signed "$API" "$TMP/gh-sums"
+    if ! why=$("$PY" -I "$BASE/donate/release_sums.py" "$TMP/gh-sums" "$TMP/gh-sums.sig" 2>&1); then
+        say "v$version: ${why:-the checksum list could not be checked} - keeping the site as it is"
+        exit 1
+    fi
+
     # ---- Mirror the installers ---------------------------------------------------
     # Only what end users install: the wheel and the source tarball are left
     # on GitHub. Fetched when missing, a different size, or when GitHub's
@@ -304,11 +319,25 @@ else
         dest=$FILES/$name
         have=-1
         [ -f "$dest" ] && have=$(wc -c < "$dest" | tr -d ' ')
-        want=""
-        case $digest in sha256:*) want=${digest#sha256:} ;; esac
+        # The checksum the signed list gives it - none, and it does not go out.
+        want=$(awk -v n="$name" '$2 == n || $2 == "*" n { print $1; exit }' "$TMP/gh-sums")
+        if [ -z "$want" ]; then
+            say "$name is not on the signed checksum list"
+            failed="$failed $name"
+            continue
+        fi
+        case $digest in
+            sha256:*) if [ "${digest#sha256:}" != "$want" ]; then
+                          say "$name: GitHub's checksum is not the signed one"
+                          failed="$failed $name"
+                          continue
+                      fi ;;
+        esac
         had=""
         [ -f "$FILES/SHA256SUMS" ] && had=$(awk -v n="$name" '$2 == n { print $1; exit }' "$FILES/SHA256SUMS")
-        if [ "$have" != "$size" ] || { [ -n "$want" ] && [ -n "$had" ] && [ "$had" != "$want" ]; }; then
+        # A file here that no list here names is read once to know what it is.
+        [ -z "$had" ] && [ "$have" = "$size" ] && had=$(sha256 -q "$dest")
+        if [ "$have" != "$size" ] || [ "$had" != "$want" ]; then
             printf '[sync] fetching %s (%s bytes) ... ' "$name" "$size" >&2
             part=$dest.part.$$
             if ! fetch -q -T 1800 --user-agent="$UA" -o "$part" "$url"; then
@@ -317,10 +346,10 @@ else
                 failed="$failed $name"
                 continue
             fi
-            # Against GitHub's own digest, while the bytes are in hand: a
-            # truncated download must never go out advertised with the
-            # right checksum.
-            if [ -n "$want" ] && [ "$(sha256 -q "$part")" != "$want" ]; then
+            # Against the signed checksum, while the bytes are in hand: a
+            # truncated or changed download must never go out advertised
+            # with the right checksum.
+            if [ "$(sha256 -q "$part")" != "$want" ]; then
                 rm -f "$part"
                 echo "CORRUPT (sha256 mismatch)" >&2
                 failed="$failed $name"
@@ -336,11 +365,7 @@ else
         else
             say "$name already current"
         fi
-        sha=$want
-        if [ -z "$sha" ] && [ -f "$dest" ]; then
-            sha=$(sha256 -q "$dest")
-        fi
-        printf '%s\t%s\n' "$name" "$sha" >> "$TMP/mirrored.tsv"
+        printf '%s\t%s\n' "$name" "$want" >> "$TMP/mirrored.tsv"
     done < "$TMP/assets.tsv"
 
     # A download that failed is a half-built release too: keep what is
@@ -368,10 +393,10 @@ else
         fi
     done
 
-    # The release's checksum list and its signature by dopeIPTV's key, as
-    # GitHub has them: the app installs an update only with that signature
-    # (dopeiptv/core/selfupdate.py, signed_asset).
-    fetch_signed "$API" "$TMP/gh-sums"
+    # The release's checksum list and its signature by dopeIPTV's key (in
+    # $TMP/gh-sums, checked above) go into releases.json: the app installs
+    # an update only with that signature (dopeiptv/core/selfupdate.py,
+    # signed_asset).
 
     # releases.json, the release the pages are rendered from, in the shape
     # and layout the PHP sync wrote it.
