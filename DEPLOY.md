@@ -194,7 +194,7 @@ The rest of what PHP did:
 
 ```sh
 curl -sSI 'https://iptv.dope.rs/?lang=sv' | grep -i -E '^(set-cookie|content-security-policy):'
-#   set-cookie: lang=sv; Max-Age=31536000; path=/
+#   set-cookie: lang=sv; Max-Age=31536000; path=/; Secure; SameSite=Lax
 #   content-security-policy: default-src 'self'; ...      (the TLS proxy's, unchanged)
 curl -s -H 'Accept-Language: de-DE,de;q=0.9' https://iptv.dope.rs/ | grep -o '<html lang="[a-z]*"'
 #   <html lang="de"

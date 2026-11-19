@@ -383,3 +383,15 @@ def test_a_log_line_holds_only_so_much_of_what_was_sent():
     dl = "".join(next(f for f in top.all("log_format") if f.args[0] == "iptv_dl").args[1:])
     assert dl.split('"')[1] == "$iptv_log_request" and dl.split('"')[5] == "$iptv_log_ua"
     assert dl.startswith("$remote_addr - - [$time_local] ") and dl.endswith('"$http_x_real_ip"')
+
+
+def test_the_language_cookie_goes_over_https_and_only_from_the_site():
+    top = conf()
+    assert map_value(top, "$iptv_set_cookie", "") == ""
+    assert map_value(top, "$iptv_set_cookie", "sv") == \
+        "lang=$iptv_lang_arg; Max-Age=31536000; path=/; Secure; SameSite=Lax"
+    # Every page that sets it sets it from that map, and only that.
+    for loc in _locations(_server(top).body):
+        for value in loc.values("add_header"):
+            if value.startswith("Set-Cookie"):
+                assert value.split()[1] == "$iptv_set_cookie", loc
