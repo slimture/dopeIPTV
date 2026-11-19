@@ -20,6 +20,16 @@
  * hide the first, so both are asked. */
 var IPTV_CR = !!(navigator.userAgentData || window.chrome || navigator.brave);
 if (IPTV_CR) { document.documentElement.classList.add("cr"); }
+/* A phone or tablet (app.js says how it is told): dopeIPTV is a computer's
+ * app, so the header's Download button stays off on every page, not only
+ * the front page (style.css, .handheld .bar .btn). */
+(function () {
+  var ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod|Android|Mobile/i.test(ua) ||
+      (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+    document.documentElement.classList.add("handheld");
+  }
+})();
 
 var iptvHit = (function () {
   "use strict";

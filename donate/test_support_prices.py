@@ -154,6 +154,28 @@ def test_the_heart_says_support_us_and_the_footer_the_country():
     assert "· Örebro, Sverige ·" in _support("", "", "sv", page="terms")
 
 
+def test_every_page_has_the_one_footer():
+    # One footer for every page (render.jq, site_footer): the three groups,
+    # the payment terms among the legal links, and on the company line that
+    # dopeIPTV holds no channels - once, not a sentence of its own.
+    import glob
+    for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
+        have = json.load(open(f, encoding="utf-8"))
+        for k in ("foot_tagline", "foot_h_app", "foot_h_contact", "foot_h_legal", "foot_nocontent"):
+            assert have.get(k), (f, k)
+    for t in glob.glob(os.path.join(SITE, "templates", "*.html")):
+        text = open(t, encoding="utf-8").read()
+        if "</body>" in text:
+            assert "{{v:footer}}" in text and "<footer>" not in text, t
+    for page in ("terms", "support"):
+        en = _support("", "", "en", page=page)
+        foot = en.split("<footer>", 1)[1]
+        assert foot.count('class="foot-col"') == 3
+        assert 'href="/payments/"' in foot and 'href="/about/"' in foot and "data-feedback" in foot
+        assert "· No channels or content included.</p>" in foot
+        assert "foot-nocontent" not in en
+
+
 def test_nginx_serves_every_legal_page():
     # A page sync-releases.sh renders but nginx does not route is a 404 on
     # the live site - which /payments/ was, its first hour.

@@ -351,14 +351,44 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 .autonote a.verify-link { color: var(--accent); font-weight: 600; }
 .autonote a.verify-link:hover { text-decoration: underline; }
 
-footer { background: var(--surface); padding: 28px 0 44px; margin-top: 24px; }
-footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+/* The footer (render.jq, site_footer): dopeIPTV and what it is beside the
+   links in three small groups; under a hairline Solecraft, the version and
+   the company line. On a phone the brand goes over the groups, two columns
+   of them (the app's beside contact and legal), each link a finger's room. */
+footer { background: var(--surface); padding: 44px 0 36px; margin-top: 24px; }
+footer .foot-top { display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 32px 56px; flex-wrap: wrap; }
+footer .foot-brand { max-width: 300px; }
+footer .foot-mark { display: inline-flex; align-items: center; gap: 10px; color: var(--text); }
+footer .foot-mark .logo { width: 24px; height: 24px; flex: none; }
+footer .foot-mark .logo rect { fill: var(--brand); }
+footer .foot-mark .logo path { fill: #fff; }
+footer .foot-mark b { font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -.02em; }
+footer .foot-tag { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+footer .foot-cols { display: grid; grid-template-columns: repeat(3, auto); gap: 24px 56px; }
+footer .foot-h { margin: 0 0 12px; font-size: 12px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--faint); }
+footer .foot-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+footer .foot-col a { color: var(--muted); font-size: 14px; }
+footer .foot-col a:hover { color: var(--accent); }
+footer .foot-base { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line);
+  display: grid; gap: 10px; }
+footer .foot-maker { display: flex; align-items: center; justify-content: space-between;
+  gap: 8px 16px; flex-wrap: wrap; }
 footer .v { font-size: 12.5px; color: var(--faint); }
-/* wrap: four links do not fit on one line at 320px, and a footer is no
-   reason for the whole page to scroll sideways. */
-footer nav { display: flex; gap: 22px; flex-wrap: wrap; }
-footer nav a { color: var(--muted); font-size: 12.5px; }
-footer nav a:hover { color: var(--accent); }
+footer .foot-company { margin: 0; color: var(--faint); font-size: 12.5px; line-height: 1.6; }
+footer .foot-company a { color: inherit; }
+footer .foot-company bdi { white-space: nowrap; }
+footer .foot-company a:hover { color: var(--accent); }
+@media (max-width: 720px) {
+  footer { padding: 36px 0 30px; }
+  footer .foot-top { flex-direction: column; gap: 28px; }
+  footer .foot-cols { grid-template-columns: 1fr 1fr; gap: 22px 24px; width: 100%; }
+  footer .foot-col:first-child { grid-row: span 2; }
+  footer .foot-col ul { gap: 2px; }
+  footer .foot-col a { display: inline-block; padding: 8px 0; font-size: 15px; }
+  footer .foot-base { margin-top: 28px; }
+}
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 
@@ -1005,7 +1035,6 @@ footer .v a { color: inherit; }
 /* Solecraft's logotype (its S is the company's mark) as the footer's own
    sign, the copyright line under it; drawn in a text colour, so it follows
    both themes. */
-footer .maker { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
 footer .sole { display: block; color: var(--muted); line-height: 0; position: relative; }
 footer .sole:hover { color: var(--text); }
 /* Who made it, on hover: a label of the site's own rather than the browser's
@@ -1170,13 +1199,6 @@ footer .v a:hover { color: var(--accent); }
   .perk { padding: 18px 12px 16px; }
   .sp-q > summary h3 { font-size: 16px; }
 }
-/* Every footer: who makes dopeIPTV, where to reach them, and that it holds
-   no channels - small print, but on every page. */
-footer .foot-legal { flex-basis: 100%; margin-top: 4px; }
-footer .foot-company, footer .foot-nocontent { margin: 0; color: var(--faint);
-  font-size: 12.5px; line-height: 1.5; }
-footer .foot-nocontent { margin-top: 2px; }
-footer .foot-company a { color: inherit; }
 /* The supporter key under the thank-you: the key itself, set apart, to copy
    or hand to the app. */
 .dn-key { margin-top: 14px; padding: 14px; border-radius: 14px; width: 100%; box-sizing: border-box;
@@ -1437,7 +1459,9 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 .is-phone #support .donate {
   background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
     var(--bg); }
-.is-phone .bar .btn { display: none; }
+.is-phone .bar .btn, .handheld .bar .btn { display: none; }
+/* Before nav.js has said so: a touch screen that narrow is a phone. */
+@media (max-width: 760px) and (pointer: coarse) { .bar .btn { display: none; } }
 
 /* ---- motion ------------------------------------------------------------- */
 /* Apple-style, and quiet: what scrolls into view rises into place (app.js

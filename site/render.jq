@@ -272,14 +272,46 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                  langpick: $langpick,
                  menuitems: ($menuitems + (if $SUPPORT_ON then $menudonate else "" end))}))
       + tip_i18n + feedback_i18n;
-  # Every footer: who makes dopeIPTV, where to reach them, and that it holds
-  # no channels - in plain sight on every page (Stripe's review, the Swedish
-  # E-Commerce Act's section 8).
-  def company_line:
-    "    <div class=\"foot-legal\">\n"
-    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a></p>\n"
-    + "      <p class=\"foot-nocontent\">\(t("foot_nocontent") | h)</p>\n"
-    + "    </div>\n";
+  # Every page's footer, one for all: dopeIPTV and what it is, the links in
+  # three small groups, and under a hairline who makes it, where to reach
+  # them and that it holds no channels - in plain sight on every page
+  # (Stripe's review, the Swedish E-Commerce Act's section 8).
+  def foot_group($head; $links):
+    "      <div class=\"foot-col\">\n"
+    + "        <h2 class=\"foot-h\">\($head | h)</h2>\n"
+    + "        <ul>\n"
+    + ([$links[] | "          <li><a href=\"\(.[0] | h)\"\(.[2] // "")>\(.[1] | h)</a></li>\n"] | add)
+    + "        </ul>\n"
+    + "      </div>\n";
+  def site_footer:
+    "<footer>\n"
+    + "  <div class=\"wrap\">\n"
+    + "    <div class=\"foot-top\">\n"
+    + "      <div class=\"foot-brand\">\n"
+    + "        <a class=\"foot-mark\" href=\"/\"><svg class=\"logo\" viewBox=\"0 0 100 100\" aria-hidden=\"true\" focusable=\"false\"><rect width=\"100\" height=\"100\" rx=\"22\"/><path d=\"M38 28v44l36-22z\"/></svg><b>dopeIPTV</b></a>\n"
+    + "        <p class=\"foot-tag\">\(t("foot_tagline") | h)</p>\n"
+    + "      </div>\n"
+    + "      <nav class=\"foot-cols\">\n"
+    + foot_group(t("foot_h_app");
+        [["/#download", t("nav_download")], ["/help/", t("nav_help")],
+         ["https://github.com/slimture/dopeIPTV/releases", t("footer_releases")],
+         ["https://github.com/slimture/dopeIPTV", "GitHub"]])
+    + foot_group(t("foot_h_contact");
+        [["#feedback", t("foot_feedback"), " data-feedback"], ["/about/", t("foot_about")]]
+        + (if $SUPPORT_ON then [["/support/", t("support_nav")]] else [] end))
+    + foot_group(t("foot_h_legal");
+        [["/privacy/", t("foot_privacy_terms")], ["/payments/", t("foot_payments")]])
+    + "      </nav>\n"
+    + "    </div>\n"
+    + "    <div class=\"foot-base\">\n"
+    + "      <div class=\"foot-maker\">\n"
+    + "        <a class=\"sole\" href=\"https://solecraft.se/\" rel=\"noopener\" aria-label=\"\(t("footer_built_by") | h)\" data-tip=\"\(t("footer_built_by") | h)\"><span class=\"sole-logo\">Solecraft</span></a>\n"
+    + "        <span class=\"v\">dopeIPTV\(($R.version // "" | tostring) as $v | if ($v | truthy) then " " + ($v | h) else "" end) · © \($year | h) Solecraft AB</span>\n"
+    + "      </div>\n"
+    + "      <p class=\"foot-company\">\(t("foot_made_by") | gsub("%COMPANY%"; $COMPANY) | h) · \(t("foot_orgnr") | h) <bdi>\($ORGNR | h)</bdi> · \(t("foot_place") | gsub("%TOWN%"; $TOWN) | h) · <a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a> · \(t("foot_nocontent") | h)</p>\n"
+    + "    </div>\n"
+    + "  </div>\n"
+    + "</footer>\n";
   def common:
     {lang: ($lang | h),
      dir: (if ($S.rtl | index($lang)) then "rtl" else "ltr" end),
@@ -289,7 +321,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
      featjs: ($asset_urls["/features.js"] // "/features.js" | h),
      # Without a hash (an older sync-releases.sh) still the file, not "null".
      eventsjs: ($asset_urls["/events.js"] // "/events.js" | h),
-     year: $year, company: company_line};
+     year: $year, footer: site_footer};
 
 # -- index.php ----------------------------------------------------------------
 
@@ -603,7 +635,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                 " · <a class=\"wn-link\" href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\" data-wn>\(t("wn_h2") | h)</a>" end)),
          downloads: downloads($version; $reldate),
          donate: (if $SUPPORT_ON then support_band else "" end),
-         donate_footer: (if $SUPPORT_ON then "      <a href=\"/support/\">\(t("support_nav") | h)</a>\n" else "" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
          # What's new: the notes in a <template>, opened in a dialog from the
          # link beside the version (app.js) - no section of their own.
@@ -682,8 +713,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
              + (if ($g.features // "") != "" then
                   "            <a class=\"help-sec-more\" href=\"/features/#\($g.features | h)\">\(t("help_features_link") | h)</a>\n"
                 else "" end)
-             + "          </section>\n"] | add // ""),
-         help_version: (if ($version | truthy) then " " + ($version | h) else "" end)});
+             + "          </section>\n"] | add // "")});
 
 # -- /features/ -------------------------------------------------------------------
 # Everything the app does, a line each: site/features.json lists the groups
@@ -714,8 +744,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                       else "" end)
                    + "</li>\n"] | add // "")
              + "            </ul>\n"
-             + "          </section>\n"] | add // ""),
-         fl_version: (if ($version | truthy) then " " + ($version | h) else "" end)});
+             + "          </section>\n"] | add // "")});
 
 # -- 404.php --------------------------------------------------------------------
 
