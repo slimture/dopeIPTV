@@ -26,6 +26,7 @@ assessment of each. The findings, and what came of them:
 | Error reports | The pattern scrub missed quoted and JSON values, Authorization and Cookie lines, bearer tokens, addresses without a scheme | medium | 1.6.8 |
 | Settings sync | The slot alone let anyone who learnt it read, replace or delete a household's copy | high | 1.6.9 + website: a credential from the code (`auth_of`, `X-Sync-Auth`) the server keeps only a hash of; a bound slot refuses requests without it |
 | Settings sync | A slot only an older app has written stays unbound, so its slot alone still opens it | medium | 1.6.9: the first round of a computer with this version writes the slot with its credential even when nothing changed, binding it at once |
+| Settings sync | Whoever held the sync code could change a playlist's proxy, headers, rewrite, DNS or trusted certificate in the copy, and it was taken without a word (red team) | high | 1.6.9: those settings are held back, said on a card and taken only on Review's Apply |
 | Settings sync | The server could hand back an earlier copy unnoticed | medium | 1.6.8: a counter sealed in every copy; an earlier copy is told and this computer's put back |
 | Settings sync | The counter is no freshness guarantee for a computer that has never synced, and the server can withhold a copy | info | Written down: inherent to a server that stores; the transparency page says so |
 | Settings sync | Requests could follow a redirect or go over plain http | low | 1.6.8: https only, no redirect followed |

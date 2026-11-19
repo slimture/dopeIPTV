@@ -69,6 +69,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   logged unredacted), and the system is no longer told the title as the
   reason the screen stays awake.
 
+- core/sync.py, ui/sync_review.py: sync can no longer reroute a playlist
+  behind the person's back. Whoever held a household's sync code could
+  change an existing playlist's proxy, extra headers, address rewrite,
+  udpxy, catch-up address, backup addresses, own DNS server or trusted
+  certificate in the synced copy, and the next round wrote it in without a
+  word. These settings now never arrive by themselves: this computer keeps
+  its own (a playlist new from sync comes without them), a card says which
+  playlist and which settings wait, and Review shows each beside this
+  computer's, with Apply and Keep mine. Nothing changes for anyone who
+  never uses these settings. Found in a red-team review.
 ## [1.6.8]
 
 ### Security

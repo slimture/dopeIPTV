@@ -154,7 +154,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 
 **Sync between computers** (`sync`) - "Sync" in the sidebar, for everyone
 - (untitled): start or join, what syncs (`sync_cats`), the code, Sync now,
-  stop
+  connection settings from sync waiting to be reviewed (an action, shown
+  only while any wait), stop
 - Encrypted, and nothing about you: what dopeiptv.org gets, in plain words
 
 **Integrations** (`integrations`)
