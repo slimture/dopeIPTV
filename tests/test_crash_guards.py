@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
+
+import pytest
 
 from dopeiptv.providers import airplay_bridge as ab
 
@@ -41,6 +45,40 @@ def test_a_reused_pid_that_is_not_ffmpeg_is_left_alone(tmp_path, monkeypatch):
     monkeypatch.setattr(ab.os, "kill", lambda pid, sig: killed.append(pid))
     assert ab.sweep_leftovers(str(tmp_path), run=lambda *a, **k: Out()) == 0
     assert not killed and not left.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX processes")
+def test_another_running_copy_s_airplay_cast_is_never_ended(tmp_path):
+    """Two copies of the app may run: one starting AirPlay sweeps only the
+    runs of a copy that is gone, never a live one's ffmpeg."""
+    sleeper = [sys.executable, "-c", "import time; time.sleep(60)"]
+    owner = subprocess.Popen(sleeper)           # the other copy of the app
+    ffmpeg = subprocess.Popen(sleeper)          # its ffmpeg, pulling the channel
+    try:
+        live = tmp_path / f"airplay-{owner.pid}-x1"
+        live.mkdir()
+        (live / ab.PIDFILE).write_text(str(ffmpeg.pid))
+
+        class Out:
+            stdout = "ffmpeg\n"
+
+        assert ab.sweep_leftovers(str(tmp_path), run=lambda *a, **k: Out()) == 0
+        assert live.exists() and ffmpeg.poll() is None, "a live copy's cast goes on"
+        owner.kill()
+        owner.wait(10)
+        assert ab.sweep_leftovers(str(tmp_path), run=lambda *a, **k: Out()) == 1
+        assert not live.exists() and ffmpeg.wait(10) is not None, "a gone copy's is ended"
+    finally:
+        for p in (owner, ffmpeg):
+            if p.poll() is None:
+                p.kill()
+                p.wait(10)
+
+
+def test_a_run_folder_names_its_copy():
+    assert ab._owner(ab.folder_prefix() + "abc") == os.getpid()
+    assert ab._alive(os.getpid())
+    assert ab._owner("airplay-abc") is None, "an older version's: a leftover as before"
 
 
 def test_the_player_core_drops_mpvs_unused_scripts_where_it_can(monkeypatch):
