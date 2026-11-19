@@ -35,3 +35,43 @@ def test_every_answer_of_the_site_carries_its_security_headers():
     refer = re.search(r"map \$uri \$dopeiptv_referrer \{(.*?)\}", text, re.S).group(1)
     for path in ("/admin", "/support", "/trakt/"):
         assert re.search(r"~\^%s\S*\s+\"no-referrer\";" % re.escape(path), refer), path
+
+
+def test_the_script_puts_in_what_the_file_shows_and_keeps_the_rest(tmp_path):
+    # deploy/proxy-headers.sh on the proxy's file as it was before the
+    # headers (CONTENT_HOST already the real address): the same header
+    # lines as the repo's file, an add_header of the http block named
+    # again, the addresses untouched, a copy kept, a second run a no-op.
+    import shutil
+    import subprocess
+    before = subprocess.run(["git", "-C", os.path.dirname(HERE), "show", "39752db:deploy/proxy-dopeiptv.org.conf"],
+                            capture_output=True, text=True)
+    if before.returncode:
+        import pytest
+        pytest.skip("no git history here")
+    ngx = tmp_path / "nginx"
+    (ngx / "conf.d").mkdir(parents=True)
+    (ngx / "nginx.conf").write_text("http {\n    include csp-map.conf;\n    add_header Content-Security-Policy $csp_policy;\n"
+                                    "    add_header X-Global \"1\";\n    server { location /f { add_header X-Inner 2; } }\n"
+                                    "    include conf.d/*.conf;\n}\n")
+    (ngx / "csp-map.conf").write_text("map $server_name $csp_policy { default \"x\"; }\n")
+    live = ngx / "conf.d" / "dopeiptv.org.conf"
+    live.write_text(before.stdout.replace("CONTENT_HOST", "10.0.0.5"))
+    keep = tmp_path / "keep"
+    keep.mkdir()
+    env = dict(os.environ, NGINX_DIR=str(ngx), NGINX_TEST="true", NGINX_RELOAD="true", BACKUP_DIR=str(keep))
+    script = os.path.join(os.path.dirname(HERE), "deploy", "proxy-headers.sh")
+    run = subprocess.run(["sh", script], env=env, capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr + run.stdout
+    assert 'kept from the http block: add_header X-Global "1";' in run.stdout and "X-Inner" not in run.stdout
+    got = live.read_text()
+    want = open(CONF, encoding="utf-8").read()
+    for line in [ln for ln in want.splitlines() if not ln.lstrip().startswith("#")
+                 and ("add_header" in ln or "proxy_hide_header" in ln or "no-referrer" in ln)]:
+        assert line in got, line
+    assert '    add_header X-Global "1";' in _servers(got)["dopeiptv.org"]
+    assert "CONTENT_HOST" not in got and got.count("10.0.0.5:8081") == 4
+    assert [p.read_text() for p in keep.iterdir()] == [before.stdout.replace("CONTENT_HOST", "10.0.0.5")]
+    again = subprocess.run(["sh", script], env=env, capture_output=True, text=True)
+    assert again.returncode == 0 and "nothing changed" in again.stdout and live.read_text() == got
+    assert shutil.which("sh")
