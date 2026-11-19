@@ -107,3 +107,19 @@ def test_cron_leaves_while_a_sync_runs_and_a_run_by_hand_waits():
     # The release part in a subshell of its own, whose end clears no lock.
     assert re.search(r"set \+e\n\(\nset -e\ntrap - EXIT HUP INT TERM", sh)
     assert sh.index("release_rc=$?") < sh.index("# ---- The pages")
+
+
+def test_a_release_whose_tag_is_not_a_version_is_never_used(base, tmp_path):
+    # GitHub answers, but the tag is more than a version number: nothing of
+    # that release reaches the site, and the pages are made from the one here.
+    b, env = base
+    latest = tmp_path / "latest.json"
+    latest.write_text(json.dumps({"tag_name": 'v1</script><script src="/files/a.zip">', "assets": []}))
+    (tmp_path / "bin" / "fetch").write_text(
+        "#!/bin/sh\nout=\nfor a in \"$@\"; do\n  [ \"$prev\" = -o ] && out=$a\n  prev=$a\ndone\n"
+        "case \"$a\" in\n  */releases/latest) cp %s \"$out\" ;;\n  *) exit 1 ;;\nesac\n" % latest)
+    run = _run(b, env)
+    assert run.returncode == 0, run.stderr
+    assert "the latest release's tag is not a version number" in run.stderr
+    assert json.loads((b / "public" / "releases.json").read_text())["version"] == "1.6.6"
+    assert "</script><script" not in (b / "public" / "i18n" / "en" / "index.html").read_text(encoding="utf-8")

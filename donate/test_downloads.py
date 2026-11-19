@@ -164,3 +164,20 @@ def test_the_help_page_offers_feedback_where_it_says_what_to_do_when_stuck(relea
     import glob
     for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
         assert json.load(open(f, encoding="utf-8")).get("fbs_title"), f
+
+
+def test_the_structured_data_cannot_end_its_script_element(tmp_path):
+    # The tag goes into the JSON-LD block as softwareVersion: a "</script>"
+    # in it - or in a translation - must stay inside, as JSON.
+    path = tmp_path / "releases.json"
+    evil = '1</script><script src="/files/x.zip"></script>&'
+    path.write_text(json.dumps({"version": evil, "published_at": "2026-11-18T23:47:42Z",
+                                "notes": "", "html_url": "https://github.com/slimture/dopeIPTV",
+                                "assets": []}), encoding="utf-8")
+    page = _index(str(path))
+    block = re.search(r'<script type="application/ld\+json">(.*?)</script>', page, re.S).group(1)
+    assert "<" not in block and ">" not in block and "&" not in block
+    assert '<script src="/files/x.zip">' not in page
+    data = json.loads(block)
+    graph = data.get("@graph", [data])
+    assert any(g.get("softwareVersion") == evil for g in graph)

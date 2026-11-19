@@ -627,8 +627,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
             "cast", "subs", "keys", "c6") as $k
       ({}; .["fx_\($k)"] = fx($k; $version));
   # json_encode(..., JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), which
-  # still writes U+2028 and U+2029 escaped.
-  def php_json: tojson | gsub(" "; "\\u2028") | gsub(" "; "\\u2029");
+  # still writes U+2028 and U+2029 escaped - and <, > and & escaped as
+  # JSON_HEX_TAG | JSON_HEX_AMP do: it sits in a <script> element, which a
+  # "</script>" in a release's tag or a translation would otherwise end.
+  def php_json: tojson | gsub(" "; "\\u2028") | gsub(" "; "\\u2029")
+    | gsub("<"; "\\u003c") | gsub(">"; "\\u003e") | gsub("&"; "\\u0026");
   def jsonld($version):
     ({"@type": "SoftwareApplication", "@id": "\($SITE)/#app", "name": "dopeIPTV",
       "alternateName": "dopeiptv",

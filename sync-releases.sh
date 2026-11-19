@@ -254,6 +254,12 @@ if ! jq -e '.tag_name | type == "string" and length > 0' "$API" >/dev/null 2>&1;
     say "unexpected API payload; keeping the site as it is"
     exit 1
 fi
+# A version number and nothing else: the tag goes into the pages, the file
+# names and releases.json, so a tag that is anything more is never used.
+if ! jq -e '.tag_name | test("^v?[0-9]+(\\.[0-9]+){1,3}$")' "$API" >/dev/null 2>&1; then
+    say "the latest release's tag is not a version number; keeping the site as it is"
+    exit 1
+fi
 version=$(jq -r '.tag_name | sub("^v+"; "")' "$API")
 
 # ---- Completeness gate -------------------------------------------------------------
