@@ -49,7 +49,10 @@ Each visit, one by one, goes to STATS_DIR/visits/<day>.json for the admin
 page's visitor log: when, country, browser and version, system, device and
 screen, languages, how the visitor came, the pages and how long each was
 looked at, downloads, the donate dialog - and whether the visitor was here
-before. A visit ends after 30 minutes without a page. After
+before. A payment is never on a visit, only in the day's count: the
+visit's time, country and browser beside the payment service's record of
+who paid would tie the two together. A visit ends after 30 minutes
+without a page. After
 STATS_VISITS_DAYS days (400, thirteen months: a year against the year
 before) a visit is made anonymous rather than deleted:
 it moves to STATS_DIR/visits-anon/<month>.json with its day, country,
@@ -721,7 +724,10 @@ def _page_line(stats: dict, uniques: dict, state: dict, r: dict, db, visits: Vis
         return
     if ev in ("donate", "donated"):
         _bump(d.setdefault("events", {}), ev)
-        if visit is not None:
+        # A payment is counted per day only, never on a visit: the visit's
+        # time, country and browser beside Stripe's own record of who paid
+        # would tie the two together. Opening the dialog is the visit's.
+        if visit is not None and ev == "donate":
             visit["events"].append([t, ev])
             visit["end"] = max(visit["end"], t)
         return
@@ -1027,6 +1033,7 @@ def collect(backfill: bool = False, with_fetch: bool = False) -> None:
         stats["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         stats["geo"] = db is not None
         visits.save()
+        _drop_payments(state)
         _anonymize_old()
         _save(uniques_path, uniques)
         _save(kinds_path, kinds)
@@ -1059,8 +1066,33 @@ def anonymous(v: dict, day: str) -> dict:
             "site": v.get("ref") or "", "pages": len(v.get("pages") or []),
             "time": round((v.get("time") or 0) / 10) * 10, "timed": bool(v.get("time")),
             "returning": bool(v.get("returning")), "downloaded": bool(v.get("downloads")),
-            "donate": "donate" in events, "donated": "donated" in events,
-            "kind": v.get("kind") or ""}
+            "donate": "donate" in events, "kind": v.get("kind") or ""}
+
+
+def _drop_payments(state: dict) -> None:
+    """Once: a payment marked on a visit before payments were counted per
+    day only, taken off every visit kept - in detail and anonymous."""
+    if state.get("payments_off_visits"):
+        return
+    for f in glob.glob(os.path.join(VISITS_DIR, "*.json")):
+        lst = _load_list(f)
+        changed = False
+        for v in lst:
+            evs = v.get("events") if isinstance(v, dict) else None
+            if isinstance(evs, list) and any(isinstance(e, list) and e[1:2] == ["donated"] for e in evs):
+                v["events"] = [e for e in evs if not (isinstance(e, list) and e[1:2] == ["donated"])]
+                changed = True
+        if changed:
+            _save(f, lst)
+    for f in glob.glob(os.path.join(ANON_DIR, "*.json")):
+        month = _load(f, {})
+        rows = month.get("visits")
+        if isinstance(rows, list) and any(isinstance(a, dict) and "donated" in a for a in rows):
+            for a in rows:
+                if isinstance(a, dict):
+                    a.pop("donated", None)
+            _save(f, month)
+    state["payments_off_visits"] = 1
 
 
 def _anonymize_old() -> None:

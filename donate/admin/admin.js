@@ -896,8 +896,7 @@
     if (a.kind === "robot") { tags.append(badge("Likely robot", "robot")); }
     if (a.returning) { tags.append(badge("Returning")); }
     if (a.downloaded) { tags.append(badge("Downloaded", "good")); }
-    if (a.donated) { tags.append(badge("\u2665 Donated", "heart")); }
-    else if (a.donate) { tags.append(badge("Opened donate", "soft-heart")); }
+    if (a.donate) { tags.append(badge("Opened donate", "soft-heart")); }
     sum.append(tags);
     row.append(sum);
     const body = mk("div", "v-body");
@@ -925,7 +924,9 @@
     else if (v.kind === "unknown") { tags.append(badge("Not sure")); }
     if (v.returning) { tags.append(badge("Returning · " + v.returning + (v.returning === 1 ? " day" : " days") + " before")); }
     if (dls) { tags.append(badge("Downloaded", "good")); }
-    (v.events || []).forEach((e) => tags.append(badge(e[1] === "donated" ? "\u2665 Donated" : "Opened donate", e[1] === "donated" ? "heart" : "soft-heart")));
+    // A payment is never on a visit (counted per day only): what shows
+    // is the dialog opened.
+    (v.events || []).filter((e) => e[1] === "donate").forEach(() => tags.append(badge("Opened donate", "soft-heart")));
     sum.append(tags);
     row.append(sum);
 
@@ -933,7 +934,7 @@
     const steps = [];
     v.pages.forEach((p) => steps.push([p[0], (PAGE_NAMES[p[1]] || p[1]) + (p[2] ? " · looked at " + duration(p[2]) : "")]));
     v.downloads.forEach((d) => steps.push([d[0], "Downloaded " + d[1]]));
-    (v.events || []).forEach((e) => steps.push([e[0], e[1] === "donated" ? "Donated" : "Opened the donate dialog"]));
+    (v.events || []).filter((e) => e[1] === "donate").forEach((e) => steps.push([e[0], "Opened the donate dialog"]));
     (v.acts || []).forEach((a) => { const t = actText(a); if (t) { steps.push([a[0], t]); } });
     steps.sort((a, b) => a[0] - b[0]);
     const ol = mk("ol", "steps");

@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 FIELDS = ("day", "start", "hour", "wd", "id", "country", "channel", "site", "source", "os", "osv",
           "browser", "bv", "device", "screen", "lang", "blang", "pages", "paths", "time",
-          "dl", "files", "donate", "donated", "ret", "kind", "acts")
+          "dl", "files", "donate", "ret", "kind", "acts")
 
 
 def _days(stats_dir: str, first: str) -> list:
@@ -64,7 +64,7 @@ def row(v: dict, day: str) -> list:
             blang if re.fullmatch(r"[a-z]{2,3}", blang) else "",
             len(v.get("pages") or []), paths, v.get("time") or 0,
             sorted({platform_of(d[1]) for d in downloads}), [d[1] for d in downloads][:5],
-            int("donate" in events), int("donated" in events), v.get("returning") or 0,
+            int("donate" in events), v.get("returning") or 0,
             v.get("kind") or "unknown", [a[1:] for a in v.get("acts") or []]]
 
 

@@ -50,7 +50,7 @@
     v.f = {
       day: day, start: anon ? new Date(day + "T12:00:00").getTime() / 1000 : v.start,
       pages: pages, time: v.time || 0, dl: dls, acts: anon ? 0 : (v.acts || []).length,
-      donate: anon ? !!(v.donate || v.donated) : evs.length > 0, ret: !!v.returning,
+      donate: anon ? !!v.donate : evs.includes("donate"), ret: !!v.returning,
       country: v.country || "unknown", os: os, browser: v.browser || "Other", device: v.device || "Unknown",
       channel: v.channel || (dls && !pages ? "Straight to a download" : "Direct or unknown"),
       site: (anon ? v.site : v.ref) || "", lang: v.lang || "", kind: v.kind || "unknown", id: anon ? "" : v.id,
