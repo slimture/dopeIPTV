@@ -483,8 +483,9 @@ footer .foot-company a:hover { color: var(--accent); }
 .navmenu[open] .navmenu-bars i:nth-child(2) { opacity: 0; }
 .navmenu[open] .navmenu-bars i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 @media (prefers-reduced-motion: reduce) { .navmenu-bars i { transition: none; } }
-/* Its rows (render.jq, nav): an icon in a tinted square, the words and a
-   chevron, each a finger's height; the page you are on in the accent; under
+/* Its rows (render.jq, nav): an icon in a tinted square and the words, each
+   a finger's height - no chevron: in a menu one says a submenu opens, and
+   every row goes straight to its page; the page you are on in the accent; under
    them, small, feedback and the rules. It slides in over a toned-down page
    (nav.js, .menu-scrim), and a tap beside it closes it. */
 .navmenu-panel {
@@ -508,13 +509,9 @@ footer .foot-company a:hover { color: var(--accent); }
 .navmenu-item.navdonate .mi-ico { color: var(--heart);
   background: color-mix(in srgb, var(--heart) 15%, transparent); }
 .navmenu-item.navdonate .mi-ico svg { fill: currentColor; stroke: none; }
-.navmenu-item::after { content: ""; flex: none; margin-inline-start: auto; width: 7px; height: 7px;
-  border-top: 2px solid var(--faint); border-right: 2px solid var(--faint); transform: rotate(45deg); }
-[dir="rtl"] .navmenu-item::after { transform: rotate(-135deg); }
 .navmenu-item:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .navmenu-item.is-current { color: var(--accent); font-weight: 600;
   background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.navmenu-item.is-current::after { border-color: var(--accent); }
 /* A computer's row, or a phone's (nav.js marks a phone or tablet .handheld;
    a narrow touch screen before it has). */
 .navmenu-item.menu-phone { display: none; }

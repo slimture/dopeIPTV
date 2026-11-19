@@ -60,8 +60,9 @@ bug.
   filled). The same thing has the same icon wherever it shows.
 - **One idea of a control**: the header's square buttons (44 x 40, a 12px
   radius); panels that open from the header (the menu, the language picker)
-  16px round with rows of a finger's height, an icon in a tinted square and
-  a chevron; hover is the accent's light tint everywhere.
+  16px round with rows of a finger's height and an icon in a tinted square,
+  no chevron (in a menu it says a submenu opens; every row goes straight to
+  its page); hover is the accent's light tint everywhere.
 - **The page you are on** is marked the same way everywhere: the accent, on
   its light wash.
 - **The same words for the same thing**: a link reuses the key the other

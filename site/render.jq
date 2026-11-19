@@ -243,7 +243,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     ([$links[] | select(.[2] == "features" or .[2] == "help") | . as [$href, $label, $key]
       | "      <a class=\"navlink\" href=\"\($href | h)\"\(if cur($key) then " aria-current=\"page\"" else "" end)>\($label | h)</a>\n"]
      | add) as $navlinks
-    # The menu's rows: an icon in a tinted square, the words, a chevron (CSS).
+    # The menu's rows: an icon in a tinted square and the words (no chevron:
+    # it reads as a submenu, and each row goes straight to its page).
     # On a phone or tablet the download row sends the link to a computer
     # instead (menu-phone / menu-desk, nav.js): the one row an iPhone or iPad
     # app of dopeIPTV's own takes over once there is one.
