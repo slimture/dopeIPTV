@@ -416,6 +416,8 @@ dopeiptv/
                        fold, rows hidden, Just the list
     mw_pane_follow.py  The middle pane follows what plays
     mw_cast.py         Casting: the cast dialog, the card's controls, archive hand-over
+    mw_cast_moment.py  Going back during a live cast: the rewind buffer, else
+                       the archive; the strip's timeshift menu, back to live
     mw_cast_watch.py   The cast card's picture, words and state; a stuck cast
                        sent again (twice, then Try again); "On TV" marks
     cast_dialog.py     The cast window: the devices found and added, tracks and
