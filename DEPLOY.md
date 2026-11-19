@@ -62,7 +62,7 @@ pgrep -lf sync-releases.php             # nothing - no PHP sync still running
 pw useradd iptv -c "iptv.dope.rs sync" -d /nonexistent -s /usr/sbin/nologin
 chown -R iptv:iptv /usr/local/www/iptv
 chown www /usr/local/www/iptv/downloads.json      # dl.php counts into it until step 8
-touch /var/log/iptv-sync.log && chown iptv:iptv /var/log/iptv-sync.log
+install -m 600 -o iptv -g iptv /dev/null /var/log/iptv-sync.log
 ```
 
 php-fpm runs as `www` for Nextcloud, and the site was `www`'s only because
@@ -156,7 +156,7 @@ mkdir -p /usr/local/etc/newsyslog.conf.d
 cat > /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'EOF'
 # logfilename                                [owner:group]  mode count size when flags [/pid_file] [sig]
 /var/log/nginx/iptv.dope.rs-downloads.log    root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
-/var/log/iptv-sync.log                       iptv:iptv      644  5     1024 *    JN
+/var/log/iptv-sync.log                       iptv:iptv      600  5     1024 *    JN
 EOF
 newsyslog -nv 2>&1 | grep iptv          # a dry run: both files listed, nothing rotated
 ```
@@ -609,7 +609,7 @@ cd ~/dopeiptv && git pull origin website
 cp -R donate /usr/local/www/iptv/
 install -d -o iptv -g iptv -m 700 /usr/local/www/iptv/stats
 install -m 640 -o root -g iptv /dev/null /var/log/nginx/iptv.dope.rs-stats.log
-install -m 640 -o iptv -g iptv /dev/null /var/log/iptv-stats.log
+install -m 600 -o iptv -g iptv /dev/null /var/log/iptv-stats.log
 service iptv_donate restart
 echo '5,20,35,50 * * * * iptv /usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py >> /var/log/iptv-stats.log 2>&1' >> /etc/crontab
 echo '/var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30' \
@@ -1293,9 +1293,10 @@ from the proxy's file and `csp.snippet.txt`. Nothing it shows is a secret:
 the proxy's address, the live allow-list and nginx.conf stay on the
 server.
 
-The page quotes this file in three places - the newsyslog lines for the
-downloads' and statistics' logs and the service's ("10. Log rotation",
-"Statistics and the admin page", "Hardening, November 2026") - found by
+The page quotes this file in two places - the site's whole newsyslog file
+and the logs narrowed by hand, both under "Every log on the server" (the
+three lines it quoted before, in "10. Log rotation", "Statistics and the
+admin page" and "Hardening, November 2026", until that round) - found by
 their words: change those, and change `CODE` in `tools/transparency.py`
 with them. `python3 -m pytest donate/test_transparency.py` fails once a
 block the page shows is gone from its file. After a change to a file the
@@ -1367,6 +1368,34 @@ or for the admin page.
   lines of before and of now alike while the old ones age out, two days
   (`donate/test_log_fields.py` works the lines out from the file as nginx
   writes them and counts both).
+- **Every log, honestly.** The transparency page (part 7) and the privacy
+  policy list every log on the server with what it holds, how long and
+  who may read it - not "two days" where a log keeps more. The site's
+  newsyslog file is written whole (below): `iptv-sync.log` 600 (it was
+  644), `iptv-stats.log` turned over at all (it never was) and 600. nginx's
+  error log in each jail is narrowed to 600 (nginx makes it 644). The two
+  access logs stay 640 `root:iptv`: nginx makes a log its workers' user's
+  (`www`) when it reopens it, and `stats_collect.py` and `sync-releases.sh`
+  read them as `iptv` - through the group; 600 would lock them out. So
+  `www` - Nextcloud's php-fpm with nginx - can read them, as it always
+  could; the transparency page says so.
+
+### Every log on the server
+
+| Log | Jail | What it holds | Kept | Mode |
+|---|---|---|---|---|
+| `/var/log/nginx/iptv.dope.rs-stats.log` | pontusweb | Page views (`/`, `/help/`) and `/hit`: the visitor's address, time, method, the page's path - for `/hit` its twelve fields -, status, the page that linked without its query, the browser's name (1024 characters), the page's language | turned over at midnight, the day before kept: two days at the most (`1 * @T00`) | 640 `www:iptv` (newsyslog makes it `root:iptv`, nginx's reopen gives it to its workers' user) |
+| `/var/log/nginx/iptv.dope.rs-downloads.log` | pontusweb | `/dl.php`: the proxy's address, time, method, the file's name, protocol, status, size, the page that linked without its query, the browser's name, the visitor's address | the same | the same |
+| `/var/log/nginx/error.log` | pontusweb | nginx's, shared with Nextcloud; the site's server writes `crit` only: what stops nginx - a file it cannot open, the service's socket gone or refused. Such a line names the request (its line - a sync slot, say) and the proxy's address, not the visitor's | not turned over by any line of this site: until removed by hand | 600 from this round (nginx makes it 644) |
+| `/var/log/nginx/error.log` | webproxy | the proxy's, shared with the other sites behind it; the site's servers write `crit` only - a TLS handshake nginx cannot make sense of, a worker out of files. There the address on a line is the visitor's | the same | 600 from this round |
+| `/var/log/iptv-donate.log` | pontusweb | the service's (daemon `-o`): its start line and set-up, files it narrowed, a fault by its kind and file:line (never its words), Stripe's refusals in Stripe's fixed codes (a tip that could not even start: Stripe's sentence about the site's own settings), a push that failed and the push service's host, an admin sign-in refused and why (an admin's name, never what was typed or from where), once a day how many sync copies, rooms, reports and modified builds' requests came and went, sync's space; the statistics' own lines when the admin page brings them up to date. Never an address, a request or its path, nor anything a visitor sent | five old copies of up to 1 MB (`5 1024 *`): until 5 MB more are written - at its pace months, perhaps years | 600 `iptv` |
+| `/var/log/iptv-stats.log` | pontusweb | `stats_collect.py`'s from cron: the country database fetched (its address) or why not, how many log lines could not be read (a count, never a line), a day that held as many visits as a day may, a `STATS_IGNORE` name not found (yours), Python's error should a run break. Nothing of a visit | five old copies of up to 1 MB from this round (before: never turned over) - years at its pace | 600 `iptv` from this round (it was 640) |
+| `/var/log/iptv-sync.log` | pontusweb | `sync-releases.sh`'s - the release mirroring and page rendering, nothing to do with settings sync: GitHub's release, each file fetched or already current, how many downloads counted (a number), the pages rendered, nightly.json | five old copies of up to 1 MB: a few lines every five minutes, so months | 600 `iptv` from this round (it was 644) |
+
+Beside them only FreeBSD's own (cron, messages, auth.log...), which hold
+nothing of a request. Nothing else writes a log: the content server's
+other requests none (`access_log off`), the proxy's servers for the site
+none, the service none of a request (`log_message` says nothing).
 
 **pontusweb (jail)** - `bastille console pontusweb`, then `sh`. First the
 allow list, before the content server's new file, which nginx no longer
@@ -1432,6 +1461,52 @@ pontusweb names it (the foreign address), put that one in with the
 /usr/local/etc/nginx/iptv-only-from-proxy.conf`, `cp
 /root/iptv.dope.rs.conf.before-logs
 /usr/local/etc/nginx/conf.d/iptv.dope.rs.conf`, `service nginx reload`.
+
+The pages - the transparency page and the privacy policy say all of it:
+
+```sh
+cp -R site /usr/local/www/iptv/
+cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
+```
+
+The site's newsyslog file, whole (`iptv-stats.log` new, `iptv-sync.log`
+600; the downloads' and statistics' logs turned over at midnight with the
+day before kept uncompressed, `P`, for the readers to finish; 30 is
+SIGUSR1, nginx's reopen; the service's line sends daemon(8) its SIGHUP):
+
+```sh
+cp /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf /root/newsyslog-iptv.dope.rs.conf.before-logs
+cat > /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'LOGS'
+/var/log/nginx/iptv.dope.rs-downloads.log    root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
+/var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
+/var/log/iptv-sync.log                       iptv:iptv      600  5     1024 *    JN
+/var/log/iptv-stats.log                      iptv:iptv      600  5     1024 *    JN
+/var/log/iptv-donate.log                     iptv:iptv      600  5     1024 *    J     /var/run/iptv_donate/iptv_donate.pid
+LOGS
+diff /root/newsyslog-iptv.dope.rs.conf.before-logs /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
+newsyslog -nv 2>&1 | grep iptv
+```
+
+`diff` shows the old header line gone, `iptv-sync.log`'s 644 as 600 and
+`iptv-stats.log`'s line new (and the service's, if the last round's line
+was not added yet - it may be: the rc file with `-H` is in place since
+then). `newsyslog -nv` lists the five, rotating none. newsyslog sets the
+mode of a log it makes anew; the ones there now are narrowed by hand:
+
+```sh
+chmod 600 /var/log/iptv-sync.log* /var/log/iptv-stats.log* /var/log/iptv-donate.log*
+chmod 600 /var/log/nginx/error.log
+ls -l /var/log/iptv-* /var/log/nginx/
+```
+
+**webproxy (jail)** - `bastille console webproxy`, then `sh`. Only the
+error log's mode; neither of the proxy's files changes:
+
+```sh
+ls -l /var/log/nginx/error.log
+chmod 600 /var/log/nginx/error.log
+ls -l /var/log/nginx/error.log
+```
 
 **Check.** From the host and from a jail other than webproxy:
 

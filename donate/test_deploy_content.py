@@ -446,6 +446,43 @@ def test_the_port_is_kept_to_the_proxy_and_nginx_will_not_start_without_the_list
     assert section.index(line) < section.index("cp deploy/content-iptv.dope.rs.conf /usr/local/etc/nginx/conf.d/")
 
 
+_ROTATION = re.compile(r"(/var/log/[\w./-]+)\s+(\w+:\w+)\s+(\d{3})\s+(\d+)\s+(\d+|\*)\s+(@T\d\d|\*)\s+([A-Z]+)")
+
+
+def test_every_log_is_turned_over_and_readable_only_by_its_own():
+    deploy = open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8").read()
+    # Every newsyslog line DEPLOY.md gives, in every round: 600 - but the
+    # two access logs, which nginx makes its workers' user's when it reopens
+    # them and stats_collect.py and sync-releases.sh read as iptv, through
+    # their group (600 would lock them out).
+    readers = {"/var/log/nginx/iptv.dope.rs-stats.log", "/var/log/nginx/iptv.dope.rs-downloads.log"}
+    lines = _ROTATION.findall(deploy)
+    assert len(lines) >= 9
+    for path, owner, mode, *_rest in lines:
+        assert (owner, mode) == ("root:iptv", "640") if path in readers else mode == "600", (path, owner, mode)
+    # The site's newsyslog file, written whole: a line for every log the
+    # site writes - nginx's access logs, the service's, cron's.
+    whole = re.search(r"<<'LOGS'\n(.*?)\nLOGS\n", deploy, re.S).group(1)
+    kept = {f[0]: f for f in _ROTATION.findall(whole)}
+    assert len(kept) == len(whole.splitlines())
+    srv = _server(conf())
+    written = {v.split()[0] for loc in _locations(srv.body) for v in loc.values("access_log") if v != "off"}
+    rc = open(os.path.join(ROOT, "deploy", "iptv_donate"), encoding="utf-8").read()
+    service = re.search(r"^: \$\{iptv_donate_log:=(\S+)\}$", rc, re.M).group(1)
+    cron = set(re.findall(r">> (/var/log/\S+) 2>&1", deploy))
+    assert written == readers and cron == {"/var/log/iptv-sync.log", "/var/log/iptv-stats.log"}
+    assert set(kept) == written | {service} | cron
+    for path in readers:                         # daily, the day before kept as it is for the readers
+        assert kept[path][3:] == ("1", "*", "@T00", "JP"), path
+    # ...and every one, the error logs too, in the list of what each holds.
+    table = deploy[deploy.index("### Every log on the server"):]
+    table = table[:table.index("\n\n", table.index("|---"))]
+    for path in set(kept) | {"/var/log/nginx/error.log"}:
+        assert f"| `{path}` |" in table, path
+    assert table.count("| `/var/log/nginx/error.log` |") == 2          # the content server's and the proxy's
+    assert srv.values("error_log") == ["/var/log/nginx/error.log crit"]
+
+
 def test_the_services_log_is_turned_over_and_reopened():
     # newsyslog sends a SIGHUP to daemon(8)'s pid file; only with -H does
     # daemon reopen its log on one rather than take it amiss.

@@ -198,8 +198,10 @@ new install:
    GitHub is unreachable or a download fails halfway - a half-built release
    is never published with an installer silently missing.
 
-5. **Rotate the download log** with newsyslog, keeping `.0` uncompressed so
-   the sync can finish reading it - the line is in DEPLOY.md, step 10.
+5. **Rotate the logs** with newsyslog, keeping the download and statistics
+   logs' `.0` uncompressed so the sync and the statistics can finish
+   reading them - the whole file, and what each log holds, how long and in
+   which mode, is in DEPLOY.md, "Every log on the server".
 
 ## Where this actually runs
 
