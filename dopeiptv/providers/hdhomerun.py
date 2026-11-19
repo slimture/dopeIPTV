@@ -13,14 +13,15 @@ from __future__ import annotations
 
 import socket
 import struct
+import time
 import zlib
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
 from ..core.log import log
 from ..i18n import tr
-from .boxes import BoxClient, build_xmltv, clean_text
 from . import device_urls
+from .boxes import BoxClient, build_xmltv, clean_text
 
 GUIDE_API = "https://api.hdhomerun.com/api/guide.php"
 DISCOVER_PORT = 65001
@@ -161,7 +162,9 @@ def discover_packet() -> bytes:
 
 
 def parse_reply(data: bytes, ip: str) -> dict | None:
-    """A discover reply (type 3) as {"server", "device_id", "kind"}, or None."""
+    """A discover reply (type 3) as {"server", "device_id", "kind"}, or None
+    - also for one whose tags run past its end. The address it names is
+    taken on *ip*, the tuner that answered (providers/device_urls.py)."""
     if len(data) < 8:
         return None
     body, crc = data[:-4], struct.unpack("<I", data[-4:])[0]
@@ -176,6 +179,8 @@ def parse_reply(data: bytes, ip: str) -> dict | None:
         tag, ln = body[pos], body[pos + 1]
         pos += 2
         if ln & 0x80:
+            if pos >= end:
+                return None
             ln = (ln & 0x7F) | (body[pos] << 7)
             pos += 1
         tags[tag] = body[pos:pos + ln]
@@ -190,7 +195,9 @@ def parse_reply(data: bytes, ip: str) -> dict | None:
 
 def discover(timeout: float = 1.5, target: tuple[str, int] = ("255.255.255.255", DISCOVER_PORT)
              ) -> list[dict]:
-    """Every HDHomeRun tuner that answers a broadcast on the local network."""
+    """Every HDHomeRun tuner that answers a broadcast on the local network
+    within *timeout* - however many answers keep coming; one that cannot be
+    read is passed over, never the end of the search."""
     found: dict[str, dict] = {}
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -201,9 +208,17 @@ def discover(timeout: float = 1.5, target: tuple[str, int] = ("255.255.255.255",
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             s.settimeout(timeout)
             s.sendto(discover_packet(), target)
+            deadline = time.monotonic() + timeout
             while True:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                s.settimeout(left)
                 data, (ip, _port) = s.recvfrom(2048)
-                got = parse_reply(data, ip)
+                try:
+                    got = parse_reply(data, ip)
+                except (ValueError, IndexError, struct.error):
+                    got = None
                 if got and not got["storage"]:
                     found.setdefault(got["server"], got)
         except (socket.timeout, TimeoutError):

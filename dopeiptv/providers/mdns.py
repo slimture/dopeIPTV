@@ -29,6 +29,8 @@ MAX_PACKET = 9000
 MAX_PACKETS = 512
 # Pointers followed while reading one name, before it counts as a loop.
 _MAX_JUMPS = 32
+# The longest a name is (RFC 1035: 255 octets); one longer is no name.
+_MAX_NAME = 255
 
 Name = tuple[str, ...]
 
@@ -73,10 +75,12 @@ def query(questions: list[tuple[Name, int]], ident: int = 0) -> bytes:
 
 def _read_name(data: bytes, at: int) -> tuple[Name, int]:
     """The name at *at* and where the record goes on after it, following
-    compression pointers (with a guard against a packet that loops)."""
+    compression pointers (with a guard against a packet that loops, and
+    against a name longer than a name may be)."""
     parts: list[str] = []
     end = -1
     jumps = 0
+    size = 0
     while True:
         n = data[at]
         if n == 0:
@@ -95,6 +99,9 @@ def _read_name(data: bytes, at: int) -> tuple[Name, int]:
         chunk = data[at + 1:at + 1 + n]
         if len(chunk) != n:
             raise ValueError("a label past the end")
+        size += 1 + n
+        if size > _MAX_NAME:
+            raise ValueError("a name longer than a name is")
         parts.append(chunk.decode("utf-8", "replace"))
         at += 1 + n
     return tuple(parts), (end if end >= 0 else at)

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import socket
+import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -36,7 +37,8 @@ def is_rtsp(url: str | None) -> bool:
 def options(host: str, port: int = PORT, timeout: float = 2.0,
             user_agent: str = "dopeIPTV/1.0") -> dict[str, Any] | None:
     """What an RTSP server says to OPTIONS: {"status", "public", "server"};
-    None when nothing answers RTSP there."""
+    None when nothing answers RTSP there. The answer is read within
+    *timeout* once connected, however slowly it comes."""
     h = f"[{host}]" if ":" in host and not host.startswith("[") else host
     ask = (f"OPTIONS rtsp://{h}:{port}/ RTSP/1.0\r\nCSeq: 1\r\n"
            f"User-Agent: {user_agent}\r\n\r\n").encode()
@@ -45,7 +47,12 @@ def options(host: str, port: int = PORT, timeout: float = 2.0,
         with socket.create_connection((host, port), timeout=timeout) as s:
             s.settimeout(timeout)
             s.sendall(ask)
+            deadline = time.monotonic() + timeout
             while b"\r\n\r\n" not in data and len(data) < 16384:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return None
+                s.settimeout(left)
                 chunk = s.recv(4096)
                 if not chunk:
                     break
