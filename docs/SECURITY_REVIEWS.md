@@ -55,7 +55,7 @@ assessment of each. The findings, and what came of them:
 | Updates | A taken-over site could offer an older signed release; a file lying in the download folder | medium | 1.6.9: never older than the copy running; a file of the updater's own |
 | Player text | A station's or programme's title drawn as rich text over the picture | low | 1.6.9: plain text |
 | Stream addresses | An `av://lavfi` channel address made the player write a file of the provider's choosing; `gopher://`, `edl://`, `memory://` reached past streams (input review; proven) | critical | 1.6.9: `core/stream_address.py`, checked where every address is handed out and in both players |
-| Guide cache | The guide's index was unpickled with no restriction | high (needs local write) | 1.6.9: a restricted unpickler |
+| Guide cache | The guide's index was unpickled with no restriction | high (needs local write) | 1.6.9: a plain format of its own, no pickle in the app |
 | Pictures | A logo naming `/dev/zero` or `\\host\share` was read on sight; an SVG made Qt open files it named; no size cap | high | 1.6.9: `core/picture_files.py`, `core/svg_safe.py`, a 64 MB download cap and allocation limits |
 | Answers | An endless M3U, Xtream or API answer filled memory; deep JSON raised past the handlers | high | 1.6.9: a ceiling on every answer read whole |
 | Links | A quote in a `dopeiptv://` link could add `--server`, `--play` or Qt's `-platformpluginpath` (code run as the person); any web page could make the app open any address | high | 1.6.9: a link read alone, Qt given the program's name only, a play link asked about first |
@@ -83,6 +83,8 @@ assessment of each. The findings, and what came of them:
 | MQTT | A broker could hold the events thread and flood the app with commands | low | 1.6.9: bounded and paced |
 | Local IPC | The command socket's last place was the shared temporary folder | low | 1.6.9: a folder of the user's own |
 | Windows | System tools by bare name, ffmpeg and mpv from the current folder or a batch file | low | 1.6.9: full paths, programs only |
+| Internet sources | A provider on the internet could send the player to a file share, a raw socket, WebDAV or a service on this computer (a printer's page, a cloud's metadata), its pictures and guide too | medium | 1.6.9: media protocols only, never this computer or link-local (AceStream's engine the one exception) |
+| Settings files | A settings file on a drive without permissions stayed readable by others without a word | low | 1.6.9: said once, by name |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
 ## The next round

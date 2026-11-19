@@ -256,6 +256,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - core/player_exec.py, core/platform_windows.py, the installer: Windows'
   own tools are started by their full path, and ffmpeg and mpv never come
   from the current folder or a batch file.
+- core/stream_address.py, providers/client.py: a source on the internet
+  hands out media streams only (http(s), rtsp, rtmp and its kin, rtp,
+  srtp, udp, srt, rist, mms) and never a host on this computer or a
+  link-local one, in any spelling - its pictures and its playlist's own
+  guide address neither. Home sources, playlist files, the person's own
+  rewrite rules and udpxy, and AceStream lists through the engine on this
+  computer play as before.
+- providers/epg.py: the guide's index is plain data with no code in it;
+  an older app's pickled index is never read and is rebuilt from the guide.
+- core/settings_files.py: a settings file that cannot be kept private (a
+  drive without permissions) is logged by name and said once in the window.
 ## [1.6.8]
 
 ### Security
