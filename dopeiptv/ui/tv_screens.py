@@ -358,7 +358,7 @@ class MediaScreen(TvScreen):
             if w.overrides.is_locked(self.kind, cid) and not unlocked:
                 continue
             name = w.overrides.display_name(self.kind, cid, c.get("category_name", "?"))
-            if kids and adult_category(name):
+            if kids and adult_category(name, c.get("category_name")):
                 continue
             rows.append({"name": name, "_cat": cid})
         self.cats.set_items(rows, "cat", 1 if len(rows) > 1 else 0)

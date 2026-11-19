@@ -192,7 +192,7 @@ class _PhoneBrowseMixin:
                 if cid is None or str(cid) in shown.excluded:
                     continue
                 name = shown.names.get(str(cid)) or str(c.get("category_name") or "?")
-                if snap["kids"] and adult_category(name):
+                if snap["kids"] and adult_category(name, c.get("category_name")):
                     continue
                 ref = refs.put("cat", f"{mode}:{cid}", (mode, cid, name))
                 out.append({"k": "dir", "p": f"{mode}/{ref}", "name": name})

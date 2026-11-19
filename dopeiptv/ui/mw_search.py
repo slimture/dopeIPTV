@@ -144,7 +144,7 @@ class _SearchMixin:
                 continue
             cname = self.overrides.display_name(
                 self.mode, cid, c.get("category_name", "?"))
-            if kids and (adult_category(cname) or (
+            if kids and (adult_category(cname, c.get("category_name")) or (
                     self.overrides.is_locked(self.mode, cid)
                     and not self.parental.session_unlocked)):
                 continue

@@ -393,7 +393,7 @@ class _ListsMixin:
                     continue
                 name = self.overrides.display_name(
                     self.mode, cid, c.get("category_name", "?"))
-                if kids and adult_category(name):
+                if kids and adult_category(name, c.get("category_name")):
                     continue
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):

@@ -439,7 +439,7 @@ class ChannelsScreen(TvScreen):
             if w.overrides.is_locked("live", cid) and not unlocked:
                 continue
             name = w.overrides.display_name("live", cid, c.get("category_name", "?"))
-            if kids and adult_category(name):
+            if kids and adult_category(name, c.get("category_name")):
                 continue
             rows.append({"name": name, "_cat": cid})
         # Favorites first when there are some, else the first real category

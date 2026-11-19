@@ -91,7 +91,7 @@ class Shown:
 def kids_rows(client: Any, rows: list[dict], names: Mapping[str, str] | None = None) -> list[dict]:
     """*rows* of another source as a kids profile may see them: none the
     provider marks for adults, none in a category named for them (by the
-    name the user gave it, *names*, else the provider's). A source whose
+    name the user gave it, *names*, or the provider's own). A source whose
     categories cannot be read gives none of its categorised rows."""
     from ..core.profiles import adult_category, adult_item
     rows = [r for r in rows if not adult_item(r)]
@@ -103,7 +103,7 @@ def kids_rows(client: Any, rows: list[dict], names: Mapping[str, str] | None = N
     given = names or {}
     adult = {str(c.get("category_id")) for c in cats
              if isinstance(c, dict) and adult_category(
-                 given.get(str(c.get("category_id"))) or str(c.get("category_name") or ""))}
+                 given.get(str(c.get("category_id"))), c.get("category_name"))}
     return [r for r in rows if str(r.get("category_id")) not in adult]
 
 

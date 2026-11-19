@@ -56,18 +56,20 @@ def _gone(obj: Any) -> bool:
 
 def adult_ids(cats: Any, overrides: Any, mode: str) -> frozenset[str]:
     """The ids of *cats* (a source's categories of *mode*) named for adults,
-    by the name the lists show them under."""
+    by the name the lists show them under or the provider's own: a category
+    renamed in the app is still one."""
     out: set[str] = set()
     for c in cats or []:
         if not isinstance(c, dict) or c.get("category_id") is None:
             continue
-        cid, name = c.get("category_id"), str(c.get("category_name") or "")
+        cid, own = c.get("category_id"), str(c.get("category_name") or "")
+        name = own
         try:
             if overrides is not None:
-                name = overrides.display_name(mode, cid, name)
+                name = overrides.display_name(mode, cid, own)
         except Exception:
             pass
-        if adult_category(name):
+        if adult_category(name, own):        # renamed or not
             out.add(str(cid))
     return frozenset(out)
 

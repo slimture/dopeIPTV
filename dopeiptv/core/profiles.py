@@ -340,10 +340,12 @@ _ADULT = re.compile(r"(?<![\w])(adults?|xxx|18\s*\+|porn\w*|erotic\w*|for adults
                     re.IGNORECASE)
 
 
-def adult_category(name: str) -> bool:
+def adult_category(name: Any, *more: Any) -> bool:
     """Whether a category's name says it is for adults ("XXX", "Adult",
-    "18+"): never shown in a kids profile, locked or not."""
-    return bool(_ADULT.search(str(name or "")))
+    "18+"): never shown in a kids profile, locked or not. *more*: its other
+    names - the provider's own beside the one given it in the app - so that
+    a category renamed ("XXX" -> "Fun") stays out of a kids profile."""
+    return any(_ADULT.search(str(n or "")) for n in (name, *more))
 
 
 def adult_item(item: dict) -> bool:

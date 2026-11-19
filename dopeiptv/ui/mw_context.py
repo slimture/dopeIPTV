@@ -847,5 +847,24 @@ class _ContextMenuMixin:
         self._pending_cat_select = (cur.data(Qt.ItemDataRole.UserRole)
                                     if cur else self._pending_cat_select)
         ContentManagerDialog(
-            self, self.mode, self._raw_categories, self.overrides).exec()
+            self, self.mode, self._managed_categories(), self.overrides).exec()
         self._load_categories()
+
+    def _managed_categories(self) -> list:
+        """The categories Manage categories… lists: all of them - for a kids
+        profile only those its lists show (none named for adults, none
+        locked), as its category column has them."""
+        cats = list(self._raw_categories or [])
+        kids = getattr(self, "_profile_kids", None)
+        if kids is None or not kids():
+            return cats
+        from ..core.profiles import adult_category
+        out = []
+        for c in cats:
+            cid = c.get("category_id")
+            own = c.get("category_name")
+            name = self.overrides.display_name(self.mode, cid, str(own or ""))
+            if adult_category(name, own) or self.overrides.is_locked(self.mode, cid):
+                continue
+            out.append(c)
+        return out
