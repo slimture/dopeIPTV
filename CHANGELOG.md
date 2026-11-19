@@ -16,6 +16,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Security
 
+- core/backup.py: a full backup may get a password (Settings > General >
+  Backup, a field and its repeat). With one the file is encrypted -
+  ChaCha20-Poly1305 under a key PBKDF2-HMAC-SHA256 makes of the password
+  in 600 000 rounds, a new salt and nonce each time, the header covered by
+  the tag - and a restore, from Settings or the welcome, asks for it: a
+  wrong password or a changed file is one error, said and asked again.
+  Key and file are worked on a thread of their own. Without a password the
+  file is exactly as before, and old backups restore as they did. The
+  design is in docs/SECURITY.md, "A backup's password".
 - core/build_check.py: `secure` lets a service's address through only over
   https to dopeiptv.org itself (`SERVICE_HOST`; loopback for the tests) -
   an address on another host, or a name that only ends in it, is refused.

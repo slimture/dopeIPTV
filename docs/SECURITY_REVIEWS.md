@@ -50,6 +50,7 @@ assessment of each. The findings, and what came of them:
 | Local servers | The loopback proxy took anyone's requests; one address could open unlimited connections; a forged Host reached the token-bearing addresses | medium | 1.6.9: a per-run key, connection caps, time limits, `host_for_addresses` |
 | Recordings | A batch file after a recording ran a title's `&` / `%VAR%`; a NUL or `..` in a name or folder | high (Windows) | 1.6.9: text only; names and folders made safe |
 | Backups | A restore turned on server mode or joined a sync unnamed | medium | 1.6.9: named before it is put back |
+| Backups | A full backup held every login as plain text, with no way to lock the file | medium | 1.6.9: an optional password - ChaCha20-Poly1305 under PBKDF2-HMAC-SHA256 (600 000 rounds), the header covered by the tag, test vectors; a weak password against an offline guesser written down (docs/SECURITY.md, "A backup's password") |
 | Build chain | Downloads by "latest", actions by tag, unhashed pip installs, the update key in every build job | high | 1.6.9: SHA-256 pins, a hashed lock, actions by commit, read-only workflows, the key in one signing step |
 | Updates | A taken-over site could offer an older signed release; a file lying in the download folder | medium | 1.6.9: never older than the copy running; a file of the updater's own |
 | Player text | A station's or programme's title drawn as rich text over the picture | low | 1.6.9: plain text |

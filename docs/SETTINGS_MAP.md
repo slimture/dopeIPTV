@@ -172,7 +172,9 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
   `last_place` / `last_list_place`, no row - or always on Mine)
 - Privacy: private viewing (until the app closes, not stored), clear recent history
 - Updates: `check_updates`, `update_channel`
-- Backup: back up, restore
+- Backup: back up, restore; a password for the backup and its repeat
+  (optional, never stored - emptied once the file is written; with one the
+  file is encrypted, and a restore asks for it)
 - System: `desktop_entry` (Linux), `mpris` (the system's media controls)
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found

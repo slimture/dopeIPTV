@@ -34,7 +34,8 @@ disagree, the code is what runs and the sentence is a bug: report it.
   files are this user's alone. The sync copy on dopeiptv.org is encrypted
   on the computer with a key the site never sees (`core/sync.py`). A
   backup shows what it holds before anything of it is put back
-  (`core/backup.py`, `ui/backup_dialogs.py`).
+  (`core/backup.py`, `ui/backup_dialogs.py`), and with a password it is
+  encrypted ([A backup's password](#a-backups-password)).
 - **The computer itself.** Nothing from outside runs code here: no stream
   address, playlist line, picture, guide, link or answer from the network
   becomes a program, an option, a file read or a file written that the
@@ -278,13 +279,15 @@ GitHub Action, a build runner, GitHub itself - or the release key.
 
 ### Someone with a backup or the sync code
 
-**A backup** holds every setting a person would miss, logins included, as
-plain text - playlists' passwords, Trakt's and OpenSubtitles' sign-ins,
-the sync code - and every profile with its PIN as kept (`core/backup.py`).
-The app says so where the file is made, and writes it readable only by its
-owner where the system has such a thing. Left out: the remote API's, the
-phone remote's and server mode's tokens, the media servers' device id,
-where the windows sit, caches. Whoever has the file has those logins.
+**A backup** holds every setting a person would miss, logins included -
+playlists' passwords, Trakt's and OpenSubtitles' sign-ins, the sync code -
+and every profile with its PIN as kept (`core/backup.py`). Without a
+password they are plain text in it; with one the file is encrypted
+([below](#a-backups-password)). The app says so where the file is made, and
+writes it readable only by its owner where the system has such a thing.
+Left out: the remote API's, the phone remote's and server mode's tokens,
+the media servers' device id, where the windows sit, caches. Whoever has a
+file without a password has those logins.
 
 **A backup someone else made** is outside input. Before it is put back,
 the window names what would run something, let others in or send the
@@ -316,6 +319,100 @@ plays, and play, pause and seek for everyone, within bounds
 remote's address** is the remote for whoever is on the home network with
 it; New address shuts out every phone that had the old one. **Server
 mode's playlist** carries its token: [below](#server-mode-has-one-token-for-watching-and-for-its-settings).
+
+## A backup's password
+
+The design behind a backup's optional password, with its test vectors
+(AGENTS.md rule 9; its line on the transparency page belongs to the
+`website` branch's `tools/transparency.py`). A person
+may give the backup a password where it is made (Settings > General >
+Backup, a field and its repeat). Without one the file is exactly what a
+backup always was, and a plain or an old file restores as before.
+
+**The file** (`core/backup.py`: `seal`, `lock`, `for_file`) is one JSON
+object, written as every backup is (`backup.write`: whole or not at all,
+0600):
+
+```json
+{"dopeiptv_backup": "encrypted", "v": 1, "kdf": "pbkdf2-sha256",
+ "cipher": "chacha20-poly1305", "rounds": 600000,
+ "salt": "<16 bytes, base64>", "nonce": "<12 bytes, base64>",
+ "data": "<the ciphertext and its 16-byte tag, base64>"}
+```
+
+- The key: PBKDF2-HMAC-SHA256 of the password - NFC-normalised, UTF-8 - with
+  the salt, in `rounds` rounds, 32 bytes (`backup._key`).
+- The data: ChaCha20-Poly1305 (RFC 8439, `core/chacha20poly1305.py`) of the
+  backup's own bytes - exactly the file the same backup is without a
+  password (`backup.encode`) - under that key and the nonce.
+- The associated data: every field but `data` as canonical JSON - keys
+  sorted, `,` and `:` without spaces, ASCII (`backup._aad`). A changed
+  header fails the tag as a changed byte does.
+- The salt and the nonce: 16 and 12 bytes from `secrets`, new for every
+  file. A new salt is a new key, so a key seals one message and its nonce
+  never repeats.
+
+**Reading one** (`backup.read_any`, `locked`, `Locked.unlock`). Before any
+work: `v` 1 (a higher one is said to be from a newer dopeIPTV), exactly
+these fields, the kdf and the cipher by name, `rounds` an integer from
+100 000 to 5 000 000 (`MIN_ROUNDS`, `MAX_ROUNDS`), salt and nonce of their
+exact sizes, every base64 field strict (the alphabet, the padding, the
+canonical spelling), the data longer than its tag, the whole file within
+the 64 MiB a backup is read up to. Only then is the key made and the tag
+checked. A wrong password and a changed file are one error - "Wrong
+password, or the file was changed" - never which, never a traceback, and
+asked again. What opens is read as a plain backup is and goes on to the
+restore window unchanged. Put back over everything, it waits for the next
+start where every restore waits (`stage`, `apply_pending`): beside the
+settings files, 0600 in their 0700 folder, removed as it is put in place -
+as protected as the settings files that then hold the same logins.
+
+**Why these.** Only what is here (rule 9): ChaCha20-Poly1305 is the
+cipher sync and Watch together use, and PBKDF2-HMAC-SHA256 in 600 000
+rounds is how a PIN and a room code are stretched (`core/pins.py`,
+`core/together.py`) - no new primitive, no new dependency. A memory-hard
+function (scrypt, Argon2) would slow a graphics card more, but Python's
+scrypt depends on the OpenSSL a build links, and Argon2 is not in the
+standard library: a backup made by one copy must open in every other. The
+rounds are in the file, so a later version can raise them and still open
+an older file. Measured on the development machine: the 600 000 rounds
+0.15 s; ChaCha20-Poly1305 in plain Python about 0.08 s a MB either way
+(4 MB 0.3 s, 16 MB 1.3 s). Both run on a thread of their own while a small
+window says so, the window's thread going on
+(`ui/backup_dialogs.run_working`, `UnlockBackupDialog`).
+
+**What it protects.** A backup file that is lost, left on a USB stick or in
+a cloud folder, or shared by mistake: without the password it shows
+nothing of what it holds, and a changed one is refused, never put back.
+
+**What it does not.**
+
+- A weak password against an offline guesser. Whoever has the file can try
+  passwords as fast as their hardware computes PBKDF2: the rounds make each
+  guess slower, a graphics card still tries thousands a second. A long
+  passphrase is the protection; the app does not judge the password.
+- Malware, or another program running as the person: it reads the settings
+  files, where every login is in plain text anyway
+  ([below](#logins-are-in-the-settings-files-not-a-keyring)), or the
+  password as it is typed.
+- The password in memory: Python cannot wipe a string. The field is
+  emptied once the backup is made or the password sent, and the thread
+  lets go of it when it ends; a copy can stay in the process's memory until
+  it is reused. Never in the log, a report or an error's text.
+- The file's size and when it was written. The header says only how it is
+  locked: no version, no date, no names.
+- A lost password: nothing recovers it, and the app says so where it is
+  given.
+
+**Test vectors** (`tests/test_backup_lock.py`): PBKDF2-HMAC-SHA256 against
+RFC 7914's own, and the file's: the password "correct horse battery
+staple", salt 00..0f, nonce a0..ab, 100 000 rounds and the plain text
+`{"dopeiptv_backup": 1, "stores": {}}` as `backup.encode` writes it give the
+key `49d49c25…175d2a1e` and exactly the file in the test - the same bytes
+pyca/cryptography's ChaCha20Poly1305 gives (checked once when it was made).
+
+**An older app** (1.6.8 and before) does not know the layout: it says the
+file is not a dopeIPTV backup or is damaged, and changes nothing.
 
 ## Honest limits
 
@@ -527,6 +624,17 @@ whoever can change the file can take the PIN out of it.
 *Why:* a PIN keeps a family member out, not someone with the computer
 (`core/pins.py` says so); four digits are what a remote types.
 
+### A backup's password is as strong as the password
+
+A backup without a password holds every login as plain text. With one, a
+copy of the file can be tried offline as fast as PBKDF2's 600 000 rounds
+allow: a short or common password falls
+([A backup's password](#a-backups-password)).
+
+*Why:* the password is optional so that an everyday backup stays as it
+was, and the app does not judge one; the field's hint says what each
+choice means, and a memory-hard function is not in the standard library.
+
 ### Home means any private address
 
 The phone remote, and the remote API and server mode on the home network,
@@ -667,7 +775,7 @@ person outside the project is recorded there yet.
   `test_recording_safety.py`, `test_privacy.py`,
   `test_privacy_playback.py`, `test_privacy_logs.py`, `test_report.py`,
   `test_sync.py`, `test_sync_edges.py`, `test_together.py`,
-  `test_backup.py`, `test_build_check.py`, `test_selfupdate.py`,
+  `test_backup.py`, `test_backup_lock.py`, `test_build_check.py`, `test_selfupdate.py`,
   `test_winupdate.py`, `test_macupdate.py` and `test_ytdlp.py`. CI runs
   them on every push, with the audit of the shipped packages.
 - **The review kit before every release** (AGENTS.md rule 13): on the

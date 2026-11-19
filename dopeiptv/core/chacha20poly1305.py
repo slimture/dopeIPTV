@@ -1,9 +1,12 @@
 """ChaCha20-Poly1305 (RFC 8439), in plain Python.
 
 Settings sync (core/sync.py) encrypts what it sends to dopeiptv.org with
-it, so the site keeps bytes it cannot read. Plain Python, as core/ed25519.py
-is: the frozen app ships no cryptography library, and what is synced is
-small (tens to a few hundred KB).
+it, so the site keeps bytes it cannot read; Watch together seals its
+messages and a backup with a password its file (core/backup.py) with it
+too. Plain Python, as core/ed25519.py is: the frozen app ships no
+cryptography library, and what is synced is small (tens to a few hundred
+KB) - a backup of a few MB takes some tenths of a second, on a thread of
+its own.
 
 ChaCha20 here works on many 64-byte blocks at once: each of the sixteen
 state words of up to ``_LANES`` blocks sits in one Python int, a 64-bit
