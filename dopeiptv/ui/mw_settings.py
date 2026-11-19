@@ -750,8 +750,14 @@ class _SettingsMixin:
             clear()
         self.refresh_playlist(force=False)
 
-    def _unlock_nerd(self) -> None:
-        """Nerd on, from About's seven taps: the page appears in Settings."""
+    def _unlock_nerd(self, in_settings: bool = False) -> None:
+        """Nerd on, from About's seven taps: the page appears in Settings.
+        A kids profile changes Settings only with a grown-up's PIN: the taps
+        do it there in About over Settings (*in_settings*), never in the one
+        the Help menu opens."""
+        kids = getattr(self, "_profile_kids", None)
+        if not in_settings and callable(kids) and kids():
+            return
         from ..core import nerd
         already = self.settings.value("nerd_enabled", "false") == "true"
         self.settings.setValue("nerd_enabled", "true")
