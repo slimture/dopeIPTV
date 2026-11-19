@@ -521,6 +521,8 @@ dopeiptv/
     list_mirror.py     Such a place kept to the list, its source of truth
     mw_local.py        Local files: the folders, the folder view, the search
     mw_local_library.py The library view: its walk, its cache, its pictures
+    mw_queue.py        What is dropped on the window; the music queue, the
+                       visualiser and the equaliser
     mw_place_local.py  The Local files place where the list was: Back, header,
                        Continue, the folder's rows or the library's posters
     local_place.py     The Local files place itself, dressed as it paints
