@@ -8,11 +8,28 @@ name = "dopeiptv"
 # (tests/test_version.py) fails the build if they drift, so a release can't
 # ship an sdist named after the wrong version again. Bump BOTH on a release.
 version = "1.6.6"
-description = "Modern IPTV player"
+description = "IPTV player for Xtream Codes, M3U playlists and Stalker portals, the TV servers at home and Jellyfin, Emby and Plex"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
+keywords = ["iptv", "xtream-codes", "m3u", "stalker", "epg", "xmltv", "mpv", "timeshift",
+            "enigma2", "tvheadend", "hdhomerun", "sat-ip", "jellyfin", "plex"]
+# No licence classifier: the licence is the SPDX expression above (PEP 639).
+classifiers = [
+    "Environment :: X11 Applications :: Qt",
+    "Environment :: MacOS X",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video :: Display",
+    "Topic :: Multimedia :: Sound/Audio :: Players",
+]
 
 dependencies = [
     # Lower bounds = the oldest tested; upper bounds guard against a future
@@ -41,7 +58,7 @@ Homepage = "https://dopeiptv.org/"
 Documentation = "https://dopeiptv.org/help/"
 Source = "https://github.com/slimture/dopeIPTV"
 Issues = "https://github.com/slimture/dopeIPTV/issues"
-Donate = "https://dopeiptv.org/#donate"
+Support = "https://dopeiptv.org/support/"
 
 [project.scripts]
 dopeiptv = "dopeiptv.launcher:main"

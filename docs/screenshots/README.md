@@ -10,9 +10,15 @@ point at them:
 | `epg-grid.png` | The **programme guide's timeline grid**. |
 | `multiview.png` | **Multiview** with four live channels. |
 | `player.png` | **Timeshift**: a live channel rewound, the timeline over the video. |
-| `themes.png` | **Settings → Appearance**: the theme and accent pickers. Taken by hand. |
+| `themes.png` | **Settings → Appearance**: the theme pictures, dark and light, and the accent colours. |
 
-All but `themes.png` are the website's English front-page pictures, made by
+`themes.png` is taken offscreen the way `tools/help_screenshots.py` takes the
+help's pictures of the settings (a throwaway settings store, the demo
+source, the default theme and accent, English): the Settings window at
+1040×720 with `QT_SCALE_FACTOR=2`, so 2080×1440, on Appearance, scrolled
+until the accent colours' row is at the bottom, saved as PNG.
+
+The others are the website's English front-page pictures, made by
 `tools/site_screenshots.py` (see `docs/MAINTAINING.md`): take them with
 `xvfb-run -a -s "-screen 0 2560x1600x24" python tools/site_screenshots.py OUT en`,
 then save `hero-1`, `feat-c3`, `feat-mv` and `feat-c1` from WebP
@@ -24,7 +30,7 @@ the metainfo of every release already out points at them on `main`.
 - Load the public **iptv-org** M3U (add a playlist → type **M3U** →
   `https://iptv-org.github.io/iptv/index.m3u`), or just use the built-in
   **🎬 Demo channels** button.
-- The theme picker shot needs no content at all.
+- The theme pictures need no content at all.
 - Don't want your provider's category names visible? Use the **◉** solo
   toggle by "Categories" (shows only the active one) or the **☰** icon-rail
   (`Ctrl+B`).

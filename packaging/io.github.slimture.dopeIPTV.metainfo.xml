@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>dopeIPTV</name>
-  <summary>Modern IPTV player for Xtream Codes with EPG</summary>
+  <summary>IPTV player for providers, TV boxes and media servers</summary>
   <description>
     <p>
       dopeIPTV plays live TV, films and series from what you already have:
@@ -16,20 +16,22 @@
     <ul>
       <li>A programme guide: now and next in the channel list, a timeline grid and a search of the whole guide</li>
       <li>Pause and rewind live TV, and the provider's catch-up archive where it keeps one</li>
-      <li>Films and series with posters and details from TMDB, resume where you stopped, and a Home page with what to watch next</li>
+      <li>Films and series with posters and details from TMDB, resume where you stopped, and Mine: what you were watching, your favourite channels live now, Watch later and new episodes</li>
       <li>Recording now, on a timer or every airing of a series, optionally saved as MP4</li>
       <li>Multiview: up to nine live channels at once</li>
-      <li>Home network sources: Enigma2 receivers, Tvheadend, HDHomeRun, VDR, DVBViewer, NextPVR and MythTV, and Jellyfin, Emby and Plex servers</li>
+      <li>Home network sources: Enigma2 receivers, Tvheadend, HDHomeRun, SAT&gt;IP servers, VDR, DVBViewer, NextPVR and MythTV, and Jellyfin, Emby and Plex servers</li>
       <li>Your own video and music files, internet radio, and YouTube or Twitch through yt-dlp</li>
       <li>Casting to Chromecast, DLNA smart TVs and Kodi</li>
-      <li>TV mode, a full-screen layout for the sofa run with a remote or a game controller, and your phone as a remote</li>
+      <li>Optionally a server for the home: an HDHomeRun tuner for Plex, Jellyfin and Emby, and a playlist for VLC and Kodi</li>
+      <li>TV mode, a full-screen layout for the sofa run with a remote or a game controller, and your phone as a remote that also browses, rewinds live TV and records</li>
       <li>A profile for each person in the household, kids profiles and a parental lock</li>
       <li>Optional Trakt and Simkl sync, subtitles from OpenSubtitles, and encrypted settings sync between your computers</li>
       <li>The desktop's media controls, 25 themes and 27 languages, right-to-left ones included</li>
     </ul>
     <p>
       dopeIPTV is a player only: it does not provide any channels or content -
-      you connect it to a service you already subscribe to.
+      you connect it to a service you already subscribe to, or to your own
+      receiver or media server.
     </p>
   </description>
   <launchable type="desktop-id">io.github.slimture.dopeIPTV.desktop</launchable>
