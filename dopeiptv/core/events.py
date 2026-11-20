@@ -275,6 +275,17 @@ class _Sink:
             self._q.append((kind, message))
             self._cv.notify()
 
+    def withdraw_titled(self) -> int:
+        """Private viewing turned on: the events still waiting here that say
+        what plays are taken back unsent - those already sent cannot be.
+        How many."""
+        with self._cv:
+            kept = deque(it for it in self._q
+                         if it[0] != "event" or it[1].get("private") or not (WHAT & it[1].keys()))
+            gone = len(self._q) - len(kept)
+            self._q = kept
+        return gone
+
     def close(self, drain_s: float = 1.0) -> None:
         """Send what is queued for at most *drain_s*, then end."""
         with self._cv:
@@ -854,6 +865,14 @@ class Dispatcher:
         if state is not None:
             self.set_state(*state, private=private, now=now)
         return message
+
+    def withdraw_titled(self) -> int:
+        """Every receiver's waiting events that say what plays, taken back
+        (private viewing turned on); how many."""
+        gone = sum(s.withdraw_titled() for s in self.sinks)
+        if gone:
+            log.info("events: %d waiting event(s) that named what plays taken back", gone)
+        return gone
 
     def set_state(self, state: str, fields: dict[str, Any] | None = None, private: bool = False,
                   now: float | None = None) -> None:

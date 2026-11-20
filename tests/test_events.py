@@ -1032,3 +1032,19 @@ def test_a_mistyped_webhook_address_keeps_its_id_out_of_the_log_and_the_check(mo
         events.log.removeHandler(h)
         events.log.setLevel(level)
     assert len(seen) == 2 and not [m for m in seen if secret in m], seen
+
+
+def test_waiting_events_that_name_what_plays_are_taken_back_when_private_viewing_starts():
+    """Turned on while events still wait to go out: those that say what
+    plays are taken back unsent; the rest go as they would."""
+    sink = events._Sink(limit=10)
+    sink.put("event", events.payload("playback_started", {"title": "Nyheterna", "channel": "SVT1"}))
+    sink.put("event", events.payload("app_started"))
+    sink.put("event", events.payload("playback_paused", {"title": "x"}, private=True))
+    sink.put("state", {"state": "playing"})
+    assert sink.withdraw_titled() == 1
+    kinds = [(k, m.get("event")) for k, m in sink._q]
+    assert kinds == [("event", "app_started"), ("event", "playback_paused"), ("state", None)]
+    d = events.Dispatcher()
+    d.sinks = [sink]
+    assert d.withdraw_titled() == 0

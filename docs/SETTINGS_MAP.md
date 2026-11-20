@@ -125,7 +125,8 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   (`nerd_chno_<source id>`) → Nerd › Boxes and lists; a channel's guide by hand
 - Advanced: `refresh`; Nerd: `radio`, `recordings` (Enigma2, Tvheadend),
   `show_drm`, `hd_group` (HDHomeRun), `radio`, `recordings` (VDR, NextPVR),
-  `favourites`, `recordings` (DVBViewer), `recordings` (MythTV)
+  `favourites`, `recordings` (DVBViewer), `recordings` (MythTV);
+  `home_addresses` (a list on the internet may name devices at home; off)
 
 **Mine** (`mine`) - the place that holds favourites, Watch later and
 history (there is no Home since 1.6.2: its settings were carried over once
@@ -155,7 +156,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 **Sync between computers** (`sync`) - "Sync" in the sidebar, for everyone
 - (untitled): start or join, what syncs (`sync_cats`), the code, Sync now,
   connection settings from sync waiting to be reviewed (an action, shown
-  only while any wait), stop
+  only while any wait), a new code (the old one's copy deleted; the other
+  computers join again), stop
 - Encrypted, and nothing about you: what dopeiptv.org gets, in plain words
 
 **Integrations** (`integrations`)
@@ -267,7 +269,10 @@ while Nerd is on, and so are the link rows that lead to them.
   `nerd_server_sources` (the sources as chips; the categories in each are
   chosen on the server's page in a browser, which also changes the port, the
   tuners and channels for adults), `nerd_server_adult` (channels for adults
-  in the lineup and the shared playlist; off); open the page, copy the tuner's and the playlist's
+  in the lineup and the shared playlist; off), `nerd_server_open` (who uses
+  the tuner without its token: nobody - the address carries it -, the
+  devices in `nerd_server_open_hosts`, or every device on this computer's
+  networks; nobody for a new install); open the page, copy the tuner's and the playlist's
   addresses, how it stands. Not shown: `nerd_server_token` (the playlist's,
   guide's and streams'), `nerd_server_admin_token` (the page's and its
   `api/`, opened from here), `nerd_server_device_id` (made once, never in a

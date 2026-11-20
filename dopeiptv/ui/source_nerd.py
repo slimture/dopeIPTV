@@ -22,6 +22,7 @@ from ..i18n import tr
 from .nerd_check_line import CheckLine
 from .nerd_settings import UA_CHOICES, text_box
 from .rewrite_rules import RulesEditor
+from ..core.stream_address import HOME_OPTION
 from .settings_ui import ToggleSwitch
 
 TVH_PROFILES = ["", "pass", "matroska", "htsp", "audio", "webtv-h264-aac-mpegts",
@@ -197,6 +198,10 @@ class SourceNerdPanel(QWidget):
                 box.setAccessibleName(tr(label))
                 self.kind_switches[k][key] = box
         self.switches: dict[str, ToggleSwitch] = {}
+        # A list on the internet that names devices at home (the person's
+        # own): off, such an address is never played or fetched.
+        self.home_box = ToggleSwitch(_flag(o, HOME_OPTION, False))
+        self.home_box.setAccessibleName(tr("nerd_src_home"))
         self._kind = ""
         self.ua.currentIndexChanged.connect(self._shown)
         self.proxy.currentIndexChanged.connect(self._shown)
@@ -258,8 +263,10 @@ class SourceNerdPanel(QWidget):
                             "streamdev_port",
                             "profile", "transcode", "udpxy", "epg_shift", "ms_quality",
                             "catchup_template", "catchup_mode", url_rewrite.KEY,
-                            mirrors.KEY)
+                            mirrors.KEY, HOME_OPTION)
                and k not in {key for sw in SWITCHES.values() for key, _l, _d in sw}}
+        if self.home_box.isChecked():
+            out[HOME_OPTION] = True
         ua = self.ua.currentData()
         ua = self.ua_custom.text().strip() if ua == "custom" else ua
         if ua:

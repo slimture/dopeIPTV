@@ -61,6 +61,29 @@ _HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\
                         r"(?::\d{1,5})?/[^\s'\"<>()\[\]]*", re.IGNORECASE)
 
 
+# A login told in words: "my password is hunter2", "lösenord: x",
+# "username kalle" - the word after the name, in the languages most reports
+# come in. ("login" and "pin" are left: "login failed", "the PIN was wrong".)
+_SAID = re.compile(r"(?i)\b(password|passwd|passcode|username|user name|"
+                   r"l\u00f6senord|anv\u00e4ndarnamn|passwort|benutzername|kennwort|"
+                   r"mot de passe|identifiant|contrase\u00f1a|usuario|senha|usu\u00e1rio|"
+                   r"wachtwoord|gebruikersnaam|has\u0142o|parola|salasana|adgangskode|passord)"
+                   r"(\s*[:=]\s*|\s+(?:is now|is|was|\u00e4r|var|ist|est|es|\u00e9)?\s*)"
+                   r"(?![\"']?<)([^\s,;.!?]{2,128})")
+# A token whatever it is called: a JSON web token, a GitHub or Slack token,
+# and any run of 32 or more letters and digits with both in it (a key, a
+# hash that would name a file).
+_JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
+_PREFIXED = re.compile(r"\b(?:gh[pousr]|xox[abprs]|sk|pk|rk)[-_][A-Za-z0-9_-]{16,}")
+_LONG = re.compile(r"(?<![A-Za-z0-9_/-])(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])"
+                   r"[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])")
+# Another account's home folder (Windows, macOS, Linux): its name.
+_HOME_DIR = re.compile(r"(?i)((?:[A-Z]:)?[\\/](?:Users|home|Documents and Settings)[\\/])"
+                       r"([^\\/\s:*?\"<>|]{1,64})")
+# A phone number written as one usually is: with a + or 00 first.
+_PHONE = re.compile(r"(?<![\w+])(?:\+|00)\d{1,3}(?:[ .-]?\d){6,13}(?!\d)")
+
+
 def _hide_value(m: re.Match[str]) -> str:
     value = m.group(3)
     quote = value[0] if value[:1] in ("'", '"') else ""
@@ -91,9 +114,15 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
     out = _AUTH_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
     out = _BEARER.sub(lambda m: f"{m.group(1)} <hidden>", out)
     out = _KEYVAL.sub(_hide_value, out)
+    out = _SAID.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
+    out = _JWT.sub("<token>", out)
+    out = _PREFIXED.sub("<token>", out)
+    out = _LONG.sub("<token>", out)
+    out = _PHONE.sub("<phone>", out)
     home = os.path.expanduser("~")
     if len(home) > 1:
         out = out.replace(home, "~")
+    out = _HOME_DIR.sub(lambda m: f"{m.group(1)}<user>", out)
     try:
         user = getpass.getuser()
     except Exception:

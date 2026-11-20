@@ -1049,6 +1049,43 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
     adult.setAccessibleName(tr("srv_adult"))
     c.row(tr("srv_adult"), adult, tr("srv_adult_hint"),
           search="adult adults 18+ XXX parental lineup playlist share")
+    # Who may use the tuner without its token (hs.K_OPEN): nobody unless the
+    # person lets a device in - its address then needs no token.
+    from ..core.nerd_check import OK, WARN, Check
+    open_box = combo([(hs.OPEN_OFF, tr("srv_open_off")), (hs.OPEN_DEVICES, tr("srv_open_devices")),
+                      (hs.OPEN_HOME, tr("srv_open_home"))], hs.open_mode(settings))
+
+    def open_job() -> Any:
+        if open_box.currentData() != hs.OPEN_HOME:
+            return None
+        return lambda: Check(WARN, "srv_open_home_warn")
+    open_line = CheckLine(open_job, tr("srv_open"))
+    lines.append(open_line)
+    c.row(tr("srv_open"), open_box, tr("srv_open_hint"),
+          search="token tuner Plex without token devices network HDHomeRun security",
+          below=open_line)
+    open_hosts = QLineEdit(n.get(hs.K_OPEN_HOSTS))
+    open_hosts.setPlaceholderText("192.168.1.20, 192.168.1.21")
+
+    def hosts_job() -> Any:
+        good, bad = hs.parse_open_hosts(open_hosts.text())
+        if bad:
+            return lambda: Check(WARN, "srv_open_hosts_bad", {"n": bad[0]})
+        if not good:
+            return lambda: Check(WARN, "srv_open_hosts_none")
+        return lambda: Check(OK, "srv_open_hosts_ok", {"n": len(good)})
+    hosts_line = CheckLine(hosts_job, tr("srv_open_hosts"))
+    lines.append(hosts_line)
+    open_hosts.textChanged.connect(hosts_line.changed)
+    hosts_row = c.row(tr("srv_open_hosts"), open_hosts, tr("srv_open_hosts_hint"),
+                      stretch_control=True, search="address addresses devices Plex token",
+                      below=hosts_line)
+    c.shown_if(hosts_row, lambda: open_box.currentData() == hs.OPEN_DEVICES)
+
+    def open_changed(_i: int = 0) -> None:
+        c.refresh()
+        open_line.changed()
+    open_box.currentIndexChanged.connect(open_changed)
 
     def token() -> str:
         got = str(settings.value(hs.K_TOKEN, "") or "").strip()
@@ -1085,7 +1122,11 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         from ..core.xdg import open_url
         open_url(f"http://127.0.0.1:{port.value()}/?token={quote(admin_token())}")
     open_btn.clicked.connect(lambda _c=False: open_page())
-    copy_tuner.clicked.connect(lambda _c=False: copy(copy_tuner, base()))
+    def tuner_address() -> str:
+        if open_box.currentData() == hs.OPEN_OFF:
+            return f"{base()}/t/{token()}"
+        return base()
+    copy_tuner.clicked.connect(lambda _c=False: copy(copy_tuner, tuner_address()))
     copy_m3u.clicked.connect(lambda _c=False: copy(copy_m3u, f"{base()}/playlist.m3u?token={token()}"))
 
     def job() -> Any:
@@ -1130,6 +1171,8 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         return {hs.K_ON: "true" if on.isChecked() else "false",
                 hs.K_TUNERS: str(tuners.value()), hs.K_PORT: str(port.value()),
                 hs.K_ADULT: "true" if adult.isChecked() else "false",
+                hs.K_OPEN: str(open_box.currentData() or hs.OPEN_OFF),
+                hs.K_OPEN_HOSTS: ", ".join(hs.parse_open_hosts(open_hosts.text())[0]),
                 hs.K_SOURCES: json.dumps(picked, sort_keys=True) if picked else ""}
     values.switch = on  # type: ignore[attr-defined]
     values.port = port.value  # type: ignore[attr-defined]

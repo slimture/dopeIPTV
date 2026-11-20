@@ -662,7 +662,10 @@ class SourcePage(SourceFields, QScrollArea):
         c = self._card("adv")
         c.row(tr("playlist_auto_refresh"), self.refresh)
         if self.nerd_panel is not None:
-            self._switch_rows(self._card("adv", tr("nerd_page"), nerd_only=True), None)
+            nc = self._card("adv", tr("nerd_page"), nerd_only=True)
+            self._switch_rows(nc, None)
+            nc.row(tr("nerd_src_home"), self.nerd_panel.home_box, tr("nerd_src_home_hint"),
+                   search="home network LAN private address box picon internet playlist")
 
     # -- the kind ---------------------------------------------------------------------------
 

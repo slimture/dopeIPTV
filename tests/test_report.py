@@ -597,3 +597,23 @@ def test_the_last_scrub_is_in_send_itself_and_it_goes_over_https_only(monkeypatc
     assert "Kalle" not in json.loads(calls[-1][1]["data"])["text"]
     with pytest.raises(TypeError):
         report.send_status("feedback", "x")                       # type: ignore[call-arg]
+
+
+def test_a_report_loses_logins_told_in_words_tokens_home_folders_and_phone_numbers():
+    for text, gone in (
+            ("my password is hunter2, user ok", "hunter2"),
+            ("mitt lösenord är Sommar2024", "Sommar2024"),
+            ("Passwort: geheim123", "geheim123"),
+            ("username kalle77 cannot log in", "kalle77"),
+            ("token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0", "eyJ"),
+            ("ghp_1234567890abcdefghijklmnopqrstuvwxyz12", "ghp_"),
+            ("key 9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c", "9f8e7d6c5b4a"),
+            ("C:\\Users\\Kalle\\AppData\\Roaming", "Kalle"),
+            ("/home/someone/.config/dopeIPTV", "someone"),
+            ("call me on +46 70 123 45 67", "123 45 67")):
+        out = report.scrub(text)
+        assert gone not in out, (text, out)
+    # What a report needs stays as it is.
+    for text in ("Login failed: 401", "the PIN was wrong", "dopeIPTV 1.6.9 (Linux; x86_64)",
+                 "at 21:05:03 on 2026-11-20", 'File "/usr/lib/python3.11/x.py", line 12'):
+        assert report.scrub(text) == text, text

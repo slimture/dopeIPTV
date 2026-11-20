@@ -219,27 +219,60 @@ def test_a_file_kept_private_is_noted_nowhere(tmp_path, nothing_noted):
     assert settings_files.not_private() == []
 
 
-def test_the_window_says_it_once_calmly_with_where_it_is(tmp_path, monkeypatch, nothing_noted):
+def test_the_window_asks_first_then_says_it_calmly_with_where_it_is(tmp_path, monkeypatch,
+                                                                       nothing_noted):
+    """A settings file others may read holds every login: the window asks -
+    close (the default), or go on with that file - and only once the person
+    said to go on does it say so calmly each start after."""
     from PyQt6.QtWidgets import QApplication
     QApplication.instance() or QApplication([])
     from dopeiptv.i18n import tr
     from dopeiptv.ui.mw_settings import _SettingsMixin
     from dopeiptv.ui.notices import NoticeHub
 
-    class Window(_SettingsMixin):
-        def __init__(self):
-            self.notices = NoticeHub()
+    class Settings(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
 
-    w = Window()
+        def setValue(self, k, v):
+            self[k] = v
+
+    class Window(_SettingsMixin):
+        def __init__(self, answer):
+            self.notices = NoticeHub()
+            self.settings = Settings()
+            self.asked: list[str] = []
+            self.closed = False
+            self.answer = answer
+
+        def _ask_settings_open(self, path):
+            self.asked.append(path)
+            return self.answer
+
+        def close(self):
+            self.closed = True
+
+    w = Window("quit")
     w._tell_settings_not_private()
-    assert w.notices.messages() == []                           # nothing to say
+    assert w.notices.messages() == [] and not w.asked              # nothing to say
     f = _shared_file(tmp_path)
     monkeypatch.setattr(settings_files.os, "chmod", lambda path, mode: None)
     settings_files.keep_private(str(f))
     w._tell_settings_not_private()
-    w._tell_settings_not_private()
-    [msg] = w.notices.messages()
-    assert msg.level == "warning" and not msg.decide            # a message, not a question
+    assert w.asked == [str(f)] and w.closed, "Close: the app closes"
+    assert settings_files.ACCEPTED_KEY not in w.settings
+    go = Window("go")
+    go._tell_settings_not_private()
+    assert go.asked == [str(f)] and not go.closed
+    assert go.settings[settings_files.ACCEPTED_KEY] == settings_files.accepted_mark(str(f))
+    assert str(f) not in str(go.settings), "the path itself is not kept"
+    later = Window("quit")
+    later.settings = go.settings
+    later._tell_settings_not_private()
+    later._tell_settings_not_private()
+    assert later.asked == [] and not later.closed, "asked once, for that file"
+    [msg] = later.notices.messages()
+    assert msg.level == "warning" and not msg.decide
     assert msg.title == tr("settings_open_title") and str(f) in msg.body
     assert msg.action_label == tr("btn_open_folder")
     opened = []

@@ -114,6 +114,34 @@ came of them:
 | Limits | The ceilings let a hostile source make the app read and unpack up to 256 MiB, 1 GiB and 2 GiB | low | Written down (docs/SECURITY.md, "A hostile source can make the app work up to its ceilings") |
 | Home network | Plain http on the home network, cast addresses with a login, a relay that sees who is in a room, a sync server that can hold a copy back, files without owners on some drives | info | Written down, each with its reason (docs/SECURITY.md, Honest limits) |
 
+## November 2026 - second independent AI review of 1.6.9 (testing)
+
+The kit made again from `testing` (64956d7) and the website (737166a), given
+to an independent AI assistant: **7/10 overall** against
+[docs/SECURITY.md](SECURITY.md). What came of its findings:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Casting | A Kodi typed as `https://` was asked over http, its login in the clear | high | 1.6.9: the scheme is kept (`KodiDevice.secure`, `parse_target`), stored with the device; never asked over http instead |
+| Server mode | The HDHomeRun endpoints let any device on this computer's networks watch without a token | high | 1.6.9: the token is needed, in the tuner's own address (`/t/<token>/`); devices are let in without it only as the person says - the addresses listed, or every device on this computer's networks (what a server set up before 1.6.9 keeps); the UDP search answers only those let in |
+| Remote API | No Host or Origin check on requests with the token | medium | 1.6.9: a Host that is not a home name, a page of another site (Origin, Sec-Fetch-Site) refused whatever the token |
+| Network bridge | The loopback proxy started a thread for every connection before the key, without a limit | medium | 1.6.9: `MAX_SERVING` (64) at once, closed before any work beyond it; a request's head within `HEAD_TIMEOUT` in all, a trickle let go |
+| Recordings | The folder check was by name: a link inside the recordings folder could send a recording elsewhere | high (conditional) | 1.6.9: no link on the way down, where it resolves still inside (`_stays_inside`), a link where the file goes a name taken; a folder others may write in logged |
+| Settings files | A drive that keeps no permissions left the logins readable, with only a calm note | high (conditional) | 1.6.9: the window asks first - close the default, or go on with that file; server mode without a window does not start until told |
+| Providers | A source on the internet could send the app to any device of the home network | medium | 1.6.9: never, unless the person lets that source in (`home_addresses`); a multicast relay at home (udpxy) still taken |
+| Private viewing | Turned on mid-play, events still waiting named what plays | medium | 1.6.9: taken back unsent (`withdraw_titled`); what was sent already is said to be beyond reach |
+| Error reports | Logins told in words, tokens without a name, other accounts' home folders and phone numbers survived the cleaning | medium | 1.6.9: each removed (`_SAID`, `_JWT`, `_PREFIXED`, `_LONG`, `_HOME_DIR`, `_PHONE`), with tests; the page's promise says the cleaning removes what it recognizes, which the person reads first |
+| Sync | One code is the whole key, with no way to replace it | high (conditional) | 1.6.9: a new code from Settings > Sync; the old one's copy deleted |
+| Release chain | The signing job runs on what the workflow says, with no person in the way | high (conditional) | 1.6.9: release.yml's `checksums` in the environment `release-signing`, nightly's `publish` in `nightly-signing`; the owner sets a required reviewer and moves the key there (docs/MAINTAINING.md, "The release key") |
+| Website statistics | k=5 counted visits, not people | medium | website: five different visitors, told apart by a hash that goes in the same step |
+| Feedback | A thread's code hash linked its reports for 12 months | low | website: gone after 120 quiet days (`forget_codes`) |
+| Website deployment | The CSP, the proxy-only include and port 8081 could not be seen in the repository | high (conditional) | website: `deploy/check-live.sh`, run from outside after every deploy |
+| Backups | A backup without a password, or a weak one | high (conditional) | Answered: a password of 10 characters or more, and without one a warning with Cancel the default (1.6.9); the hint now recommends one |
+| Phone remote, casts | Tokens in plain http on the home network | high (on-path) | Written down (docs/SECURITY.md, "The phone remote speaks plain http"): a certificate for a home address would be one every phone warns about |
+| Watch together, sync | The relay and the sync server see timing and sizes; they can drop or hold back | medium | Written down (docs/SECURITY.md, Honest limits) |
+| PINs, kids profiles | Four digits; a provider's categories decide what is for adults | medium | Written down (docs/SECURITY.md, "A PIN is four digits", "A kids profile holds only with a grown-up's PIN") |
+| Media libraries | mpv, FFmpeg and Qt parse hostile media natively | medium | Written down ("Bugs in the media libraries are theirs") |
+
 ## The next round
 
 Before 1.6.9 is released: the kit made again from `testing` with these

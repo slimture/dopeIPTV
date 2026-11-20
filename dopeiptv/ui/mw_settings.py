@@ -178,8 +178,9 @@ class _SettingsMixin:
     def _tell_settings_not_private(self) -> None:
         """Once a start, when a settings file could not be made readable by
         this user alone (core/settings_files.py: a drive that keeps no
-        permissions): a calm message saying where it is - the app works
-        on. Its button opens the folder."""
+        permissions): asked in a window that waits for an answer - it holds
+        every login - until the person says to go on for that file; after
+        that a calm message each start. Its button opens the folder."""
         try:
             from ..core import settings_files
             found = settings_files.not_private()
@@ -192,11 +193,41 @@ class _SettingsMixin:
             def show() -> None:
                 from ..core import xdg
                 xdg.open_folder(folder)
+            accepted = str(self.settings.value(settings_files.ACCEPTED_KEY, "") or "")
+            if accepted != settings_files.accepted_mark(path):
+                answer = self._ask_settings_open(path)
+                if answer == "go":
+                    self.settings.setValue(settings_files.ACCEPTED_KEY,
+                                           settings_files.accepted_mark(path))
+                    log.warning("settings: kept on a drive other accounts may read, as the "
+                                "person said")
+                    return
+                if answer == "open":
+                    show()
+                log.warning("settings: the app closes - its settings file is not private")
+                self.close()
+                return
             hub_of(self).post(tr("settings_open_body", path=path), title=tr("settings_open_title"),
                               level="warning", action=show, action_label=tr("btn_open_folder"),
                               key="settings_not_private")
         except Exception as e:      # never in the way of starting
             log.warning("settings: the note on their permissions was not shown: %s", e)
+
+    def _ask_settings_open(self, path: str) -> str:
+        """The question a settings file others may read asks: "go" (go on
+        with it, for this file), "open" (its folder, and close) or "quit" -
+        Close the default, and Escape."""
+        box = QMessageBox(QMessageBox.Icon.Warning, tr("settings_open_title"),
+                          plain_text(tr("settings_open_body", path=path)),
+                          QMessageBox.StandardButton.NoButton, self)
+        opened = box.addButton(tr("btn_open_folder"), QMessageBox.ButtonRole.ActionRole)
+        quit_btn = box.addButton(tr("settings_open_quit"), QMessageBox.ButtonRole.RejectRole)
+        go = box.addButton(tr("settings_open_go"), QMessageBox.ButtonRole.AcceptRole)
+        box.setDefaultButton(quit_btn)
+        box.setEscapeButton(quit_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        return "go" if clicked is go else "open" if clicked is opened else "quit"
 
     def _ask_desktop_entry(self) -> None:
         """The status-row link was clicked: ask, and remember the answer."""

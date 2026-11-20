@@ -205,3 +205,43 @@ def test_the_real_ffmpeg_goes_through_with_the_key_and_not_without(case):
     assert keyed.returncode == 0, keyed.stderr[-400:]
     assert [r["path"] for r in inside.requests] == ["/live/2.ts"]
     assert "proxy-authorization" not in inside.requests[0]["headers"]
+
+
+def test_the_bridge_serves_a_bounded_number_of_connections_and_drops_a_trickle(case, monkeypatch):
+    """Another account on this computer cannot pile up threads: past
+    MAX_SERVING a connection is closed before any work, and one that sends
+    its request a byte at a time is let go once HEAD_TIMEOUT is over."""
+    import time
+    bridge, _inside = case
+    monkeypatch.setattr(net_bridge, "HEAD_TIMEOUT", 0.6)
+    held = []
+    try:
+        for _ in range(net_bridge.MAX_SERVING):
+            held.append(socket.create_connection(("127.0.0.1", bridge.port), timeout=5))
+        deadline = time.monotonic() + 5
+        extra = None
+        while time.monotonic() < deadline:
+            extra = socket.create_connection(("127.0.0.1", bridge.port), timeout=5)
+            extra.settimeout(2)
+            try:
+                if extra.recv(1) == b"":
+                    break               # closed at once: its share was taken
+            except (TimeoutError, OSError):
+                pass
+            extra.close()
+            time.sleep(0.05)
+        assert bridge.turned_away >= 1
+    finally:
+        for s in held:
+            s.close()
+    trickle = socket.create_connection(("127.0.0.1", bridge.port), timeout=5)
+    trickle.settimeout(5)
+    start = time.monotonic()
+    try:
+        while time.monotonic() - start < 4:
+            trickle.sendall(b"G")
+            time.sleep(0.2)
+    except OSError:
+        pass                            # closed on it - as it should be
+    assert time.monotonic() - start < 3.5, "the trickle was let go"
+    trickle.close()

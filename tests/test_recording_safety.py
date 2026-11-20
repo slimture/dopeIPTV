@@ -124,3 +124,27 @@ def test_a_job_from_the_settings_with_a_folder_outside_records_inside(tmp_path, 
     root = os.path.abspath(str(tmp_path / "rec"))
     assert os.path.commonpath([root, out]) == root
     assert not (tmp_path / "autostart").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="symbolic links")
+def test_a_link_inside_the_recordings_folder_never_sends_a_recording_out(tmp_path):
+    """A folder on the way to a recording that is a link leading elsewhere
+    (another account's doing, or a template's folder): the recording goes
+    to the recordings folder itself, never through the link."""
+    rm, _s = _rm(tmp_path, "rec-link")
+    root = tmp_path / "rec"
+    root.mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    os.symlink(elsewhere, root / "Series")
+    assert not RecordingManager._stays_inside(str(root), str(root / "Series"))
+    assert RecordingManager._stays_inside(str(root), str(root))
+    (root / "Films").mkdir()
+    assert RecordingManager._stays_inside(str(root), str(root / "Films"))
+    path = rm.build_path("Nyheterna", folder="Series")
+    assert os.path.dirname(path) == str(root) and not os.listdir(elsewhere)
+    # A link left where the file would go is a name taken, never written through.
+    stem = path[:-3]
+    os.symlink(tmp_path / "victim", stem + ".ts")
+    again = rm.build_path("Nyheterna", folder="Series")
+    assert again != stem + ".ts" and not os.path.lexists(tmp_path / "victim")

@@ -77,6 +77,7 @@ class KodiDevice:
     user: str = ""
     password: str = ""
     manual: bool = False
+    secure: bool = False      # typed as https://: asked over https, never http
 
     def __repr__(self) -> str:          # never the login
         return f"KodiDevice({self.name!r}, {self.address})"
@@ -88,7 +89,8 @@ class KodiDevice:
 
     @property
     def endpoint(self) -> str:
-        return f"http://{self.address}/jsonrpc"
+        scheme = "https" if self.secure else "http"
+        return f"{scheme}://{self.address}/jsonrpc"
 
     @property
     def login(self) -> tuple[str, str] | None:
@@ -101,8 +103,11 @@ class KodiDevice:
         return self.name + SUFFIX
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "host": self.host, "port": self.port,
-                "user": self.user, "password": self.password}
+        out: dict[str, Any] = {"name": self.name, "host": self.host, "port": self.port,
+                               "user": self.user, "password": self.password}
+        if self.secure:
+            out["secure"] = True
+        return out
 
 
 # -- what goes over the wire -----------------------------------------------------
@@ -111,6 +116,14 @@ def parse_address(text: str) -> tuple[str, int] | None:
     """(host, port) from what a person types: "192.168.1.20",
     "192.168.1.20:8080", "kodi.local:8080", "http://host:8080/jsonrpc",
     "[fe80::1]:8080". None for anything that is not an address."""
+    where = parse_target(text)
+    return None if where is None else (where[0], where[1])
+
+
+def parse_target(text: str) -> tuple[str, int, bool] | None:
+    """(host, port, secure) from what a person types: as parse_address,
+    and whether it was typed as https:// - a Kodi asked over https is never
+    asked over http instead, with its login in the clear."""
     text = (text or "").strip()
     if not text:
         return None
@@ -126,7 +139,7 @@ def parse_address(text: str) -> tuple[str, int] | None:
         return None
     if not all(c.isalnum() or c in ".-:_%" for c in host):
         return None
-    return host, port
+    return host, port, parts.scheme == "https"
 
 
 def rpc_request(method: str, params: dict[str, Any] | None = None,
@@ -207,7 +220,7 @@ def load_devices(settings: Any) -> list[KodiDevice]:
                               host=str(d["host"]), port=port,
                               user=str(d.get("user") or ""),
                               password=str(d.get("password") or ""),
-                              manual=True))
+                              manual=True, secure=d.get("secure") is True))
     return out
 
 
@@ -373,12 +386,12 @@ class KodiManager:
         return sorted(devices)
 
     def add(self, host: str, port: int, user: str = "", password: str = "",
-            name: str = "") -> str:
+            name: str = "", secure: bool = False) -> str:
         """Remember a Kodi (or its new login) and return its name in the
         device list. Checks that it answers first: LocalizedError when it
         wants a login or does not answer."""
         dev = KodiDevice(name="", host=host, port=port, user=user,
-                         password=password, manual=True)
+                         password=password, manual=True, secure=secure)
         try:
             dev.name = _clean_name(name or describe(dev, self.session))
         except KodiAuthError as e:

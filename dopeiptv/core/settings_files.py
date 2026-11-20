@@ -20,7 +20,10 @@ system's ~/Library/Preferences, is left alone.
 A file system that keeps no permissions (a FAT or exFAT drive, some network
 shares) refuses the change or takes it and keeps the old mode. The app
 starts all the same: the file is logged by its name (never what it holds)
-and kept in ``not_private`` for the window to say once (ui/mw_settings.py).
+and kept in ``not_private``; the window asks in a window that waits for an
+answer - close, or go on with that file (ACCEPTED_KEY) - and says so each
+start after (ui/mw_settings.py); server mode without a window does not start
+(headless.py) until the person says so.
 """
 from __future__ import annotations
 
@@ -37,6 +40,9 @@ FOLDER_MODE = 0o700
 
 #: The settings files this start could not keep to this user, in order.
 _not_private: list[str] = []
+#: The file the person said to go on with, readable by others all the same
+#: (accepted_mark): asked again for any other file, or a moved one.
+ACCEPTED_KEY = "settings_open_accepted"
 _lock = threading.Lock()
 
 
@@ -56,6 +62,13 @@ def _note(path: str, why: str) -> None:
     with _lock:
         if path not in _not_private:
             _not_private.append(path)
+
+
+def accepted_mark(path: str) -> str:
+    """What ACCEPTED_KEY holds for *path*: its hash, not the path itself (a
+    backup or a report of the settings names no folder)."""
+    import hashlib
+    return hashlib.sha256(os.path.abspath(path).encode("utf-8", "replace")).hexdigest()[:32]
 
 
 def not_private() -> list[str]:

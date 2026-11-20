@@ -801,11 +801,15 @@ class M3UClient(OfflineClient):
             return True
         if not url.lower().startswith(("http://", "https://")):
             return False
-        return not (stream_address.on_internet(self.server) and stream_address.host_refusal(url))
+        return not (stream_address.on_internet(self.server)
+                    and stream_address.host_refusal(url, home=not self.home_ok))
 
     def __init__(self, url: str, stable: bool = False, map_path: str = "") -> None:
         super().__init__()
         self.server = (url or "").strip()
+        #: The source's own option (core/stream_address.HOME_OPTION), set by
+        #: make_client: a list on the internet may name devices at home.
+        self.home_ok = False
         # core/m3u_ids.py: *stable* - a channel's id made from the channel,
         # else its place in the list (and *map_path* told what each place's
         # stable id is, for the move at the next start).
@@ -1224,11 +1228,16 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
     server = str(source.get("_server") or "")
     remote = _is_remote(kind, server)
     internet = remote and _on_internet(kind, server, source)
+    # A source on the internet never sends the app to a device at home -
+    # unless the person said this one's list is their own (its option).
+    home_ok = stream_address.home_allowed(source)
+    if hasattr(client, "home_ok"):
+        client.home_ok = home_ok
 
     def theirs(address: Any) -> str:
         """*address* as the source's own word may be played: what a stream
         can be from where the source is (core/stream_address.py)."""
-        return stream_address.played(address, remote, kind, internet=internet)
+        return stream_address.played(address, remote, kind, internet=internet, home_ok=home_ok)
 
     def handed(raw: Any, udpxy: bool = False) -> Any:
         """What is played for the address the source gave: through the
@@ -1294,7 +1303,7 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
     # catch-up address, ui/mw_timeshift.py): judged as these are.
     client.played_from_source = theirs
     if internet:
-        _keep_pictures(client)
+        _keep_pictures(client, home=not home_ok)
 
 
 def _is_remote(kind: str, server: str) -> bool:
@@ -1318,61 +1327,62 @@ _PICTURE_CALLS = ("live_streams", "vod_streams", "series_list", "series_info", "
 _PICTURE_DEPTH = 6
 
 
-def _picture_kept(value: Any) -> Any:
+def _picture_kept(value: Any, home: bool = False) -> Any:
     """*value* (an address or a list of them) without what names this
-    computer or a link-local host (core/stream_address.picture_refusal)."""
+    computer or a link-local host - with *home*, a device at home too
+    (core/stream_address.picture_refusal)."""
     if isinstance(value, str):
-        return "" if value and stream_address.picture_refusal(value) else value
+        return "" if value and stream_address.picture_refusal(value, home) else value
     if isinstance(value, list):
         kept = [v for v in value if not (isinstance(v, str) and v
-                                         and stream_address.picture_refusal(v))]
+                                         and stream_address.picture_refusal(v, home))]
         return kept if len(kept) != len(value) else value
     return value
 
 
-def _row_pictures(row: dict) -> None:
+def _row_pictures(row: dict, home: bool = False) -> None:
     for key in row.keys() & PICTURE_KEYS:
         value = row[key]
-        kept = _picture_kept(value)
+        kept = _picture_kept(value, home)
         if kept is not value:
             row[key] = kept
 
 
-def _deep_pictures(found: Any, depth: int = 0) -> None:
+def _deep_pictures(found: Any, depth: int = 0, home: bool = False) -> None:
     """An info answer's pictures, at any depth (a series' seasons and its
     episodes' own)."""
     if depth > _PICTURE_DEPTH:
         return
     if isinstance(found, dict):
-        _row_pictures(found)
+        _row_pictures(found, home)
         found = found.values()
     elif not isinstance(found, (list, tuple)):
         return
     for value in found:
         if isinstance(value, (dict, list, tuple)):
-            _deep_pictures(value, depth + 1)
+            _deep_pictures(value, depth + 1, home)
 
 
-def _pictures_kept(found: Any) -> Any:
+def _pictures_kept(found: Any, home: bool = False) -> Any:
     """*found* - a list of rows, an info answer - with every picture a
     source on the internet named on this computer or a link-local host
     taken out, in place: the app itself fetches a row's pictures, and such
     an address had it send requests to this computer's or the cloud's
-    services. A private address of the home network stays (a box's picon).
-    A list's rows are looked at for their own pictures; an info answer
-    through and through."""
+    services. With *home* a device of the home network's too (a source the
+    person did not let in there). A list's rows are looked at for their own
+    pictures; an info answer through and through."""
     if isinstance(found, dict):
-        _deep_pictures(found)
+        _deep_pictures(found, 0, home)
     elif isinstance(found, (list, tuple)):
         for item in found:
             if isinstance(item, dict):
-                _row_pictures(item)
+                _row_pictures(item, home)
             elif isinstance(item, (list, tuple)):
-                _pictures_kept(item)
+                _pictures_kept(item, home)
     return found
 
 
-def _picture_call(call: Any) -> Any:
+def _picture_call(call: Any, home: bool = False) -> Any:
     """*call* with what it answers through _pictures_kept - a list the
     source's cache hands out again as it was looked at once."""
     last: dict[Any, Any] = {}
@@ -1385,7 +1395,7 @@ def _picture_call(call: Any) -> Any:
                 return got
         except TypeError:
             key = None
-        _pictures_kept(got)
+        _pictures_kept(got, home)
         if key is not None:
             if len(last) >= 64:
                 last.clear()
@@ -1394,13 +1404,13 @@ def _picture_call(call: Any) -> Any:
     return kept
 
 
-def _keep_pictures(client: Any) -> None:
+def _keep_pictures(client: Any, home: bool = False) -> None:
     """A source on the internet's lists and pages handed out with their
-    pictures through _pictures_kept."""
+    pictures through _pictures_kept (*home*: a device at home's too)."""
     for name in _PICTURE_CALLS:
         call = getattr(client, name, None)
         if call is not None:
-            setattr(client, name, _picture_call(call))
+            setattr(client, name, _picture_call(call, home))
 
 
 def _on_internet(kind: str, server: str, options: dict) -> bool:

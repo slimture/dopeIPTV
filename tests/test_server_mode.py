@@ -142,7 +142,7 @@ class Host:
 
     def save(self, changes):
         self.saved.update(changes)
-        return hs.Config(port=int(changes.get(hs.K_PORT, 0) or 0), token="tok-" + "x" * 20,
+        return hs.Config(open=hs.OPEN_HOME, port=int(changes.get(hs.K_PORT, 0) or 0), token="tok-" + "x" * 20,
                          device_id="1234567F")
 
     def page(self):
@@ -158,7 +158,7 @@ def server(tmp_path, provider):
     pool = DvrPool(tmp_path, 60.0, 10**9, min_free=0)
     host = Host(pool)
     client = FakeClient(f"http://127.0.0.1:{provider.server_address[1]}")
-    cfg = hs.Config(port=0, tuners=0, token=TOKEN, device_id=hdhr.new_device_id())
+    cfg = hs.Config(open=hs.OPEN_HOME, port=0, tuners=0, token=TOKEN, device_id=hdhr.new_device_id())
     srv = hs.HomeServer(host, cfg, bind="127.0.0.1", discovery_port=0,
                         make_client=lambda _pl: client, guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"))
     srv.start()
@@ -516,8 +516,10 @@ def test_headless_starts_answers_and_stops_on_sigterm(tmp_path):
                 port = int(m.group(1))
                 break
         assert port, "".join(lines)
-        d = json.loads(OPENER.open(f"http://127.0.0.1:{port}/discover.json", timeout=5).read())
-        assert d["FriendlyName"] == "dopeIPTV"
+        # A new install's tuner wants its token: nobody is let in without it.
+        with pytest.raises(urllib.error.HTTPError) as e:
+            OPENER.open(f"http://127.0.0.1:{port}/discover.json", timeout=5)
+        assert e.value.code == 401
         proc.send_signal(signal.SIGTERM)
         out = proc.communicate(timeout=20)[1]
         assert proc.returncode == 0, out
@@ -596,7 +598,7 @@ def test_an_hls_channel_is_restreamed_as_ts_over_one_connection(tmp_path):
             return f"http://127.0.0.1:{web.server_address[1]}/hls/index.m3u8"
 
     pool = DvrPool(tmp_path / "dvr", 60.0, 10**9, min_free=0)
-    cfg = hs.Config(port=0, token=TOKEN, device_id=hdhr.new_device_id())
+    cfg = hs.Config(open=hs.OPEN_HOME, port=0, token=TOKEN, device_id=hdhr.new_device_id())
     srv = hs.HomeServer(Host(pool), cfg, bind="127.0.0.1", discovery_port=0,
                         make_client=lambda _pl: HlsClient("http://x.invalid"))
     srv.start()
@@ -673,7 +675,7 @@ def test_the_player_adopts_the_server_s_session(monkeypatch, tmp_path, provider)
 
 def _serving(tmp_path, client):
     pool = DvrPool(tmp_path / "dvr", 60.0, 10**9, min_free=0)
-    cfg = hs.Config(port=0, token=TOKEN, device_id=hdhr.new_device_id())
+    cfg = hs.Config(open=hs.OPEN_HOME, port=0, token=TOKEN, device_id=hdhr.new_device_id())
     srv = hs.HomeServer(Host(pool), cfg, bind="127.0.0.1", discovery_port=0,
                         make_client=lambda _pl: client,
                         guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"))
@@ -1359,3 +1361,69 @@ def test_an_address_the_tuner_refuses_is_said_once_with_the_way_in(server, monke
     for i in range(hs.REFUSED_NAMES_MAX + 5):
         srv.refused_address(f"10.9.0.{i}")
     assert len(srv._refused_addresses) == hs.REFUSED_NAMES_MAX, "a flood of addresses stays small"
+
+
+# -- who may use the tuner without its token (1.6.9) --------------------------------------
+
+def test_a_new_tuner_needs_its_token_and_answers_under_it(server):
+    """Nobody is let in without the token by default: the plain endpoints
+    refuse, the tuner's address with the token in it works - its lineup's
+    stream addresses carry it too."""
+    srv = server[0]
+    srv.config.open = hs.OPEN_OFF
+    for path in ("/discover.json", "/lineup.json", "/auto/v5"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(srv, path)
+        assert e.value.code == 401, path
+    base = f"/t/{TOKEN}"
+    d = json.loads(_get(srv, base + "/discover.json").read())
+    assert d["BaseURL"].endswith(base) and d["LineupURL"].endswith(base + "/lineup.json")
+    lineup = json.loads(_get(srv, base + "/lineup.json").read())
+    assert lineup and all(f"{base}/auto/v" in c["URL"] for c in lineup)
+    r = _watch(srv, base + "/auto/v5")
+    r.close()
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(srv, "/t/" + "y" * 24 + "/discover.json")
+    assert e.value.code == 401, "a wrong token in the address"
+    assert srv.tuner_address("http://h:1") == f"http://h:1{base}"
+
+
+def test_only_the_devices_listed_use_the_tuner_without_its_token(server):
+    srv = server[0]
+    srv.config.open = hs.OPEN_DEVICES
+    srv.config.open_hosts = ("192.168.1.20",)
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _get(srv, "/discover.json")                 # 127.0.0.1 is not on the list
+    assert e.value.code == 401
+    assert srv.open_to("192.168.1.20") and srv.open_to("::ffff:192.168.1.20")
+    assert not srv.open_to("192.168.1.21")
+    assert not srv._may_discover("192.168.1.21"), "the UDP search answers only them"
+    srv.config.open_hosts = ("127.0.0.1",)
+    assert json.loads(_get(srv, "/discover.json").read())["FriendlyName"] == "dopeIPTV"
+    assert srv.tuner_address("http://h:1") == "http://h:1"
+
+
+def test_the_devices_let_in_are_home_addresses_only():
+    good, bad = hs.parse_open_hosts("192.168.1.20, 10.0.0.5\nfd00::1 127.0.0.1 8.8.8.8 kodi.lan "
+                                    "192.168.1.20")
+    assert good == ["192.168.1.20", "10.0.0.5", "fd00::1", "127.0.0.1"]
+    assert bad == ["8.8.8.8", "kodi.lan"]
+    assert len(hs.parse_open_hosts(" ".join(f"10.0.0.{i}" for i in range(1, 60)))[0]) \
+        == hs.OPEN_HOSTS_MAX
+
+
+def test_server_mode_set_up_before_keeps_its_open_tuner_and_a_new_one_is_shut():
+    class S(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
+
+        def setValue(self, k, v):
+            self[k] = v
+    old = S({hs.K_ON: "true"})
+    assert hs.open_mode(old) == hs.OPEN_HOME and old[hs.K_OPEN] == hs.OPEN_HOME
+    new = S()
+    assert hs.open_mode(new) == hs.OPEN_OFF and new[hs.K_OPEN] == hs.OPEN_OFF
+    new[hs.K_ON] = "true"
+    assert hs.open_mode(new) == hs.OPEN_OFF, "turned on now: stays shut"
+    headless = S({hs.K_DEVICE: "1234ABCD"})
+    assert hs.open_mode(headless, ran_before=True) == hs.OPEN_HOME, "a --server of before"

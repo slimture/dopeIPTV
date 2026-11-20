@@ -64,6 +64,7 @@ import functools
 import ipaddress
 import socket
 import unicodedata
+from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from .log import log
@@ -116,6 +117,14 @@ _HOST_ENDS = ("/?#", "/?", "/?#\\| \t")
 #: Why a host is no stream's from the internet - the log's words for it.
 THIS_COMPUTER = "this computer"
 LINK_LOCAL = "a link-local host"
+#: A host of the home network - refused to a source on the internet unless
+#: the person let that source in (its option HOME_OPTION).
+HOME = "the home network"
+#: A source's own option (in its options): its addresses may lead into the
+#: home network - a list of the person's own on the internet naming boxes
+#: at home. Off: what a playlist on the internet names never sends the app
+#: to a device at home.
+HOME_OPTION = "home_addresses"
 #: The end of a refusal only a source on the internet gets.
 _INTERNET = " from the internet"
 #: AceStream's engine on this computer: its HTTP API on port 6878 plays the
@@ -227,6 +236,28 @@ def _host_kind(host: str) -> str:
     return ""
 
 
+def _home_kind(host: str) -> str:
+    """HOME for one host as an address names it that is a device of the
+    home network: a private or unique local address (not this computer's,
+    not link-local - those are refused anyway), a name without a dot, or one
+    with a home ending (.local, .lan, .home.arpa, .fritz.box...). Never
+    looked up."""
+    name = host.strip().lower().rstrip(".")
+    if not name:
+        return ""
+    ip = _ip(name)
+    if ip is not None:
+        if ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast:
+            return ""
+        return HOME if (ip.is_private or not ip.is_global) else ""
+    from .home_net import HOME_SUFFIXES
+    if ":" in name or "%" in name:
+        return ""
+    if "." not in name or name.endswith(HOME_SUFFIXES) or name in _HOME_NAMES:
+        return HOME
+    return ""
+
+
 def _hosts(address: str) -> set[str]:
     """Every host *address* may be read as naming: by each reader's end of
     the host's part (_HOST_ENDS), after its last "@", before its port; as
@@ -250,17 +281,28 @@ def _hosts(address: str) -> set[str]:
     return {h for h in found | more if h}
 
 
-def host_refusal(address: str) -> str:
+def host_refusal(address: str, home: bool = False) -> str:
     """Why *address* names a host a source on the internet may not send the
     player to: THIS_COMPUTER (loopback however it is spelt, localhost, this
     computer's own name, 0.0.0.0) or LINK_LOCAL (169.254/16, fe80::/10, a
-    cloud's metadata service); "" for any other host - a public one, or a
-    private one of the home network. Read as written, never looked up."""
-    kinds = {_host_kind(h) for h in _hosts(address)}
+    cloud's metadata service), and with *home* HOME (a device of the home
+    network: _home_kind); "" for any other host. Read as written, never
+    looked up."""
+    hosts = _hosts(address)
+    kinds = {_host_kind(h) for h in hosts}
     for kind in (THIS_COMPUTER, LINK_LOCAL):
         if kind in kinds:
             return kind
+    if home and any(_home_kind(h) for h in hosts):
+        return HOME
     return ""
+
+
+def home_allowed(options: Any) -> bool:
+    """Whether a source's own *options* let its addresses lead into the home
+    network (HOME_OPTION) - a list of the person's own on the internet."""
+    value = options.get(HOME_OPTION) if isinstance(options, dict) else None
+    return value is True or str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 def acestream(address: str) -> bool:
@@ -277,21 +319,21 @@ def acestream(address: str) -> bool:
 
 
 @functools.lru_cache(maxsize=4096)
-def _head_refusal(head: str) -> str:
-    return host_refusal(head)
+def _head_refusal(head: str, home: bool = False) -> str:
+    return host_refusal(head, home)
 
 
-def picture_refusal(address: str) -> str:
+def picture_refusal(address: str, home: bool = False) -> str:
     """host_refusal for a picture's address from a source on the internet
     (a logo, a poster), the same rule as a stream's: THIS_COMPUTER,
-    LINK_LOCAL or "". Asked for every row of a list, so kept per scheme and
-    host part - everything before the first "/" or "?" after "://", where
-    every reader's host lies (_HOST_ENDS, urlsplit's)."""
+    LINK_LOCAL, with *home* HOME, or "". Asked for every row of a list, so
+    kept per scheme and host part - everything before the first "/" or "?"
+    after "://", where every reader's host lies (_HOST_ENDS, urlsplit's)."""
     start = address.find("://")
     if start < 0:
         return ""
     ends = [i for i in (address.find("/", start + 3), address.find("?", start + 3)) if i >= 0]
-    return _head_refusal(address[:min(ends)] if ends else address)
+    return _head_refusal(address[:min(ends)] if ends else address, home)
 
 
 def on_internet(address: str) -> bool:
@@ -325,11 +367,13 @@ def on_internet(address: str) -> bool:
 _HOME_NAMES = frozenset(("fritz.box",))
 
 
-def refusal(address: str, remote: bool = True, internet: bool = False) -> str:
+def refusal(address: str, remote: bool = True, internet: bool = False,
+            home_ok: bool = False) -> str:
     """Why *address* is not played, in a word for the log - "" when it is.
     *remote*: it came over the network (anything but a playlist file on
     this computer); *internet*: from a source on the internet
-    (:func:`on_internet`), which hands out less."""
+    (:func:`on_internet`), which hands out less - never a device of the home
+    network either, unless *home_ok* (the source's HOME_OPTION)."""
     if not address:
         return ""
     if any(c < " " or c == "\x7f" for c in address):
@@ -348,10 +392,33 @@ def refusal(address: str, remote: bool = True, internet: bool = False) -> str:
         return ""
     if scheme not in MEDIA:
         return f"{scheme}://{_INTERNET}"
-    where = host_refusal(address)
+    where = host_refusal(address, home=not home_ok)
     if where == THIS_COMPUTER and acestream(address):
         return ""
+    if where == HOME and udpxy(address):
+        return ""
     return where + _INTERNET if where else ""
+
+
+def udpxy(address: str) -> bool:
+    """Whether *address* is a multicast group through a relay on the home
+    network (udpxy on the router: http://192.168.1.1:4022/udp/239.0.0.1:1234)
+    - what an operator's playlist on the internet names for its own
+    channels. It asks the relay for a group and nothing else."""
+    try:
+        parts = urlsplit(address)
+        host = parts.hostname or ""
+    except ValueError:
+        return False
+    if parts.scheme not in ("http", "https") or parts.username or parts.password:
+        return False
+    ip = _ip(host)
+    if ip is None or not ip.is_private:
+        return False
+    kind, _sep, group = parts.path.lstrip("/").partition("/")
+    group_host = group.lstrip("@").rsplit(":", 1)[0]
+    gip = _ip(group_host)
+    return kind in ("udp", "rtp") and gip is not None and gip.is_multicast
 
 
 #: Each refusal is said once a session: a list asks for its addresses often.
@@ -360,17 +427,21 @@ _SAID_MAX = 200
 
 
 def played(address: object, remote: bool = True, what: str = "source",
-           internet: bool = False) -> str:
+           internet: bool = False, home_ok: bool = False) -> str:
     """*address* when a source's stream may be that, else "" - logged once,
     with the reason and never the address (it may carry a login)."""
     text = str(address or "")
-    why = refusal(text, remote, internet)
+    why = refusal(text, remote, internet, home_ok)
     if not why:
         return text
     key = (what, why)
     if key not in _said and len(_said) < _SAID_MAX:
         _said.add(key)
-        if why.endswith(_INTERNET):
+        if why == HOME + _INTERNET:
+            log.warning("%s: a source on the internet named a device of the home network - "
+                        "not played; if it is your own list, let it in: the source's settings "
+                        "> Advanced > Addresses on my home network", what)
+        elif why.endswith(_INTERNET):
             log.warning("%s: a source on the internet may not send the player to %s - "
                         "not played", what, why[:-len(_INTERNET)])
         else:

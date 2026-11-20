@@ -2022,10 +2022,16 @@ jobs:
   # installs an update only when its file is on a list signed so
   # (dopeiptv/core/update_keys.py), and sync-releases.sh moves the site to
   # a release only once it is signed. Also after a .dmg is replaced.
+  #
+  # Its environment, release-signing, holds the update key and waits for a
+  # person's approval (Settings > Environments: a required reviewer, the
+  # secret there and not among the repository's): nothing signs a release
+  # that the maintainer did not let through, whatever else ran before it.
   checksums:
     needs: [python-dist, linux-bundle, macos-dmg, windows-zip, flatpak]
     if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/') || (inputs.replace_macos_dmg || '') != '') }}
     runs-on: ubuntu-24.04
+    environment: release-signing
     permissions:
       contents: write      # the release's notes, and its signed checksum list
     env:

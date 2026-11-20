@@ -298,15 +298,22 @@ SPELLINGS = ("http://127.1/", "http://2130706433/", "http://0x7f000001/", "http:
              "http://tv.example\\@127.0.0.1/", "http://１２７.０.０.１/", "https://[::1]:8443/x.m3u8",
              "rtmp://127.0.0.1/app playpath=x", "rtsp://169.254.10.10/cam", "udp://@127.0.0.1:1234")
 #: From the internet as before: a server's stream, a multicast group, and a
-#: private address of the home network (an ISP's multicast proxy, udpxy
-#: on the router).
+#: group through a relay at home (an ISP's multicast proxy, udpxy on the
+#: router).
 STILL_FROM_THE_INTERNET = (
     "http://tv.example:8080/live/u/p/1.ts", "https://cdn.example/hls/a.m3u8?token=1",
     "rtsp://cam.example/1", "rtmp://live.example/app playpath=x live=1", "udp://@239.0.0.1:1234",
     "rtp://@239.1.1.1:5000", "srt://relay.example:9000?streamid=x", "rist://relay.example:1968",
-    "mms://radio.example/a", "http://192.168.1.1:4022/udp/239.0.0.1:1234", "http://10.0.0.5:8080/x.ts",
-    "http://[fd00::5]:8096/x", "http://100.64.1.2/x.ts", "http://tv.example/x.ts|Referer=http://127.0.0.1/",
-    "http://127.0.0.1.tv.example/x.ts")
+    "mms://radio.example/a", "http://192.168.1.1:4022/udp/239.0.0.1:1234",
+    "http://10.0.0.1:4022/rtp/@232.1.1.1:5000",
+    "http://tv.example/x.ts|Referer=http://127.0.0.1/", "http://127.0.0.1.tv.example/x.ts")
+#: A device of the home network: never from a source on the internet unless
+#: the person let that source in (its option home_addresses).
+HOME_FROM_THE_INTERNET = (
+    "http://10.0.0.5:8080/x.ts", "http://[fd00::5]:8096/x", "http://100.64.1.2/x.ts",
+    "http://192.168.1.1/", "http://router/admin", "http://nas.local:5000/x.ts",
+    "http://kodi.lan:8080/jsonrpc", "http://192.168.1.1:4022/status",
+    "http://192.168.1.1:4022/udp/192.168.1.5:80")
 
 
 def test_a_source_on_the_internet_hands_out_media_streams_and_never_this_computer():
@@ -315,6 +322,10 @@ def test_a_source_on_the_internet_hands_out_media_streams_and_never_this_compute
         assert played(address, True, internet=True) == ""
     for address in STILL_FROM_THE_INTERNET:
         assert refusal(address, internet=True) == "", address
+    for address in HOME_FROM_THE_INTERNET:
+        assert refusal(address, internet=True) == stream_address.HOME + " from the internet", address
+        assert refusal(address, internet=True, home_ok=True) == "", address
+        assert refusal(address, internet=False) == "", "from the home network's own source"
     # What is no stream whoever lists it stays so.
     for address in NEVER:
         assert refusal(address, internet=True), address
@@ -486,6 +497,11 @@ def test_an_internet_sources_pictures_never_name_this_computer(monkeypatch):
     the box), and a home network's or a playlist file's pictures as before."""
     internet = _odd("http://tv.example/list.m3u", monkeypatch)
     assert [r["stream_icon"] for r in internet.live_streams()] == [
+        "", "", "", "", "http://logos.example/5.png", ""]
+    monkeypatch.setattr(M3UClient, "_fetch", lambda self: PLAYLIST_ODD)
+    let_in = client_mod.make_client({"kind": "m3u", "server": "http://tv.example/list.m3u",
+                                     "options": {"home_addresses": True}})
+    assert [r["stream_icon"] for r in let_in.live_streams()] == [
         "", "http://192.168.1.1/picon/2.png", "", "", "http://logos.example/5.png", ""]
     for server in ("http://192.168.1.10/list.m3u", "/home/u/list.m3u"):
         own = _odd(server, monkeypatch)
@@ -498,6 +514,8 @@ def test_an_internet_sources_pictures_never_name_this_computer(monkeypatch):
     for fine in ("http://logos.example/a.png", "https://image.tmdb.org/t/p/w500/x.jpg",
                  "http://192.168.1.1/picon/1.png", "/home/u/picons/1.png", ""):
         assert stream_address.picture_refusal(fine) == "", fine
+    assert stream_address.picture_refusal("http://192.168.1.1/picon/1.png", home=True) \
+        == stream_address.HOME
 
 
 class _Pictured(_Fake):
@@ -533,12 +551,18 @@ def test_every_list_and_page_of_an_internet_source_is_looked_at_for_pictures():
                                 "episodes": {"1": [{"id": 5, "info": {"movie_image": ""}}]}}
     assert c.vod_info(1) == {"info": {"movie_image": "", "cover_big": "", "backdrop_path": ""}}
     # The home network's own, on this computer too: as before.
-    for picture, server in (("http://127.0.0.1:8096/Items/1/Images/Primary", "http://127.0.0.1:8096"),
-                            ("http://192.168.1.5/picon.png", "http://tv.example")):
+    for picture, opts in (("http://127.0.0.1:8096/Items/1/Images/Primary",
+                           {"_server": "http://127.0.0.1:8096"}),
+                          ("http://192.168.1.5/picon.png",
+                           {"_server": "http://tv.example", "home_addresses": True})):
         c = _Pictured(picture)
-        client_mod._nerd_lists(c, {"_kind": "jellyfin", "_server": server}, "p1")
+        client_mod._nerd_lists(c, dict(opts, _kind="jellyfin"), "p1")
         assert c.vod_streams()[0]["stream_icon"] == picture
         assert c.series_info(1)["episodes"]["1"][0]["info"]["movie_image"] == picture
+    # A device at home named by a source on the internet the person did not let in: out.
+    c = _Pictured("http://192.168.1.5/picon.png")
+    client_mod._nerd_lists(c, {"_kind": "jellyfin", "_server": "http://tv.example"}, "p1")
+    assert c.vod_streams()[0]["stream_icon"] == ""
 
 
 def test_an_internet_playlists_own_guide_address_never_names_this_computer():
@@ -548,9 +572,13 @@ def test_an_internet_playlists_own_guide_address_never_names_this_computer():
             ("http://tv.example/list.m3u", "http://127.0.0.1:631/printers", False),
             ("http://tv.example/list.m3u", "http://169.254.169.254/latest/meta-data/", False),
             ("http://tv.example/list.m3u", "file:///etc/passwd", False),
-            ("http://tv.example/list.m3u", "http://192.168.1.10/epg.xml", True),
+            ("http://tv.example/list.m3u", "http://192.168.1.10/epg.xml", False),
             ("http://192.168.1.10/list.m3u", "http://127.0.0.1:34400/xmltv.xml", True),
             ("/home/u/list.m3u", "/home/u/guide.xml", True)):
         c = M3UClient(server)
         c._parse(head.format(guide))
         assert c.epg_url == (guide if kept else ""), (server, guide)
+    c = M3UClient("http://tv.example/list.m3u")
+    c.home_ok = True                    # the person let this list in
+    c._parse(head.format("http://192.168.1.10/epg.xml"))
+    assert c.epg_url == "http://192.168.1.10/epg.xml"

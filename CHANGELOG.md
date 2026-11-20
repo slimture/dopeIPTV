@@ -58,6 +58,38 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   recordings for it. A kids profile is made only once a grown-up's PIN
   exists, and is left for a grown-up's profile only with one; one made
   before, in a household with no grown-up's PIN, is never locked in.
+- services/home_server.py: server mode's tuner needs its token, in the
+  tuner's own address (`/t/<token>/`, every stream of its lineup under it) -
+  Jellyfin, Emby and Channels take it. Devices are let in without the token
+  only as the person says (Settings > Nerd > Remote and automation): the
+  addresses listed, or every device on this computer's networks, which a
+  server set up before keeps. The UDP search answers only those let in.
+- providers/kodi.py: a Kodi typed as `https://` is asked over https, never
+  over http with its login in the clear.
+- core/stream_address.py, providers/client.py: a source on the internet
+  never sends the app to a device of the home network - its streams, its
+  pictures, its guide - unless the person lets that source in (its option
+  "Addresses on my home network"); a multicast relay at home (udpxy) still
+  plays.
+- core/remote_api.py: a request under a Host that is not a home name, or
+  from a page of another site, is refused whatever its token.
+- core/net_bridge.py: at most 64 connections at once, and a request's head
+  in ten seconds in all, before any work for it.
+- core/recording.py: no link on the way into the recordings folder sends a
+  recording elsewhere; a link where the file goes is a name taken.
+- core/settings_files.py, ui/mw_settings.py, headless.py: a settings file
+  that could not be made private is asked about before the app goes on
+  (close is the default); server mode without a window does not start
+  until `--settings-not-private` says so.
+- core/events.py: turning private viewing on takes back the events still
+  waiting that name what plays.
+- core/report.py: a login told in words, a token without a name, another
+  account's home folder and a phone number are cleaned out of a report too.
+- ui/mw_sync.py: a new sync code from Settings > Sync - the old one's copy
+  is deleted, the other computers join again with the new one.
+- release.yml, nightly.yml: signing runs in the environments
+  `release-signing` and `nightly-signing`, so the owner can require an
+  approval and keep the update key there alone.
 - services/home_server.py: server mode's page and `api/` take a token of
   their own (`nerd_server_admin_token`, never in a backup); the playlist's
   token, which every TV and player holds, opens the playlist, the guide and

@@ -222,6 +222,18 @@ or a checksum changed beside the file, gets nothing installed.
 - `tools/sign_sums.py` refuses a secret whose public half the app does not
   carry, so a wrong secret stops the build instead of shipping a release
   no app will install.
+- **Who lets a signature happen (since 1.6.9).** release.yml's `checksums`
+  job runs in the environment `release-signing`, nightly.yml's `publish` in
+  `nightly-signing`. Set them up once, in the repository's Settings >
+  Environments: `release-signing` with yourself as a required reviewer and
+  deployment branches and tags limited to `main` and `v*`; `nightly-signing`
+  limited to `testing`. Put `DOPEIPTV_UPDATE_KEY` in each environment's own
+  secrets and delete the repository-wide one. Then no workflow on another
+  branch can read the key, and no release is signed until you approve the
+  job in the Actions tab - a changed workflow or a stolen token alone signs
+  nothing. Until then the jobs run as before (an environment that does not
+  exist is made without rules, and the repository-wide secret still
+  reaches it).
 - **The build jobs' own key (required since 1.6.9).** Every build job
   signs its build manifest ("Official builds" below) after it has run
   PyInstaller, pip's packages and other people's tools, so those jobs never

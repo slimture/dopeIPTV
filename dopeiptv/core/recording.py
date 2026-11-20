@@ -561,6 +561,47 @@ class RecordingManager(QObject):
             return root
         return target
 
+    @staticmethod
+    def _stays_inside(root: str, folder: str) -> bool:
+        """Whether *folder* (made already) is the recordings folder *root*
+        or one inside it on disk too: no link on the way from *root* down
+        that leads elsewhere, and where it resolves to still inside *root* -
+        a folder another account can change cannot send a recording out."""
+        try:
+            top = os.path.realpath(root)
+            rel = os.path.relpath(os.path.abspath(folder), os.path.abspath(root))
+        except ValueError:
+            return False
+        if rel == os.curdir:
+            return True
+        if rel.startswith(os.pardir):
+            return False
+        here = os.path.abspath(root)
+        for part in rel.split(os.sep):
+            here = os.path.join(here, part)
+            try:
+                if os.path.islink(here):
+                    return False
+            except OSError:
+                return False
+        try:
+            return os.path.commonpath([top, os.path.realpath(folder)]) == top
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _shared_folder(folder: str) -> bool:
+        """POSIX: *folder* is another account's, or others may write in it
+        without the sticky bit - a link put there could redirect a file."""
+        if os.name != "posix":
+            return False
+        try:
+            st = os.stat(folder)
+        except OSError:
+            return False
+        others_write = bool(st.st_mode & 0o002) and not (st.st_mode & 0o1000)
+        return others_write or (st.st_uid != os.getuid() and bool(st.st_mode & 0o022))
+
     def build_path(self, title: str, folder: str = "", channel: str = "") -> str:
         """A unique target file for a new recording: "Title 2026-11-14
         21.00.ts", or as the Nerd page's template names it (folders
@@ -576,9 +617,19 @@ class RecordingManager(QObject):
             stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
             stem = os.path.join(base, f"{safe_filename(title)} {stamp}")
         os.makedirs(os.path.dirname(stem), exist_ok=True)
+        root = self.directory()
+        if not self._stays_inside(root, os.path.dirname(stem)):
+            log.warning("record: a folder on the way to the recording leads out of the "
+                        "recordings folder (a link) - recorded in the recordings folder instead")
+            stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
+            stem = os.path.join(root, f"{safe_filename(title)} {stamp}")
+        if self._shared_folder(os.path.dirname(stem)):
+            log.warning("record: other accounts on this computer can change the recordings "
+                        "folder - a recording there is only as safe as they are")
         path = stem + ".ts"
         n = 1
-        while os.path.exists(path):
+        # lexists: a link left where the file goes is a name taken too.
+        while os.path.lexists(path):
             path = f"{stem} ({n}).ts"
             n += 1
         return path

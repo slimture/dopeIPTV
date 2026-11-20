@@ -182,11 +182,14 @@ def remote():
 def test_the_shared_playlist_is_never_written_under_a_host_of_the_asker_s_choosing(remote):
     path = f"/playlist.m3u?token={remote.token}"
     here = f"http://127.0.0.1:{remote.port}/stream/s/1?token={remote.token}"
-    for host in ("evil.example.com", "evil.example.com:80", "192.168.1.20.evil.com", None):
+    for host in ("evil.example.com", "evil.example.com:80", "192.168.1.20.evil.com"):
+        # Not a home name: a web page's own, rebound here - not answered at all.
         resp, body = _ask(remote.port, path, host)
-        assert resp.status == 200
-        assert here in body.decode(), host
-        assert "evil" not in body.decode()
+        assert resp.status == 403, host
+        assert remote.token not in body.decode()
+    resp, body = _ask(remote.port, path, None)
+    assert resp.status == 200
+    assert here in body.decode()
     # Every name and address a device at home asks by is kept as it was.
     for host in ("mediapc.local:3673", "192.168.1.20:3673", "[fd00::1]:3673",
                  "pc.tail1234.ts.net:3673", "mediapc:3673", f"localhost:{remote.port}"):
@@ -219,7 +222,7 @@ def test_no_answer_is_sniffed_or_hands_its_address_on(remote):
 def home(tmp_path):
     pool = DvrPool(tmp_path, 60.0, 10**9, min_free=0)
     host = Host(pool)
-    cfg = hs.Config(port=0, tuners=0, token=TOKEN, device_id=hdhr.new_device_id())
+    cfg = hs.Config(open=hs.OPEN_HOME, port=0, tuners=0, token=TOKEN, device_id=hdhr.new_device_id())
     srv = hs.HomeServer(host, cfg, bind="127.0.0.1", discovery_port=0,
                         make_client=lambda _pl: FakeClient(PROVIDER),
                         guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"))

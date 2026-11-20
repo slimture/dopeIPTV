@@ -78,6 +78,9 @@ jobs:
     # without the Linux AppImage there is no nightly at all.
     if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: ubuntu-24.04
+    # The update key lives in this environment, for the testing branch alone
+    # (docs/MAINTAINING.md, "The release key").
+    environment: nightly-signing
     permissions:
       contents: write      # publishes the pre-release, removes the oldest
     outputs:

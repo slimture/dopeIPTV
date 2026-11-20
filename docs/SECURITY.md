@@ -447,19 +447,24 @@ the playlist cannot change what is served.
 *Why:* a playlist of its own per device is not built; the playlist token
 is for watching only.
 
-### The tuner endpoints of server mode take no token
+### The tuner without its token, when the person lets a device in
 
-The HDHomeRun API (`discover.json`, `lineup.json`, `/auto/v<n>`) and its
-UDP discovery on 65001 take no token, so any device on this computer's own
-networks (and Nerd's other networks) can watch through the tuner, within
-its channels at once and at 10 requests a second per address
-(`TUNER_RATE`).
+Since 1.6.9 the HDHomeRun API (`discover.json`, `lineup.json`,
+`/auto/v<n>`) needs the token, in the tuner's own address
+(`/t/<token>/discover.json`, and every stream address of its lineup under
+it): Jellyfin, Emby and Channels take such an address. The UDP discovery
+on 65001 says nothing to a device not let in. Plex asks a tuner by its
+address alone, so Settings > Nerd > Remote and automation can let devices
+in without the token (`nerd_server_open`): only the addresses listed
+(`nerd_server_open_hosts`, home addresses or this computer's), or - what
+1.6.0 to 1.6.8 did, and what a server set up then keeps until it is
+changed - every device on this computer's own networks. A device let in
+watches within the channels at once and at 10 requests a second per
+address (`TUNER_RATE`), and the person is told what that means.
 
-*Why:* Plex, and the other media servers that take an HDHomeRun, send no
-token to a tuner. These endpoints answer only this computer's own networks
-(`home_net.LocalNetworks`), never every private range, never a web page
-(`cross_site`) and never under a name that is not a home's
-(`tuner_host_ok`).
+*Why:* a device let in by its address is trusted by its address; on the
+home network another device could take that address. Never a web page
+(`cross_site`), never under a name that is not a home's (`tuner_host_ok`).
 
 ### A cast hands the TV the stream address
 
@@ -523,18 +528,21 @@ encrypted", `core/conn_test.py`).
 
 ### A list chooses where its pictures come from
 
-The picture addresses in a list are fetched as they are: any web address,
-one at home too (`core/workers.py`). A source on the internet never names
-one on this computer or a link-local host (`providers/client._pictures_kept`,
-the stream addresses' rule), but its list can still make the app send
-plain GET requests to a private address of the home network - the router,
-a printer - and a source of the home network's, or a playlist file, to
-any. The request carries a generic user agent and nothing of the person's
-(`_IMG_HEADERS`), its answer is read up to a cap, and only a picture is
-drawn.
+The picture addresses in a list are fetched as they are (`core/workers.py`).
+Since 1.6.9 a source on the internet names no device of the home network
+either - a private or unique local address, a name without a dot or with a
+home ending - for its streams, its pictures or its guide
+(`core/stream_address.HOME`, `providers/client._pictures_kept`), unless the
+person let that source in (its own option `home_addresses`: a list of
+their own, on the internet, of their boxes). The one shape still taken is a
+multicast group through a relay at home (udpxy: `/udp/<group>`), which an
+operator's list names. A source of the home network's, or a playlist file,
+names what it likes. A public name that resolves to a home address is not
+caught for the player (mpv looks names up itself); the app's own requests
+are caught for this computer and link-local hosts only (`dest_guard`).
 
 *Why:* a box's picons and a media server's artwork are at home addresses,
-and a playlist on a server at home is common.
+and a playlist on a server at home is common - those are home sources.
 
 ### The player and the recorder look names up themselves
 
@@ -568,7 +576,10 @@ Every login and token is in Qt's settings, as plain text, in files only
 this user can read (`core/settings_files.py`: 0600 in a 0700 folder on
 Linux and macOS; on Windows the registry and the user's own profile). A
 program that runs as the person can read them, and so can anyone with the
-person's account or a copy of the disk.
+person's account or a copy of the disk. Where a drive keeps no permissions
+(FAT, some shares) the window asks before it goes on - close, the default,
+or go on with that file, remembered by its hash - and server mode without a
+window does not start until `--settings-not-private` says so once.
 
 *Why:* a program running as the person can, on most desktops, also ask an
 unlocked keyring; no keyring library is a dependency today. Moving them is
@@ -653,6 +664,16 @@ characters - a copy of the file can be tried offline as fast as PBKDF2's
 
 *Why:* a memory-hard function is not in the standard library, and the app
 does not judge a password beyond its length.
+
+### The sync code is the whole key
+
+One code gives its slot, the slot's credential and the key: whoever has it
+reads and writes what syncs. Since 1.6.9, Settings > Sync makes a new code
+(`_sync_new_code`): the copy under the old one is deleted at the site, and
+the other computers join again with the new one.
+
+*Why:* nothing else ties the computers together - no account. A code that
+may have been seen is replaced, not guarded.
 
 ### Home means any private address
 

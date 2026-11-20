@@ -532,8 +532,9 @@ def test_the_window_s_share_asks_server_mode_s_filters(sources, monkeypatch):
 def test_a_bad_host_header_cannot_write_the_playlist(served, sources):
     _xt, pls = sources
     srv = served(share=Share(lambda: pls[:1]))
-    _c, _h, raw = ask(srv.port, "GET", "/playlist.m3u", headers={"Host": 'evil.example"><script>'})
-    assert "evil" not in raw.decode() and f"http://127.0.0.1:{srv.port}/stream/main/401" in raw.decode()
+    code, _h, raw = ask(srv.port, "GET", "/playlist.m3u", headers={"Host": 'evil.example"><script>'})
+    # Not a home name: refused whole, nothing of the playlist written.
+    assert code == 403 and "evil" not in raw.decode() and "/stream/" not in raw.decode()
 
 
 # -- sharing: one guide ---------------------------------------------------------------------
@@ -889,3 +890,18 @@ def test_a_guide_cut_short_keeps_what_was_whole(tmp_path):
         if name != "gzip cut in the middle":
             assert [c.get("id") for c in root.findall("channel")] == ["tv4.se"], name
             assert [x.findtext("title") for x in root.findall("programme")] == ["Nyheterna – 東京"], name
+
+
+def test_a_web_page_cannot_use_the_remote_api_even_with_its_token(served):
+    """A browser says who asks: a page of another site (an Origin not the
+    server's own, Sec-Fetch-Site cross-site) is refused whatever token it
+    carries - Home Assistant, scripts and players send neither."""
+    srv = served()
+    for extra in ({"Origin": "http://evil.example"}, {"Sec-Fetch-Site": "cross-site"},
+                  {"Sec-Fetch-Site": "same-site"}):
+        code, _h, raw = ask(srv.port, "GET", "/", headers=extra)
+        assert code == 403, extra
+    code, _h, _raw = ask(srv.port, "GET", "/")
+    assert code == 200
+    code, _h, _raw = ask(srv.port, "GET", "/", headers={"Origin": f"http://127.0.0.1:{srv.port}"})
+    assert code == 200, "its own origin"

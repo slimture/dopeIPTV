@@ -69,6 +69,13 @@ PIN_RECHECK = 600.0
 TRUST_RECHECK = 600.0
 CONNECT_TIMEOUT = 10.0
 HEAD_MAX = 64 * 1024
+#: Connections a bridge serves at once - the player's and the recorder's
+#: need a handful. One more is closed before a thread is made for it: a
+#: program of another account on this computer that opens thousands gets
+#: nothing but closed sockets.
+MAX_SERVING = 64
+#: A connection that has not sent its request with the key by then is let go.
+HEAD_TIMEOUT = 10.0
 _HOP = (b"proxy-connection", b"proxy-authorization", b"connection", b"keep-alive")
 #: The name in the bridge's login; its key is the password (Bridge.secret).
 USER = "dopeiptv"
@@ -81,11 +88,19 @@ class Refused(Exception):
     pass
 
 
-def _read_head(sock: socket.socket) -> tuple[bytes, bytes] | None:
+def _read_head(sock: socket.socket, within: float | None = None) -> tuple[bytes, bytes] | None:
+    """A request's head, read in *within* seconds at most in all (a sender
+    that trickles a byte at a time is let go too)."""
     buf = b""
+    deadline = None if within is None else time.monotonic() + within
     while b"\r\n\r\n" not in buf:
         if len(buf) > HEAD_MAX:
             return None
+        if deadline is not None:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return None
+            sock.settimeout(left)
         data = sock.recv(8192)
         if not data:
             return None
@@ -205,6 +220,9 @@ class Bridge:
         self._pins_ok: dict[tuple[str, int], float] = {}
         self._lock = threading.Lock()
         self._closed = False
+        self._slots = threading.BoundedSemaphore(MAX_SERVING)
+        #: Connections closed because MAX_SERVING were being served.
+        self.turned_away = 0
         threading.Thread(target=self._accept, name="net-bridge", daemon=True).start()
 
     def close(self) -> None:
@@ -223,10 +241,20 @@ class Bridge:
                     return
                 time.sleep(0.05)
                 continue
-            if peer[0] != "127.0.0.1":
+            if peer[0] != "127.0.0.1" or not self._slots.acquire(blocking=False):
+                if peer[0] == "127.0.0.1":
+                    with self._lock:
+                        self.turned_away += 1
                 conn.close()
                 continue
-            threading.Thread(target=self._serve, args=(conn,), name="net-bridge-conn", daemon=True).start()
+            threading.Thread(target=self._serve_slot, args=(conn,), name="net-bridge-conn",
+                             daemon=True).start()
+
+    def _serve_slot(self, client: socket.socket) -> None:
+        try:
+            self._serve(client)
+        finally:
+            self._slots.release()
 
     def _failed(self, what: str) -> None:
         log.info("net bridge: %s", what)
@@ -272,10 +300,10 @@ class Bridge:
         up: socket.socket | None = None
         where = "?"
         try:
-            client.settimeout(20.0)
-            got = _read_head(client)
+            got = _read_head(client, HEAD_TIMEOUT)
             if got is None:
                 return
+            client.settimeout(20.0)
             head, rest = got
             line, _sep, fields = head.partition(b"\r\n")
             parts = line.decode("latin-1").split(" ")

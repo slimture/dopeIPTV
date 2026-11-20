@@ -12,6 +12,8 @@ buffers wiped.
 
 ``--port N`` listens on N this time (the setting stays); ``--no-discovery``
 leaves UDP 65001 alone (another tuner emulator on the computer has it).
+A settings file that could not be made readable by this user alone stops
+it, until ``--settings-not-private`` says once to go on with that file.
 """
 from __future__ import annotations
 
@@ -176,6 +178,19 @@ def main(argv: list[str] | None = None) -> int:
     from .core import settings_files
     settings_files.protect()            # the logins and tokens: this user's alone
     settings = QSettings(ORG, ORG)
+    exposed = settings_files.not_private()
+    if exposed:
+        mark = settings_files.accepted_mark(exposed[0])
+        if "--settings-not-private" in argv:
+            settings.setValue(settings_files.ACCEPTED_KEY, mark)
+        if str(settings.value(settings_files.ACCEPTED_KEY, "") or "") != mark:
+            # Every login and token is in it: no server on it until the
+            # person says so - once, for that file.
+            log.error("server: %s could not be made readable by this user alone - it holds "
+                      "every login, and other accounts on this computer may read it. Move the "
+                      "settings to a drive that keeps permissions, or start once with "
+                      "--settings-not-private to go on with it as it is", exposed[0])
+            return 2
     from .core import nerd
     from .i18n import set_language
     set_language(str(settings.value("language", "en") or "en"))
@@ -192,6 +207,9 @@ def main(argv: list[str] | None = None) -> int:
         HomeServer, avoided_ports, look_at_port, port_taken, read_config,
     )
     host = HeadlessHost(settings)
+    from .services.home_server import K_DEVICE, open_mode
+    # A server run before 1.6.9 without a window keeps its tuner as it was.
+    open_mode(settings, ran_before=bool(str(settings.value(K_DEVICE, "") or "").strip()))
     cfg = read_config(settings)
     register_secrets(cfg.token)
     port = _arg(argv, "--port")

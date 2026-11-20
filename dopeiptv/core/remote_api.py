@@ -253,6 +253,18 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             if not server.client_ok(str(self.client_address[0]), _own(self)):
                 self._json(403, {"error": "only this computer and the home network"})
                 return
+            host = self.headers.get("Host")
+            if host and not home_net.home_host(host):
+                # A web page whose own name a DNS rebinding pointed here asks
+                # under that public name: never answered, token or not.
+                self._json(403, {"error": "ask by this computer's address or a home name"})
+                return
+            from .phone_remote import cross_site
+            if cross_site(self.headers, host):
+                # A web page in a browser here or at home (a fetch, a form):
+                # Home Assistant, scripts and players send no Origin.
+                self._json(403, {"error": "not for a web page"})
+                return
             parts = urlsplit(self.path)
             path = parts.path.rstrip("/") or "/"
             query = parse_qs(parts.query, keep_blank_values=False)

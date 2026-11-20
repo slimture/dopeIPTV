@@ -79,6 +79,19 @@ K_ADMIN = "nerd_server_admin_token"
 K_DEVICE = "nerd_server_device_id"
 #: Channels and categories for adults handed out too (off: left out).
 K_ADULT = "nerd_server_adult"
+#: Who may use the tuner without its token (OPEN_*): nobody - the tuner's
+#: address then carries the token, /t/<token>/ - only the devices at the
+#: addresses in K_OPEN_HOSTS, or every device on this computer's own
+#: networks (what server mode did before 1.6.9). A media server that cannot
+#: take an address with a path (Plex) needs one of the last two.
+K_OPEN = "nerd_server_open"
+K_OPEN_HOSTS = "nerd_server_open_hosts"
+OPEN_OFF = "off"
+OPEN_DEVICES = "devices"
+OPEN_HOME = "home"
+OPEN_MODES = (OPEN_OFF, OPEN_DEVICES, OPEN_HOME)
+#: At most this many devices let in by address.
+OPEN_HOSTS_MAX = 32
 MAX_BODY = 64 * 1024
 #: A stream whose client reads nothing for this long is let go.
 STREAM_WRITE_TIMEOUT = 30.0
@@ -96,6 +109,8 @@ LINEUP_TTL = 60.0
 HDHR_PATHS = ("/discover.json", "/lineup.json", "/lineup_status.json", "/device.xml",
               "/lineup.post")
 _AUTO = re.compile(r"^/auto/v([0-9]{1,6}(?:\.[0-9]{1,3})?)$")
+#: The tuner under its token: /t/<token>/discover.json, /t/<token>/auto/v5.
+_TOKENED = re.compile(r"^/t/([A-Za-z0-9_-]{16,128})(/.*)?$")
 SAFE_HEADERS = {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer",
                 "X-Frame-Options": "DENY"}
 #: In every answer: dopeIPTV's own server, and whose - its host's ``kind``
@@ -130,6 +145,10 @@ class Config:
     #: Channels for adults in the lineup and the share (``kept_out``); off,
     #: as a TV in a child's room has no profile or PIN.
     adult: bool = False
+    #: Who may use the tuner without its token (K_OPEN): OPEN_OFF by default.
+    open: str = OPEN_OFF
+    #: OPEN_DEVICES: the addresses let in, as ip_address strings.
+    open_hosts: tuple[str, ...] = ()
 
 
 def parse_sources(raw: Any) -> dict[str, list[str]]:
@@ -158,6 +177,47 @@ def read_flag(value: Any) -> bool:
     return value is True or str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
+def parse_open_hosts(text: Any) -> tuple[list[str], list[str]]:
+    """The devices let in by address (K_OPEN_HOSTS): one IPv4 or IPv6
+    address per line or separated by commas or spaces - a home address, or
+    this computer's own (a media server beside the app), at most
+    OPEN_HOSTS_MAX. (the addresses, the parts refused)."""
+    good: list[str] = []
+    bad: list[str] = []
+    for part in re.split(r"[\s,;]+", str(text or "")):
+        part = part.strip().strip("[]")
+        if not part:
+            continue
+        try:
+            ip = ipaddress.ip_address(part.split("%")[0])
+        except ValueError:
+            bad.append(part[:64])
+            continue
+        if not (ip.is_private or ip.is_link_local or ip.is_loopback) or ip.is_unspecified \
+                or ip.is_multicast:
+            bad.append(part[:64])
+            continue
+        norm = str(ip)
+        if norm not in good and len(good) < OPEN_HOSTS_MAX:
+            good.append(norm)
+    return good, bad
+
+
+def open_mode(settings: Any, ran_before: bool = False) -> str:
+    """Who may use the tuner without its token (K_OPEN). Never set before:
+    every device on this computer's networks where server mode was already
+    on - or, *ran_before*, had run (``dopeiptv --server`` needs no switch:
+    its device id is there) - as it was until 1.6.9, so a media server set
+    up then keeps its tuner; else nobody. Written, so it stays what it is."""
+    mode = str(settings.value(K_OPEN, "") or "").strip().lower()
+    if mode in OPEN_MODES:
+        return mode
+    was = read_flag(settings.value(K_ON, False)) or ran_before
+    mode = OPEN_HOME if was else OPEN_OFF
+    settings.setValue(K_OPEN, mode)
+    return mode
+
+
 def read_config(settings: Any) -> Config:
     """The server's settings; a token and a device id made the first time."""
     token = str(settings.value(K_TOKEN, "") or "").strip()
@@ -176,7 +236,9 @@ def read_config(settings: Any) -> Config:
                   tuners=_int(settings.value(K_TUNERS, 0), 0, 0, MAX_TUNERS),
                   sources=parse_sources(settings.value(K_SOURCES, "")),
                   token=token, admin=admin, device_id=device,
-                  adult=read_flag(settings.value(K_ADULT, False)))
+                  adult=read_flag(settings.value(K_ADULT, False)),
+                  open=open_mode(settings),
+                  open_hosts=tuple(parse_open_hosts(settings.value(K_OPEN_HOSTS, ""))[0]))
 
 
 def changes_from_page(body: dict, known: list[str]) -> dict[str, str]:
@@ -327,9 +389,14 @@ class HomeServer:
             if who in self._refused_addresses or len(self._refused_addresses) >= REFUSED_NAMES_MAX:
                 return False
             self._refused_addresses.add(who)
-        log.info("server: the tuner refused %s - not on one of this computer's own home "
-                 "networks (a VPN's, Tailscale's or a provider's shared range are not); to let "
-                 "it in, add it under Nerd > Network > Other networks", who)
+        if self.config.open == OPEN_HOME:
+            log.info("server: the tuner refused %s - not on one of this computer's own home "
+                     "networks (a VPN's, Tailscale's or a provider's shared range are not); to "
+                     "let it in, add it under Nerd > Network > Other networks", who)
+        else:
+            log.info("server: the tuner refused %s without its token - give that device the "
+                     "tuner's address with the token, or let it in under Nerd > Remote and "
+                     "automation > Server mode", who)
         return True
 
     # -- on and off ---------------------------------------------------------------------
@@ -592,14 +659,41 @@ class HomeServer:
         ip = hdhr.address_towards(client) if client else (lan_addresses() or ["127.0.0.1"])[0]
         return f"http://{ip}:{self.port}"
 
+    def tuner_address(self, base: str) -> str:
+        """The tuner's address for a media server: under its token unless
+        devices are let in without it (K_OPEN)."""
+        if self.config.open == OPEN_OFF:
+            return f"{base}/t/{self.config.token}"
+        return base
+
     def addresses(self, base: str) -> dict[str, str]:
         q = f"?token={quote(self.config.token)}"
         page = f"?token={quote(self.config.admin or self.config.token)}"
-        return {"tuner": base, "playlist": f"{base}/playlist.m3u{q}",
+        return {"tuner": self.tuner_address(base), "tuner_tokened": f"{base}/t/{self.config.token}",
+                "playlist": f"{base}/playlist.m3u{q}",
                 "guide": f"{base}/xmltv.xml{q}", "page": f"{base}/{page}"}
 
+    def open_to(self, ip: str, own: str = "") -> bool:
+        """May *ip* use the tuner without its token (K_OPEN)? Nobody by
+        default; the devices listed; or, as before 1.6.9, every device on
+        this computer's own networks."""
+        mode = self.config.open
+        if mode == OPEN_HOME:
+            return self.local.allows(ip, own)
+        if mode == OPEN_DEVICES:
+            try:
+                norm = str(ipaddress.ip_address(ip.split("%")[0]))
+            except ValueError:
+                return False
+            if norm.startswith("::ffff:"):
+                norm = norm[7:]
+            return norm in self.config.open_hosts
+        return False
+
     def _may_discover(self, ip: str) -> bool:
-        return self.local.allows(ip)
+        # The UDP search gets the tuner's address without its token: only
+        # for a device that may use it so.
+        return self.open_to(ip)
 
     def _discovery_answer(self, ip: str) -> tuple[str, int, str] | None:
         if not self.running:
@@ -788,13 +882,43 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
             query = parse_qs(parts.query, keep_blank_values=False)
             reading = method in ("GET", "HEAD")
             try:
+                tokened = _TOKENED.match(path)
+                if tokened:
+                    # The tuner under its token: what a media server is
+                    # given unless devices are let in without it.
+                    inner = tokened.group(2) or "/discover.json"
+                    if not (inner in HDHR_PATHS or _AUTO.match(inner)):
+                        self._text(404, "not found")
+                        return
+                    if lim.blocked(who):
+                        self._text(429, "too many wrong tokens - try again later",
+                                   {"Retry-After": "60"})
+                        return
+                    if cross_site(self.headers):
+                        self._text(403, "not for a web page")
+                        return
+                    if not self._tuner_token(tokened.group(1)):
+                        if not _loopback(who) and lim.failed(who):
+                            log.warning("server: an address on the network kept guessing the "
+                                        "tuner's token; it is shut out for %d minutes",
+                                        int(lim.lockout // 60))
+                        time.sleep(0.25)
+                        self._text(401, "the tuner's address has the wrong token")
+                        return
+                    self._hdhomerun(inner, method, f"{self._base()}/t/{server.config.token}")
+                    return
                 if path in HDHR_PATHS or _AUTO.match(path):
                     # No token here, so no lock-out either: a shut-out
                     # address still has its tuner.
-                    if not server.local.allows(who, _own(self)):
-                        # No token here: this computer's own networks only.
+                    if not server.open_to(who, _own(self)):
+                        # No token here: only the devices let in without it
+                        # (Settings > Nerd > Remote and automation).
                         server.refused_address(who)
-                        self._text(403, "only this computer's own network")
+                        if server.config.open == OPEN_HOME:
+                            self._text(403, "only this computer's own network")
+                        else:
+                            self._text(401, "the tuner's address needs its token (dopeIPTV > "
+                                            "Settings > Nerd > Remote and automation)")
                         return
                     if cross_site(self.headers):
                         # A web page in a browser here (an <img>, a fetch)
@@ -813,7 +937,7 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                         self._text(429, "asked too often - try again in a moment",
                                    {"Retry-After": "5"})
                         return
-                    self._hdhomerun(path, method)
+                    self._hdhomerun(path, method, self._base())
                     return
                 if lim.blocked(who):
                     self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
@@ -867,8 +991,12 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                 except OSError:
                     pass
 
-        def _hdhomerun(self, path: str, method: str) -> None:
-            base = self._base()
+        def _tuner_token(self, given: str) -> bool:
+            t = server.config.token
+            return bool(t) and hmac.compare_digest(given.encode("utf-8", "replace"),
+                                                   t.encode("utf-8"))
+
+        def _hdhomerun(self, path: str, method: str, base: str) -> None:
             cfg = server.config
             if path == "/lineup.post":
                 self._text(200, "")              # a scan: the lineup is always current

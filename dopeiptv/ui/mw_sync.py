@@ -606,6 +606,20 @@ class _SyncMixin:
             run_async(self._sync_pool, remote.delete, _ignore, self._sync_delete_failed)
         self._sync_forget()
 
+    def _sync_new_code(self) -> str:
+        """A new code for the same synced settings - a code that may have
+        been seen by someone else stops working: the copy under the old one
+        is deleted at the site, this computer's goes up under the new one,
+        and the other computers join again with it. The new code."""
+        raw = sync.code_of(self.settings)
+        if raw is not None:
+            remote = sync.Remote.of(raw, self._sync_endpoint)
+            run_async(self._sync_pool, remote.delete, _ignore, self._sync_delete_failed)
+        code = sync.new_code()
+        self._sync_begin(code, joining=False)
+        log.info("sync: a new code - the old one's copy deleted")
+        return code
+
     @staticmethod
     def _sync_delete_failed(msg: str) -> None:
         log.info("sync: the copy there was not deleted: %s", msg)
@@ -745,6 +759,13 @@ class _SyncCard(QObject):
         self.held_row.hint_label.setTextFormat(Qt.TextFormat.PlainText)     # playlists' names
         card.shown_if(self.held_row, self.has_held)
 
+        renew_btn = QPushButton(tr("sync_renew"))
+        renew_btn.clicked.connect(self.renew)
+        renew_btn.setEnabled(self.official)
+        card.shown_if(card.row(tr("sync_renew_row"), renew_btn, tr("sync_renew_hint"),
+                               search="sync new code change code lost stolen shared"),
+                      self._on)
+
         stop_btn = QPushButton(tr("btn_stop"))
         stop_btn.clicked.connect(self.stop)
         card.shown_if(card.row(tr("sync_stop"), stop_btn, tr("sync_stop_hint"),
@@ -823,6 +844,15 @@ class _SyncCard(QObject):
 
     def review_held(self) -> None:
         self.win._sync_review_held(self.dlg)
+        self.refresh()
+
+    def renew(self) -> None:
+        from .widgets import confirm
+        if not confirm(self.dlg, tr("sync_title"), tr("sync_renew_confirm"),
+                       default_yes=False):
+            return
+        if self.win._sync_new_code():
+            self.revealed = True
         self.refresh()
 
     def stop(self) -> None:
