@@ -520,7 +520,8 @@ checked.
 
 *Why:* a stream that plays in mpv plays here. Many providers' certificates
 do not check out (expired, self-signed, made for another name), and a
-check turned on everywhere would stop their channels.
+check turned on everywhere would stop their channels. Kept as it is: the
+maintainer's decision - playback first.
 
 **What Nerd's trusted certificate does.** For one source and one server
 (host and port), the person sees the certificate first and pins exactly
@@ -620,8 +621,9 @@ or go on with that file, remembered by its hash - and server mode without a
 window does not start until `--settings-not-private` says so once.
 
 *Why:* a program running as the person can, on most desktops, also ask an
-unlocked keyring; no keyring library is a dependency today. Moving them is
-open work.
+unlocked keyring; no keyring library is a dependency today, and keyrings
+differ on every desktop and are missing on some. Kept as it is: the
+maintainer's decision.
 
 ### Programs started by the app show their arguments
 
@@ -638,7 +640,9 @@ player and multiview are libmpv inside the app, not a program of their
 own.
 
 *Why:* ffmpeg, mpv and VLC take a stream's address on their command line,
-and another way in has not been built. Open work.
+and a proxy of the app's in front of every recording and external player
+would be one more thing that can fail; it matters only with other
+accounts on the same computer. Kept as it is: the maintainer's decision.
 
 ### The cache and the logs keep the folder modes the system gives
 
@@ -774,7 +778,9 @@ characters - a copy of the file can be tried offline as fast as PBKDF2's
 ([A backup's password](#a-backups-password)).
 
 *Why:* a memory-hard function is not in the standard library, and the app
-does not judge a password beyond its length.
+does not judge a password beyond its length. A password is the person's
+choice, not the default: one forgotten is a backup that cannot be put back
+(the maintainer's decision).
 
 ### The sync code is the whole key
 
