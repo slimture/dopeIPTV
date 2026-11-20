@@ -212,10 +212,19 @@ def open_mode(settings: Any, ran_before: bool = False) -> str:
     mode = str(settings.value(K_OPEN, "") or "").strip().lower()
     if mode in OPEN_MODES:
         return mode
-    was = read_flag(settings.value(K_ON, False)) or ran_before
-    mode = OPEN_HOME if was else OPEN_OFF
+    mode = open_mode_of(settings, ran_before)
     settings.setValue(K_OPEN, mode)
     return mode
+
+
+def open_mode_of(settings: Any, ran_before: bool = False) -> str:
+    """open_mode without writing it: what the tuner is open to now, as a
+    page that only shows it reads it."""
+    mode = str(settings.value(K_OPEN, "") or "").strip().lower()
+    if mode in OPEN_MODES:
+        return mode
+    was = read_flag(settings.value(K_ON, False)) or ran_before
+    return OPEN_HOME if was else OPEN_OFF
 
 
 def read_config(settings: Any) -> Config:

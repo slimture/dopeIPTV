@@ -310,7 +310,7 @@ STILL_FROM_THE_INTERNET = (
 #: A device of the home network: never from a source on the internet unless
 #: the person let that source in (its option home_addresses).
 HOME_FROM_THE_INTERNET = (
-    "http://10.0.0.5:8080/x.ts", "http://[fd00::5]:8096/x", "http://100.64.1.2/x.ts",
+    "http://10.0.0.5:8080/x.ts", "http://[fd00::5]:8096/x", "http://172.16.4.2/x.ts",
     "http://192.168.1.1/", "http://router/admin", "http://nas.local:5000/x.ts",
     "http://kodi.lan:8080/jsonrpc", "http://192.168.1.1:4022/status",
     "http://192.168.1.1:4022/udp/192.168.1.5:80")

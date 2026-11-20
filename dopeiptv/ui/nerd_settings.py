@@ -1052,8 +1052,9 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
     # Who may use the tuner without its token (hs.K_OPEN): nobody unless the
     # person lets a device in - its address then needs no token.
     from ..core.nerd_check import OK, WARN, Check
+    open_was = hs.open_mode_of(settings)
     open_box = combo([(hs.OPEN_OFF, tr("srv_open_off")), (hs.OPEN_DEVICES, tr("srv_open_devices")),
-                      (hs.OPEN_HOME, tr("srv_open_home"))], hs.open_mode(settings))
+                      (hs.OPEN_HOME, tr("srv_open_home"))], open_was)
 
     def open_job() -> Any:
         if open_box.currentData() != hs.OPEN_HOME:
@@ -1168,12 +1169,17 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
 
     def values() -> dict[str, str]:
         picked = {pid: chosen.get(pid, []) for pid, chip in chips if chip.isChecked()}
-        return {hs.K_ON: "true" if on.isChecked() else "false",
-                hs.K_TUNERS: str(tuners.value()), hs.K_PORT: str(port.value()),
-                hs.K_ADULT: "true" if adult.isChecked() else "false",
-                hs.K_OPEN: str(open_box.currentData() or hs.OPEN_OFF),
-                hs.K_OPEN_HOSTS: ", ".join(hs.parse_open_hosts(open_hosts.text())[0]),
-                hs.K_SOURCES: json.dumps(picked, sort_keys=True) if picked else ""}
+        out = {hs.K_ON: "true" if on.isChecked() else "false",
+               hs.K_TUNERS: str(tuners.value()), hs.K_PORT: str(port.value()),
+               hs.K_ADULT: "true" if adult.isChecked() else "false",
+               hs.K_OPEN_HOSTS: ", ".join(hs.parse_open_hosts(open_hosts.text())[0]),
+               hs.K_SOURCES: json.dumps(picked, sort_keys=True) if picked else ""}
+        mode = str(open_box.currentData() or hs.OPEN_OFF)
+        # Stored once chosen, or once stored: a page only looked at writes
+        # nothing (the server stores what it found the first time it starts).
+        if mode != open_was or settings.value(hs.K_OPEN) is not None:
+            out[hs.K_OPEN] = mode
+        return out
     values.switch = on  # type: ignore[attr-defined]
     values.port = port.value  # type: ignore[attr-defined]
     return values

@@ -199,10 +199,11 @@ class _EventsMixin:
         try:
             if on and self._events_now is not None:
                 self._events_now["private"] = True
-            if on and self._events is not None:
-                # Still waiting to go out, not yet sent: taken back.
-                self._events.withdraw_titled()
             self._events_publish_state()
+            withdraw = getattr(self._events, "withdraw_titled", None) if on else None
+            if callable(withdraw):
+                # Still waiting to go out, not yet sent: taken back.
+                withdraw()
         except Exception:
             log.debug("events: private viewing", exc_info=True)
 

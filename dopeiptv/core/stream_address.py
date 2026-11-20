@@ -246,11 +246,13 @@ def _home_kind(host: str) -> str:
     if not name:
         return ""
     ip = _ip(name)
+    from .home_net import HOME_SUFFIXES, is_home_client
     if ip is not None:
         if ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast:
             return ""
-        return HOME if (ip.is_private or not ip.is_global) else ""
-    from .home_net import HOME_SUFFIXES
+        # The home network as on_internet tells it: a private range or a
+        # unique local address - the same rule both ways.
+        return HOME if is_home_client(str(ip)) else ""
     if ":" in name or "%" in name:
         return ""
     if "." not in name or name.endswith(HOME_SUFFIXES) or name in _HOME_NAMES:
