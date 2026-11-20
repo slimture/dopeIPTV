@@ -1719,7 +1719,8 @@ jexec dopeiptv rm /usr/local/www/iptv/public/link-check.txt
 - `deploy/check-live.sh` checks what the live site really sends, from any
   computer that is not the server: the security headers on a page, on a
   404 and on a service (CSP with `default-src` and `frame-ancestors 'none'`,
-  HSTS, nosniff, DENY, Referrer-Policy, COOP, no version in `Server`) - and,
+  HSTS, nosniff, DENY, Referrer-Policy, COOP on the admin pages - only they
+  get it -, no version in `Server`) - and,
   given the content jail's address, that its port 8081 does not answer from
   outside. Run it after every deploy:
 

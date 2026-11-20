@@ -18,7 +18,9 @@ check() {  # check PATH: the headers every answer carries
     echo "$h" | grep -qi '^x-content-type-options: nosniff' || miss "$1: X-Content-Type-Options"
     echo "$h" | grep -qi '^x-frame-options: deny' || miss "$1: X-Frame-Options"
     echo "$h" | grep -qi '^referrer-policy:' || miss "$1: Referrer-Policy"
-    echo "$h" | grep -qi '^cross-origin-opener-policy:' || miss "$1: Cross-Origin-Opener-Policy"
+    case $1 in /admin/*)    # the admin pages alone in a window of their own
+        echo "$h" | grep -qi '^cross-origin-opener-policy: *same-origin' || miss "$1: Cross-Origin-Opener-Policy same-origin" ;;
+    esac
     echo "$h" | grep -qi '^server:.*[0-9]' && miss "$1: the server names its version"
     echo "checked $1"
 }
@@ -26,6 +28,7 @@ check /
 check /transparency/
 check /no-such-page-$$
 check /feedback/replies
+check /admin/
 if [ -n "$CONTENT" ]; then
     # The content server listens for the front proxy alone: from here, nothing.
     if curl -sS -o /dev/null --max-time 5 "http://$CONTENT:8081/" 2>/dev/null; then
