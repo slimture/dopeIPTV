@@ -1273,3 +1273,30 @@ def test_only_the_receiver_is_served():
     finally:
         b.stop()
     assert "receiver=_host_of(self.active)" in open(cast_bridge.__file__.replace("cast_bridge", "chromecast")).read()
+
+
+def test_without_the_receivers_address_the_first_that_asks_is_the_one():
+    import http.client
+    b = CastBridge()
+    b.exe = sys.executable
+    try:
+        b.start("http://p/x.m3u8", ["h264"])
+        assert b.peers == frozenset()
+        port = b._server.server_address[1]
+
+        def head(path, source=None):
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=5, source_address=source)
+            c.request("HEAD", path)
+            r = c.getresponse()
+            r.read()
+            c.close()
+            return r.status
+        assert head("/other") == 404 and b.peers == frozenset(), "a wrong address binds nothing"
+        assert head(b.path) == 200 and b.peers == {"127.0.0.1"}
+        try:
+            other = head(b.path, ("127.0.0.2", 0))
+        except OSError:
+            pytest.skip("no second loopback address here")
+        assert other == 403, "anyone else who saw the address gets nothing"
+    finally:
+        b.stop()

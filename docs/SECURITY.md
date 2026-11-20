@@ -429,16 +429,26 @@ Some are decisions; some are open work, said so.
 The phone remote, server mode, the remote API on the home network and a
 cast's servers speak http, not https. The phone remote's key never crosses
 the network - its requests are signed, each once (`core/phone_remote.py`) -
-but what they carry does: whoever reads the home network's traffic (an
-open Wi-Fi, a device that has taken over the router) sees what plays, the
-lists the phone asks for and the calendar's own key. Server mode's and the
-remote API's tokens are in their addresses, so such a reader can use
-them; a converted cast serves only its receiver's address, which another
-device on the network could take.
+so someone who only listens can neither use nor replay them; but what they
+carry does cross it: whoever reads the home network's traffic (an open
+Wi-Fi, a device that has taken over the router) sees what plays, the lists
+the phone asks for and the calendar's own key. Someone who can change that
+traffic - not only read it - can also change the page itself on its way to
+the phone, and a changed page can read the key the phone keeps: they can
+then drive the remote (play, stop, record, the volume) until New address,
+though never reach a login, a file or anything beyond what the remote does.
+Server mode's and the remote API's tokens are in their addresses, so such a
+reader can use them; a converted cast serves only its receiver's address -
+or, where that is not known, the first that asks for its own address -,
+which another device on the network could take.
 
 *Why:* a certificate for a home address could only be one the app makes
 itself, which every phone's browser would warn about and ask the person to
-accept; a TV, Kodi or VLC given a playlist cannot sign. What holds them is
+accept - and a changed page would come with a warning just as the real one
+does, so it would protect nothing; a trusted one needs a public name per
+computer and a service handing out certificates (Plex runs one), which puts
+every computer in the public certificate logs. A TV, Kodi or VLC given a
+playlist cannot sign. What holds them is
 the home network, a 192-bit token, the lock-out and New address.
 
 ### Server mode's playlist token lets a device watch all it serves

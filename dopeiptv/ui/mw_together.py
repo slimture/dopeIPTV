@@ -53,6 +53,7 @@ class _TogetherSignals(QObject):
     """The link's threads emit these; the window hears them on its own."""
     message = pyqtSignal(int, object)       # link id, Message
     status = pyqtSignal(int, str, int)      # link id, kind, members
+    older = pyqtSignal(int)                 # link id: a member of an older app
 
 
 def _derive(lid: int, code: str) -> tuple[int, str, str, bytes]:
@@ -103,6 +104,7 @@ class _TogetherMixin:
         q = Qt.ConnectionType.QueuedConnection
         self._together_signals.message.connect(self._together_on_message, q)
         self._together_signals.status.connect(self._together_on_status, q)
+        self._together_signals.older.connect(self._together_on_older, q)
         self._together_tick_timer = QTimer(self)
         self._together_tick_timer.setInterval(TICK_MS)
         self._together_tick_timer.timeout.connect(self._together_tick)
@@ -248,6 +250,7 @@ class _TogetherMixin:
         link = together.Link(room_id, key, room.me, room.clock,
                              on_message=partial(sig.message.emit, lid),
                              on_status=partial(sig.status.emit, lid),
+                             on_older=partial(sig.older.emit, lid),
                              relay_for=self._together_relay_for,
                              endpoint=self._together_endpoint,
                              identity=self._together_identity)
@@ -334,6 +337,11 @@ class _TogetherMixin:
                 dlg.show_error(tr("together_full", most=together.MAX_MEMBERS))
             return
         self._together_refresh()
+
+    def _together_on_older(self, lid: int) -> None:
+        """Someone in the room uses an app that cannot sign: said once."""
+        if lid == self._together_lid and self._together_room is not None:
+            self._together_toast(tr("together_older"), 8000)
 
     def _together_on_message(self, lid: int, msg: together.Message) -> None:
         room, link = self._together_room, self._together_link

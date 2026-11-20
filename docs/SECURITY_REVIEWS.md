@@ -145,6 +145,20 @@ to an independent AI assistant: **7/10 overall** against
 | Limits | 256 MiB for an answer and 1 GiB for a source's lists let a few requests at once take the memory | low | 1.6.9: 32 MiB and 512 MiB (`_lazy_requests.RESPONSE_MAX`, `LIST_MAX`) |
 | Media session | Any program on the session bus can drive the app | low | Answered: Settings > General turns the system's media controls off (docs/SECURITY.md, "Any program on the session bus can drive the app") |
 
+## November 2026 - third independent AI review of 1.6.9 (testing, in progress)
+
+The kit from `testing` (a47e613) and the website (147f133), given to an
+independent AI assistant with the rule to review those commits alone:
+**7/10, preliminary**. What came of its findings so far:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Website statistics | One person whose address changed counted as several people, so one phone could pass k=5 | medium | website: each visit also carries its device's sealed mark (browser, language, exact screen - no address); the smaller of the two counts is taken; both deleted when the month is made anonymous |
+| Website statistics | The page that linked (its path) was counted per day; a path can name a person | medium | website: kept nowhere; days and months kept before lose theirs at the next run; the privacy policy says so |
+| Watch together | The note for an older, unsigned member never reached the person: such a frame was dropped before the room saw it | low | 1.6.9: the link says it once (`older_frame`, `Link`'s *on_older*), still taking nothing of it |
+| Casting | Without the receiver's address the converter fell back to its token alone | low | 1.6.9: the first address that asks for the run's own stream becomes the only one (`CastBridge.admits`) |
+| Phone remote | An attacker who can change the home network's traffic can change the page and read the key | medium (on-path, active) | Written down (docs/SECURITY.md, "The home network's servers speak plain http"): https needs a public name and a certificate service per computer; the remote reaches no login or file |
+
 ## The next round
 
 Before 1.6.9 is released: the kit made again from `testing` with these

@@ -330,6 +330,15 @@ def open_frame(key: bytes, room: str, blob: bytes) -> dict[str, Any] | None:
     return _loads(_open_text(key, room, blob))
 
 
+def older_frame(key: bytes, room: str, blob: bytes) -> bool:
+    """Whether *blob* is a message of this room with no signature at all -
+    what an app up to 1.6.8 sends (its 16-hex id is no member's either). It
+    is never taken (open_message says None); the window says once that such
+    a member is in the room and left out until they update."""
+    d = _loads(_open_text(key, room, blob))
+    return isinstance(d, dict) and d.get("k") in KINDS and "sg" not in d and "pk" not in d
+
+
 def open_message(key: bytes, room: str, blob: bytes) -> Message | None:
     """The message in *blob*, well formed and from who it says: with the
     signature of the key its sender's id is the hash of. None for anything
@@ -978,7 +987,8 @@ class Link:
                  on_message: Callable[[Message], None],
                  on_status: Callable[[str, int], None],
                  relay_for: Callable[[str, str], Any] | None = None,
-                 endpoint: str | None = None, identity: Identity | None = None) -> None:
+                 endpoint: str | None = None, identity: Identity | None = None,
+                 on_older: Callable[[], None] | None = None) -> None:
         if identity is not None and identity.id != me:
             raise ValueError("the identity is another member's")
         self.room, self.key, self.me, self.clock = room, key, me, clock
@@ -986,6 +996,9 @@ class Link:
         self._polled = threading.Event()
         self._posted = threading.Event()
         self._on_message, self._on_status = on_message, on_status
+        #: Told once a link: a member of an older app, unsigned (older_frame).
+        self._on_older = on_older
+        self._older_told = False
         self._relay_for = relay_for or functools.partial(Relay, endpoint=endpoint)
         self._stop = threading.Event()
         self._queue: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=64)
@@ -1079,6 +1092,13 @@ class Link:
                 if self._stop.is_set():
                     break
                 msg = open_message(self.key, self.room, blob)
+                if msg is None and not self._older_told and self._on_older is not None \
+                        and older_frame(self.key, self.room, blob):
+                    self._older_told = True
+                    try:
+                        self._on_older()
+                    except Exception:
+                        log.debug("together: an older member not told", exc_info=True)
                 if msg is None or msg.sender == self.me:
                     continue
                 try:

@@ -967,10 +967,10 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
         """Whether the request comes from the receiver the cast went to:
         anyone else on the network who saw the address on its way (plain
         http) gets nothing of the stream, nor a converter of its own."""
-        peers = self.server.bridge.peers
-        if not peers or _peer(self.client_address[0]) in peers:
+        bridge = self.server.bridge
+        if bridge.admits(_peer(self.client_address[0]), self.path):
             return True
-        self.server.bridge.refused_peer(self.client_address[0])
+        bridge.refused_peer(self.client_address[0])
         self.send_error(403)
         return False
 
@@ -1350,6 +1350,20 @@ class CastBridge:
     #   receiver BUFFERING - converter is 1 segments written, 0 MB
     # Three segments is about twelve seconds of head start, paid once.
     HLS_LEAD = 3
+
+    def admits(self, who: str, path: str) -> bool:
+        """Whether *who* may be served *path*: the receiver's addresses when
+        they are known; when not, the first address that asks for this run's
+        own stream becomes the one (the receiver asks within seconds of being
+        told) - a request for anything else binds nothing."""
+        with self._lock:
+            if self.peers:
+                return who in self.peers
+            ours = _same(path, self.path) or (self.hls and _under(path, self.prefix))
+            if ours:
+                self.peers = frozenset({who})
+                log.info("cast bridge: the receiver's address not known - served to the first that asked")
+            return True
 
     def refused_peer(self, address: str) -> None:
         """Someone other than the receiver asked for the stream: said once a run."""

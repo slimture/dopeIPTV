@@ -1008,6 +1008,35 @@ def test_nobody_speaks_under_another_members_id():
     assert together.open_message(KEY, ROOM, together._seal_text(KEY, ROOM, real[:-12] + b'"}')) is None
 
 
+def test_a_member_of_an_older_app_is_told_once_and_never_taken():
+    """The room's own frame without a signature - 1.6.8's - is no message,
+    but the link says once that such a member is there."""
+    old = {"k": "st", "f": "ab" * 8, "n": 3, "t": 5, "st": _state_wire(b="ab" * 8)}
+    blob = together.seal(KEY, ROOM, old)
+    assert together.open_message(KEY, ROOM, blob) is None and together.older_frame(KEY, ROOM, blob)
+    anna = together.new_identity()
+    signed = together.seal(KEY, ROOM, {"k": "hi", "f": anna.id, "n": 1, "t": 5, "name": "A"}, anna)
+    assert not together.older_frame(KEY, ROOM, signed)
+    other_room, other_key = together.derive("ZZZZZ-ZZZZZ")
+    assert not together.older_frame(KEY, ROOM, together.seal(other_key, other_room, old)), "another room's"
+    hub = Hub()
+    got, told = [], []
+    link = together.Link(ROOM, KEY, "a1" * 20, together.Clock(), on_message=got.append,
+                         on_status=lambda k, n: None,
+                         relay_for=lambda room, member: FakeRelay(hub, member),
+                         on_older=lambda: told.append(1))
+    link.start()
+    try:
+        assert _wait(lambda: link._polled.is_set())  # in the room: what comes now is read
+        for _ in range(3):
+            FakeRelay(hub, "ab" * 8).post(blob)
+        assert _wait(lambda: told)
+        time.sleep(0.3)
+        assert told == [1] and got == []
+    finally:
+        link.close()
+
+
 def test_a_member_on_1_6_8_is_not_heard():
     """An unsigned message (1.6.8's: 16 hex, no key, no signature) is no
     message: whoever sent it could have written any id."""
