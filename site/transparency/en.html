@@ -65,7 +65,7 @@
 <p>Where your login does leave your computer, it is because you sent it there:</p>
 <ul>
 <li><strong>Settings sync</strong>, if you add Sources to what syncs – they are not among the defaults: locked on your computer with a key we never see (<a href="#sync">part 8</a>).</li>
-<li><strong>A full backup</strong> holds it – a file you save where you choose, never sent anywhere.</li>
+<li><strong>A full backup</strong> holds it – a file you save where you choose, never sent anywhere: plain text, unless you give it a password, which encrypts the whole file.</li>
 <li><strong>A TV you cast to</strong> fetches the stream itself, so it gets the stream's address – and with many providers the login is part of that address.</li>
 <li><strong>A player you give the app's shared playlist</strong> (a Nerd setting) is sent on to the stream's own address the same way.</li>
 </ul>
@@ -96,6 +96,7 @@
 <li>The settings file is not encrypted: anyone who can sign in as you, an administrator of the computer, or a program you run yourself can read it – as they could most of what is yours on the computer. On Windows and macOS the settings are kept where the system keeps each user's own.</li>
 <li>Your provider gets your login with every request – that is how a login works. With a provider on plain <code>http://</code>, it crosses the network unencrypted, and anyone who can see your traffic can read it.</li>
 <li>A TV you cast to, or a player you give the shared playlist, gets the stream's address – with many providers, your login with it.</li>
+<li>When the app records over a connection of its own, or opens VLC or mpv as a program of their own, it hands that program the stream's address – with many providers your login in it – and on Linux and macOS, while it runs, other user accounts on the same computer can see a program's command line.</li>
 </ul>
 
 <h2 id="watching">2. Can you see what I watch?</h2>
@@ -226,6 +227,7 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <ul>
 <li><strong>Built in public.</strong> Every release is built by GitHub Actions from the version's tag in the code – not on our computers. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">The build's recipe</a> is in the code, and <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">the log of every build</a> is open to anyone.</li>
 <li><strong>Signed.</strong> The release's files are listed with their checksums, and the list is signed with our release key. The app checks an update against it, and this website checks every file it hands out against it too, before it hands it out (below).</li>
+<li><strong>Checked before it is signed.</strong> Every package a release ships is looked up against the known vulnerabilities first; an audit that finds one, or cannot finish, stops the release before it is signed. And yt-dlp, which the app can download for YouTube and the like, is only the release whose checksums the build checked against yt-dlp's own signature.</li>
 <li><strong>Not yet reproducible.</strong> The build's log and the signature show what was built, from which tag and where. They are not a byte-for-byte proof: the builds are not reproducible yet, so you cannot build the same bytes yourself and compare. Until they are, the open log and recipe are what you can check.</li>
 <li><strong>It checks itself.</strong> The app carries a signed list of its own files and checks them when it starts. A changed copy knows it is changed, and does not use our services: it looks for no updates here and sends no reports to us. Run straight from the code, it says so, and works as an official build.</li>
 <li><strong>A courtesy, not a lock.</strong> The check is made by the app itself, and what kind of build it is the app says about itself. A copy changed on purpose can change the check too, and anyone can write a request by hand. So none of the protection on this page rests on it – that is the encryption and the cleaning above. What it gives you is an app that knows when it is not ours, and says so.</li>
@@ -243,15 +245,17 @@ python3 -m pip install -r requirements.txt pytest
 QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 
 <h2 id="private">6. Can the app keep nothing of what I watch?</h2>
-<p class="tp-promise">While private viewing is on, nothing you play is kept on your computer or told to anyone – until you close the app.</p>
+<p class="tp-promise">While private viewing is on, nothing you play is kept or told to anyone, and nothing of it is written to a disk – until you close the app.</p>
 <p class="tp-know"><b>What we can know:</b> nothing of it. Private viewing is about what your own computer keeps and tells; we get nothing of what you watch either way (<a href="#watching">part 2</a>).</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>One switch</b> in the app's memory – never saved, so it is off again when the app starts.</li>
 <li><b>Each place that keeps something</b> – watch history, where you stopped – asks the switch itself before it writes.</li>
 <li><b>Each place that tells</b> – Trakt, Simkl, Discord, your media server, the statistics, the log – asks it too.</li>
+<li><b>What must be written while it plays</b> – the rewind buffer, a cast the app converts for the TV, a subtitle you fetch – goes only to memory that cannot reach a disk, or is not made at all.</li>
 </ol>
 <p>The check sits in the stores themselves, not in the buttons that play something. So no part of the app can forget it: whichever way you start a film, the history refuses to write it. A playback that began in private stays private to its end – even if the stream reconnects after you turn private viewing off: it is not kept, not counted and not told to Trakt, Simkl, Discord or your media server.</p>
+<p>Memory counts only when it really is memory: on Linux, a folder of your own on a file system in memory (tmpfs), and only when what the system moves out of memory cannot be read from a disk afterwards – no swap, encrypted swap, or zram with no disk behind it. Where there is no such memory – on macOS and Windows, or with swap on a plain disk – a private channel plays without the rewind buffer, a cast that needs converting says why it cannot, and a subtitle reaches the player without becoming a file. Turn private viewing on while a channel plays from a buffer on the disk, and it is opened again the private way; a cast being converted on the disk stops within a second and is sent again. A recording while you watch privately is asked about first.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -265,15 +269,24 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code private stores-->
 <p>And where Trakt and Simkl are told – asked of the playback, not only of the switch:</p>
 <!--tp:code private tellers-->
+<p>What counts as memory – the file system, and swap that cannot carry it to a disk:</p>
+<!--tp:code private memory-->
+<p>A private channel's rewind buffer: in such memory, or none at all – and no connection opened for the try:</p>
+<!--tp:code private buffer-->
+<p>A cast the app converts: its work only in such memory and within its room, and a run on the disk stopped as private viewing begins:</p>
+<!--tp:code private cast-->
 <h3>Check it yourself</h3>
-<blockquote class="tp-ask" data-for="private"><p>Below is code from dopeIPTV, an open-source TV player – its private viewing mode. Explain in plain English, step by step, what it does. Then review it critically: is there a way for what is played during private viewing to be saved or reported anyway? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
+<blockquote class="tp-ask" data-for="private"><p>Below is code from dopeIPTV, an open-source TV player – its private viewing mode. Explain in plain English, step by step, what it does. Then review it critically: is there a way for what is played during private viewing to be saved, reported or written to a disk anyway? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
 <!--tp:copy private-->
 </div>
 </details>
 <h3>What it does not protect against</h3>
 <ul>
 <li>Your TV provider still sees what you play – it sends you the stream – and so can anyone who can see your network traffic. Private viewing is about what your own computer keeps and tells, not about being invisible.</li>
-<li>A recording you start is still saved – you asked for that file.</li>
+<li>A recording is still a file – the app asks first, and keeps it if you say yes.</li>
+<li>The player's own memory – the picture it decodes, what it reads ahead – is the program's memory, which your system may move to swap like any other: it is protected only as your swap is.</li>
+<li>A cast being converted on the disk when you turn private viewing on goes on for up to a second before it stops; what it wrote is deleted then.</li>
+<li>On macOS and Windows there is no such memory for the app: a private channel has no rewind buffer there, and a cast that needs converting is not converted.</li>
 </ul>
 
 <h2 id="reports">7. What is in an error report?</h2>
@@ -285,7 +298,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>You</b> read all of it, change or delete anything, and decide whether to send it.</li>
 <li><b>Our server</b> cleans it once more and keeps it without your IP address.</li>
 </ol>
-<p>The cleaning works in two ways. First it looks for <em>patterns</em>: anything shaped like a web address – with or without <code>http://</code> in front –, an IP or MAC address, an e-mail address, a password, token or login written as <code>name=value</code>, in quotes or as JSON, and a login header or cookie. Then it removes <em>what the app knows is yours</em>: the names, servers and logins of your sources, your channel names, the titles you have watched, your user name and your home folder. Each is replaced by a placeholder such as <code>&lt;private&gt;</code>, so the report still makes sense to us without saying who you are. The part that sends runs the patterns once more on exactly what goes, whichever way the text came, and sends it only over HTTPS to our own address – never after a redirect elsewhere.</p>
+<p>The cleaning works in two ways. First it looks for <em>patterns</em>: anything shaped like a web address – with or without <code>http://</code> in front –, an IP or MAC address, an e-mail address, a phone number, a password, token or login written as <code>name=value</code>, in quotes, as JSON or told in words, a token on its own (a JWT, a key with a service's prefix, a long random string), and a login header or cookie. Then it removes <em>what the app knows is yours</em>: the names, servers and logins of your sources, your channel names, the titles you have watched, your user name, and the home folder of any account. Each is replaced by a placeholder such as <code>&lt;private&gt;</code>, so the report still makes sense to us without saying who you are. The part that sends runs the patterns once more on exactly what goes, whichever way the text came, and sends it only over HTTPS to our own address – never after a redirect elsewhere.</p>
 <p>If you ask for an answer, the app makes a random code that stays on your computer and sends only a hash of it – a one-way fingerprint we cannot turn back into the code. Later the app asks whether that hash has an answer. The hash is the same each time it asks, so our server can tell that the questions belong together, but not who asks. A reply you write to one of our answers is cleaned the same way as the report.</p>
 <p>Our server keeps a report for 12 months and then removes it by itself – with every answer we wrote to it and every reply you sent to one. An answer we write to a whole problem at once (“fixed in 1.5.1”, for everyone who reported it) holds only our own words and stays until we remove it.</p>
 <details class="tp-proof">
@@ -331,9 +344,10 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>From the code</b> come two unrelated values: a <em>slot</em> (where the copy is kept) and a <em>key</em> (which locks it).</li>
 <li><b>Our server</b> gets the slot and the locked copy. Never the code, never the key.</li>
 </ol>
+<p>A third value comes from the code too: the slot's credential. Our server keeps only a hash of it, and once a copy is written nothing reads, changes or deletes that slot without it – knowing a slot is not enough.</p>
 <p>The two values come from the code through <strong>HKDF-SHA256</strong>, a standard way to make several keys from one secret: knowing the slot says nothing about the key. The copy is compressed and then encrypted with <strong>ChaCha20-Poly1305</strong>, one of the ciphers that protect HTTPS connections on the web. It also detects any change: a copy someone has tampered with does not open.</p>
-<p>What our server could still do is hand back an earlier copy it kept. So every copy carries a counter, locked with the rest and one higher with every upload. A computer that has already seen a later copy notices, keeps its own newer values, puts its copy back and tells you so. Your other computers get the same code from you – typed or pasted – and so make the same slot and key.</p>
-<p>The request carries the app's name and version, whether it is an official build, the slot and the locked copy. No account, no e-mail address, no name. It goes only over HTTPS, and never after a redirect elsewhere. The web server does not log sync requests at all, and a copy no computer has read or written for 180 days is deleted.</p>
+<p>What our server could still do is hand back an earlier copy it kept. So every copy carries a counter, locked with the rest and one higher with every upload. A computer that has already seen a later copy notices, keeps its own newer values, puts its copy back and tells you so. Your other computers get the same code from you – typed or pasted – and so make the same slot and key. A playlist's connection settings that a copy brings – a proxy, headers, a rewrite rule and the like – are never put in place unasked: the app shows them, and you choose.</p>
+<p>The request carries the app's name and version, whether it is an official build, the slot, its credential and the locked copy. No account, no e-mail address, no name. It goes only over HTTPS, and never after a redirect elsewhere. The web server does not log sync requests at all, and a copy no computer has read or written for 180 days is deleted.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -352,7 +366,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code sync stored-->
 <p>The counter in every copy, and how a round notices an earlier copy and puts its own back:</p>
 <!--tp:code sync counter-->
-<p>What the app sends with it – its name and version, nothing about you – and only over HTTPS:</p>
+<p>What the app sends with it – its name and version, and the slot's credential, nothing about you – and only over HTTPS:</p>
 <!--tp:code sync send-->
 <p>On our server: what is kept per slot, and how a request is handled – the address only for the limits (<a href="#reports">part 7</a>).</p>
 <!--tp:code sync server-->
@@ -380,7 +394,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>From the code</b> each computer makes the same room name and the same key.</li>
 <li><b>Our server</b> passes the locked messages on, keeps them only in memory, and forgets the room an hour after the last request.</li>
 </ol>
-<p>Ten characters are quick to type, but on their own they would be quicker to guess than a key should be. So the code is first stretched with <strong>PBKDF2</strong> – 600,000 rounds of SHA-256, so trying every code against one room would keep a graphics card busy for centuries – and then turned into a room name and a key with HKDF, as for sync. A code of eight characters from an older version still joins its room. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Inside, locked, each message also carries its sender's number and a count: one passed on twice is used once. Each person gets a new random number for each room. The app talks to the relay only over HTTPS, and never follows a redirect elsewhere.</p>
+<p>Ten characters are quick to type, but on their own they would be quicker to guess than a key should be. So the code is first stretched with <strong>PBKDF2</strong> – 600,000 rounds of SHA-256, so trying every code against one room would keep a graphics card busy for centuries – and then turned into a room name and a key with HKDF, as for sync. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Each person gets a key of their own for each room (Ed25519) and is known in it by a hash of the key's public half: every message is signed with that key, so nobody – the relay included – can speak as someone else, and a message without a signature is left out. Each message also carries a count, remembered for the rest of the app's run: one passed on twice is used once, and one from well before you joined, or far from the relay's time, is not acted on. A code of eight characters from 1.6.7 no longer joins: the app says so, and a new room gives one of ten. The app talks to the relay only over HTTPS, and never follows a redirect elsewhere.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -393,7 +407,9 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <h3>The code</h3>
 <p>The room name and the key from the code, and how a message is padded and locked:</p>
 <!--tp:code together key-->
-<p>How each message gets its count, and how one seen before is left out:</p>
+<p>Each person's key and id, and how a message is signed and its signature checked:</p>
+<!--tp:code together signed-->
+<p>How each message gets its count, and how one seen before, or out of its time, is left out:</p>
 <!--tp:code together replay-->
 <p>On our server: a message is taken as bytes and passed on – nothing opens it, nothing is written to disk – and the request, where the address is used only for the limits:</p>
 <!--tp:code together server-->
@@ -408,8 +424,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <ul>
 <li>Anyone who gets the room code can join the room and see the names and what plays. Share it only with the people you watch with. A room takes at most eight people.</li>
 <li>The people in the room see the name you choose and what you watch – that is the point of it.</li>
-<li>Our server sees the room name, a random number for each person, how big the messages are and when they are sent – and, like every server, the IP address they come from, which it uses only in memory, for the limits. It could also hold messages back or pass them on late; it cannot read, change or forge them. Watch together cannot be used while private viewing is on.</li>
-<li>A code of eight characters from an older version is easier to guess. Start a new room to get one of ten.</li>
+<li>Our server sees the room name, an id for each person – the hash of a key made for that room –, how big the messages are and when they are sent – and, like every server, the IP address they come from, which it uses only in memory, for the limits. It could also hold messages back or pass them on late; it cannot read, change or forge them, or speak as one of you. Watch together cannot be used while private viewing is on.</li>
+<li>Whoever has the code is in the room, as far as the app can tell: it cannot tell a friend from someone the code was passed on to.</li>
 </ul>
 
 <h2 id="website">10. Does this website track me?</h2>
@@ -535,7 +551,6 @@ curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
 <li>Some of the front server's settings are not in the repository, because its main file serves other sites too: the allowance for pages and the connection limit, its TLS versions and ciphers, and the policy's row itself (<code>csp.snippet.txt</code> is its copy). Test its TLS yourself with any TLS checker.</li>
 <li>The content server believes the address it is told in <code>X-Real-IP</code>. That only the front server can reach its port rests on the server's firewall and on a small file with the front server's address – neither in the repository, since they hold the server's addresses. nginx will not start without the file, but that the firewall and the file say what we write here you have to take on trust. The few addresses that only send you on elsewhere, or answer “not found”, answer before nginx asks the file – that is all they give.</li>
 <li>The service runs as the same user that makes the pages: a flaw in it that let someone run code could change the site. Who is signed in to the admin page it does not take from nginx: it checks the signed session itself.</li>
-<li>The two logs with your address can be read by nginx's own user as well as by the statistics' – nginx makes a log its own when it starts on a new one; in that jail only nginx runs as that user.</li>
 <li>The limits count addresses. People who share one – a phone network, a school – share its limits, and someone with many addresses gets many.</li>
 </ul>
 

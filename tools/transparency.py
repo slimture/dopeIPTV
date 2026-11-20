@@ -73,8 +73,8 @@ CODE: dict[str, list[dict]] = {
     "reports": [
         {"id": "scrub", "repo": "app", "path": "dopeiptv/core/report.py",
          "names": ["_IPV4", "_IPV6", "_MAC", "_EMAIL", "_SUPPORTER", "_KEYVAL", "_AUTH_LINE",
-                   "_BEARER", "_HOST_PATH", "_hide_value", "_not_an_address", "scrub",
-                   "personal_values"],
+                   "_BEARER", "_HOST_PATH", "_SAID", "_JWT", "_PREFIXED", "_LONG", "_HOME_DIR",
+                   "_PHONE", "_hide_value", "_not_an_address", "scrub", "personal_values"],
          "with": [{"repo": "app", "path": "dopeiptv/core/log.py", "names": ["URL_IN_TEXT"]}]},
         {"id": "send", "repo": "app", "path": "dopeiptv/core/report.py",
          "names": ["ENDPOINT", "_over_https", "_post", "send_status"],
@@ -91,7 +91,7 @@ CODE: dict[str, list[dict]] = {
     ],
     "sync": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/sync.py",
-         "names": ["format_code", "new_code", "hkdf", "derive", "seal", "unseal"]},
+         "names": ["format_code", "new_code", "hkdf", "derive", "auth_of", "seal", "unseal"]},
         {"id": "aead", "repo": "app", "path": "dopeiptv/core/chacha20poly1305.py",
          "names": ["poly1305", "_pad16", "_tag", "encrypt", "decrypt"]},
         {"id": "stored", "repo": "app", "path": "dopeiptv/core/sync.py", "names": ["K_CODE", "code_of"],
@@ -100,7 +100,7 @@ CODE: dict[str, list[dict]] = {
         {"id": "counter", "repo": "app", "path": "dopeiptv/core/sync.py",
          "names": ["_META", "_COUNTER", "counter", "_counted", "round_trip"]},
         {"id": "send", "repo": "app", "path": "dopeiptv/core/sync.py",
-         "names": ["ENDPOINT", "Remote.__init__", "Remote._call"],
+         "names": ["ENDPOINT", "AUTH_HEADER", "Remote.__init__", "Remote._call"],
          "with": [{"repo": "app", "path": "dopeiptv/core/build_check.py", "names": ["secure"]}]},
         {"id": "server", "repo": "site", "path": "donate/sync.py",
          "names": ["AUTH", "Refused", "_seal", "_check", "get", "put", "delete"],
@@ -110,12 +110,17 @@ CODE: dict[str, list[dict]] = {
     ],
     "together": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/together.py",
-         "names": ["ALPHABET", "CODE_LEN", "OLD_LEN", "STRETCH", "OLD_STRETCH", "_PAD", "new_code",
+         "names": ["ALPHABET", "CODE_LEN", "OLD_LEN", "STRETCH", "_PAD", "new_code", "is_old_code",
                    "derive", "seal", "open_frame"]},
+        {"id": "signed", "repo": "app", "path": "dopeiptv/core/together.py",
+         "names": ["Identity", "member_of", "new_identity", "_signed", "encode",
+                   "_signature_holds", "open_message"]},
         {"id": "replay", "repo": "app", "path": "dopeiptv/core/together.py",
          "from": r"^    def _make\(", "to": r"^        return msg$",
          "with": [{"repo": "app", "path": "dopeiptv/core/together.py",
-                   "from": r"^    def receive\(", "to": r"self\._last_n\[msg\.sender\] = msg\.n"}]},
+                   "names": ["Room._timely", "Room._counted", "remembered"]},
+                  {"repo": "app", "path": "dopeiptv/core/together.py",
+                   "from": r"^    def receive\(", "to": r"^        if not self\._counted\(msg, now\):"}]},
         {"id": "server", "repo": "site", "path": "donate/together.py", "names": ["Relay.post"],
          "with": [{"repo": "site", "path": "donate/donate.py", "names": ["Handler._together"]}]},
         {"id": "nolog", "repo": "site", "path": "deploy/proxy-dopeiptv.org.conf",
@@ -129,6 +134,13 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "app", "path": "dopeiptv/services/resume.py", "names": ["ResumeStore.record"]}]},
         {"id": "tellers", "repo": "app", "path": "dopeiptv/ui/mw_trakt.py",
          "names": ["_TraktMixin._watch_accounts_start"]},
+        {"id": "memory", "repo": "app", "path": "dopeiptv/core/memory_safe.py",
+         "names": ["in_memory", "encrypted_block", "swap_safe", "stays_in_memory", "private_folder"]},
+        {"id": "buffer", "repo": "app", "path": "dopeiptv/core/dvr_pool.py",
+         "names": ["NoPrivateBuffer", "DvrPool.open"]},
+        {"id": "cast", "repo": "app", "path": "dopeiptv/providers/cast_bridge.py",
+         "names": ["private_cast_dir", "private_cap", "folder_bytes", "CastBridge.start",
+                   "CastBridge._watch"]},
     ],
     "updates": [
         {"id": "headers", "repo": "app", "path": "dopeiptv/core/updates.py",
@@ -594,15 +606,16 @@ import base64, json
 from dopeiptv.core import together
 code = "K7PQM-2XDH9"
 room, key = together.derive(code)
-member = together.new_member()
-here = together.Room(code, member, "Kalle", together.Clock())
+me = together.new_identity()
+here = together.Room(code, me.id, "Kalle", together.Clock())
 media = together.Media(kind="episode", name="The Bridge S02E03", title="the bridge",
                        year=2011, season=2, episode=3)
 msg = here.publish(media, True, 1880.0)
-frame = together.seal(key, room, msg)
-print(json.dumps({"code": code, "inside": json.dumps(msg, ensure_ascii=False),
+frame = together.seal(key, room, msg, me)
+inside = together.encode(msg, room, me).decode("utf-8")
+print(json.dumps({"code": code, "inside": inside,
                   "request": "POST " + together.ENDPOINT + room,
-                  "member": together.MEMBER_HEADER + ": " + member,
+                  "member": together.MEMBER_HEADER + ": " + me.id,
                   "size": len(frame), "body": base64.b64encode(frame).decode("ascii")}))
 '''
 
