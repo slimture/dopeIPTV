@@ -26,4 +26,6 @@ UPDATE_KEYS: tuple[str, ...] = (
     "IP6gbDXErt8o1kctkDQsL2gRnXSs7RU92F3yjmIuEdg=",
 )
 
-BUILD_KEYS: tuple[str, ...] = ()
+BUILD_KEYS: tuple[str, ...] = (
+    "9IY9Gfki86RUj00fpiIR2GFaOJr9uK7pvnLr81TQGkA=",
+)
