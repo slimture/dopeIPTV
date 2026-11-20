@@ -186,7 +186,7 @@ Only names here - the values are with the owner.
 | GitHub Actions secret `SIMKL_CLIENT_ID` | the client id of dopeIPTV's app at simkl.com/settings/developer (no secret is used: the PIN sign-in needs none), written into `dopeiptv/_simkl_key.py` (git-ignored) by every release build ("Bake built-in Simkl client id"); a client id public in the code, `PUBLIC_CLIENT_ID` (`providers/simkl.py`), wins over the file | nothing while `PUBLIC_CLIENT_ID` is set; with it empty too, Simkl is not offered in Settings |
 | Discord application | its application id is `DISCORD_APP_ID` in `dopeiptv/core/discord_rpc.py` (public, not a secret: discord.com/developers → Applications, named "dopeIPTV", since Discord shows "Watching <its name>"); a Rich Presence art asset named `dopeiptv` gives the status its picture | the Discord switch is not offered |
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | Trakt sign-in fails: there is no Settings row for a client id of one's own - only a build with `DEFAULT_CLIENT_ID` empty asks for one on Connect (`_trakt_creds_dialog` in `ui/mw_trakt.py`) |
-| The web server | runs the site and its cron sync (website branch: `README.md`, `DEPLOY.md`) | the site stops updating; the app is unaffected |
+| The web server | runs the site and its cron sync (website branch: `README.md`; how the server is set up: the private repository `slimture/dopeiptv-server`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
 | Stripe (dopeIPTV's own account, under Solecraft AB) - the tip dialog and a Payment Link | a tip (any amount, once) in the site's tip dialog, paid through `donate/donate.py` (or a Payment Link of its own, `SUPPORT_TIP_URL`, while `SUPPORT_TIPS` is not on), and monthly support (a fixed price) as a Payment Link returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; the settings are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIPS`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`, ...), read by `sync-releases.sh` (website branch, `DEPLOY.md` "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
 | Stripe key for the supporter key | a restricted key, read-only (Checkout Sessions: Read, PaymentIntents: Read), on the web server in `/usr/local/etc/iptv-donate.key`, read by `donate/donate.py` | the thank-you after paying shows no supporter key |
@@ -415,7 +415,9 @@ rather than ship something half done.
 ## The website
 
 The `website` branch has its own `README.md` (architecture, local
-preview, SEO) and `DEPLOY.md` (the server). In short:
+preview, SEO). How the servers are set up - the runbook, the nginx files,
+the tests that check them - is kept out of the public repository, in the
+private `slimture/dopeiptv-server`. In short:
 
 - Static pages rendered by `sync-releases.sh` + `site/render.jq` from the
   latest GitHub release, every 15 minutes by cron on the server. It also
