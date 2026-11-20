@@ -177,6 +177,61 @@ def test_swap_is_asked_of_the_system():
     assert "swap = stats_collect.swap_state()" in src and "SWAP NOT ENCRYPTED" in src
 
 
+def test_fourteen_days_means_fourteen_dates():
+    # Today and the 13 days before it are kept; the 14th day back is gone at
+    # the first run that day - a visit is never kept past 14 days.
+    sc, _dir = _module()
+    os.makedirs(sc.VISITS_DIR)
+    today = date.today()
+    kept = (today - timedelta(days=sc.VISITS_DAYS - 1)).isoformat()
+    gone = (today - timedelta(days=sc.VISITS_DAYS)).isoformat()
+    for day in (kept, gone):
+        with open(os.path.join(sc.VISITS_DIR, day + ".json"), "w") as fh:
+            json.dump([], fh)
+    assert sc.left_behind() == [os.path.join(sc.VISITS_DIR, gone + ".json")]
+    data = {"days": {kept: {"views": 1}, gone: {"views": 1}}}
+    sc._forget_old(data)
+    assert os.path.exists(os.path.join(sc.VISITS_DIR, kept + ".json"))
+    assert not os.path.exists(os.path.join(sc.VISITS_DIR, gone + ".json"))
+    assert data["days"][gone].get("folded") == 1 and "folded" not in data["days"][kept]
+    os.makedirs(sc.UPDATES_DIR)
+    old_update = (today - timedelta(days=sc.UPDATES_DAYS)).isoformat()
+    with open(os.path.join(sc.UPDATES_DIR, old_update + ".json"), "w") as fh:
+        json.dump([], fh)
+    assert os.path.join(sc.UPDATES_DIR, old_update + ".json") in sc.left_behind()
+
+
+def test_zram_counts_only_without_a_disk_behind_it(tmp_path):
+    sc, _dir = _module()
+    blocks = tmp_path / "class" / "block"
+    for name, files in {"zram0": {"backing_dev": "none"}, "zram1": {"backing_dev": "/dev/sdb2"},
+                        "dm-0": {"dm/uuid": "CRYPT-LUKS2-x"}, "dm-1": {"dm/uuid": "LVM-y"},
+                        "sda3": {}}.items():
+        for rel, text in files.items():
+            f = blocks / name / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(text + "\n")
+        (blocks / name).mkdir(parents=True, exist_ok=True)
+    (blocks / "dm-1" / "slaves" / "dm-0").mkdir(parents=True)
+    (blocks / "dm-2" / "slaves" / "sda3").mkdir(parents=True)
+    root = str(tmp_path)
+    assert sc._linux_encrypted("/dev/zram0", root)
+    assert not sc._linux_encrypted("/dev/zram1", root), "writes back to a disk"
+    assert sc._linux_encrypted("/dev/dm-0", root)
+    assert sc._linux_encrypted("/dev/dm-1", root), "LVM on LUKS"
+    assert not sc._linux_encrypted("/dev/dm-2", root), "LVM on a plain partition"
+    assert not sc._linux_encrypted("/dev/sda3", root)
+
+
+def test_swap_that_cannot_be_asked_is_said_too():
+    sc, _dir = _module()
+    sc._SWAP.clear()
+    sc._swap_devices = lambda: None
+    assert sc.trouble() == [{"what": "swap", "path": "", "why": "could not be asked"}]
+    js = open(os.path.join(HERE, "admin", "admin.js"), encoding="utf-8").read()
+    assert 'swap.why === "could not be asked"' in js
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     for name, fn in tests:

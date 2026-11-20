@@ -1951,25 +1951,27 @@ def fold_day(stats: dict, day: str) -> None:
 
 
 def _forget_old(stats: dict | None = None) -> None:
-    """Visits older than STATS_VISITS_DAYS: their day's counts per way in
-    kept (funnel_of), then the day's file deleted - no row of a visit
-    stays. The day's lists of who came are folded with it (fold_day)."""
+    """Visits of STATS_VISITS_DAYS days ago and older: their day's counts
+    per way in kept (funnel_of), then the day's file deleted - no row of a
+    visit stays. Today and the 13 days before it are the 14 kept, so a
+    visit is gone 14 days after its day began, at the first run then. The
+    day's lists of who came are folded with it (fold_day)."""
     cutoff = (datetime.now(timezone.utc).date() - timedelta(days=VISITS_DAYS)).isoformat()
     for f in sorted(glob.glob(os.path.join(VISITS_DIR, "*.json"))):
         day = os.path.basename(f)[:10]
-        if day >= cutoff:
+        if day > cutoff:
             continue
         if stats is not None and day in (stats.get("days") or {}):
             stats["days"][day]["funnel"] = funnel_of(_load_list(f))
         _gone(f)
     if stats is not None:
         for day in sorted(stats.get("days") or {}):
-            if day < cutoff:
+            if day <= cutoff:
                 fold_day(stats, day)
     # The app's updates of then: counted in stats.json already, so they go.
     gone_updates = (datetime.now(timezone.utc).date() - timedelta(days=UPDATES_DAYS)).isoformat()
     for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):
-        if os.path.basename(f)[:10] < gone_updates:
+        if os.path.basename(f)[:10] <= gone_updates:
             _gone(f)
 
 
@@ -2021,10 +2023,10 @@ def left_behind(today: date | None = None) -> list:
     out += sorted(glob.glob(os.path.join(ANON_DIR, "*")))
     cutoff = (today - timedelta(days=VISITS_DAYS)).isoformat()
     out += [f for f in sorted(glob.glob(os.path.join(VISITS_DIR, "*.json")))
-            if _is_day(os.path.basename(f)[:10]) and os.path.basename(f)[:10] < cutoff]
+            if _is_day(os.path.basename(f)[:10]) and os.path.basename(f)[:10] <= cutoff]
     updates = (today - timedelta(days=UPDATES_DAYS)).isoformat()
     out += [f for f in sorted(glob.glob(os.path.join(UPDATES_DIR, "*.json")))
-            if _is_day(os.path.basename(f)[:10]) and os.path.basename(f)[:10] < updates]
+            if _is_day(os.path.basename(f)[:10]) and os.path.basename(f)[:10] <= updates]
     return out
 
 
@@ -2078,20 +2080,35 @@ def _swap_devices() -> list | None:
     return swap_listed(out.stdout)
 
 
-def _linux_encrypted(device: str) -> bool:
+def _linux_encrypted(device: str, sys_root: str = "/sys") -> bool:
     """Whether a Linux swap device keeps nothing readable after a restart:
-    zram (in memory) or a dm-crypt mapping (its uuid starts CRYPT-)."""
-    real = os.path.realpath(device)
-    name = os.path.basename(real)
-    if name.startswith("zram"):
-        return True
-    if not name.startswith("dm-"):
+    zram with no device it writes back to, a dm-crypt mapping (its uuid
+    starts CRYPT-), or a mapping (LVM, RAID) whose every part is one - as
+    the app's core/memory_safe.encrypted_block. A swap file: not known, so
+    not counted."""
+    return _block_encrypted(os.path.basename(os.path.realpath(device)), sys_root)
+
+
+def _block_encrypted(name: str, sys_root: str, depth: int = 0) -> bool:
+    if depth > 8 or not name or "/" in name or name.startswith("."):
         return False
+    block = os.path.join(sys_root, "class", "block", name)
+
+    def read(rel: str) -> str:
+        try:
+            with open(os.path.join(block, rel), encoding="ascii", errors="replace") as f:
+                return f.read(4096).strip()
+        except OSError:
+            return ""
+    if name.startswith("zram"):
+        return read("backing_dev") in ("", "none")
+    if read("dm/uuid").startswith("CRYPT-"):
+        return True
     try:
-        with open(f"/sys/block/{name}/dm/uuid", encoding="ascii") as f:
-            return f.read().startswith("CRYPT-")
+        parts = sorted(os.listdir(os.path.join(block, "slaves")))
     except OSError:
         return False
+    return bool(parts) and all(_block_encrypted(p, sys_root, depth + 1) for p in parts)
 
 
 def swap_state(now: float | None = None) -> dict:
@@ -2121,11 +2138,14 @@ def swap_state(now: float | None = None) -> dict:
 
 def trouble() -> list:
     """What the admin page warns about: each file that should be gone and is
-    not, with why - and swap that keeps what it is given."""
+    not, with why - and swap that keeps what it is given, or that could not
+    be asked (nothing is taken on trust)."""
     out = [{"what": "delete", "path": p, "why": why} for p, why in sorted(TROUBLE.items())]
     swap = swap_state()
     if swap["state"] == "plain":
         out.append({"what": "swap", "path": ", ".join(swap["plain"]), "why": "not encrypted"})
+    elif swap["state"] == "unknown":
+        out.append({"what": "swap", "path": "", "why": "could not be asked"})
     return out
 
 
