@@ -199,6 +199,29 @@ What it found, and what was done:
 | Supply chain | The dependency audit passed when it could not ask | medium | 1.6.9: an audit that did not finish fails (exit 2: no answer after three tries, a package left unchecked); the release runs it too and is not signed until it passed (`release.yml`, `needs.audit.result`) |
 | Media libraries, credentials on command lines, plain http at home, sync's first join, direct casting, parental denylist | Known limits | documented | As written down in docs/SECURITY.md; unchanged this round |
 
+## November 2026 - sixth independent AI review of 1.6.9 (testing)
+
+The kit from `testing` (0a9da33) and the website (771a074): **8/10**;
+private viewing 6/10, casting 6/10, the website's statistics 7/10, every
+other part 8 or 9. Again no way for someone far away to steal a
+provider's login or slip in an unsigned update. What it found, and what
+was done:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Private viewing, casting | Private viewing turned on while a cast was being sent skipped the check, so a converter on the disk could go on | medium | 1.6.9: each converter run is watched by a thread of its own and stops by itself the moment private viewing begins, its files gone (`cast_bridge._watch`, `airplay_bridge._watch`, `private_stopped`) - a cast, a seek, a recast, a reconnect alike; a send on its way is looked at again once it is done (`_cast_send`'s `_private_check`); tests turn private viewing on at each of them |
+| Private viewing, casting | A private cast's HLS in memory had no cap while it ran - a long film or a high bitrate could fill the memory | medium | 1.6.9: its folder measured once a second, the converter stopped past its room (`folder_bytes`, `private_cap`) |
+| Casting | The Apple TV's bridge served anyone on the network who had its address | medium | 1.6.9: this computer and the first other address that asks for the run's stream alone, 403 for any other, said once a run (`airplay_bridge.admits`, `refused_peer`); the address's token as before |
+| Credentials | A login of three characters or fewer was not masked by value in the log | low | 1.6.9: masked as a word of its own (`core/log.py`, `_short`) |
+| Website statistics | A day's visits could stay almost 15 days | low | website: the 14th day back is gone at the first run that day - 14 dates, never more (`_forget_old`, `left_behind`: `<=`) |
+| Website statistics | zram with a backing device counted as safe swap | medium, conditional | website: zram counts only without a disk behind it; dm-crypt followed through LVM and other mappings (`_block_encrypted`) |
+| Website statistics | Swap that could not be asked gave no warning | low | website: said on the admin page as well as plain swap (`trouble`: "could not be asked") |
+| Website server | The deployment's state cannot be read from the repository | documented | DEPLOY.md's checks after a deployment (nginx's configuration, the jails' logs and their turnover, the service's socket and swap) run on the server; the start line says the swap and how long visits are kept |
+| Local servers | Server mode's tuner open to the whole home network | answered | Already off by default since 1.6.9 (`home_server.OPEN_OFF`): the tuner takes its token in its own address unless the person lets named devices or the home in |
+| Profiles | A four-digit PIN is weak | answered | 4 to 8 digits; PBKDF2 with 600 000 rounds and growing waits after two wrong tries (`core/pins.py`); a longer one is the person's choice |
+| Commands from outside | A link or the media keys change channel without asking | answered | A link that plays an address is asked first, the whole address shown; a channel change by `--channel` or the media keys comes from this user's own session (its socket and session bus), as a key pressed does |
+| TMDB, player TLS, credentials on command lines, the OS keyring, default-encrypted backups | Titles go to TMDB even with the provider's artwork (Trakt's ids, the watched marks); the rest known limits | open | Written down in docs/SECURITY.md; the order to take them in is the maintainer's to decide |
+
 ## The next round
 
 Before 1.6.9 is released: the kit made again from `testing` with these

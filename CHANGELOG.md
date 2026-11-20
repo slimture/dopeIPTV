@@ -46,6 +46,16 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   while a channel plays from a disk buffer opens it again, and a cast
   converted on the disk is sent again under the same rule. A recording
   while watching privately is asked first.
+- A cast's converter no longer waits for the window: each run - a cast, a
+  seek, a recast, a reconnect - stops by itself within a second of private
+  viewing beginning when its work is on the disk, and the cast is sent
+  again in memory or not at all, also when it was on its way meanwhile. A
+  private cast's work in memory is measured while it runs and the
+  converter stops at its room, so a long film cannot fill the memory.
+- The Apple TV's bridge serves this computer and the Apple TV alone: the
+  first other address that asks for a run's stream, anyone else refused.
+- A login of three characters or fewer is masked in the log as a word of
+  its own.
 - The audit of the packages a release ships fails when it could not check
   them all, and a release is not signed until it passed.
 - A channel watched privately from its start keeps its rewind buffer in

@@ -270,6 +270,28 @@ def test_the_bridge_serves_the_playlist_under_its_token(fake_ffmpeg):
     b.stop()                                          # twice is fine
 
 
+def test_only_the_receiver_that_asked_first_is_served(monkeypatch):
+    # The playlist's address is the run's token; a device that learnt it
+    # (another TV, a phone on the network) is refused all the same.
+    b = ab.AirPlayBridge()
+    b._own = {"127.0.0.1", "::1", "192.168.1.10"}
+    warned = []
+    monkeypatch.setattr(ab.log, "warning", lambda *a: warned.append(a))
+    assert b.admits("127.0.0.1") and b.admits("192.168.1.10"), "this computer's own player"
+    assert b._peer is None
+    assert b.admits("192.168.1.50"), "the Apple TV asks first"
+    assert b.admits("192.168.1.50")
+    assert not b.admits("192.168.1.77"), "anyone else is refused"
+    b.refused_peer()
+    b.refused_peer()
+    assert len(warned) == 1, "said once a run"
+    src = __import__("inspect").getsource(ab._Handler._answer)
+    assert src.index("bridge.admits(who)") < src.index("send_error(403)") < src.index("bridge.saw(who)")
+    assert src.index("bridge.admits(who)") < src.index("_hls_file(bridge.folder")
+    start = __import__("inspect").getsource(ab.AirPlayBridge._start)
+    assert "self._peer, self._refused_told" in start, "a new run asks again who its receiver is"
+
+
 def test_a_live_playlist_waits_for_three_segments(fake_ffmpeg):
     fake_ffmpeg(2, "live")
     b = ab.AirPlayBridge()

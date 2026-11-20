@@ -245,9 +245,125 @@ def test_a_private_casts_work_is_in_memory_with_a_cap_of_its_own(tmp_path, monke
     assert "min(self.cap, self._private_cap) if self.private else self.cap" in inspect.getsource(cb)
 
 
+def _until(cond, seconds=5.0):
+    import time
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if cond():
+            return True
+        time.sleep(0.02)
+    return cond()
+
+
+def test_private_viewing_begun_mid_cast_stops_a_run_on_the_disk_by_itself(tmp_path, monkeypatch):
+    # The window may be busy sending the cast when private viewing begins:
+    # the converter's own watch ends a run whose work is on the disk.
+    cb, disk = _private_cast(monkeypatch, tmp_path, str(tmp_path / "memory"))
+    monkeypatch.setattr(cb, "WATCH_EVERY", 0.02)
+    privacy.set_private(False)
+    bridge = cb.CastBridge()
+    try:
+        bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip")
+        assert bridge.on_disk() and str(bridge.hls_dir).startswith(str(disk))
+        privacy.set_private(True)
+        assert _until(lambda: bridge._server is None), "stopped within its tick"
+        assert bridge.private_stopped and bridge.fatal == "private viewing began"
+        assert not any(disk.iterdir()), "its work on the disk gone"
+    finally:
+        bridge.stop()
+
+
+@pytest.mark.parametrize("how", ["start", "seek", "recast", "reconnect"])
+def test_every_way_a_cast_is_sent_is_stopped_or_kept_in_memory_as_privacy_turns(
+        tmp_path, monkeypatch, how):
+    # A seek, a recast and the watchdog's reconnect are each a new start():
+    # each run has its own watch, whatever the window does meanwhile.
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    cb, disk = _private_cast(monkeypatch, tmp_path, str(memory))
+    monkeypatch.setattr(cb, "WATCH_EVERY", 0.02)
+    privacy.set_private(False)
+    bridge = cb.CastBridge()
+    args = {"start": {}, "seek": {"start_at": 600.0}, "recast": {"audio": 1},
+            "reconnect": {}}[how]
+    try:
+        bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip")
+        if how != "start":
+            bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip", **args)
+        assert bridge.on_disk()
+        privacy.set_private(True)
+        assert _until(lambda: bridge._server is None) and bridge.private_stopped
+        assert not any(disk.iterdir())
+        bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip", **args)
+        assert bridge.private and not bridge.private_stopped
+        assert str(bridge.hls_dir).startswith(str(memory))
+        privacy.set_private(False)
+        assert not _until(lambda: bridge._server is None, 0.2), "a private run goes on in memory"
+        assert not any(disk.iterdir())
+    finally:
+        bridge.stop()
+
+
+def test_a_private_casts_work_past_its_room_stops_the_converter(tmp_path, monkeypatch):
+    memory = tmp_path / "memory"
+    memory.mkdir()
+    cb, disk = _private_cast(monkeypatch, tmp_path, str(memory))
+    monkeypatch.setattr(cb, "WATCH_EVERY", 0.02)
+    bridge = cb.CastBridge()
+    killed = []
+    try:
+        bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip")
+        assert bridge.private and not bridge.on_disk()
+        monkeypatch.setattr(bridge, "kill", lambda proc: killed.append(proc))
+        with bridge._lock:
+            bridge._procs = ["ffmpeg"]
+        assert not _until(lambda: killed, 0.2), "within its room nothing is stopped"
+        (Path(bridge._tmp) / "piece.ts").write_bytes(b"x" * 4096)
+        bridge._private_cap = 1024
+        assert _until(lambda: killed == ["ffmpeg"]), "past it the converter stops"
+        assert bridge.fatal == "no more room in memory for a private cast"
+        assert cb.folder_bytes(bridge._tmp) >= 4096 and cb.folder_bytes(None) == 0
+    finally:
+        bridge.stop()
+    assert not any(memory.iterdir()) and not any(disk.iterdir())
+
+
+def test_a_cast_on_its_way_as_private_viewing_begins_is_looked_at_once_it_is_sent():
+    from dopeiptv.ui import mw_cast
+    on = inspect.getsource(mw_cast._CastMixin._cast_private_on)
+    assert 'ctx["_private_check"] = True' in on and on.index("_cast_busy()") < on.index("on_disk")
+    assert 'getattr(bridge, "private_stopped", False)' in on
+    send = inspect.getsource(mw_cast._CastMixin._cast_send)
+    assert 'ctx.pop("_private_check", False)' in send and "_cast_private_on" in send
+    calls = []
+    ctx = {}
+    bridge = SimpleNamespace(on_disk=lambda: False, private_stopped=False)
+    win = SimpleNamespace(_cast_device="tv", _cast_ctx=ctx, _cast_busy=lambda: True,
+                          cast=SimpleNamespace(bridge=bridge),
+                          _cast_restart=lambda c: calls.append("restart"))
+    mw_cast._CastMixin._cast_private_on(win)
+    assert ctx == {"_private_check": True} and calls == [], "busy: looked at later"
+    win._cast_busy = lambda: False
+    mw_cast._CastMixin._cast_private_on(win)
+    assert calls == [], "in memory already: nothing to send"
+    bridge.private_stopped = True
+    ctx["_recovering"] = 1
+    mw_cast._CastMixin._cast_private_on(win)
+    assert calls == ["restart"] and "_recovering" not in ctx, "stopped by its watch: sent again"
+
+
+def test_a_private_airplay_run_is_watched_as_the_cast_bridges(tmp_path, monkeypatch):
+    from dopeiptv.providers import airplay_bridge as ab
+    src = inspect.getsource(ab.AirPlayBridge._watch)
+    assert "privacy.playing_private()" in src and "self.private_stopped = True" in src
+    assert "folder_bytes(self.folder) <= self._private_cap" in src and "with self._run_lock:" in src
+    start = inspect.getsource(ab.AirPlayBridge.start)
+    assert "with self._run_lock:" in start and "target=self._watch" in start
+
+
 def test_a_private_airplay_cast_is_converted_only_in_memory():
     from dopeiptv.providers import airplay_bridge
-    src = inspect.getsource(airplay_bridge.AirPlayBridge.start)
+    src = inspect.getsource(airplay_bridge.AirPlayBridge._start)
     assert "privacy.playing_private()" in src and "cast_err_private_memory" in src
     assert "private_cast_dir()" in src and 'prefix=f"{os.getpid()}-airplay-"' in src
     assert src.index("self._stop(keep=feed)") < src.index("cast_err_private_memory"), \

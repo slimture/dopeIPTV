@@ -245,6 +245,22 @@ def private_cap(folder: str, cap: int) -> int:
     return room if room >= PRIVATE_LEAST else 0
 
 
+#: How often a running converter looks at private viewing and its room.
+WATCH_EVERY = 1.0
+
+
+def folder_bytes(folder: str | None) -> int:
+    """What the files under *folder* take - a converter's work."""
+    total = 0
+    for root, _dirs, files in os.walk(folder or ""):
+        for name in files:
+            try:
+                total += os.lstat(os.path.join(root, name)).st_size
+            except OSError:
+                pass
+    return total
+
+
 def ffmpeg_path() -> str | None:
     """Which ffmpeg to run, or None when there is none.
 
@@ -1210,7 +1226,12 @@ class CastBridge:
         self.private = False
         self._private_dir: str | None = None
         self._private_cap = 0
+        #: A run on the disk stopped because private viewing began - the
+        #: window sends the cast again (ui/mw_cast._cast_private_on).
+        self.private_stopped = False
         self._lock = threading.Lock()
+        # One run at a time between start() and the watch that may end it.
+        self._run_lock = threading.RLock()
 
     @staticmethod
     def available() -> bool:
@@ -1258,6 +1279,54 @@ class CastBridge:
               sub_codec: str = "", start_at: float = 0.0,
               quality: str = "original", sub_lang: str = "",
               feed: cast_feed.Feed | None = None, receiver: str = "") -> str:
+        """Begin serving *source* re-muxed for the receiver; returns the URL
+        (_start) - and watch the run while it lasts (_watch)."""
+        with self._run_lock:
+            url = self._start(source, codecs, audio, subs, sub_codec, start_at,
+                              quality, sub_lang, feed, receiver)
+            gen = self.generation
+        threading.Thread(target=self._watch, args=(gen,), name="cast-watch",
+                         daemon=True).start()
+        return url
+
+    def _watch(self, gen: int) -> None:
+        """Once a second while run *gen* lasts: private viewing begun since
+        it started (core/privacy) ends a run whose work is on the disk at
+        once - whatever the window was doing meanwhile; sent again, it is
+        converted in memory or not at all. A private run's work is kept
+        within its room (private_cap): past it, the converter stops - never
+        a byte more in memory, never one on the disk."""
+        from ..core import privacy
+        while True:
+            time.sleep(WATCH_EVERY)
+            with self._run_lock:
+                if self.generation != gen or self._server is None:
+                    return
+                if not self.private:
+                    if privacy.playing_private():
+                        log.info("cast bridge: private viewing began - the converter's work "
+                                 "on the disk stopped")
+                        self.private_stopped = True
+                        self.fatal = "private viewing began"
+                        self._stop()
+                        return
+                    continue
+                used = folder_bytes(self._tmp)
+                if used <= self._private_cap:
+                    continue
+                log.warning("cast bridge: a private cast's work reached its room in memory "
+                            "(%d MB) - the converter stopped", self._private_cap >> 20)
+                self.fatal = "no more room in memory for a private cast"
+                with self._lock:
+                    procs = list(self._procs)
+            for p in procs:
+                self.kill(p)
+            return
+
+    def _start(self, source: str, codecs: list[str] | None,
+               audio: int, subs: int | None, sub_codec: str, start_at: float,
+               quality: str, sub_lang: str,
+               feed: cast_feed.Feed | None, receiver: str) -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -1276,6 +1345,7 @@ class CastBridge:
         from ..core import privacy
         self.private = bool(privacy.playing_private())
         self._private_dir, self._private_cap = None, 0
+        self.private_stopped = False
         if self.private:
             folder = private_cast_dir()
             room = private_cap(folder, self.cap) if folder else 0

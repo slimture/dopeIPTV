@@ -41,6 +41,8 @@ _configured = False
 # taught and the ones added after it was written.
 
 _secrets: set[str] = set()
+#: Credentials of three characters or fewer: masked as words of their own.
+_short: set[str] = set()
 
 # Query parameters that carry an account, whatever the provider calls it.
 # A Stalker portal's links name the box (mac) and a play token, Plex's
@@ -110,10 +112,13 @@ def register_secrets(*values: str | None) -> None:
     exception message quoting the full URL - without a parser that has to
     keep up with each new one."""
     for v in values:
-        # A very short "secret" would blank out ordinary words all over the
-        # log, and a credential that short protects nothing to begin with.
+        # One of three characters or fewer is masked only where it stands
+        # as a word of its own (_short): as a substring it would blank out
+        # ordinary words all over the log.
         if v and len(v) > 3:
             _secrets.add(v)
+        elif v and v.strip():
+            _short.add(v)
 
 
 def redact(text: str) -> str:
@@ -125,6 +130,9 @@ def redact(text: str) -> str:
     that grows under you raises RuntimeError."""
     for s in tuple(_secrets):
         text = text.replace(s, "***")
+    for s in tuple(_short):
+        if s in text:
+            text = re.sub(r"(?<![0-9A-Za-z])" + re.escape(s) + r"(?![0-9A-Za-z])", "***", text)
     return text
 
 

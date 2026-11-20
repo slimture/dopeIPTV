@@ -20,8 +20,10 @@ disagree, the code is what runs and the sentence is a bug: report it.
   OpenSubtitles' login, the sync code, a Watch together room's code, the
   tokens of the app's own servers and the supporter key. They stay in the
   settings files (`core/settings_files.py`), and out of the log
-  (`core/log.py`), error reports (`core/report.py`) and any address that
-  is logged.
+  (`core/log.py`: each value the app holds masked wherever it appears, one
+  of three characters or fewer as a word of its own, so a short password
+  is masked without every "abc" in the log), error reports
+  (`core/report.py`) and any address that is logged.
 - **What a person watches.** History, resume points, watched marks and
   the viewing statistics stay on the computer (`core/viewing_stats.py`
   is never synced), and dopeiptv.org never learns them: sync carries watch
@@ -142,7 +144,7 @@ rebinding).
 | A link with a supporter key | Shown in the supporter window, never taken silently |
 | A request to the phone remote, the remote API, server mode, the rewind buffer or a cast | A token in every address that the page cannot know; the phone remote never counts a web page's guesses and refuses its changes (`cross_site`: `Sec-Fetch-Site`, `Origin`) |
 | Someone on the home network who reads the phone remote's traffic | Its key never crosses the network: it is after the `#` of the code's address (`/r/#key`, which no browser sends) and kept on the phone; every request is signed with it - HMAC-SHA256 over the method, the address, the time, a nonce and the body (`core/phone_remote.signature`, the page's own SHA-256 since `crypto.subtle` needs https) - within a minute of this computer's clock, each nonce once (`SIGN_WINDOW_MS`, `NONCES_MAX`): one seen on the way can be neither changed nor sent again. A picture's address is signed until a quarter of an hour on (`PICTURE_TTL_MS`). An address of before, with the key in its path, makes a new key at once (`leaked`, `on_leaked`). The calendar app, which cannot sign, gets a key of its own that opens the calendar alone (`calendar_token`) |
-| Someone on the home network who saw a converted cast's address | The converter serves only the receiver it was started for (`providers/cast_bridge.receiver_addresses`, 403 for any other address), a new token each run |
+| Someone on the home network who saw a converted cast's address | The converter serves only the receiver it was started for (`providers/cast_bridge.receiver_addresses`, 403 for any other address), a new token each run; the Apple TV's bridge, which is not told the Apple TV's address (Apple's menu picks it), serves this computer and the first other address that asks for the run's stream alone - the Apple TV, within seconds of being told -, 403 for any other (`providers/airplay_bridge.admits`) |
 | Server mode's tuner endpoints, which take no token | Refused for a web page (`cross_site`) and under a name that is not a home's (`services/home_server.tuner_host_ok`, `home_net.HOME_SUFFIXES`): a rebound name is the page's own public one |
 | The loopback proxy | A key made for each run as the proxy's login, 407 without it, and a page's `GET /...` refused (`core/net_bridge.py`) |
 | Script in the pages the app serves | A Content-Security-Policy of their own script and style hashes (`core/phone_page.py`, `core/server_page.py`) |
@@ -672,10 +674,22 @@ is not made at all (`core/memory_safe.py`):
 - **Turned on midway.** Private viewing turned on while a channel plays
   from a buffer on the disk - the app's or mpv's - opens it again, in
   memory or with none, and the disk buffer goes (`private_reopen_needed`,
-  `DvrPool.on_disk_private`); a cast whose converter works on the disk is
-  sent again under the same rule (`_cast_private_on`). A disk buffer a
+  `DvrPool.on_disk_private`). A cast's converter does not wait for the
+  window: each run - a cast, a seek, a recast, the watchdog's reconnect,
+  each a run of its own - is watched once a second by a thread of its own,
+  and one whose work is on the disk stops the moment private viewing
+  begins, its files gone (`cast_bridge._watch`, `airplay_bridge._watch`,
+  `private_stopped`). The window then sends the cast again under the same
+  rule (`_cast_private_on`); a send still on its way is looked at again
+  as soon as it is done (`_cast_send`'s `_private_check`). A disk buffer a
   recording or a cast reads goes on: what it writes is written for them,
   and a second connection is not opened beside it.
+- **Within its room.** A private cast's work - a channel's segments, a
+  film's, the archive's or the rewind buffer's pieces, the spool a pause
+  is kept in - is measured once a second while it runs, and past its room
+  (`private_cap`: Settings' cap, `PRIVATE_CAP`, half of what is free in
+  memory) the converter stops and the cast says so (`folder_bytes`): never
+  a byte more in memory, never one on the disk.
 - **A recording asks.** A recording of what plays, or one set from the
   guide, while viewing privately is a file kept in Recordings with its
   name: asked first, Cancel the default - on the phone and in TV mode as

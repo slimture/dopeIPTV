@@ -1307,6 +1307,13 @@ class _CastMixin(_CastMomentMixin):
             if ok and isinstance(ctx, dict):
                 ctx.pop("_recovering", None)      # it went: the watchdog judges it
             fn(*a)
+            # Private viewing began while it was on its way: what it started
+            # is looked at now (_cast_private_on).
+            if isinstance(ctx, dict) and ctx.pop("_private_check", False) \
+                    and not getattr(self, "_cast_inflight", 0):
+                again = getattr(self, "_cast_private_on", None)
+                if callable(again):
+                    again()
         run_async(self.pool, work, partial(over, done, True), partial(over, failed, False))
 
     def _cast_send_failed(self, msg: str) -> None:
@@ -1637,18 +1644,27 @@ class _CastMixin(_CastMomentMixin):
         one keeps its work in memory out of a disk's reach, or refuses and
         the send says why (cast_err_private_memory). A cast the TV fetches
         itself writes nothing here and goes on as it is."""
-        if not getattr(self, "_cast_device", None) or self._cast_busy():
+        if not getattr(self, "_cast_device", None):
+            return
+        ctx = getattr(self, "_cast_ctx", None)
+        if not isinstance(ctx, dict):
+            return
+        if self._cast_busy():
+            # A send on its way may start a run on the disk: the converter's
+            # own watch ends it within a second (cast_bridge._watch), and
+            # this is asked again as soon as the send is done (_cast_send).
+            ctx["_private_check"] = True
             return
         bridge = getattr(getattr(self, "cast", None), "bridge", None)
         on_disk = getattr(bridge, "on_disk", None)
         try:
-            if not (callable(on_disk) and on_disk()):
-                return
+            disk = bool(callable(on_disk) and on_disk()) or bool(getattr(bridge, "private_stopped", False))
         except Exception:
             log.debug("cast: the converter's folder not known", exc_info=True)
             return
-        ctx = getattr(self, "_cast_ctx", None) or {}
-        log.info("private viewing: the cast's converter works on the disk - sent again")
+        if not disk:
+            return
+        log.info("private viewing: the cast's converter worked on the disk - sent again")
         self._cast_restart(ctx)
         # A refusal is said, never tried again by the watchdog.
         ctx.pop("_recovering", None)

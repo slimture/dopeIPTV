@@ -22,10 +22,14 @@ def _clean_secrets():
     """Each test starts with an empty secret set and leaves one behind -
     the module-level set outlives any single test otherwise."""
     saved = set(logmod._secrets)
+    short = set(logmod._short)
     logmod._secrets.clear()
+    logmod._short.clear()
     yield
     logmod._secrets.clear()
     logmod._secrets.update(saved)
+    logmod._short.clear()
+    logmod._short.update(short)
 
 
 def test_the_xtream_stream_url_loses_its_account():
@@ -100,11 +104,15 @@ def test_the_registered_account_is_masked_in_any_shape():
     assert "timed out" in quoted
 
 
-def test_a_very_short_credential_is_not_registered():
-    """Masking a three-character string would blank out ordinary words all
-    over the log, and a credential that short protects nothing anyway."""
-    logmod.register_secrets("ab", "abc", None, "")
-    assert redact("abc is not a secret") == "abc is not a secret"
+def test_a_very_short_credential_is_masked_as_a_word_of_its_own():
+    """Masking a three-character string inside words would blank out
+    ordinary words all over the log: one that short is masked only where
+    it stands alone - in a quoted value, between separators."""
+    logmod.register_secrets("ab", "abc", None, "", " ")
+    assert redact("abc is not a secret") == "*** is not a secret"
+    assert redact("login failed for user=abc pass=ab") == "login failed for user=*** pass=***"
+    assert redact("tabcat abcd ab1 xab") == "tabcat abcd ab1 xab", "inside a word: left alone"
+    assert redact("a b c") == "a b c"
 
 
 def test_the_filter_masks_records_the_call_site_forgot():

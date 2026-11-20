@@ -58,6 +58,18 @@ def _build_from_source():
 
 
 @pytest.fixture(autouse=True)
+def _no_short_login_left():
+    """A login of three characters or fewer is masked as a word of its own
+    (core/log.py): a test's client made with "u" and "p" must not mask
+    every "/p/" in the next test's addresses."""
+    from dopeiptv.core import log as app_log
+    kept = set(app_log._short)
+    yield
+    app_log._short.clear()
+    app_log._short.update(kept)
+
+
+@pytest.fixture(autouse=True)
 def _no_cast_source_left():
     """A cast's source (core/nerd.set_cast_source) is set as a cast starts:
     one a test started must not stand for the next test's Kodi or AirPlay."""
