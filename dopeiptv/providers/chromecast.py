@@ -896,7 +896,7 @@ class ChromecastManager:
             log.info("cast: %s cannot decode %s - converting it here",
                      device_name, " + ".join(bad) or "this stream")
         bridged = self.bridge.start(
-            url, codecs,
+            url, codecs, receiver=_host_of(self.active) if self.active is not None else "",
             audio=(audio or {}).get("index", 0),
             subs=None if subs is None else subs.get("index"),
             sub_codec=(subs or {}).get("codec", ""), start_at=start,

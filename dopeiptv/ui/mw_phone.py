@@ -280,7 +280,8 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         error = ""
         for port in ports:
             srv = PhoneServer(port, token, self._phone_call, self._phone_page,
-                              asset=assets.get, on_client=self._phone_client)
+                              asset=assets.get, on_client=self._phone_client,
+                              on_leaked=self._phone_leaked)
             try:
                 srv.start()
             except OSError as e:
@@ -327,6 +328,23 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
             dlg.exec()
         finally:
             self._phone_dialog = None
+
+    def _phone_leaked(self, token: str) -> None:
+        """A phone used the address of before, whose path carries the key:
+        the server made a new key at once (its thread) - kept here and
+        said on the window's; every phone scans the code again."""
+        on_gui_thread(lambda: self._phone_key_renewed(token))
+
+    def _phone_key_renewed(self, token: str) -> None:
+        self.settings.setValue(TOKEN_KEY, token)
+        dlg = getattr(self, "_phone_dialog", None)
+        refresh = getattr(dlg, "_refresh", None)
+        if callable(refresh):
+            try:
+                refresh()           # the code shown is the new key's
+            except RuntimeError:
+                pass                # the window is already gone
+        self._show_toast(tr("phone_key_renewed"), 10000)
 
     def _phone_client(self, _who: str) -> None:
         """A phone's first request with the token while the server runs

@@ -1231,3 +1231,45 @@ def test_the_television_is_given_a_head_start():
         b2.stop()
     finally:
         b.stop()
+
+
+def test_only_the_receiver_is_served():
+    """The stream's address travels to the TV over plain http: anyone else
+    on the network who saw it gets nothing - no stream, no converter."""
+    import http.client
+    from dopeiptv.providers import cast_bridge
+    from dopeiptv.providers.cast_bridge import receiver_addresses
+    assert receiver_addresses("") == frozenset()
+    assert receiver_addresses("192.168.1.40") == {"192.168.1.40"}
+    assert receiver_addresses("[fe80::1%eth0]") == {"fe80::1"}
+    assert receiver_addresses("::ffff:192.168.1.40") == {"192.168.1.40"}
+    assert receiver_addresses("no-such-name.invalid") == frozenset()
+    b = CastBridge()
+    b.exe = sys.executable
+    try:
+        b.start("http://p/x.m3u8", ["h264"], receiver="192.168.1.40")
+        assert b.peers == {"192.168.1.40"}
+        port = b._server.server_address[1]
+        for method in ("GET", "HEAD"):
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            c.request(method, b.path)
+            r = c.getresponse()
+            r.read()
+            c.close()
+            assert r.status == 403, method
+        assert not b._procs, "no converter for a stranger"
+        # The receiver itself (here: this computer) gets past the door.
+        b.start("http://p/x.m3u8", ["h264"], receiver="127.0.0.1")
+        port = b._server.server_address[1]
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        c.request("HEAD", b.path)
+        r = c.getresponse()
+        r.read()
+        c.close()
+        assert r.status == 200
+        # Not known: the token alone, as before.
+        b.start("http://p/x.m3u8", ["h264"])
+        assert b.peers == frozenset()
+    finally:
+        b.stop()
+    assert "receiver=_host_of(self.active)" in open(cast_bridge.__file__.replace("cast_bridge", "chromecast")).read()

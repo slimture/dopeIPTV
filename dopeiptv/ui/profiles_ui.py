@@ -84,9 +84,10 @@ class ProfileAvatar(QWidget):
 
 # -- the PIN ---------------------------------------------------------------------
 
-def ask_pin(parent: QWidget, title: str, text: str) -> str | None:
-    """Four digits asked for, hidden as they are typed; None when
-    cancelled."""
+def ask_pin(parent: QWidget, title: str, text: str, longest: int = 8) -> str | None:
+    """A profile's PIN asked for (up to *longest* characters: a grown-up's
+    may be the parental PIN, which can be longer), hidden as it is typed;
+    None when cancelled."""
     d = QDialog(parent)
     d.setWindowTitle(title)
     lay = QVBoxLayout(d)
@@ -95,7 +96,7 @@ def ask_pin(parent: QWidget, title: str, text: str) -> str | None:
     lay.addWidget(msg)
     field = QLineEdit()
     field.setEchoMode(QLineEdit.EchoMode.Password)
-    field.setMaxLength(4)
+    field.setMaxLength(max(4, int(longest)))
     field.setInputMask("")
     field.setAccessibleName(tr("profile_pin"))
     field.setPlaceholderText("••••")
@@ -403,8 +404,8 @@ class ProfileDialog(QDialog):
         prow.addLayout(pcol, 1)
         self.pin = QLineEdit()
         self.pin.setEchoMode(QLineEdit.EchoMode.Password)
-        self.pin.setMaxLength(4)
-        self.pin.setFixedWidth(90)
+        self.pin.setMaxLength(8)
+        self.pin.setFixedWidth(110)
         self.pin.setAccessibleName(tr("profile_pin"))
         self.pin.setPlaceholderText("••••" if profile and profile.has_pin else tr("profile_pin_none"))
         prow.addWidget(self.pin, 0, Qt.AlignmentFlag.AlignVCenter)

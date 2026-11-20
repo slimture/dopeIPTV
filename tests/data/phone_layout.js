@@ -115,7 +115,7 @@ const gone = (page, sel) => page.waitForFunction(
         await look("tv-more-rec");
         await page.click("#tvMoreBtn");
         await shown(page, "#tvRecLive");
-        await page.evaluate(() => fetch("api/rec_stop", {method: "POST", headers: {"Content-Type": "application/json"},
+        await page.evaluate(() => signedFetch("api/rec_stop", {method: "POST", headers: {"Content-Type": "application/json"},
                                                          body: "{}"}));
         await gone(page, "#tvRecLive");
       }
@@ -139,7 +139,7 @@ const gone = (page, sel) => page.waitForFunction(
         await look("tv-rec");
       }
       // The host back to where it started for the next run.
-      await page.evaluate(() => fetch("api/stop", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}));
+      await page.evaluate(() => signedFetch("api/stop", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}));
       await ctx.close();
     }
   } finally {

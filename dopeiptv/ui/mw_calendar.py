@@ -65,7 +65,7 @@ class _CalendarMixin:
         """(where it reaches, address) for each server that serves the
         calendar now: the remote API (with remote control on), the phone
         remote."""
-        from ..core.phone_remote import page_url
+        from ..core.phone_remote import calendar_url
         from ..core.remote_api import lan_addresses
         out: list[tuple[str, str]] = []
         srv = getattr(self, "_remote", None)
@@ -78,8 +78,9 @@ class _CalendarMixin:
         if phone is not None:
             ips = lan_addresses()
             where = tr("cal_addr_lan") if ips else tr("cal_addr_local")
-            out.append((where, page_url(ips[0] if ips else "127.0.0.1", phone.port, phone.token)
-                        + "calendar.ics"))
+            # A calendar app cannot sign its requests: an address that opens
+            # the calendar alone, never the remote (phone_remote.calendar_token).
+            out.append((where, calendar_url(ips[0] if ips else "127.0.0.1", phone.port, phone.token)))
         return out
 
     def open_calendar_export(self) -> None:

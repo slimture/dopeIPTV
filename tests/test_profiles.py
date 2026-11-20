@@ -411,12 +411,13 @@ def test_a_simkl_sign_in_is_the_profiles_own_with_its_refresh_token(tmp_path):
 
 # -- the PIN, kids, removing one --------------------------------------------------------------
 
-def test_a_pin_is_four_digits_kept_hashed(tmp_path):
+def test_a_pin_is_four_to_eight_digits_kept_hashed(tmp_path):
     views, store, kid = _two(tmp_path)
     me = store.get(MAIN_ID)
     assert not profiles.valid_pin("123") and not profiles.valid_pin("12a4")
+    assert profiles.valid_pin("12345") and profiles.valid_pin("12345678")
     with pytest.raises(ValueError):
-        store.set_pin(MAIN_ID, "12345")
+        store.set_pin(MAIN_ID, "123456789")
     store.set_pin(MAIN_ID, "2468")
     store.reload()
     me = store.get(MAIN_ID)
@@ -873,3 +874,26 @@ def test_one_thing_taken_out_is_not_left_under_the_old_names(tmp_path):
     # What was not taken out is there as it was, for a downgrade.
     assert raw["main"].value("favorites_a") == OLD_MAIN["favorites_a"]
     assert raw["main"].value("epg_reminders_a") == OLD_MAIN["epg_reminders_a"]
+
+
+def test_the_parental_pin_takes_four_characters_at_least(tmp_path):
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core.stores import ParentalControl
+    pc = ParentalControl(QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat))
+    for short in ("", "1", "123"):
+        with pytest.raises(ValueError):
+            pc.set_pin(short)
+    assert not pc.has_pin()
+    pc.set_pin("1234")
+    assert pc.verify("1234") and not pc.verify("123")
+    pc.set_pin("a longer pass phrase")
+    assert pc.verify("a longer pass phrase")
+
+
+def test_the_pin_fields_take_what_the_rules_take():
+    import inspect
+    from dopeiptv.ui import mw_context, mw_profiles, profiles_ui
+    src = inspect.getsource(profiles_ui)
+    assert "self.pin.setMaxLength(8)" in src and "setMaxLength(4)" not in src
+    assert "longest=64" in inspect.getsource(mw_profiles._ProfilesMixin._grown_up_unlock)
+    assert "SHORTEST" in inspect.getsource(mw_context)

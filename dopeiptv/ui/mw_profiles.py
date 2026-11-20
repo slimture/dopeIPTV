@@ -637,7 +637,7 @@ class _ProfilesMixin:
         if self._pin_must_wait(names, title):
             return False
         from .profiles_ui import ask_pin
-        pin = ask_pin(self, title, text)
+        pin = ask_pin(self, title, text, longest=64)
         if pin is None:
             return False
         if self._pin_given(pin, *grown_ups):

@@ -30,6 +30,7 @@ provider nothing (the segments go on being written).
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import json
 import os
 import secrets
@@ -927,11 +928,51 @@ def _hls_file(folder: str | None, name: str) -> str | None:
     return None
 
 
+def _peer(address: str) -> str:
+    """An address as it is compared: an IPv4-mapped IPv6 as its IPv4."""
+    try:
+        ip = ipaddress.ip_address(str(address or "").split("%", 1)[0])
+    except ValueError:
+        return str(address or "")
+    mapped = getattr(ip, "ipv4_mapped", None)
+    return str(mapped or ip)
+
+
+def receiver_addresses(receiver: str) -> frozenset[str]:
+    """The addresses the receiver *receiver* (its address or name, as the
+    cast found it) may fetch from: the address itself, or what its name
+    resolves to - empty when that is not known, and then the token alone
+    guards the stream, as before."""
+    host = str(receiver or "").strip().strip("[]")
+    if not host:
+        return frozenset()
+    try:
+        return frozenset({_peer(str(ipaddress.ip_address(host.split("%", 1)[0])))})
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError:
+        return frozenset()
+    return frozenset(_peer(str(info[4][0])) for info in infos)
+
+
 class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):        # noqa: A003 - stdlib hook
         pass                                  # the app has its own log
+
+    def _from_receiver(self) -> bool:
+        """Whether the request comes from the receiver the cast went to:
+        anyone else on the network who saw the address on its way (plain
+        http) gets nothing of the stream, nor a converter of its own."""
+        peers = self.server.bridge.peers
+        if not peers or _peer(self.client_address[0]) in peers:
+            return True
+        self.server.bridge.refused_peer(self.client_address[0])
+        self.send_error(403)
+        return False
 
     def _headers(self) -> None:
         self.send_response(200)
@@ -943,6 +984,8 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self) -> None:
+        if not self._from_receiver():
+            return
         if not _same(self.path, self.server.bridge.path):
             self.send_error(404)
             return
@@ -1024,6 +1067,8 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         bridge = self.server.bridge
+        if not self._from_receiver():
+            return
         if bridge.hls and _under(self.path, bridge.prefix):
             self._serve_hls()
             return
@@ -1112,6 +1157,9 @@ class CastBridge:
         # belongs to the run it began in - see first_frames().
         self.generation = 0
         self.exe: str | None = None          # overridable, for tests
+        #: The receiver's addresses, the only ones served (empty: any).
+        self.peers: frozenset[str] = frozenset()
+        self._refused_told = False
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._procs: list[subprocess.Popen] = []
@@ -1169,7 +1217,7 @@ class CastBridge:
               audio: int = 0, subs: int | None = None,
               sub_codec: str = "", start_at: float = 0.0,
               quality: str = "original", sub_lang: str = "",
-              feed: cast_feed.Feed | None = None) -> str:
+              feed: cast_feed.Feed | None = None, receiver: str = "") -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -1178,9 +1226,12 @@ class CastBridge:
         *source* (which is then only what the logs name), and the receiver
         gets one HLS playlist. No subtitle rides along a feed. The bridge
         owns *feed* from now: it is closed when another stream replaces it
-        or the bridge stops.
+        or the bridge stops. *receiver*: the receiver's address (or name),
+        the only one then served (``receiver_addresses``).
         """
         self._stop(keep=feed)
+        self.peers = receiver_addresses(receiver)
+        self._refused_told = False
         self.fatal = ""          # a new run gets to fail on its own terms
         self.generation += 1
         source = self._safe_source(source)
@@ -1299,6 +1350,12 @@ class CastBridge:
     #   receiver BUFFERING - converter is 1 segments written, 0 MB
     # Three segments is about twelve seconds of head start, paid once.
     HLS_LEAD = 3
+
+    def refused_peer(self, address: str) -> None:
+        """Someone other than the receiver asked for the stream: said once a run."""
+        if not self._refused_told:
+            self._refused_told = True
+            log.warning("cast bridge: a request from another address than the receiver was refused")
 
     def hls_ready(self, name: str) -> bool:
         """Whether *name* can be served, starting ffmpeg if it has not been.

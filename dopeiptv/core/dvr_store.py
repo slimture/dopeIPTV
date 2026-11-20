@@ -7,11 +7,19 @@ stop where their run ends, so a reconnect gap is never played across. Old
 segments go by time, by a byte cap, and when the disk runs low; a segment
 a reader still has open is only forgotten then, and deleted once it is let
 go (Windows cannot delete an open file).
+
+A channel watched privately from its start keeps its segments in memory
+where the system has a folder there for this user alone (``memory_base``:
+Linux's ``$XDG_RUNTIME_DIR``, a tmpfs gone at logout and at a restart), with
+a budget of its own (``memory_budget``) - so nothing of it ever reaches the
+disk. Elsewhere it is on disk as any buffer, marked (``PRIVATE_MARK``) and
+deleted as it is left, and at the next start after a crash.
 """
 from __future__ import annotations
 
 import os
 import shutil
+import sys
 import threading
 import time
 from collections.abc import Callable, Generator
@@ -482,3 +490,79 @@ def sweep_abandoned(base: Path, older_than: float = 600.0) -> int:
 
 def session_dir(base: Path, token: str) -> Path:
     return base / f"{os.getpid()}-{token[:12]}"
+
+
+# -- a private session's buffer in memory ---------------------------------------
+
+#: The most a private session keeps in memory, and of what that memory has
+#: free at most a half (the rest of the system lives there too).
+MEMORY_MAX = 1 << 30
+#: What must stay free in that memory before older segments go.
+MEMORY_MIN_FREE = 64 << 20
+#: Below this a buffer in memory is not worth it: the disk, as before.
+MEMORY_LEAST = 64 << 20
+#: The kinds of file system that live in memory alone.
+_IN_MEMORY = ("tmpfs", "ramfs")
+
+
+def _unescape(field: str) -> str:
+    # /proc/mounts writes a space, a tab, a newline and a backslash in octal.
+    for code, ch in (("\\040", " "), ("\\011", "\t"), ("\\012", "\n"), ("\\134", "\\")):
+        field = field.replace(code, ch)
+    return field
+
+
+def in_memory(path: Path, mounts: str | None = None) -> bool:
+    """Whether *path* is on a file system in memory, by the mount table
+    (Linux's /proc/self/mounts): the longest mount point it is under."""
+    if mounts is None:
+        try:
+            with open("/proc/self/mounts", encoding="utf-8", errors="replace") as fh:
+                mounts = fh.read(1 << 20)
+        except OSError:
+            return False
+    where = os.path.realpath(str(path))
+    best, kind = "", ""
+    for line in mounts.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        point = _unescape(parts[1]).rstrip("/") or "/"
+        if (where == point or where.startswith(point.rstrip("/") + "/")) and len(point) > len(best):
+            best, kind = point, parts[2]
+    return kind in _IN_MEMORY
+
+
+def memory_base(env: dict | None = None, mounts: str | None = None,
+                platform: str | None = None) -> Path | None:
+    """Where a private session's buffer goes in memory: a folder under
+    ``$XDG_RUNTIME_DIR`` - only on Linux, only when it is this user's own
+    (0700, theirs) and on tmpfs; None anywhere else."""
+    if (platform or sys.platform) != "linux":
+        return None
+    run = (os.environ if env is None else env).get("XDG_RUNTIME_DIR") or ""
+    if not run or not os.path.isabs(run):
+        return None
+    try:
+        st = os.stat(run)
+    except OSError:
+        return None
+    import stat as _stat
+    if not _stat.S_ISDIR(st.st_mode) or st.st_mode & 0o077 or st.st_uid != os.getuid():
+        return None
+    if not in_memory(Path(run), mounts):
+        return None
+    return Path(run) / "dopeiptv-dvr"
+
+
+def memory_budget(base: Path, max_bytes: int) -> int:
+    """What a private session may keep in memory at *base*: the rewind
+    buffer's own cap, MEMORY_MAX, half of what is free there - 0 when that
+    is too little to be worth it."""
+    try:
+        base.mkdir(parents=True, exist_ok=True, mode=0o700)
+        free = shutil.disk_usage(base).free
+    except OSError:
+        return 0
+    budget = min(int(max_bytes), MEMORY_MAX, max(0, free - MEMORY_MIN_FREE) // 2)
+    return budget if budget >= MEMORY_LEAST else 0

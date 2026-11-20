@@ -192,6 +192,37 @@ def test_who_is_in_the_room():
     assert room.receive(_msg("hi", "dd" * 20, 1, old, name="Dan"), now=80.0) == []
 
 
+def test_a_rejoin_in_the_same_run_still_knows_what_it_took():
+    clock = _Clock()
+    code = "MNPQR-STVWX"
+    bob = "bb" * 20
+    first = together.Room(code, "aa" * 20, "Me", clock, seen=together.remembered(code))
+    assert first.receive(_msg("hi", bob, 5, clock.ms, name="Bob"), now=10.0)
+    # Left and joined again (a new key pair here): Bob's old message handed
+    # again by the relay is not taken.
+    again = together.Room(code, "ee" * 20, "Me", clock, seen=together.remembered(code))
+    assert again.receive(_msg("hi", bob, 5, clock.ms, name="Bob"), now=20.0) == []
+    assert again.receive(_msg("hi", bob, 4, clock.ms, name="Bob"), now=20.0) == []
+    assert [k for k, _ in again.receive(_msg("hi", bob, 6, clock.ms, name="Bob"), now=21.0)][0] == "joined"
+    # Another room has counters of its own; only the last few rooms are kept.
+    other = together.Room("ZZZZZ-ZZZZZ", "aa" * 20, "Me", clock, seen=together.remembered("ZZZZZ-ZZZZZ"))
+    assert other.receive(_msg("hi", bob, 1, clock.ms, name="Bob"), now=22.0)
+    for i in range(together.ROOMS_REMEMBERED):
+        together.remembered(f"R{i:04d}-XXXXX")
+    assert together.remembered(code) == {}, "forgotten after enough other rooms"
+    assert len(together._REMEMBERED) <= together.ROOMS_REMEMBERED
+
+
+def test_an_older_app_in_the_room_is_said_once():
+    import dataclasses
+    clock = _Clock()
+    room = together.Room("ABCDE-FGHJK", "aa" * 20, "Me", clock)
+    old = dataclasses.replace(_msg("hi", "bb" * 20, 1, clock.ms, name="Old"), signed=False)
+    assert room.receive(old, now=1.0) == [("unsigned", None)]
+    old2 = dataclasses.replace(_msg("hi", "cc" * 20, 1, clock.ms, name="Old2"), signed=False)
+    assert room.receive(old2, now=2.0) == [] and room.members == {}
+
+
 def test_the_newest_state_wins_and_publishing_moves_the_version_on():
     clock = _Clock()
     me = "aa" * 20
@@ -1026,7 +1057,8 @@ def test_an_unsigned_message_never_speaks_for_anyone():
     unsigned = together.parse({"k": "hi", "f": anna.id, "n": 1, "t": clock.ms, "name": "Anna"})
     assert unsigned is not None and not unsigned.signed
     with _Lines() as lines:
-        assert room.receive(unsigned, now=10.0) == []
+        assert room.receive(unsigned, now=10.0) == [("unsigned", None)]    # said once, nothing else
+        assert room.receive(unsigned, now=11.0) == []
     assert room.members == {} and room.state is None and not lines.records
     signed = together.open_message(KEY, ROOM, together.seal(
         KEY, ROOM, {"k": "st", "f": anna.id, "n": 3, "t": clock.ms,

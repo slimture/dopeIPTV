@@ -181,10 +181,12 @@ ICONS = {"icon-180.png": 180, "icon-192.png": 192, "icon-512.png": 512,
 def manifest(bg: str = "") -> bytes:
     """The web app manifest: "Add to Home screen" on Android (and Chrome
     elsewhere) gets the name, the icons and a window of its own - no
-    address bar. Every address is relative, so it stays under the token."""
+    address bar. No start address of its own: the phone keeps the one it
+    was on, the key after its # with it (a home screen app on an iPhone has
+    storage of its own, so the key must come along in the address)."""
     colour = bg if _HEX.fullmatch(bg or "") else "#111111"
     data = {
-        "name": APP_NAME, "short_name": "dopeIPTV", "start_url": "./", "scope": "./",
+        "name": APP_NAME, "short_name": "dopeIPTV", "scope": "./",
         "display": "standalone", "orientation": "portrait",
         "background_color": colour, "theme_color": colour,
         "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png",
@@ -756,6 +758,97 @@ const W = @@WORDS@@;
 const T = @@TOUCH@@;
 const SKIP = @@SKIP@@;
 const $ = (id) => document.getElementById(id);
+// SHA-256 and HMAC in plain script: the browser's own (crypto.subtle) is
+// there only over https, and the remote is plain http at home.
+const K256 = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+function sha256(data) {
+  const len = data.length, size = ((len + 72) >> 6) << 6, m = new Uint8Array(size);
+  m.set(data); m[len] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(size - 8, Math.floor(len / 0x20000000)); dv.setUint32(size - 4, (len * 8) >>> 0);
+  const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const w = new Uint32Array(64);
+  const rot = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let off = 0; off < size; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const a = w[i - 15], b = w[i - 2];
+      w[i] = (w[i - 16] + (rot(a, 7) ^ rot(a, 18) ^ (a >>> 3)) + w[i - 7] + (rot(b, 17) ^ rot(b, 19) ^ (b >>> 10))) | 0;
+    }
+    let [a, b, c, d, e, f, g, k] = h;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (k + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + ((e & f) ^ (~e & g)) + K256[i] + w[i]) | 0;
+      const t2 = ((rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      k = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    [a, b, c, d, e, f, g, k].forEach((v, i) => { h[i] = (h[i] + v) | 0; });
+  }
+  const out = new Uint8Array(32), ov = new DataView(out.buffer);
+  h.forEach((v, i) => ov.setUint32(i * 4, v >>> 0));
+  return out;
+}
+function hmac(key, msg) {
+  const pad = new Uint8Array(64);
+  pad.set(key.length > 64 ? sha256(key) : key);
+  const inner = new Uint8Array(64 + msg.length), outer = new Uint8Array(96);
+  for (let i = 0; i < 64; i++) { inner[i] = pad[i] ^ 0x36; outer[i] = pad[i] ^ 0x5c; }
+  inner.set(msg, 64); outer.set(sha256(inner), 64);
+  return sha256(outer);
+}
+const enc = new TextEncoder();
+const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+// The key: after the # of the code's address - a browser never sends what
+// follows a #, not in a Referer either - kept on this phone too. It stays in
+// the address, so "Add to Home screen" takes it along.
+let KEY = null, skew = 0;
+(function () {
+  const h = location.hash.slice(1);
+  let k = "";
+  if (/^[A-Za-z0-9_-]{20,128}$/.test(h)) {
+    k = h;
+    try { localStorage.setItem("key", h); } catch (e) { /* private mode: this visit only */ }
+  } else {
+    try { k = localStorage.getItem("key") || ""; } catch (e) { k = ""; }
+  }
+  KEY = k ? enc.encode(k) : null;
+})();
+const where = (path) => { const u = new URL(path, location.href); return u.pathname + u.search; };
+function nonce() { const b = new Uint8Array(18); crypto.getRandomValues(b); return hex(b); }
+// Every request signed with the key: the method, the address, the time, a
+// nonce and the body - one seen on the way can be neither changed nor sent again.
+function signed(method, path, body) {
+  if (!KEY) return {};
+  const t = String(Date.now() + skew), n = nonce();
+  const msg = enc.encode(method + "\n" + where(path) + "\n" + t + "\n" + n + "\n" + (body || ""));
+  return {"X-Remote-Time": t, "X-Remote-Nonce": n, "X-Remote-Sign": hex(hmac(KEY, msg))};
+}
+// A picture's address, signed until a quarter of an hour on (the same for
+// five minutes at a time, so the browser keeps the picture it has).
+function picture(path) {
+  if (!KEY || !path) return path;
+  const x = String(Math.ceil((Date.now() + skew) / 300000) * 300000 + 600000);
+  return path + "?x=" + x + "&s=" + hex(hmac(KEY, enc.encode("GET\n" + where(path) + "\n" + x + "\npicture\n")));
+}
+// A request the app did not take as signed comes with its clock: this
+// phone's set right once, and asked again.
+async function signedFetch(path, opt, again) {
+  const sent = Object.assign({}, opt);
+  sent.headers = Object.assign({}, opt.headers || {}, signed(sent.method || "GET", path, opt.body));
+  const r = await fetch(path, sent);
+  if (r.status === 401 && !again) {
+    const now = Number(r.headers.get("X-Remote-Now"));
+    if (now > 0 && Math.abs(now - Date.now() - skew) > 20000) { skew = now - Date.now(); return signedFetch(path, opt, true); }
+  }
+  return r;
+}
 const LANG = document.documentElement.lang || "en";
 // The app's language, in the phone's own variant of it when it has one (en-GB: 24 hours).
 const LOCALE = (navigator.languages || []).find((l) => l.toLowerCase().split("-")[0] === LANG.toLowerCase()) || LANG;
@@ -773,8 +866,8 @@ try { touchOn = localStorage.getItem("touchpad") === "1"; } catch (e) { /* priva
 async function api(path, body) {
   const opt = body === undefined ? {cache: "no-store"}
     : {method: "POST", cache: "no-store", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)};
-  const r = await fetch(path, opt);
-  if (r.status === 403) { expired(); throw new Error("403"); }
+  const r = await signedFetch(path, opt);
+  if (r.status === 401 || r.status === 403) { expired(); throw new Error(String(r.status)); }
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
 }
@@ -782,9 +875,9 @@ async function api(path, body) {
 // What plays, asked with the tag of the state shown: null when it is the
 // same (a 304 - nothing to read or draw again).
 async function getState() {
-  const r = await fetch("api/state", {cache: "no-store", headers: etag ? {"If-None-Match": etag} : {}});
+  const r = await signedFetch("api/state", {cache: "no-store", headers: etag ? {"If-None-Match": etag} : {}});
   if (r.status === 304) return null;
-  if (r.status === 403) { expired(); throw new Error("403"); }
+  if (r.status === 401 || r.status === 403) { expired(); throw new Error(String(r.status)); }
   if (!r.ok) throw new Error(String(r.status));
   const s = await r.json();
   etag = r.headers.get("ETag") || "";
@@ -796,9 +889,9 @@ async function getState() {
 const kept = new Map();
 async function getList(path) {
   const k = kept.get(path);
-  const r = await fetch(path, {cache: "no-store", headers: k ? {"If-None-Match": k.tag} : {}});
+  const r = await signedFetch(path, {cache: "no-store", headers: k ? {"If-None-Match": k.tag} : {}});
   if (r.status === 304 && k) return k.data;
-  if (r.status === 403) { expired(); throw new Error("403"); }
+  if (r.status === 401 || r.status === 403) { expired(); throw new Error(String(r.status)); }
   if (!r.ok) throw new Error(String(r.status));
   const data = await r.json();
   const tag = r.headers.get("ETag");
@@ -1087,7 +1180,7 @@ function show(s) {
   if (id !== nowImgId) {
     nowImgId = id;
     hide(img, true);
-    if (id) img.src = id; else img.removeAttribute("src");
+    if (id) img.src = picture(id); else img.removeAttribute("src");
   }
   $("nowInitials").textContent = stopped ? "" : initials(title);
   $("nowLogo").classList.toggle("long", $("nowInitials").textContent.length > 3);
@@ -1233,7 +1326,7 @@ function row(c) {
     const img = new Image(); img.alt = ""; img.loading = "lazy"; img.decoding = "async";
     img.addEventListener("load", () => lg.classList.add("pic"));
     img.addEventListener("error", () => img.remove());
-    img.src = "logo/" + encodeURIComponent(String(c.id));
+    img.src = picture("logo/" + encodeURIComponent(String(c.id)));
     lg.append(img);
   }
   const name = document.createElement("span"); name.className = "name"; name.textContent = c.name;
@@ -1451,7 +1544,7 @@ function libRow(it) {
       const img = new Image(); img.alt = ""; img.loading = "lazy"; img.decoding = "async";
       img.addEventListener("load", () => lg.classList.add("pic"));
       img.addEventListener("error", () => img.remove());
-      img.src = "thumb/" + it.ref;
+      img.src = picture("thumb/" + it.ref);
       lg.append(img);
     }
   }

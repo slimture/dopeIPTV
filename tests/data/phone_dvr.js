@@ -86,18 +86,18 @@ function read() {
       await page.waitForTimeout(500);
       if (out.steady === null) {
         out.steady = await page.evaluate(async () => {
-          const a = await fetch("api/state");
+          const a = await signedFetch("api/state", {});
           const etag = a.headers.get("ETag"), got = [];
           for (let i = 0; i < 2; i++) {
             await new Promise((ok) => setTimeout(ok, 1500));
-            got.push((await fetch("api/state", {headers: {"If-None-Match": etag}})).status);
+            got.push((await signedFetch("api/state", {headers: {"If-None-Match": etag}})).status);
           }
           return got;
         });
       }
       out.runs[tag] = r;
       // The host back to where it started for the next run.
-      await page.evaluate(() => fetch("api/stop", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}));
+      await page.evaluate(() => signedFetch("api/stop", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"}));
       await ctx.close();
     }
   } finally {

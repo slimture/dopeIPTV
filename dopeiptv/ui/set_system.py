@@ -20,7 +20,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QColorDialog, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
+    QColorDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
     QWidget,
 )
 
@@ -576,11 +576,8 @@ def build_parental(ctx: SettingsContext) -> None:
     def set_pin():
         if win.parental.has_pin() and not win._request_unlock():
             return
-        pin, ok = QInputDialog.getText(
-            d, tr("parental_control"), tr("pin_new_prompt"),
-            QLineEdit.EchoMode.Password)
-        pin = (pin or "").strip()
-        if ok and pin:
+        pin = win._ask_new_parental_pin(d, tr("pin_new_prompt"))
+        if pin:
             win.parental.set_pin(pin)
         refresh_pin_status()
 

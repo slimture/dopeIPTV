@@ -49,7 +49,9 @@ message is signed, on the link's threads, never the window's.
 What is not taken (Room.receive, and Link for the backlog). The relay, or
 anyone who learnt the room id, can hand an old sealed message again. A
 counter per sender ("n") refuses it while this computer remembers the
-sender; after a rejoin or a restart nothing is remembered, so: what the
+sender - kept in memory per room for the app's run (``remembered``: the
+last ROOMS_REMEMBERED rooms), so leaving and joining again still knows
+every number taken; after a restart nothing is remembered, so: what the
 relay already held when this computer's first request was answered is not
 acted on (those in the room answer the hello with what plays now; the
 hello waits for that first answer, and where it could not, the backlog is
@@ -87,7 +89,7 @@ import secrets
 import struct
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -554,6 +556,26 @@ class Member:
     greeted: float = float("-inf")
 
 
+#: Rooms whose senders' counters this run of the app keeps (memory only).
+ROOMS_REMEMBERED = 8
+_REMEMBERED: OrderedDict[str, dict[str, tuple[int, float]]] = OrderedDict()
+_REMEMBERED_LOCK = threading.Lock()
+
+
+def remembered(code: str) -> dict[str, tuple[int, float]]:
+    """The counters taken in room *code* this run (a Room's ``_last_n``):
+    the same dict each time it is joined, so a message taken before a
+    rejoin is not taken again. Never written anywhere."""
+    with _REMEMBERED_LOCK:
+        seen = _REMEMBERED.pop(code, None)
+        if seen is None:
+            seen = {}
+        _REMEMBERED[code] = seen
+        while len(_REMEMBERED) > ROOMS_REMEMBERED:
+            _REMEMBERED.popitem(last=False)
+        return seen
+
+
 class Room:
     """Who is in the room and what it plays, as this computer knows it.
     The window's thread only: messages in (receive), messages out (hello,
@@ -565,7 +587,8 @@ class Room:
     #: A state from further in the future than this is taken as now.
     FUTURE_MS = 5000
 
-    def __init__(self, code: str, me: str, name: str, clock: Clock) -> None:
+    def __init__(self, code: str, me: str, name: str, clock: Clock,
+                 seen: dict[str, tuple[int, float]] | None = None) -> None:
         self.code = code
         self.me = me
         self.name = clean_name(name) or "?"
@@ -575,8 +598,10 @@ class Room:
         self.status = "idle"
         self._sent = 0
         self._born = clock.mono()
-        #: Per sender: the highest "n" seen and when (this computer's seconds).
-        self._last_n: dict[str, tuple[int, float]] = {}
+        #: Per sender: the highest "n" seen and when (this computer's
+        #: seconds) - *seen*, the room's own across rejoins (remembered).
+        self._last_n: dict[str, tuple[int, float]] = {} if seen is None else seen
+        self._told_unsigned = False
 
     # -- out
     def _make(self, kind: str, **fields: Any) -> dict[str, Any]:
@@ -632,12 +657,17 @@ class Room:
 
     def receive(self, msg: Message, now: float) -> list[tuple[str, Any]]:
         """What *msg* changes, as events: ("joined" | "left" | "status" |
-        "hello", Member), ("state", (old, new)). Nothing for one of this
-        computer's own, an old one handed again or one out of its time."""
+        "hello", Member), ("state", (old, new)), ("unsigned", None) - once a
+        room, for the first message no key signs (an app up to 1.6.8, left
+        out until it is updated). Nothing for one of this computer's own,
+        an old one handed again or one out of its time."""
         if msg.sender == self.me:
             return []
         if not msg.signed:
             log.debug("together: an unsigned message was dropped")
+            if not self._told_unsigned:
+                self._told_unsigned = True
+                return [("unsigned", None)]
             return []
         if not self._timely(msg):
             log.debug("together: a message out of its time was ignored")

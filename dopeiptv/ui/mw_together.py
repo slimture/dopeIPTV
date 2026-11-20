@@ -216,7 +216,8 @@ class _TogetherMixin:
         # A key pair of its own for this room: nobody else in it can speak
         # under this computer's id.
         self._together_identity = together.new_identity()
-        self._together_room = together.Room(code, self._together_identity.id, clean, clock)
+        self._together_room = together.Room(code, self._together_identity.id, clean, clock,
+                                            seen=together.remembered(code))
         self._together_down_at = 0.0
         self._together_joining = joining
         self._together_conn = ("connecting", 0)
@@ -350,6 +351,8 @@ class _TogetherMixin:
                 link.send(room.hello(answer=True))
             elif kind == "state":
                 self._together_on_state(what[1])
+            elif kind == "unsigned":
+                self._together_toast(tr("together_older"), 8000)
         self._together_refresh()
 
     def _together_on_state(self, state: together.PlayState) -> None:

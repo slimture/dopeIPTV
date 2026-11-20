@@ -22,6 +22,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.phone_sign import signed_request
 from dopeiptv.core import phone_page
 from dopeiptv.core.local_buffer import LIVE_REOPEN_LAG, BufferWindow, LiveLag
 from dopeiptv.core.phone_remote import BufferTold, PhoneServer, RateLimiter, buffer_reckoned, state_tag
@@ -331,9 +332,9 @@ def test_the_seek_goes_over_the_server_as_it_was_sent():
     srv.start()
     try:
         for body in ({"behind": 30}, {"by": -10}, {"live": True}):
+            path, data, h = signed_request(TOKEN, "POST", f"/{TOKEN}/api/seek", body)
             conn = http.client.HTTPConnection("127.0.0.1", srv.port, timeout=10)
-            conn.request("POST", f"/{TOKEN}/api/seek", body=json.dumps(body),
-                         headers={"Content-Type": "application/json"})
+            conn.request("POST", path, body=data, headers=h)
             assert conn.getresponse().status == 200
             conn.close()
         assert calls == [("seek", {"behind": 30}), ("seek", {"by": -10}), ("seek", {"live": True})]
@@ -509,7 +510,7 @@ def test_the_buffer_on_the_page_in_a_browser():
             servers[lang] = PhoneServer(0, TOKEN, hosts[lang], lambda p=page: p, host="127.0.0.1",
                                         limiter=RateLimiter(rate=500.0, burst=500.0))
             servers[lang].start()
-        runs = [{"url": f"http://127.0.0.1:{servers[lang].port}/{TOKEN}/", "w": w, "h": h, "lang": lang}
+        runs = [{"url": f"http://127.0.0.1:{servers[lang].port}/r/#{TOKEN}", "w": w, "h": h, "lang": lang}
                 for lang, w, h in (("en", 320, 568), ("en", 390, 844), ("ar", 375, 667))]
         done = subprocess.run([node, str(Path(__file__).parent / "data" / "phone_dvr.js"), json.dumps(runs)],
                               capture_output=True, text=True, timeout=300, env=env)

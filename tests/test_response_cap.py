@@ -112,7 +112,7 @@ def _too_large():
 
 
 def test_the_ceilings_are_far_above_any_real_answer():
-    assert _lazy_requests.RESPONSE_MAX == 256 << 20 and _lazy_requests.LIST_MAX == 1 << 30
+    assert _lazy_requests.RESPONSE_MAX == 32 << 20 and _lazy_requests.LIST_MAX == 512 << 20
     assert issubclass(_too_large(), requests.RequestException), "handled as any failed request is"
 
 

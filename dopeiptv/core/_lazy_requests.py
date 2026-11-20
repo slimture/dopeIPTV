@@ -33,11 +33,12 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any
 
-#: The most an answer read whole may be: far above any API's (a few MB).
-RESPONSE_MAX = 256 * 1024 * 1024
+#: The most an answer read whole may be: well above any API's (a few MB),
+#: low enough that a few at once on the pool cannot take the memory.
+RESPONSE_MAX = 32 * 1024 * 1024
 #: And a source's own lists and playlists (providers/client.py make_client):
-#: the largest real ones are a few hundred MB.
-LIST_MAX = 1024 * 1024 * 1024
+#: the largest real ones are a hundred MB or two.
+LIST_MAX = 512 * 1024 * 1024
 
 _lock = threading.Lock()
 _made: dict[str, Any] = {}

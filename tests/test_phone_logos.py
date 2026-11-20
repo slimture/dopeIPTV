@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
+from tests.phone_sign import signed_request
 from dopeiptv.core import phone_remote
 from dopeiptv.core.phone_remote import PhoneServer
 
@@ -97,8 +98,9 @@ def _window(tmp_path):
 
 
 def _get(port, path):
+    path, _data, h = signed_request(TOKEN, "GET", path)
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
-    c.request("GET", path)
+    c.request("GET", path, headers=h)
     r = c.getresponse()
     body = r.read()
     c.close()

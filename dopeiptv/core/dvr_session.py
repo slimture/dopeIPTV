@@ -35,7 +35,7 @@ class DvrSession:
                  max_bytes: int, ingest: Ingest | None = None,
                  key: str | None = None,
                  ingest_factory: IngestFactory | None = None,
-                 source: str = "") -> None:
+                 source: str = "", min_free: int | None = None) -> None:
         self.url = url
         self.key = key or url
         #: The source (id) whose account its connection is on - what the
@@ -44,7 +44,10 @@ class DvrSession:
         self.source = source
         self.token = secrets.token_hex(8)
         self.store = SegmentStore(session_dir(base, self.token),
-                                  keep_seconds, max_bytes)
+                                  keep_seconds, max_bytes, min_free=min_free)
+        #: In memory (dvr_store.memory_base) with this cap: a private
+        #: session from its start. None: on disk.
+        self.memory_cap: int | None = None
         # Session time 0, kept across freezes: positions in the row stay put.
         self.origin = time.time()
         self.last_used = self.origin

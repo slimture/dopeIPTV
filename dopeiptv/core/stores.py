@@ -551,7 +551,12 @@ class ParentalControl:
         self.settings.setValue("parental_salt", salt)
         self.settings.setValue("parental_pin_hash", stored)
 
+    #: The shortest PIN taken: fewer were tried in a moment (core/pins.py).
+    SHORTEST = 4
+
     def set_pin(self, pin: str) -> None:
+        if len(pin or "") < self.SHORTEST:
+            raise ValueError("a PIN of at least four characters")
         self._keep(pin)
         self.session_unlocked = False
 

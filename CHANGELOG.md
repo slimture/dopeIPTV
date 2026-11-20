@@ -29,6 +29,25 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Security
 
+- The phone remote's key no longer crosses the network: the code's address
+  carries it after its `#`, which a browser never sends, and the phone keeps
+  it. Every request is signed with it (HMAC-SHA256 over the method, the
+  address, the time, a nonce and the body; a minute's window, each nonce
+  once), so someone reading the home network's traffic can neither use nor
+  replay a request. A picture's address is signed for a quarter of an hour;
+  an address of before, with the key in it, makes a new key at once (scan
+  the code again); the calendar has a read-only key of its own. Phones that
+  had the remote need the code scanned once more.
+- A converted cast serves only the receiver it was started for.
+- A channel watched privately from its start keeps its rewind buffer in
+  memory on Linux (`$XDG_RUNTIME_DIR`, the user's own tmpfs, with a budget
+  of its own), never on the disk; elsewhere as before, deleted as it is left.
+- Watch together remembers, for the app's run, every message number taken in
+  a room, so leaving and joining again takes no message twice; a member of
+  an older app that cannot sign is said once.
+- A profile's PIN is 4 to 8 digits, the parental PIN at least 4 characters.
+- An answer read whole may be 32 MiB (was 256), a source's lists 512 MiB
+  (was 1 GiB).
 - core/dest_guard.py: the app's own requests - guides, pictures, the
   providers' and services' APIs, the rewind buffer, a cast's address - are
   checked where they land. A name that is not this computer's never reaches

@@ -11,7 +11,7 @@ from .dialogs import ContentManagerDialog
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
-from .widgets import confirm
+from .widgets import confirm, plain_text
 from PyQt6.QtCore import QItemSelectionModel, Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
@@ -613,14 +613,24 @@ class _ContextMenuMixin:
     def _ensure_pin_configured(self) -> bool:
         if self.parental.has_pin():
             return True
-        pin, ok = QInputDialog.getText(
-            self, tr("parental_control"), tr("pin_choose_prompt"),
-            QLineEdit.EchoMode.Password)
-        pin = (pin or "").strip()
-        if ok and pin:
+        pin = self._ask_new_parental_pin(self, tr("pin_choose_prompt"))
+        if pin:
             self.parental.set_pin(pin)
             return True
         return False
+
+    def _ask_new_parental_pin(self, parent, prompt: str) -> str:
+        """A new parental PIN asked for until it is long enough (or the
+        person cancels: "")."""
+        while True:
+            pin, ok = QInputDialog.getText(parent, tr("parental_control"), plain_text(prompt),
+                                           QLineEdit.EchoMode.Password)
+            pin = (pin or "").strip()
+            if not ok or not pin:
+                return ""
+            if len(pin) >= self.parental.SHORTEST:
+                return pin
+            QMessageBox.warning(parent, tr("parental_control"), plain_text(tr("pin_too_short")))
 
     # -- category context menu -----------------------------------------------------
 

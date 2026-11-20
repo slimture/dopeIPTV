@@ -75,7 +75,7 @@ change a playlist file on its web server.
 | ffmpeg reading `concat:`, `subfile:`, `unix:` or a local file behind an address | `core/player_exec.ffmpeg_protocols`: `-protocol_whitelist` with a stream's protocols wherever ffmpeg or ffprobe is started for a stream |
 | A picture that names a file: `/dev/zero`, or `\\host\share\x.png` (on Windows a login at that host) | `core/picture_files.py`: a file is read as a picture only inside the app's own picture folders, only a plain file, at most 64 MB |
 | An SVG logo that makes Qt open a file or read a stylesheet | `core/svg_safe.screened`: the picture written out again without what it names |
-| An answer that never ends, or JSON nested past what Python reads | `core/_lazy_requests.py`: `RESPONSE_MAX` (256 MiB), a source's lists `LIST_MAX` (1 GiB), then `ResponseTooLarge`; too deep is no JSON |
+| An answer that never ends, or JSON nested past what Python reads | `core/_lazy_requests.py`: `RESPONSE_MAX` (32 MiB), a source's lists `LIST_MAX` (512 MiB), then `ResponseTooLarge`; too deep is no JSON |
 | A guide with a DTD or entities, an endless download, a gzip bomb | `providers/epg.py`: `refuse_entities`, `read_capped`, `gunzip_gently` (`GUIDE_DOWNLOAD_MAX`, `GUIDE_UNPACKED_MAX`: 2 GiB); the index is built in a process of its own (`providers/epg_index.py`) |
 | A name shown as markup | `Qt.TextFormat.PlainText` and `ui/widgets.plain_text`, the text over the picture too |
 | A title spliced into the command after a recording, or into its file name | `core/rec_extras.py`: no shell, placeholders filled per argument, a batch file on Windows given text only (`through_cmd`); a name without control characters or device names, a folder never outside the recordings folder (`core/recording.py`) |
@@ -119,7 +119,7 @@ requests they send it.
 - A Jellyfin or Emby server found on the network is sent the name and
   password typed into its sign-in (once, never kept,
   `ui/media_signin.py`): a fake one gets them. Plex signs in at plex.tv.
-- The app's servers speak plain http: [below](#the-phone-remote-speaks-plain-http).
+- The app's servers speak plain http: [below](#the-home-networks-servers-speak-plain-http).
 - Server mode's tuner endpoints take no token: [below](#the-tuner-endpoints-of-server-mode-take-no-token).
 - "Home" is any private address: [below](#home-means-any-private-address).
 
@@ -137,6 +137,8 @@ rebinding).
 | A link that plays an address | Asked first in the window, with the server and the whole address shown (`ui/mw_commands._ask_link_play`), one question at a time; a stream only, never a file (`commands.stream_url_ok`) |
 | A link with a supporter key | Shown in the supporter window, never taken silently |
 | A request to the phone remote, the remote API, server mode, the rewind buffer or a cast | A token in every address that the page cannot know; the phone remote never counts a web page's guesses and refuses its changes (`cross_site`: `Sec-Fetch-Site`, `Origin`) |
+| Someone on the home network who reads the phone remote's traffic | Its key never crosses the network: it is after the `#` of the code's address (`/r/#key`, which no browser sends) and kept on the phone; every request is signed with it - HMAC-SHA256 over the method, the address, the time, a nonce and the body (`core/phone_remote.signature`, the page's own SHA-256 since `crypto.subtle` needs https) - within a minute of this computer's clock, each nonce once (`SIGN_WINDOW_MS`, `NONCES_MAX`): one seen on the way can be neither changed nor sent again. A picture's address is signed until a quarter of an hour on (`PICTURE_TTL_MS`). An address of before, with the key in its path, makes a new key at once (`leaked`, `on_leaked`). The calendar app, which cannot sign, gets a key of its own that opens the calendar alone (`calendar_token`) |
+| Someone on the home network who saw a converted cast's address | The converter serves only the receiver it was started for (`providers/cast_bridge.receiver_addresses`, 403 for any other address), a new token each run |
 | Server mode's tuner endpoints, which take no token | Refused for a web page (`cross_site`) and under a name that is not a home's (`services/home_server.tuner_host_ok`, `home_net.HOME_SUFFIXES`): a rebound name is the page's own public one |
 | The loopback proxy | A key made for each run as the proxy's login, 407 without it, and a page's `GET /...` refused (`core/net_bridge.py`) |
 | Script in the pages the app serves | A Content-Security-Policy of their own script and style hashes (`core/phone_page.py`, `core/server_page.py`) |
@@ -193,7 +195,7 @@ provider.
 
 - A provider on plain http: [below](#a-provider-on-plain-http).
 - The player checks certificates only as its libraries do: [below](#the-player-checks-certificates-only-as-its-libraries-do).
-- The app's servers speak plain http on the home network: [below](#the-phone-remote-speaks-plain-http).
+- The app's servers speak plain http on the home network: [below](#the-home-networks-servers-speak-plain-http).
 - Searches for devices (SSDP, mDNS, broadcasts) are plain by their nature,
   and a webhook goes over whatever address the person typed.
 
@@ -422,18 +424,22 @@ file is not a dopeIPTV backup or is damaged, and changes nothing.
 What the app does not protect against, each with the reason it stands.
 Some are decisions; some are open work, said so.
 
-### The phone remote speaks plain http
+### The home network's servers speak plain http
 
 The phone remote, server mode, the remote API on the home network and a
-cast's servers speak http, not https. Their token is in the address
-(`core/phone_remote.py`: `/<token>/`), so whoever can read the home
-network's traffic - an open Wi-Fi, a device that has taken over the
-router - can read it and use the remote, the server or the cast.
+cast's servers speak http, not https. The phone remote's key never crosses
+the network - its requests are signed, each once (`core/phone_remote.py`) -
+but what they carry does: whoever reads the home network's traffic (an
+open Wi-Fi, a device that has taken over the router) sees what plays, the
+lists the phone asks for and the calendar's own key. Server mode's and the
+remote API's tokens are in their addresses, so such a reader can use
+them; a converted cast serves only its receiver's address, which another
+device on the network could take.
 
 *Why:* a certificate for a home address could only be one the app makes
 itself, which every phone's browser would warn about and ask the person to
-accept. What holds the remote is the home network, a 192-bit token, the
-lock-out and New address.
+accept; a TV, Kodi or VLC given a playlist cannot sign. What holds them is
+the home network, a 192-bit token, the lock-out and New address.
 
 ### Server mode's playlist token lets a device watch all it serves
 
@@ -611,7 +617,11 @@ them (`core/dvr_store.py`, `core/log.log_dir`). Where the home folder lets
 another account in, it can read them. The log is scrubbed of logins and
 tokens (`core/log.py`), keeps a private playback's titles out
 (`privacy.for_log`), and a private channel's rewind buffer is deleted when
-it is left.
+it is left. A channel private from its start keeps its buffer in memory
+instead - Linux's `$XDG_RUNTIME_DIR` when it is this user's own tmpfs, with
+a budget of its own (`core/dvr_store.memory_base`, `memory_budget`) - so
+nothing of it reaches the disk; on macOS and Windows, or with too little
+room there, it is on disk, marked and deleted as before.
 
 *Why:* on most current systems a home folder is closed to other accounts.
 Open work.
@@ -627,16 +637,19 @@ nothing, and no address with a login is said on the bus.
 the media keys and KDE Connect need these. It can be turned off under
 Settings > General.
 
-### A PIN is four digits
+### A PIN can be short
 
-A profile's PIN and the parental lock's are four digits: 10 000 PINs. They
-are kept by PBKDF2 with 600 000 rounds and a salt each, and after two wrong
-tries each further one waits, 5 s growing to a minute (`core/pins.py`). A
-copy of the settings file - a backup - is slow to try, not hard, and
-whoever can change the file can take the PIN out of it.
+A profile's PIN is 4 to 8 digits and the parental lock's at least 4
+characters (`core/profiles.valid_pin`, `ParentalControl.SHORTEST`): four
+digits are 10 000 PINs. They are kept by PBKDF2 with 600 000 rounds and a
+salt each, and after two wrong tries each further one waits, 5 s growing to
+a minute (`core/pins.py`). A copy of the settings file - a backup - is slow
+to try, not hard, and whoever can change the file can take the PIN out of
+it.
 
 *Why:* a PIN keeps a family member out, not someone with the computer
-(`core/pins.py` says so); four digits are what a remote types.
+(`core/pins.py` says so); a remote types digits, so a longer PIN is the
+person's choice, not a rule.
 
 ### A kids profile holds only with a grown-up's PIN
 
@@ -781,7 +794,7 @@ Windows builds a pinned mpv build, the Macs Homebrew's and conda-forge's
 
 ### A hostile source can make the app work up to its ceilings
 
-The ceilings (`RESPONSE_MAX` 256 MiB, a source's lists `LIST_MAX` 1 GiB, a
+The ceilings (`RESPONSE_MAX` 32 MiB, a source's lists `LIST_MAX` 512 MiB, a
 guide 2 GiB unpacked, a picture `PICTURE_ALLOC_MIB`) are far above any
 real answer, so a source that sends that much makes the app read, unpack
 and index that much - memory, disk and time - before it is refused. The
