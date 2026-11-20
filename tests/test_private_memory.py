@@ -349,7 +349,9 @@ def test_private_viewing_begun_mid_cast_stops_a_run_on_the_disk_by_itself(tmp_pa
         bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip")
         assert bridge.on_disk() and str(bridge.hls_dir).startswith(str(disk))
         privacy.set_private(True)
-        assert _until(lambda: bridge._server is None), "stopped within its tick"
+        # Stopped and tidied: _stop() clears the server first, then removes
+        # the run's folder (_tmp None after it).
+        assert _until(lambda: bridge._server is None and bridge._tmp is None), "stopped within its tick"
         assert bridge.private_stopped and bridge.fatal == "private viewing began"
         assert not any(disk.iterdir()), "its work on the disk gone"
     finally:
@@ -375,7 +377,7 @@ def test_every_way_a_cast_is_sent_is_stopped_or_kept_in_memory_as_privacy_turns(
             bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip", **args)
         assert bridge.on_disk()
         privacy.set_private(True)
-        assert _until(lambda: bridge._server is None) and bridge.private_stopped
+        assert _until(lambda: bridge._server is None and bridge._tmp is None) and bridge.private_stopped
         assert not any(disk.iterdir())
         bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip", **args)
         assert bridge.private and not bridge.private_stopped
