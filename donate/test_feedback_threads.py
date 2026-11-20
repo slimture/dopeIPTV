@@ -486,3 +486,21 @@ if __name__ == "__main__":
         fn()
         print("ok", name)
     print(f"{len(tests)} passed")
+
+
+def test_a_quiet_thread_loses_its_code_s_hash_and_a_live_one_keeps_it():
+    """After CODE_DAYS without a word - no follow-up, no answer - nothing
+    asks after a report any more: the hash that ties it to the copy of the
+    app that sent it goes. One with a recent answer keeps it."""
+    d = _fresh()
+    quiet = _report(d, "Old and done.", reply="a" * 64)
+    live = _report(d, "Still going.", reply="b" * 64)
+    now = time.time() + (feedback.CODE_DAYS + 1) * 86400
+    data = feedback._replies(d)
+    data["report"][live] = [{"id": "cccccccccc", "t": int(now) - 86400, "code": "needinfo", "open": True}]
+    feedback._write_json(feedback._replies_path(d), data)
+    assert feedback.forget_codes(d, now) == 1
+    rows = {r["id"]: r for r in _lines(d)}
+    assert "reply" not in rows[quiet] and rows[quiet]["text"]
+    assert rows[live]["reply"] == "b" * 64
+    assert feedback.forget_codes(d, now) == 0, "once"

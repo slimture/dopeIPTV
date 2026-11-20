@@ -1713,3 +1713,29 @@ jexec dopeiptv ln -s /usr/local/www/iptv/sync-releases.sh /usr/local/www/iptv/pu
 curl -s -o /dev/null -w '%{http_code}\n' https://dopeiptv.org/link-check.txt
 jexec dopeiptv rm /usr/local/www/iptv/public/link-check.txt
 ```
+
+## Checked from outside, people not visits, codes forgotten (1.6.9 review)
+
+- `deploy/check-live.sh` checks what the live site really sends, from any
+  computer that is not the server: the security headers on a page, on a
+  404 and on a service (CSP with `default-src` and `frame-ancestors 'none'`,
+  HSTS, nosniff, DENY, Referrer-Policy, COOP, no version in `Server`) - and,
+  given the content jail's address, that its port 8081 does not answer from
+  outside. Run it after every deploy:
+
+  ```sh
+  sh deploy/check-live.sh dopeiptv.org <the content jail's public-facing address>
+  ```
+
+- The statistics' months are made k-anonymous by **people**: a combination
+  kept is shared by at least five different visitors, told apart by a short
+  hash of the month's visitor id (`who`) that goes in the same step - one
+  person who came five times no longer counts as five (`stats_collect.py`,
+  `k_anonymous`). Months already made so stay as they are.
+- A feedback report's code hash (`reply`) goes once its thread has been quiet
+  for `CODE_DAYS` (120): nothing asks after it then, and nothing links the
+  report to the copy of the app that sent it (`feedback.forget_codes`, run
+  with the daily prune).
+
+Deploy as the rounds before (copy `site`, `public`, `donate` and restart
+`iptv_donate`), then run the check above.

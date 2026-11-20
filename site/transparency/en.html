@@ -23,7 +23,7 @@
 <dt>Could someone get a harmful update into my app?</dt>
 <dd>Not without our release key: the app installs nothing that is not on a list signed with it – not even from our own website. <a href="#builds">Part 5</a></dd>
 <dt>If someone broke into dopeiptv.org, what would they find of mine?</dt>
-<dd>No logins and nothing of what you watch – we never get them. At most: an error report or feedback you chose to send, cleaned of what identified you; a sync copy or Watch together messages they cannot open; and your IP address in the web server's log of the last two days. <a href="#webservers">Part 11</a></dd>
+<dd>No logins and nothing of what you watch – we never get them. At most: an error report or feedback you chose to send, cleaned of what the app recognized as yours; a sync copy or Watch together messages they cannot open; and your IP address in the web server's log of the last two days. <a href="#webservers">Part 11</a></dd>
 <dt>Do I have to take your word for it?</dt>
 <dd><strong>No.</strong> Each part below shows the code that does it, a real example made by running that code, and a link to the very lines on GitHub – and a button that hands it all to any AI assistant to check us.</dd>
 </dl>
@@ -277,7 +277,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 </ul>
 
 <h2 id="reports">7. What is in an error report?</h2>
-<p class="tp-promise">Nothing that points to you or to what you watch leaves your computer in an error report – and nothing leaves at all until you press Send.</p>
+<p class="tp-promise">An error report is cleaned on your computer of what the app recognizes as yours or as what you watch, you read all of it first – and nothing leaves at all until you press Send.</p>
 <p class="tp-know"><b>What we can know:</b> what you choose to send – the report after its cleaning, which you read first – and an answer's place in the line, by a code only your computer has. Never your IP address in what we keep.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
@@ -422,7 +422,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>After 30 days</b> a visit loses its ID, the time of day and the screen size. Only anonymous figures remain.</li>
 </ol>
 <p>The visitor ID is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key that exists only on our server, cut to twelve characters. The key is new every month, and a month's key is deleted once the month after it has ended. Within a month the same visitor gets the same ID, so we can count unique and returning visitors. The ID does not show the address, but it is pseudonymous, not anonymous: as long as its month's key exists, whoever had both the statistics and the key could try addresses until one fits. Once the key is gone, nobody can – we included.</p>
-<p>How long each part is kept: the log with your address two days at the most; each visit in detail – its ID, the second it came, the browser's version, the screen, the languages, the page that linked here, all of which together could point to one person – 30 days; the key that made its ID, and the month's IDs with it, until the month after has ended – then only the number of different visitors in that month and its weeks; the anonymous visits kept after that are each made to look like at least four others of their month, or removed – so every combination of what is kept is shared by at least five visits. Five visits, not necessarily five people: someone who came five times makes five alike. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
+<p>How long each part is kept: the log with your address two days at the most; each visit in detail – its ID, the second it came, the browser's version, the screen, the languages, the page that linked here, all of which together could point to one person – 30 days; the key that made its ID, and the month's IDs with it, until the month after has ended – then only the number of different visitors in that month and its weeks; the anonymous visits kept after that are each made to look like the visits of at least four other people of their month, or removed – so every combination of what is kept is shared by at least five different visitors. Someone who came five times is one of them, not five: they are told apart, for that step only, by a short hash of the month's visitor ID, which goes with it. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">

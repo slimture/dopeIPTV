@@ -237,3 +237,20 @@ if __name__ == "__main__":
         fn()
         print("ok", name)
     print(f"{len(tests)} passed")
+
+
+def test_k_anonymity_counts_different_people_not_visits():
+    """One person who came five times is one of the five, not five: a
+    combination kept is shared by five different visitors, told apart by
+    "who" - which is never kept."""
+    sc, _dir = _module()
+    base = {"day": "2026-09-01", "country": "SE", "browser": "Firefox", "os": "Linux",
+            "device": "desktop", "lang": "sv", "channel": "", "site": "", "pages": 2, "time": 40,
+            "timed": True, "returning": False, "downloaded": False, "donate": False, "kind": ""}
+    one_person = [dict(base, who="p1") for _ in range(6)]
+    assert sc.k_anonymous(one_person) == [], "six visits of one person are not five people"
+    five = [dict(base, who=f"p{i}") for i in range(5)]
+    out = sc.k_anonymous(five)
+    assert len(out) == 5 and all("who" not in a for a in out)
+    a = sc.anonymous({"id": "visitor-id", "pages": ["/"], "browser": "Firefox"}, "2026-09-01")
+    assert a["who"] and a["who"] != "visitor-id" and len(a["who"]) == 12

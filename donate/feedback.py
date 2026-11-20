@@ -336,6 +336,11 @@ def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dic
 
 #: How long a report is kept: the privacy policy says 12 months.
 KEEP_DAYS = 365
+#: How long a report keeps the hash of its code ("reply") after the last
+#: word in its thread: the app asks for answers 30 days and keeps them 90,
+#: so after this nothing will ask again - the hash, which ties the report to
+#: the copy of the app that sent it, goes, and the report stays unlinked.
+CODE_DAYS = 120
 
 
 def _write(path: str, write) -> None:
@@ -415,10 +420,60 @@ def _remove(stats_dir: str, goes, groups: tuple[str, ...] = ()) -> int:
 def prune(stats_dir: str, now: float | None = None) -> int:
     """Reports older than KEEP_DAYS go, with their follow-ups (a thread goes
     with its start, never kept past it), the answers written to them and
-    their marks (each file rewritten whole and swapped in, never half). How
+    their marks (each file rewritten whole and swapped in, never half); a
+    thread quiet for CODE_DAYS loses its code's hash (forget_codes). How
     many reports went."""
-    cut = (now if now is not None else time.time()) - KEEP_DAYS * 86400
-    return _remove(stats_dir, lambda r: _t(r) < cut)
+    now = now if now is not None else time.time()
+    cut = now - KEEP_DAYS * 86400
+    gone = _remove(stats_dir, lambda r: _t(r) < cut)
+    forget_codes(stats_dir, now)
+    return gone
+
+
+def forget_codes(stats_dir: str, now: float | None = None) -> int:
+    """Each report whose thread has been quiet for CODE_DAYS - its last
+    follow-up and the last answer written to it - without its code's hash
+    ("reply"): nothing asks after it any more, and nothing links it to the
+    copy of the app it came from. The file rewritten whole. How many."""
+    cut = (now if now is not None else time.time()) - CODE_DAYS * 86400
+    path, _state_path = _paths(stats_dir)
+    with _LOCK:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.readlines()
+        except OSError:
+            return 0
+        rows: list[tuple[str, dict | None]] = []
+        last: dict[str, float] = {}
+        for line in lines:
+            try:
+                r = json.loads(line)
+            except ValueError:
+                r = None
+            r = r if isinstance(r, dict) else None
+            rows.append((line, r))
+            if r is not None:
+                rid = str(r.get("thread_of") or r.get("id") or "")
+                last[rid] = max(last.get(rid, 0.0), _t(r))
+        answers = _replies(stats_dir).get("report") or {}
+        for rid, said in answers.items():
+            for a in said if isinstance(said, list) else []:
+                if isinstance(a, dict):
+                    last[str(rid)] = max(last.get(str(rid), 0.0), float(a.get("t") or 0))
+        out, n = [], 0
+        for line, r in rows:
+            if r is not None and r.get("reply") and not r.get("thread_of") \
+                    and last.get(str(r.get("id") or ""), 0.0) < cut:
+                r = dict(r)
+                r.pop("reply", None)
+                out.append(json.dumps(r, ensure_ascii=False) + "\n")
+                n += 1
+            else:
+                out.append(line)
+        if n:
+            _write(path, lambda fh: fh.writelines(out))
+            _ASKING["key"] = None
+    return n
 
 
 def make_room(stats_dir: str) -> int:

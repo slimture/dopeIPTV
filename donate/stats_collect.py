@@ -62,12 +62,13 @@ visitor came, the number of pages, the time rounded to ten seconds, and
 whether there was a download or the donate dialog - no id, no time of day,
 no screen, mixed in the month so their order tells nothing. Once a month is
 whole they are made k-anonymous (k_anonymous, K_ANON = 5): pages and time
-in a few steps, and a visit unlike four others of its month in everything
-kept is told less - its site, channel, language, browser and so on, field
-by field, its day as its week - until it is like them, or left out (its
-counts stay in the day's). Each combination kept is then shared by at
-least five visits - visits, not people: one person who came five times is
-five of them. Those, and the counts per day, are kept for good.
+in a few steps, and a visit unlike those of four other people of its month
+in everything kept is told less - its site, channel, language, browser and
+so on, field by field, its day as its week - until it is like them, or left
+out (its counts stay in the day's). Each combination kept is then shared
+by the visits of at least five different people (told apart by a short
+hash of the month's visitor id, "who", which goes in that same step). Those,
+and the counts per day, are kept for good.
 
 Each update the app fetched for itself goes to STATS_DIR/updates/<day>.json
 for the same log: the hour it came in, the file, the version it came from,
@@ -1341,9 +1342,12 @@ def _family(os_version: str) -> str:
 
 
 def anonymous(v: dict, day: str) -> dict:
-    """A visit with nothing left that points to a person."""
+    """A visit with nothing left that points to a person - but for "who",
+    a short hash of the month's visitor id that k_anonymous counts people
+    by and then drops: until the month is whole, and never kept after."""
     events = {e[1] for e in v.get("events") or []}
-    return {"day": day, "country": v.get("country") or "", "browser": v.get("browser") or "Other",
+    who = hashlib.sha256(str(v.get("id") or "").encode("utf-8")).hexdigest()[:12] if v.get("id") else ""
+    return {"who": who, "day": day, "country": v.get("country") or "", "browser": v.get("browser") or "Other",
             "os": _family(v.get("os") or ""), "device": v.get("device") or "",
             "lang": v.get("lang") or "", "channel": v.get("channel") or "",
             "site": v.get("ref") or "", "pages": len(v.get("pages") or []),
@@ -1437,10 +1441,10 @@ def freeze_months(uniques: dict, kinds: dict, frozen: dict, today: date) -> int:
     return len(months)
 
 
-#: Each visit kept for good is like at least K_ANON - 1 others of its month
-#: in every field kept (k_anonymous): each combination of them is shared by
-#: at least K_ANON visits - visits, not people, as one person who came five
-#: times is five visits alike.
+#: Each visit kept for good is like those of at least K_ANON - 1 other
+#: people of its month in every field kept (k_anonymous): each combination
+#: of them is shared by at least K_ANON different visitors - one person who
+#: came five times is one of them, not five.
 K_ANON = 5
 #: The fields a kept visit could be told by, together.
 _QI = ("day", "country", "browser", "os", "device", "lang", "channel", "site", "pages",
@@ -1465,12 +1469,20 @@ _LESS = (
 
 
 def k_anonymous(rows: list, k: int = K_ANON) -> list:
-    """A whole month's anonymous visits with every one like at least k - 1
-    others in all of _QI: the pages and the time in a few steps first, then
-    a rarer visit told less, field by field (_LESS), until it is; one still
-    rare after all of them is left out (the day's counts keep it)."""
+    """A whole month's anonymous visits with every one like those of at
+    least k - 1 other people in all of _QI: the pages and the time in a few
+    steps first, then a rarer visit told less, field by field (_LESS), until
+    it is; one still rare after all of them is left out (the day's counts
+    keep it). People are told apart by "who" (anonymous), dropped here; a
+    visit without one counts as a person of its own."""
     def key(a: dict) -> tuple:
         return tuple(a.get(f) for f in _QI)
+
+    def people(group: list) -> dict:
+        found: dict = {}
+        for i, a in enumerate(group):
+            found.setdefault(key(a), set()).add(a.get("who") or ("visit", i))
+        return found
     out = []
     for a in rows:
         if not isinstance(a, dict) or not a.get("day"):
@@ -1480,18 +1492,17 @@ def k_anonymous(rows: list, k: int = K_ANON) -> list:
         out.append(dict(a, pages=pages if pages <= 3 else 5 if pages <= 5 else 6,
                         time=max(x for x in _TIMES if x <= t)))
     for field, less in _LESS:
-        counts: dict = {}
-        for a in out:
-            counts[key(a)] = counts.get(key(a), 0) + 1
-        rare = [a for a in out if counts[key(a)] < k]
+        counts = people(out)
+        rare = [a for a in out if len(counts[key(a)]) < k]
         if not rare:
             break
         for a in rare:
             a[field] = less(a)
-    counts = {}
-    for a in out:
-        counts[key(a)] = counts.get(key(a), 0) + 1
-    return [a for a in out if counts[key(a)] >= k]
+    counts = people(out)
+    kept = [a for a in out if len(counts[key(a)]) >= k]
+    for a in kept:
+        a.pop("who", None)
+    return kept
 
 
 def _close_months() -> None:
