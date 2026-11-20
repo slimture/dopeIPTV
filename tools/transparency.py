@@ -4,18 +4,15 @@ page shows of the app's and the site's own code, taken from that code.
     python3 tools/transparency.py --app PATH --ref v1.6.7 [--out site/transparency.json]
 
 PATH is a checkout of the app at --ref (a tag; a commit while the page is
-being written). The site's own code - donate/, deploy/ and the few other
-files CODE names - is this checkout's, at its commit (--site-ref, HEAD by
+being written). The site's own code - donate/ and the few other files
+CODE names - is this checkout's, at its commit (--site-ref, HEAD by
 default), which must be on GitHub: every excerpt links to its lines there.
 Nothing on the page is copied by hand:
 
   code      each block the page shows: the named functions, classes and
             assignments of a Python file (found with ast, so a moved
-            function is still found), the blocks and directives of an
-            nginx file named by their first words (a map, a log_format,
-            every limit_req_zone, a server's location - read as nginx reads
-            it, so a moved block is still found), or the lines from a
-            pattern in any other file - each with the comments right above
+            function is still found), or the lines from a pattern in any
+            other file - each with the comments right above
             it, the text, its first and last line and the address of those
             lines on GitHub at the pinned version
   examples  the page's before and after, made by running that code here:
@@ -48,14 +45,8 @@ REPO = "https://github.com/slimture/dopeIPTV"
 
 # What each part of the page shows. A block: (where, path, names) - "app" or
 # "site", the file, and the top-level names (or Class.method) to take; or,
-# in an nginx file, "nginx": what to take by its first words (nginx_find);
-# or a pattern from a line to a line for any other file.
-_PROXY = "deploy/proxy-dopeiptv.org.conf"          # the TLS-front proxy, dopeiptv.org
-_OLD_PROXY = "deploy/proxy-iptv.dope.rs.conf"      # ...and the old name, sent on
-_CONTENT = "deploy/content-iptv.dope.rs.conf"      # the content server behind it
-_JAIL = "deploy/nginx-dopeiptv-jail.conf"          # ...and its jail's own nginx.conf
-_CSP = "deploy/csp.snippet.txt"                    # the CSP's row in the proxy's nginx.conf
-_MAIN = "server[server_name dopeiptv.org]"         # the proxy's server of the site itself
+# or a pattern from a line to a line for any other file. No server's
+# configuration: the page says what the servers keep, not how they are set up.
 CODE: dict[str, list[dict]] = {
     "logins": [
         {"id": "stored", "repo": "app", "path": "dopeiptv/core/stores.py", "names": ["PlaylistStore._save"],
@@ -112,8 +103,6 @@ CODE: dict[str, list[dict]] = {
         {"id": "server", "repo": "site", "path": "donate/sync.py",
          "names": ["AUTH", "Refused", "_seal", "_check", "get", "put", "delete"],
          "with": [{"repo": "site", "path": "donate/donate.py", "names": ["Handler._sync"]}]},
-        {"id": "nolog", "repo": "site", "path": "deploy/proxy-dopeiptv.org.conf",
-         "from": r"^\s*location \^~ /sync/", "to": r"^\s*\}"},
     ],
     "together": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/together.py",
@@ -132,8 +121,6 @@ CODE: dict[str, list[dict]] = {
          "names": ["Link._poll_loop"]},
         {"id": "server", "repo": "site", "path": "donate/together.py", "names": ["Relay.post"],
          "with": [{"repo": "site", "path": "donate/donate.py", "names": ["Handler._together"]}]},
-        {"id": "nolog", "repo": "site", "path": "deploy/proxy-dopeiptv.org.conf",
-         "from": r"^\s*location \^~ /together/", "to": r"^\s*\}"},
     ],
     "private": [
         {"id": "switch", "repo": "app", "path": "dopeiptv/core/privacy.py",
@@ -177,11 +164,6 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "site", "path": "donate/release_sums.py", "names": ["why_not"]}]},
     ],
     "website": [
-        {"id": "log", "repo": "site", "path": "deploy/content-iptv.dope.rs.conf",
-         "from": r"^log_format iptv_stats", "to": r"';\s*$",
-         "with": [{"repo": "site", "path": _CONTENT, "nginx": ["server > location @iptv_hit"]}]},
-        {"id": "inbox", "repo": "site", "path": "donate/stats_inbox.py", "names": ["FRAME", "Inbox", "Receiver"],
-         "with": [{"repo": "site", "path": "donate/donate.py", "names": ["start_statistics"]}]},
         {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
          "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest", "swap_state"]},
         {"id": "sketch", "repo": "site", "path": "donate/sketch.py",
@@ -193,32 +175,6 @@ CODE: dict[str, list[dict]] = {
         {"id": "anon", "repo": "site", "path": "donate/stats_collect.py",
          "names": ["sketches_file", "freeze_months", "FUNNEL", "funnel_of", "FOLD", "fold_day", "_forget_old",
                    "_gone", "left_behind", "sweep_left"]},
-    ],
-    "webservers": [
-        {"id": "nolog", "repo": "site", "path": _PROXY, "nginx": ["server > access_log off", "server > error_log"],
-         "with": [{"repo": "site", "path": _OLD_PROXY, "nginx": ["server > access_log off", "server > error_log"]},
-                  {"repo": "site", "path": _CONTENT, "nginx": ["server > access_log off", "server > error_log"]},
-                  {"repo": "site", "path": _JAIL, "nginx": ["error_log", "http > access_log off"]}]},
-        {"id": "logs", "repo": "site", "path": _CONTENT,
-         "nginx": ["map $arg_f", "map $request_method", "map $http_user_agent",
-                   "map $request_uri", "map $iptv_log_uri_kept", "log_format", "map $cookie_iptv_nostats",
-                   "server > location = /", "server > location = /help/", "server > location = /dl.php",
-                   "server > location @iptv_dl", "server > location = /hit", "server > location @iptv_hit"]},
-        {"id": "kept", "repo": "site", "path": "DEPLOY.md", "last": True,
-         "from": r"^cat > \S*/usr/local/etc/newsyslog\.conf\.d/iptv\.dope\.rs\.conf <<'LOGS'$", "to": r"^LOGS$",
-         "with": [{"repo": "site", "path": "DEPLOY.md", "last": True,
-                   "from": r"^jexec -U iptv dopeiptv env IPTV_DOWNLOAD_LOG=",
-                   "to": r"^jexec dopeiptv sh -c 'rm -f /var/log/nginx/iptv\.dope\.rs-stats\.log"}]},
-        {"id": "headers", "repo": "site", "path": _PROXY,
-         "nginx": ["map $uri", _MAIN + " > add_header", _MAIN + " > proxy_hide_header", _MAIN + " > server_tokens"],
-         "with": [{"repo": "site", "path": _CSP, "from": r"^Add this line", "to": r"object/base/form locked down"},
-                  {"repo": "site", "path": _OLD_PROXY, "nginx": ["server[server_name iptv.dope.rs] > add_header"]},
-                  {"repo": "site", "path": _CONTENT,
-                   "nginx": ["map $iptv_lang_arg $iptv_set_cookie", "server > root", "server > disable_symlinks",
-                             r"server > location ~ /\.(?!well-known/)",
-                             "server > location = /.well-known/security.txt"]},
-                  {"repo": "site", "path": "public/.well-known/security.txt",
-                   "from": r"^Contact:", "to": r"^Policy:"}]},
     ],
 }
 
@@ -353,90 +309,6 @@ def _comments_above(lines: list[str], a: int) -> int:
     return a
 
 
-# -- nginx's files ----------------------------------------------------------------
-
-def nginx_tree(text: str, path: str = "") -> dict:
-    """An nginx file as nginx reads it (ngx_conf_read_token): a directive is
-    its words up to ";", a block its words up to "{" and what it holds up to
-    its "}"; a "#" where a word would start begins a comment to the end of
-    the line (inside a word it is the word's), a quoted word may hold any of
-    them, a backslash keeps the next character in its word. Each node: its
-    words (quotes off, nothing else changed), the lines it starts and ends
-    on, and its children (None for a directive)."""
-    root: dict = {"words": [], "start": 1, "end": 1, "kids": []}
-    stack, words, first = [root], [], 0
-    i, line, n = 0, 1, len(text)
-    while i < n:
-        c = text[i]
-        if c == "\n":
-            line += 1
-            i += 1
-        elif c in " \t\r":
-            i += 1
-        elif c == "#":
-            while i < n and text[i] != "\n":
-                i += 1
-        elif c in ";{":
-            if not words:
-                raise SystemExit(f"{path}: line {line}: {c} with nothing before it")
-            node = {"words": words, "start": first, "end": line, "kids": None if c == ";" else []}
-            stack[-1]["kids"].append(node)
-            if c == "{":
-                stack.append(node)
-            words = []
-            i += 1
-        elif c == "}":
-            if words or len(stack) == 1:
-                raise SystemExit(f"{path}: line {line}: a }} out of place")
-            stack.pop()["end"] = line
-            i += 1
-        else:
-            if not words:
-                first = line
-            j = i + 1
-            if c in "\"'":
-                while j < n and text[j] != c:
-                    j += 2 if text[j] == "\\" else 1
-                if j >= n:
-                    raise SystemExit(f"{path}: line {line}: a quote not closed")
-                words.append(text[i + 1:j])
-                line += text.count("\n", i, j)
-                j += 1
-            else:
-                j = i
-                while j < n and text[j] not in " \t\r\n;{}":
-                    j += 2 if text[j] == "\\" else 1
-                words.append(text[i:j])
-            i = j
-    if words or len(stack) != 1:
-        raise SystemExit(f"{path}: a block or a directive not closed")
-    root["end"] = line
-    return root
-
-
-_HOLDS = re.compile(r"(.*\S)\[([a-z_]+(?: [^\]]*)?)\]")
-
-
-def nginx_find(tree: dict, selector: str) -> list[dict]:
-    """The nodes *selector* names: steps from the file's top level, " > "
-    between them, each the first words of a directive or a block - every
-    one that starts so ("limit_req_zone": every zone; "location = /": that
-    location, not "location = /help/") - and a block's step perhaps with a
-    directive it must hold, in brackets ("server[server_name dopeiptv.org]":
-    the server of that name alone)."""
-    found = [tree]
-    for step in selector.split(" > "):
-        holds: list[str] = []
-        m = _HOLDS.fullmatch(step)
-        if m:
-            step, holds = m.group(1), m.group(2).split()
-        want = step.split()
-        found = [k for node in found for k in node["kids"] or []
-                 if k["words"][:len(want)] == want
-                 and (not holds or any(d["kids"] is None and d["words"] == holds for d in k["kids"] or []))]
-    return found
-
-
 def excerpt(root: str, ref: str, block: dict) -> list[dict]:
     path = block["path"]
     with open(os.path.join(root, path), encoding="utf-8") as fh:
@@ -445,14 +317,6 @@ def excerpt(root: str, ref: str, block: dict) -> list[dict]:
     if "names" in block:
         spans = [(_comments_above(lines, a), b)
                  for a, b in _spans(ast.parse(text), block["names"], path)]
-        spans = _merge(spans, lines)
-    elif "nginx" in block:
-        tree, spans = nginx_tree(text, path), []
-        for selector in block["nginx"]:
-            nodes = nginx_find(tree, selector)
-            if not nodes:
-                raise SystemExit(f"{path}: nothing is {selector!r}")
-            spans += [(_comments_above(lines, node["start"]), node["end"]) for node in nodes]
         spans = _merge(spans, lines)
     else:
         found = [i for i, ln in enumerate(lines, 1) if re.search(block["from"], ln)]
@@ -703,48 +567,7 @@ def examples_of(app: str, site: str) -> dict:
         "private": {"lines": pri["off"] + "\n" + pri["on"]},
         "updates": {"lines": upd["agent"] + "\n" + upd["build"]},
         "website": {"log": web["log"], "visit": pretty(web["visit"]), "anon": pretty(web["anon"])},
-        "webservers": {"page": proxy_headers(site, "/"), "admin": proxy_headers(site, "/admin/login")},
     }
-
-
-def proxy_headers(site: str, uri: str) -> str:
-    """The headers the front proxy's file adds to an answer for *uri*: its
-    site's server's add_header lines in their order, each variable as
-    nginx works it out - a map's value for that address (the string itself
-    first, then the regexes in order, else the default), the CSP from its
-    row in csp.snippet.txt (the proxy's nginx.conf holds it) - and none
-    whose value comes out empty: nginx sends no such header."""
-    with open(os.path.join(site, _PROXY), encoding="utf-8") as fh:
-        tree = nginx_tree(fh.read(), _PROXY)
-    with open(os.path.join(site, _CSP), encoding="utf-8") as fh:
-        csp = re.search(r'^\s*"dopeiptv\.org" "([^"]*)";', fh.read(), re.M).group(1)
-    maps = {n["words"][2]: n for n in tree["kids"] if n["words"][0] == "map" and n["kids"] is not None}
-    given = {"$uri": uri}
-
-    def value(var: str) -> str:
-        if var == "$csp_policy":
-            return csp
-        node = maps[var]
-        subject = given[node["words"][1]]
-        rows = [(k["words"][0], k["words"][1] if len(k["words"]) > 1 else "") for k in node["kids"]]
-        for key, out in rows:
-            if key == subject and key != "default" and not key.startswith("~"):
-                return out
-        for key, out in rows:
-            if key.startswith("~"):
-                pattern = re.sub(r"\(\?<(?=[A-Za-z_])", "(?P<", key[2:] if key.startswith("~*") else key[1:])
-                if re.search(pattern, subject, re.I if key.startswith("~*") else 0):
-                    return out
-        return dict(rows).get("default", "")
-
-    (server,) = nginx_find(tree, _MAIN)
-    out = []
-    for d in server["kids"]:
-        if d["kids"] is None and d["words"][0] == "add_header":
-            said = re.sub(r"\$[a-z_]+", lambda m: value(m.group(0)), d["words"][2])
-            if said:
-                out.append(f"{d['words'][1]}: {said}")
-    return "\n".join(out)
 
 
 def main(argv: list[str]) -> int:
@@ -763,8 +586,8 @@ def main(argv: list[str]) -> int:
     site_ref = a.site_ref or git(site, "rev-parse", "HEAD")
     shown = sorted({b["path"] for blocks in CODE.values() for blk in blocks
                     for b in [blk] + blk.get("with", []) if b["repo"] == "site"})
-    if git(site, "status", "--porcelain", "--", "donate", "deploy", *shown):
-        raise SystemExit("donate/, deploy/ or a file the page shows has changes not committed: "
+    if git(site, "status", "--porcelain", "--", "donate", *shown):
+        raise SystemExit("donate/ or a file the page shows has changes not committed: "
                          "the links would not match")
     with open(os.path.join(app, "dopeiptv/__init__.py"), encoding="utf-8") as fh:
         version = re.search(r'__version__ = "([^"]+)"', fh.read())
