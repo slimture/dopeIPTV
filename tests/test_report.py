@@ -380,6 +380,11 @@ def test_an_error_is_offered_after_its_code_and_never_over_a_video():
     assert "REPORT_WAITS_OK" in out.stdout, out.stdout + out.stderr[-3000:]
 
 
+@pytest.mark.parametrize("address", ["1.6.8.10", "1.6.8.255", "8.8.8.8", "192.168.1.20"])
+def test_valid_ipv4_including_version_like_addresses_is_redacted(address):
+    assert report.scrub(f"Remote: {address}") == "Remote: <ip>"
+
+
 @pytest.mark.parametrize("keep", ["21:05:03 INFO started", "std::string", "Qt::AlignLeft", "1.4.5", "a:b:c"])
 def test_ordinary_text_is_left_alone(keep):
     assert report.scrub(keep) == keep
