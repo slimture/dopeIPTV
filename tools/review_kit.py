@@ -31,6 +31,12 @@ NEXT = {
     ("updates", "signed"): ["_HOPS", "DOWNLOAD_MAX", "_get_https"],
 }
 
+#: Names the next release takes out of a part's code, left out when the app
+#: no longer has them (1.6.9: old room codes refused, so no old rounds).
+GONE = {
+    ("together", "key"): ["OLD_STRETCH"],
+}
+
 #: Excerpts whose markers the next release no longer has: (part, block,
 #: file, a marker still there in the released code, the names to show instead).
 MOVED = [
@@ -58,15 +64,18 @@ WHOLE = [
      "it should? Is anything run through a shell? Look at every place a program is started.",
      ["dopeiptv/core/player_exec.py", "dopeiptv/media/players.py", "dopeiptv/core/recording.py",
       "dopeiptv/core/rec_mp4.py", "dopeiptv/core/rec_extras.py", "dopeiptv/core/rec_view.py",
-      "dopeiptv/core/ytdlp.py", "dopeiptv/core/xdg.py", "dopeiptv/providers/cast_feed.py"]),
+      "dopeiptv/core/ytdlp.py", "dopeiptv/core/ytdlp_pin.py", "tools/ytdlp_pin.py",
+      "dopeiptv/core/xdg.py", "dopeiptv/providers/cast_feed.py"]),
     ("input", "everything it reads from providers, boxes, media servers, guides, pictures and subtitles",
      "Treat every answer as hostile: is each one size-limited, parsed safely (XML entities, deep "
      "nesting, huge numbers, slow regular expressions, pickle), and shown as plain text rather than "
-     "HTML? Which addresses from a provider may reach the player? Can a provider or a device on the "
+     "HTML? Which addresses from a provider may reach the player, and where can the app's own "
+     "requests land - a name that resolves to this computer, a redirect into the home network? "
+     "Can a provider or a device on the "
      "network crash the app, fill the disk or memory, make it read a local file or a network share "
      "(a Windows login hash), or make it open an internal address?",
-     ["dopeiptv/core/stream_address.py", "dopeiptv/core/picture_files.py", "dopeiptv/core/svg_safe.py",
-      "dopeiptv/core/_lazy_requests.py", "dopeiptv/core/workers.py", "dopeiptv/providers/client.py",
+     ["dopeiptv/core/stream_address.py", "dopeiptv/core/dest_guard.py", "dopeiptv/core/picture_files.py",
+      "dopeiptv/core/svg_safe.py", "dopeiptv/core/_lazy_requests.py", "dopeiptv/core/net_adapter.py", "dopeiptv/core/workers.py", "dopeiptv/providers/client.py",
       "dopeiptv/providers/stalker.py", "dopeiptv/providers/epg.py", "dopeiptv/providers/boxes.py",
       "dopeiptv/providers/enigma2.py", "dopeiptv/providers/satip.py", "dopeiptv/providers/lan_scan.py",
       "dopeiptv/providers/jellyfin.py", "dopeiptv/providers/plex.py", "dopeiptv/ui/widgets.py"]),
@@ -96,10 +105,12 @@ WHOLE = [
     ("profiles", "profiles, PINs, the parental lock and kids profiles",
      "How is a PIN kept and how many tries does guessing take? Can a kids profile or someone without "
      "the PIN reach a locked category's or an adult title - through History, Continue watching, "
-     "search, the phone remote, a rename, Settings or Nerd?",
+     "search, the phone remote, a rename, Settings or Nerd? Can a kids profile play a local file, a "
+     "recording or an address, leave for a grown-up's profile, or be made without a grown-up's PIN?",
      ["dopeiptv/core/pins.py", "dopeiptv/core/profiles.py", "dopeiptv/core/stores.py",
       "dopeiptv/ui/mw_profiles.py", "dopeiptv/ui/mw_lists.py", "dopeiptv/ui/mw_phone_browse.py",
-      "dopeiptv/core/mitt.py", "dopeiptv/ui/mw_search.py"]),
+      "dopeiptv/core/mitt.py", "dopeiptv/ui/mw_search.py", "dopeiptv/ui/profiles_ui.py",
+      "dopeiptv/ui/main_window.py"]),
     ("privacyall", "private viewing across the whole app",
      "Private viewing promises that nothing is kept or sent about what plays. Check every place that "
      "keeps or sends something about a playback - history, resume points, statistics, Trakt, Simkl, "
@@ -115,7 +126,7 @@ WHOLE = [
      [".github/workflows/release.yml", ".github/workflows/ci.yml", ".github/workflows/nightly.yml",
       "packaging/build-inputs.json", "tools/build_inputs.py", "tools/audit_deps.py",
       "requirements.txt", "dopeiptv/core/build_check.py", "dopeiptv/core/selfupdate.py",
-      "dopeiptv/core/update_keys.py"]),
+      "dopeiptv/core/update_keys.py", "tools/build_manifest.py", "tools/ytdlp_pin.py"]),
 ]
 
 #: The question over all the parts at once - the page's "copy everything".
@@ -168,6 +179,12 @@ def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
                     leaf = n.split(".")[-1]
                     if n not in block["names"] and re.search(rf"^\s*(def|class)?\s*{re.escape(leaf)}\b", src, re.M):
                         block["names"].append(n)
+    for (part, bid), names in GONE.items():
+        for block in transparency.CODE.get(part, []):
+            if block["id"] == bid:
+                src = open(os.path.join(app, block["path"]), encoding="utf-8").read()
+                block["names"] = [n for n in block["names"] if n not in names
+                                  or re.search(rf"^{re.escape(n)}\b", src, re.M)]
     # Where the app at *ref* has moved on from the excerpt's markers (the next
     # release), the excerpt follows it by name instead.
     for part, bid, path, marker, names in MOVED:
