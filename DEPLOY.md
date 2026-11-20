@@ -1883,18 +1883,28 @@ jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
 
 The keys' tmpfs holds the sketches now as well - two months of them, a few
 hundred kilobytes on a quiet site, more on a busy one - so it gets room
-for them: 16 MB. `IPTV_UID` and `IPTV_GID` as when it was made
-(`jexec dopeiptv id -u iptv`, `id -g iptv`). Growing it in place keeps the
-keys; if `mount -u` refuses, the second way empties it - the month's
-visitors before and after count twice, nothing more:
+for them: 16 MB. FreeBSD's `mount -u` refuses a tmpfs's `mode`, so it is
+mounted anew with the service stopped - which empties it: the month's
+visitors before and after count twice, nothing more. The owner is the
+service's user by number, read here (`U`, `G`), never a name typed by
+hand - a tmpfs owned by root is one the service cannot write, and it then
+keeps the keys in its memory alone:
 
 ```sh
-sed -i '' 's|tmpfs rw,size=1m,|tmpfs rw,size=16m,|' /usr/local/bastille/jails/dopeiptv/fstab
+U=$(jexec dopeiptv id -u iptv); G=$(jexec dopeiptv id -g iptv); echo "$U $G"
+K=/usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys
+sed -i '' -e 's|tmpfs rw,size=1m,|tmpfs rw,size=16m,|' -e "s|uid=[^,]*,gid=[^ ]*|uid=$U,gid=$G|" /usr/local/bastille/jails/dopeiptv/fstab
 grep iptv-stats-keys /usr/local/bastille/jails/dopeiptv/fstab
-mount -u -o size=16m /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys \
-  || { umount /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys && mount -t tmpfs -o size=16m,mode=0700,uid=IPTV_UID,gid=IPTV_GID tmpfs /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys && service -j dopeiptv iptv_donate restart; }
-jexec dopeiptv df -h /var/db/iptv-stats-keys
+service -j dopeiptv iptv_donate stop
+umount $K
+mount -t tmpfs -o size=16m,mode=0700,uid=$U,gid=$G tmpfs $K
+service -j dopeiptv iptv_donate start
+ls -ldn $K
 ```
+
+`ls -ldn` shows `drwx------` and the two numbers `echo` printed; a minute
+later `jexec dopeiptv ls -l /var/db/iptv-stats-keys/` shows `keys.json`
+and `sketches.json`, the service's own.
 
 Then, a minute later, nothing of the statistics' rows or sketches is on
 the disk any more:
@@ -1964,6 +1974,32 @@ swapoff /dev/ada0p3 && swapon /dev/ada0p3.eli
 swapctl -l
 jexec dopeiptv swapctl -l
 ```
+
+**Swap on a ZFS volume** (`/dev/zvol/zroot/swap`, as a ZFS install makes
+it): it is switched on at boot either by its `org.freebsd:swap` property or
+by a line in `/etc/fstab`. geli needs the volume as a GEOM provider
+(`volmode` `default` or `geom`). The property off, the line `.eli`, and
+the volume's old pages written over before it is used again (ZFS frees the
+old blocks; with no snapshot of it they are not kept):
+
+```sh
+zfs get -H -o property,value volmode,org.freebsd:swap zroot/swap
+grep -n swap /etc/fstab
+zfs set org.freebsd:swap=off zroot/swap
+grep -q 'zvol/zroot/swap' /etc/fstab \
+  && sed -i '' 's|^/dev/zvol/zroot/swap[[:space:]]|/dev/zvol/zroot/swap.eli |' /etc/fstab \
+  || echo '/dev/zvol/zroot/swap.eli none swap sw 0 0' >> /etc/fstab
+grep -n swap /etc/fstab
+swapoff /dev/zvol/zroot/swap
+dd if=/dev/zero of=/dev/zvol/zroot/swap bs=1m || true
+swapon /dev/zvol/zroot/swap.eli
+swapctl -l
+```
+
+`swapctl -l` then lists `/dev/zvol/zroot/swap.eli`. `swapoff` refuses
+while what is swapped out does not fit in memory: then the two lines that
+change the property and `/etc/fstab`, and a reboot. `dd` ends with "end
+of device", which is expected.
 
 The files and the service:
 
