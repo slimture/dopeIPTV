@@ -488,6 +488,9 @@ class SeriesPage(QWidget):
     season_shown = pyqtSignal(int)
     season_picked = pyqtSignal(int)
     retry_requested = pyqtSignal()
+    #: The episode card that is current now (a click, an arrow, the page
+    #: going to one), or None while there is none.
+    picked = pyqtSignal(object)
 
     #: A second ask to play the same episode within this long is the
     #: same ask (a double click, a key held down).
@@ -567,6 +570,8 @@ class SeriesPage(QWidget):
         self.view = EpisodeView()
         self.model = EpisodeModel(self.view)
         self.view.setModel(self.model)
+        self.view.selectionModel().currentChanged.connect(
+            lambda _c, _p: self.picked.emit(self.view.current_item()))
         self.delegate = EpisodeDelegate(self)
         self.view.setItemDelegate(self.delegate)
         self.view.play.connect(self._play)

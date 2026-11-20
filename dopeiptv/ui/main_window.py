@@ -572,11 +572,16 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # provider list but a string one from a JSON-roundtripped source (Home
         # cache, favourites, history), and a type mismatch here left the poster
         # button on 'play' while that channel's catch-up was in fact playing.
+        from_page = self._sp_detail_playing()
         playing_this = (p is not None and p.current_url is not None
                         and self._playing_key is not None
                         and self._current_key is not None
                         and str(self._current_key) == str(self._playing_key))
-        if not playing_this and self._series_page_playing():
+        if from_page is not None:
+            # The column shows a series' page's pick: the button is that
+            # episode's (or the series' while no card is picked).
+            playing_this = from_page
+        elif not playing_this and self._series_page_playing():
             # A series' page: the row selected in the list is the series,
             # never the episode that plays - the poster read "play" while an
             # episode of this very series played, and a click started it over.
@@ -793,7 +798,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             return
         state = self._overlay_state()
         if state == "play":
-            self.play("mpv")
+            if not self._detail_play():
+                self.play("mpv")
         elif state == "stop":
             if self.player:
                 # The button, not player.stop(): it is what also ends the

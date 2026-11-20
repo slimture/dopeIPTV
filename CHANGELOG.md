@@ -22,6 +22,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   last TV channel's logo, and its button would have started that channel.
   Every way an episode starts goes through it (the series' page, Continue,
   the next episode, TV mode, the phone, watch together).
+- A series shows its poster under the video when it is clicked, as a
+  channel or a film does: opening its page (from the Series place, a list,
+  Mine, Search or Now playing) shows the series at once, and the episode
+  picked on the page - one click, the arrows - follows there with the
+  series' poster, plot and cast. The poster's button plays that episode
+  (or the series' next one), never the list's row behind the page. The
+  page's series_info answer is shared, so nothing is asked twice.
 - Ctrl+C in the terminal the app was started from closes the window as its
   close button does (the player, recordings and settings let go in order);
   it was raised inside whatever Qt callback ran then and offered as a crash

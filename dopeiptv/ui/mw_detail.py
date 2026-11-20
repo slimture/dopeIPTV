@@ -40,8 +40,13 @@ class _DetailMixin:
 
     POSTER_SIZE_LIVE = (112, 112)
     POSTER_SIZE_MEDIA = (170, 255)
+    #: A series' page's pick the column shows - (episode or None for the
+    #: series itself, series, local title or None, episode key) - so the
+    #: poster's button plays what the column shows (mw_series_page).
+    _detail_episode: tuple | None = None
 
     def _show_detail(self, it) -> None:
+        self._detail_episode = None
         self._detail_film_continue(None)
         self.now_card.hide()
         self.media_info.hide()
@@ -298,11 +303,14 @@ class _DetailMixin:
             return
         self._current_key = key
         self._show_detail({**ep, "_kind": "episode", "_series_ctx": series})
+        self._detail_episode = (ep, dict(series), None, key)
+        self._apply_play_icon()
 
     def _show_continue_episode_detail(self, it) -> None:
         """Continue-watching episode row: show the series' poster + info (plot,
         cast, genre) with the episode's name, since the row itself carries no
-        series_id to resolve."""
+        series_id to resolve. ``_info_later``: the series' page asks its
+        series_info itself, so nothing is asked twice."""
         ctx = it.get("_series_ctx") or {}
         self.d_logo.show()
         self.play_mpv.show()
@@ -316,7 +324,7 @@ class _DetailMixin:
             (ctx.get("name") or self._detail_name).strip()[:1].upper())
         self._load_detail_poster(ctx, True, "series")
         sid = ctx.get("series_id")
-        if sid is not None:
+        if sid is not None and not it.get("_info_later"):
             self._request_media_info("series", sid, self._current_key)
 
     @property
