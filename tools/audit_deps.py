@@ -13,9 +13,12 @@ every system, not what happens to be installed here:
 
 pip-audit does the asking (PyPI's advisory database). A finding fails the
 run unless packaging/audit-allowlist.txt accepts it - with a reason, and a
-date after which it fails again, so nothing is accepted for good. When the
-advisory service cannot be reached nothing is known, and that is said as a
-warning, not as a failure: CI must not go red because a server is down.
+date after which it fails again, so nothing is accepted for good. An audit
+that did not finish fails as well (exit 2): the advisory service could not
+be reached (asked again twice, a minute apart), pip-audit gave no answer,
+or a pinned package went unchecked (its skip_reason, or missing from the
+answer). Nothing passes that was not checked - the release's signing waits
+for this check (release.yml, job audit).
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCK = os.path.join(ROOT, "packaging", "requirements-release.txt")
@@ -104,12 +108,40 @@ def ask(pins: list[tuple[str, str]], runner=subprocess.run) -> list[dict] | None
                   f"{(proc.stderr or '').strip()[-300:]}")
             return None
     found = []
+    checked = set()
     for dep in doc.get("dependencies", []) if isinstance(doc, dict) else []:
+        if not isinstance(dep, dict):
+            continue
+        name = _norm(str(dep.get("name")))
+        if dep.get("skip_reason"):
+            print(f"::error::pip-audit did not check {name}: {str(dep.get('skip_reason'))[:200]}")
+            continue
+        checked.add(name)
         for v in dep.get("vulns") or []:
-            found.append({"name": _norm(str(dep.get("name"))), "version": str(dep.get("version")),
+            found.append({"name": name, "version": str(dep.get("version")),
                           "id": str(v.get("id")), "aliases": [str(a) for a in v.get("aliases") or []],
                           "fix": ", ".join(v.get("fix_versions") or [])})
+    missing = sorted({n for n, _v in pins} - checked)
+    if missing:
+        print(f"::error::pip-audit left unchecked: {', '.join(missing)[:500]}")
+        return None
     return found
+
+
+#: An audit that could not ask is asked again this many times, so long apart.
+TRIES, WAIT = 3, 60.0
+
+
+def ask_until(pins: list[tuple[str, str]], runner=subprocess.run, sleep=time.sleep) -> list[dict] | None:
+    """ask(), tried again when it could not ask - None only when no try did."""
+    for n in range(TRIES):
+        got = ask(pins, runner)
+        if got is not None:
+            return got
+        if n + 1 < TRIES:
+            print(f"   asked again in {WAIT:.0f} s ({n + 2} of {TRIES})")
+            sleep(WAIT)
+    return None
 
 
 def judge(found: list[dict], allowed: dict[tuple[str, str], tuple[datetime.date, str]],
@@ -134,7 +166,7 @@ def judge(found: list[dict], allowed: dict[tuple[str, str], tuple[datetime.date,
     return bad, ok
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, asker=None) -> int:
     p = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     p.add_argument("--today", default="", help="YYYY-MM-DD (tests)")
     a = p.parse_args(argv)
@@ -150,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"== {title}: {len(pins)} pinned packages")
         found: list[dict] = []
         for batch in batches(pins):
-            got = ask(batch)
+            got = (asker or ask_until)(batch)
             if got is None:
                 unknown = True
                 continue
@@ -169,7 +201,9 @@ def main(argv: list[str] | None = None) -> int:
               "reason, in packaging/audit-allowlist.txt.")
         return 1
     if unknown:
-        print("::warning::the advisory service could not be asked this time: nothing is known, nothing failed")
+        print("::error::the audit did not finish: what is shipped was not all checked, so it does not "
+              "pass - run it again once the advisory service answers")
+        return 2
     return 0
 
 

@@ -830,10 +830,26 @@ class _RecordingMixin(_TimeshiftMixin):
             j["_go_ahead"] = True
             self.rec.tick()
 
+    def _rec_private_ok(self) -> bool:
+        """Watching privately (core/privacy): a recording is a file kept in
+        Recordings, with its place in the list, after private viewing ends
+        too - asked first, Cancel the default. The phone and TV mode ask it
+        as their own (_choice_dialog)."""
+        from ..core import privacy
+        if not privacy.playing_private():
+            return True
+        idx = self._choice_dialog(
+            tr("rec_private_title"), tr("rec_private_body"),
+            [(tr("rec_private_go"), "normal"), (tr("common_cancel"), "primary")])
+        log.info("recording: %s while watching privately", "asked and kept" if idx == 0 else "not made")
+        return idx == 0
+
     def _record_now(self, it, minutes, title_override=None) -> None:
         if it.get("stream_id") is None:
             return
         if not self._within_storage_cap():
+            return
+        if not self._rec_private_ok():
             return
         title = title_override or self.channel_display_name(it)
         now = time.time()
@@ -976,6 +992,8 @@ class _RecordingMixin(_TimeshiftMixin):
         if not self._recorder_ready() or it.get("stream_id") is None:
             return
         if not self._within_storage_cap():
+            return
+        if not self._rec_private_ok():
             return
         d = QDialog(self)
         d.setWindowTitle(tr("rec_schedule_recording").rstrip("."))

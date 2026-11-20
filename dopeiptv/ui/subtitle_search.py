@@ -8,6 +8,7 @@ back to its name; the text can be edited and searched again.
 from __future__ import annotations
 
 import html
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -59,18 +60,30 @@ def cached_file(file_id: int) -> Path | None:
         return None
 
 
-def save_subtitle(row: dict, name: str, data: bytes) -> Path:
+def save_subtitle(row: dict, name: str, data: bytes, private: bool = False) -> Path | str:
     """Write a fetched subtitle where it can be found again. Named after
     the release and the language, so the player's track list reads well
-    and mpv takes the language from the name."""
+    and mpv takes the language from the name. *private* (core/privacy):
+    never on the disk - in memory out of a disk's reach (core/memory_safe),
+    named for this run so a crash's is swept, or where there is none an
+    address mpv reads the bytes from itself (``hex://``), no file at all."""
     ext = (name.rsplit(".", 1)[-1] if "." in name else "srt").lower()
     if not re.fullmatch(r"[a-z0-9]{2,4}", ext):
         ext = "srt"
     stem = re.sub(r"[^\w .()-]+", "_", row.get("release") or "subtitle")
     stem = stem.strip(" ._")[:80] or "subtitle"
     lang = re.sub(r"[^A-Za-z-]", "", row.get("language") or "") or "und"
-    folder = subtitle_dir()
-    folder.mkdir(parents=True, exist_ok=True)
+    if private:
+        from ..core import memory_safe
+        base = memory_safe.private_folder("subs")
+        if base is None:
+            return "hex://" + bytes(data).hex()
+        memory_safe.sweep(base)
+        folder = base / f"{os.getpid()}-subs"
+        folder.mkdir(exist_ok=True, mode=0o700)
+    else:
+        folder = subtitle_dir()
+        folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{stem} [{int(row['file_id'])}].{lang}.{ext}"
     path.write_bytes(data)
     return path
@@ -274,7 +287,9 @@ class SubtitleSearchDialog(QDialog):
             if have is not None:
                 return str(have), None
             name, data = client.download(row["file_id"])
-            return str(save_subtitle(row, name, data)), client.remaining
+            from ..core import privacy
+            return str(save_subtitle(row, name, data, private=privacy.playing_private())), \
+                client.remaining
 
         def done(res: tuple[str, int | None]) -> None:
             path, remaining = res

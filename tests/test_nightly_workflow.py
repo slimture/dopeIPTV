@@ -31,9 +31,9 @@ def test_the_release_workflow_can_be_called_with_a_nightly_version():
              "      - name: Nightly version\n"
              "        if: ${{ inputs.nightly_version }}\n")
     assert RELEASE.count(stamp) == 5
-    # The other two checkouts are the checksums job's and the ytdlp-pin
-    # job's, which build nothing.
-    assert RELEASE.count("uses: actions/checkout@") == len(checkouts) == 7
+    # The other three checkouts are the checksums job's, the ytdlp-pin
+    # job's and the audit's, which build nothing.
+    assert RELEASE.count("uses: actions/checkout@") == len(checkouts) == 8
 
 
 def test_a_release_still_attaches_only_on_a_tag():

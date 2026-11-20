@@ -297,7 +297,11 @@ Nothing a build runs or ships is "whatever is newest that day":
   Flatpak's wheels. A known vulnerability fails the job: move the lock (or
   the manifest) to the fixed version, or accept it for a while in
   `packaging/audit-allowlist.txt` with a reason and a date after which it
-  fails again. A service that cannot be reached is a warning, not a failure.
+  fails again. An audit that did not finish fails too (exit 2): the
+  advisory service not reached after three tries a minute apart, or a
+  package pip-audit left unchecked - run the job again once it answers.
+  `release.yml` runs the same audit; its `checksums` job (the signing) runs
+  only once it passed.
 - **The yt-dlp the app may download** for web streams is named in the
   build, not at the user's: `release.yml`'s first job, `ytdlp-pin`, runs
   `tools/ytdlp_pin.py --or-none`, which takes the newest yt-dlp release,

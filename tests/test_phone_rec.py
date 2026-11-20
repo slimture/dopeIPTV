@@ -136,6 +136,7 @@ def window(tmp_path, monkeypatch):
         _within_storage_cap = R._within_storage_cap
         _fmt_gb = R.__dict__["_fmt_gb"]
         _record_now = R._record_now
+        _rec_private_ok = R._rec_private_ok
         _record_in_background = R._record_in_background
         _with_conn_warning = R._with_conn_warning
         _one_more_over = R._one_more_over

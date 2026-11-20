@@ -29,7 +29,11 @@ disagree, the code is what runs and the sentence is a bug: report it.
   what the person turned on - Trakt, Simkl, their own media server,
   Discord, a Watch together room. With private viewing, a playback that
   began private keeps and sends nothing to its end, whatever is switched
-  meanwhile (`core/privacy.py`, `playback_private`, `for_log`).
+  meanwhile (`core/privacy.py`, `playback_private`, `for_log`) - and writes
+  no media of it to a disk: a rewind buffer, a cast's converted stream, a
+  fetched subtitle only in memory that swap cannot carry to a disk
+  (`core/memory_safe.py`), or not at all; a recording only once asked
+  ([below](#private-viewing-writes-nothing-to-a-disk)).
 - **The household's settings and its sync copy.** On disk the settings
   files are this user's alone. The sync copy on dopeiptv.org is encrypted
   on the computer with a key the site never sees (`core/sync.py`). A
@@ -258,7 +262,7 @@ GitHub Action, a build runner, GitHub itself - or the release key.
 | They could try | What stops it |
 |---|---|
 | A new version of a package on PyPI | `packaging/requirements-release.txt`: every version and the SHA-256 of every file pip may take; `release.yml` installs with `-c` and pip refuses the rest |
-| A known vulnerability in a shipped package | CI's audit job (`tools/audit_deps.py`); an exception only in `packaging/audit-allowlist.txt`, with a reason and a date |
+| A known vulnerability in a shipped package | CI's audit job and the release's (`tools/audit_deps.py`; the release is not signed until it passed - `release.yml`, `needs.audit.result`); an audit that did not finish fails too (exit 2: no answer after three tries, a package left unchecked); an exception only in `packaging/audit-allowlist.txt`, with a reason and a date |
 | A changed binary at a download address (libmpv for Windows, the AppImage runtime and tool, micromamba) or a moved git tag | `packaging/build-inputs.json`: each file's SHA-256 and each tree's commit, fetched only through `tools/build_inputs.py` |
 | A changed action, or a token left in a clone | Actions named by commit, workflows read-only unless a job says otherwise, `persist-credentials: false` (`.github/workflows/`) |
 | A download swapped on GitHub or on the site | The signed `SHA256SUMS` (`tools/sign_sums.py`) checked by the app and by the site; GitHub's artifact attestations: `gh attestation verify <file> --repo slimture/dopeIPTV` |
@@ -627,21 +631,68 @@ them (`core/dvr_store.py`, `core/log.log_dir`). Where the home folder lets
 another account in, it can read them. The log is scrubbed of logins and
 tokens (`core/log.py`), keeps a private playback's titles out
 (`privacy.for_log`), and a private channel's rewind buffer is deleted when
-it is left. A channel private from its start keeps its buffer in memory
-instead - Linux's `$XDG_RUNTIME_DIR` when it is this user's own tmpfs, with
-a budget of its own (`core/dvr_store.memory_base`, `memory_budget`) - so
-nothing of it reaches the disk. The folder it writes into is checked
-itself before a byte is: a folder, not a link, this user's own, 0700, and
-in memory where it really is by the mount table - so a link under the
-runtime folder to a disk, or a disk mounted there, is found
-(`memory_folder`; `NotInMemory`, and no connection opened for the try).
-On macOS and Windows, with too little room, or where that check fails, it
-is on disk, marked and deleted as before - and the log says so. What runs
-as the same user can still read the buffer while it is being written, as
-it can read the screen.
+it is left. A channel private from its start keeps its buffer only in
+memory out of a disk's reach, or has none
+([below](#private-viewing-writes-nothing-to-a-disk)). What runs as the
+same user can still read a buffer while it is being written, as it can
+read the screen.
 
 *Why:* on most current systems a home folder is closed to other accounts.
 Open work.
+
+### Private viewing writes nothing to a disk
+
+What the app makes of a private playback - the rewind buffer, a cast's
+converted stream (its HLS segments and the spool a pause is kept in, the
+Chromecast's and the Apple TV's converter alike), a subtitle fetched for
+it - goes only to a folder in memory that swap cannot carry to a disk, or
+is not made at all (`core/memory_safe.py`):
+
+- **In memory, for real.** Linux's `$XDG_RUNTIME_DIR` when it is this
+  user's own (0700, theirs) and a tmpfs by the mount table
+  (`private_base`), and a folder there made and checked itself - not a
+  link, this user's own, 0700, in memory where it really is (`own_folder`,
+  `stays_in_memory`; a link under the runtime folder to a disk, or a disk
+  mounted there, is found).
+- **Out of swap's reach.** A tmpfs's pages can be swapped out, so it
+  counts only when what swap keeps cannot be read from a disk afterwards
+  (`swap_safe`): no swap, every swap area zram without a backing device or
+  dm-crypt - directly, or under LVM or another mapping whose every part is
+  one - a swap file on such a device; or the tmpfs mounted `noswap`, or
+  ramfs. Swap on a plain partition, a swap file on a plain disk, a system
+  that cannot be asked: not memory, said once in the log.
+- **Else nothing.** A private channel then plays with no rewind buffer of
+  the app's (`dvr_pool.NoPrivateBuffer`: no connection opened for the try,
+  the player opens the provider's address), mpv's own rewind stays in its
+  memory even where Settings put it on the disk (`cache-on-disk`), a cast
+  that needs converting is refused with the reason (`cast_err_private_memory`
+  - the converter of the stream before goes first), a subtitle reaches mpv
+  as bytes in its address (`hex://`), no file. A copy of a subtitle without
+  stray right-to-left marks is not made.
+- **Turned on midway.** Private viewing turned on while a channel plays
+  from a buffer on the disk - the app's or mpv's - opens it again, in
+  memory or with none, and the disk buffer goes (`private_reopen_needed`,
+  `DvrPool.on_disk_private`); a cast whose converter works on the disk is
+  sent again under the same rule (`_cast_private_on`). A disk buffer a
+  recording or a cast reads goes on: what it writes is written for them,
+  and a second connection is not opened beside it.
+- **A recording asks.** A recording of what plays, or one set from the
+  guide, while viewing privately is a file kept in Recordings with its
+  name: asked first, Cancel the default - on the phone and in TV mode as
+  their own question (`_rec_private_ok`).
+- **A crash.** What a run that ended without tidying left in memory is
+  swept at the next start (`memory_safe.sweep`: entries named by their
+  process, only one that has ended); a reboot empties it anyway.
+
+macOS and Windows have no such folder for the app: there a private channel
+has no rewind buffer and a private cast is not converted. Their swap is
+encrypted by the system (macOS always; Windows with BitLocker), but the
+app does not count on it.
+
+*What is left.* The player's own memory - mpv's demuxer cache, the decoded
+picture - is the process's memory, which the system may swap like any
+other; that is protected only as the system's swap is. A hibernation image
+is the same.
 
 ### Any program on the session bus can drive the app
 

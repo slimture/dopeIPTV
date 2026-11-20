@@ -1630,6 +1630,29 @@ class _CastMixin(_CastMomentMixin):
         bits.append(t.get("codec") or "?")
         return " · ".join(bits)
 
+    def _cast_private_on(self) -> None:
+        """Private viewing turned on during a cast whose converter works on
+        the disk (providers/cast_bridge, airplay_bridge): sent again the way
+        a stuck cast is - the converter's run before goes first, and the new
+        one keeps its work in memory out of a disk's reach, or refuses and
+        the send says why (cast_err_private_memory). A cast the TV fetches
+        itself writes nothing here and goes on as it is."""
+        if not getattr(self, "_cast_device", None) or self._cast_busy():
+            return
+        bridge = getattr(getattr(self, "cast", None), "bridge", None)
+        on_disk = getattr(bridge, "on_disk", None)
+        try:
+            if not (callable(on_disk) and on_disk()):
+                return
+        except Exception:
+            log.debug("cast: the converter's folder not known", exc_info=True)
+            return
+        ctx = getattr(self, "_cast_ctx", None) or {}
+        log.info("private viewing: the cast's converter works on the disk - sent again")
+        self._cast_restart(ctx)
+        # A refusal is said, never tried again by the watchdog.
+        ctx.pop("_recovering", None)
+
     def _recast_with(self, audio, subs, start: float | None = None,
                      settle: bool = False) -> None:
         """Cast the same title again with different tracks, from where the TV

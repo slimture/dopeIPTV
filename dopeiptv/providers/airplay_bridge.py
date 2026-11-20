@@ -49,9 +49,9 @@ from ..core.log import log
 from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
 from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
-from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
-                          cast_cache_dir, ffmpeg_path, lan_address,
-                          video_encoder)
+from .cast_bridge import (PRIVATE_CAP, _endless, _hls_file, _hls_name_ok, _timeshift,
+                          cast_cache_dir, ffmpeg_path, lan_address, private_cap,
+                          private_cast_dir, video_encoder)
 
 # What an Apple TV plays out of an HLS stream: these are copied untouched.
 COPY_VIDEO = frozenset({"h264", "hevc"})
@@ -495,6 +495,8 @@ class AirPlayBridge:
         self.exe: str | None = None          # a stand-in, for tests
         self.prefix: str | None = None
         self.folder: str | None = None
+        #: What it converts is private: its segments in memory alone.
+        self.private = False
         self.url: str = ""
         self.plan: Plan | None = None
         self.error = ""
@@ -526,6 +528,11 @@ class AirPlayBridge:
         p = self._proc
         return p is not None and p.poll() is None
 
+    def on_disk(self) -> bool:
+        """Whether a run is going whose segments are on the disk - for
+        private viewing turned on meanwhile, which sends the cast again."""
+        return self._server is not None and not getattr(self, "private", False)
+
     def start(self, p: Plan, start: float = 0.0,
               net: list[str] | None = None,
               feed: cast_feed.Feed | None = None,
@@ -540,9 +547,25 @@ class AirPlayBridge:
         exe = self.exe or ffmpeg_path()
         if not exe:
             raise RuntimeError("no ffmpeg")
+        # What plays privately (core/privacy): its segments in memory out of
+        # a disk's reach (cast_bridge.private_cast_dir), or not converted at
+        # all - never on the disk. The run before has gone already.
+        from ..core import privacy
+        self.private = bool(privacy.playing_private())
+        private_dir = private_cast_dir() if self.private else None
+        if self.private and not (private_dir and private_cap(private_dir, PRIVATE_CAP)):
+            if feed is not None:
+                feed.close()
+            log.info("airplay bridge: a private cast is not converted - no memory out of a "
+                     "disk's reach for its work")
+            from ..i18n import LocalizedError
+            raise LocalizedError("cast_err_private_memory")
         self.plan, self.error, self.remote_seen = p, "", False
         self._tail.clear()
-        self.folder = tempfile.mkdtemp(prefix=folder_prefix(), dir=_cache_dir())
+        if private_dir:
+            self.folder = tempfile.mkdtemp(prefix=f"{os.getpid()}-airplay-", dir=private_dir)
+        else:
+            self.folder = tempfile.mkdtemp(prefix=folder_prefix(), dir=_cache_dir())
         self.prefix = f"/{secrets.token_urlsafe(18)}/"
         server = _Server(("0.0.0.0", 0), _Handler)
         server.bridge = self

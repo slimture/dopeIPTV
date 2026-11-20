@@ -178,6 +178,27 @@ and what was done:
 | Phone remote | A web page that pointed its own name at this computer could make failed tries that shut the phone out for a while | low | 1.6.9: a Host that is no name of the home is refused (421) before anything is counted (`home_net.home_host`) |
 | Phone remote | An attacker who controls the home network's traffic can change the page | documented | Accepted as written down (docs/SECURITY.md, "The home network's servers speak plain http"); the remote is off until turned on |
 
+## November 2026 - fifth independent AI review of 1.6.9 (testing)
+
+The kit from `testing` (8a1ee68) and the website (ee704ee): **8/10**;
+private viewing 6/10, the website's statistics 7/10. Again no way for
+someone far away to steal a provider's login or slip in an unsigned update.
+What it found, and what was done:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Private viewing | A cast's converter kept its work - HLS segments, the spool a pause is kept in - in the disk cache, private or not; private viewing turned on midway did not touch it | medium | 1.6.9: what plays privately is converted only in memory out of a disk's reach (`cast_bridge.private_cast_dir`, the Apple TV's bridge too), else the cast is refused with the reason; private viewing turned on sends a disk-converted cast again under that rule (`_cast_private_on`); a crash's leftovers in memory swept at the next start |
+| Private viewing | tmpfs may swap: "in memory" was not "never on a disk" | medium | 1.6.9: a folder counts as memory only when swap cannot carry it to a disk - no swap, zram, dm-crypt (under LVM too), a swap file on such a device, or a tmpfs mounted `noswap` (`core/memory_safe.py`) |
+| Private viewing | Too little memory or a failed check put a private buffer on the disk | low | 1.6.9: no buffer at all then (`dvr_pool.NoPrivateBuffer`, no connection opened for the try); a disk buffer of the channel from before goes as it is watched privately; mpv's own disk cache never for a private playback; private viewing turned on opens a disk-buffered channel again |
+| Private viewing | Recordings and other outputs were not asked | low | 1.6.9: a recording while viewing privately is asked first, Cancel the default (`_rec_private_ok`, the phone and TV mode too); a fetched subtitle in memory or as bytes in mpv's address, never a file; no copy of a subtitle in the cache |
+| Website statistics | `STATS_VISITS_DAYS` could keep visits past 14 days | low | website: never more than 14 (`VISITS_DAYS_MAX`), said at the start |
+| Website statistics | A failed deletion of what should be gone was silent | medium | website: every one through `_gone` - said once, tried again every run; after each run `left_behind` lists what should no longer exist and `sweep_left` deletes it; what stays is said at the top of the admin page |
+| Website statistics | The keys and sketches on a tmpfs could reach a disk through swap | medium | website: the server's swap encrypted with a one-time key (DEPLOY.md, `.eli`); `swap_state` asks the system, swap that keeps what it is given is said in the start line and on the admin page |
+| Website statistics | The privacy policy said the key was never in a file, that a restart of the service forgets it, and named two statistics logs of before | medium | website: corrected in English and Swedish, the transparency page too; `test_policy_text.py` fails on the old sentences |
+| Website server | The error logs kept a line with an address until removed by hand | low | website: both jails' error logs turned over every night, six days kept (DEPLOY.md, newsyslog) |
+| Supply chain | The dependency audit passed when it could not ask | medium | 1.6.9: an audit that did not finish fails (exit 2: no answer after three tries, a package left unchecked); the release runs it too and is not signed until it passed (`release.yml`, `needs.audit.result`) |
+| Media libraries, credentials on command lines, plain http at home, sync's first join, direct casting, parental denylist | Known limits | documented | As written down in docs/SECURITY.md; unchanged this round |
+
 ## The next round
 
 Before 1.6.9 is released: the kit made again from `testing` with these

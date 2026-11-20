@@ -70,8 +70,9 @@ jobs:
     # of the Flatpak's wheels, asked of PyPI's advisory database by pip-audit
     # (tools/audit_deps.py). A finding fails this job until the lock moves
     # to a fixed version - or packaging/audit-allowlist.txt accepts it, with
-    # a reason and a date after which it fails again. An advisory service
-    # that cannot be reached is a warning, never a failure.
+    # a reason and a date after which it fails again. An audit that did not
+    # finish - the advisory service not reached after three tries, a package
+    # left unchecked - fails too: nothing passes that was not checked.
     name: Known vulnerabilities in what is shipped
     runs-on: ubuntu-24.04
     steps:

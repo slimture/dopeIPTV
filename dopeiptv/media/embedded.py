@@ -1667,9 +1667,13 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 # 1-4 GB an hour for as long as a channel plays - so that is
                 # the user's choice, for a long rewind without the memory.
                 mpv_rewind = local_buffer and self._dvr is None
-                m["cache-on-disk"] = ("yes" if mpv_rewind
-                                      and self._live_rewind_disk() else "no")
-                m["demuxer-max-back-bytes"] = self._back_buffer(mpv_rewind)
+                # Never on a disk for a private playback (core/privacy): its
+                # rewind stays in mpv's memory, at the memory's size.
+                on_disk = bool(mpv_rewind and self._live_rewind_disk()
+                               and not self._dvr_playing_private())
+                m["cache-on-disk"] = "yes" if on_disk else "no"
+                self._mpv_cache_on_disk = on_disk
+                m["demuxer-max-back-bytes"] = self._back_buffer(mpv_rewind, on_disk)
             except Exception as e:
                 log.warning("live rewind buffer unavailable: %s", e)
             # Decode mode, set per stream (not in apply_default_options - that
@@ -2241,12 +2245,13 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         except (TypeError, ValueError):
             return 2
 
-    def _back_buffer(self, local_buffer: bool) -> int | str:
+    def _back_buffer(self, local_buffer: bool, on_disk: bool | None = None) -> int | str:
         """demuxer-max-back-bytes for the stream about to play: the live
-        rewind buffer, or what every other stream had before it."""
+        rewind buffer (on the disk or in memory, *on_disk*: as Settings say
+        when not given), or what every other stream had before it."""
         if local_buffer:
             return rewind_bytes(self._live_rewind_minutes(),
-                                self._live_rewind_disk())
+                                self._live_rewind_disk() if on_disk is None else on_disk)
         return os.environ.get("DOPEIPTV_DEMUX_MAX_BACK") or "50MiB"
 
     def _set_cache_secs(self, secs: int) -> None:

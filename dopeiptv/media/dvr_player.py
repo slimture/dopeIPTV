@@ -143,10 +143,15 @@ class DvrPlayerMixin:
                                           private=self._dvr_playing_private())
         except Exception as e:
             from ..core.dvr_ingest import NotAStream
+            from ..core.dvr_pool import NoPrivateBuffer
             if isinstance(e, NotAStream):
                 # Its provider sent a page or a message, not a stream: mpv
                 # opens the address itself and says what it found.
                 log.info("DVR: %s, not a stream - playing as before", e)
+            elif isinstance(e, NoPrivateBuffer):
+                # Watched privately with no memory out of a disk's reach:
+                # no buffer of the app's - never one on the disk.
+                log.info("DVR: private viewing - no rewind buffer of the app's (%s)", e)
             else:
                 log.warning("DVR: own buffer unavailable (%s) - playing as "
                             "before", e)
@@ -212,6 +217,16 @@ class DvrPlayerMixin:
         """Private viewing was turned on while a channel plays."""
         if self._dvr is not None:
             self._dvr.mark_private()
+
+    def private_reopen_needed(self) -> bool:
+        """Private viewing was turned on while a stream plays whose rewind
+        buffer is on the disk - the app's (core/dvr_pool.on_disk_private)
+        or mpv's own disk cache: it must be opened again, so what follows
+        is kept in memory or not at all."""
+        pool = self._dvr_pool
+        if self._dvr is not None and pool is not None and pool.on_disk_private():
+            return True
+        return bool(getattr(self, "_mpv_cache_on_disk", False))
 
     def dvr_forget_private(self) -> None:
         """Private viewing ended: the buffers of the channels left in it go."""

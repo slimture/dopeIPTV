@@ -36,11 +36,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Security
 
+- Private viewing writes nothing of what plays to a disk. A channel's
+  rewind buffer, a cast's converted stream and a fetched subtitle go only
+  to a folder in memory that swap cannot carry to a disk - no swap,
+  encrypted swap or zram, or a tmpfs never swapped - or are not made at
+  all: the channel plays with no rewind buffer, a cast that needs
+  converting is refused with the reason, a subtitle reaches the player with
+  no file. mpv's own rewind stays in memory too. Private viewing turned on
+  while a channel plays from a disk buffer opens it again, and a cast
+  converted on the disk is sent again under the same rule. A recording
+  while watching privately is asked first.
+- The audit of the packages a release ships fails when it could not check
+  them all, and a release is not signed until it passed.
 - A channel watched privately from its start keeps its rewind buffer in
   memory only when the very folder it writes into is: no link, this user's
-  own, 0700, on a file system in memory by the mount table. A link or a
-  disk under the runtime folder sends it to the disk, marked and deleted as
-  everywhere else, and the log says so - no second connection for the try.
+  own, 0700, on a file system in memory by the mount table - otherwise it
+  has none, and no second connection is opened for the try.
 - The phone remote refuses a Host that is no name of the home before it
   counts anything, so a web page pointing its own name at this computer
   cannot shut a phone out of its remote.

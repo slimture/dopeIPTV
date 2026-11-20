@@ -106,6 +106,17 @@ class _PrivacyMixin:
             dvr_base()                  # sweeps once, on a thread of its own
         except Exception:
             log.debug("private viewing: buffers not swept", exc_info=True)
+        # A private cast's work and a private subtitle a crash left in
+        # memory (core/memory_safe): gone now, not at the next logout.
+        import threading
+
+        def sweep() -> None:
+            from ..core import memory_safe
+            for name in ("cast", "subs"):
+                base = memory_safe.private_base(name)
+                if base is not None and base.is_dir():
+                    memory_safe.sweep(base)
+        threading.Thread(target=sweep, name="private-sweep", daemon=True).start()
 
     def _place_private_pill(self) -> None:
         pill = getattr(self, "_private_pill", None)
@@ -147,6 +158,17 @@ class _PrivacyMixin:
                 mark = getattr(p, "dvr_mark_private", None)
                 if callable(mark):
                     mark()
+                # A buffer on the disk - the app's or mpv's own - holds
+                # nothing more of it: the channel opened again, its buffer
+                # in memory out of a disk's reach, or none (core/dvr_pool).
+                reopen = getattr(p, "private_reopen_needed", None)
+                if callable(reopen) and reopen() and lp.get("kind") == "live":
+                    log.info("private viewing: the channel's buffer is on the disk - opened again")
+                    QTimer.singleShot(0, self._retry_last_stream)
+            # A cast whose converter works on the disk: sent again, its work
+            # in memory out of a disk's reach - or stopped and said so.
+            if hasattr(self, "_cast_private_on"):
+                self._cast_private_on()
             health = getattr(self, "health", None)
             if health is not None:
                 health.leave()

@@ -2027,9 +2027,30 @@ jobs:
   # person's approval (Settings > Environments: a required reviewer, the
   # secret there and not among the repository's): nothing signs a release
   # that the maintainer did not let through, whatever else ran before it.
+  # Known vulnerabilities in what is shipped, checked again for this very
+  # release (tools/audit_deps.py, as ci.yml's audit job): nothing is signed
+  # until it passed - a finding or an audit that did not finish keeps the
+  # signing job below from running at all.
+  audit:
+    name: Known vulnerabilities in what is shipped
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: '3.12'
+      - name: pip-audit, as pinned
+        run: |
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install --require-hashes -r packaging/requirements-audit.txt
+      - name: Audit
+        run: python tools/audit_deps.py
+
   checksums:
-    needs: [python-dist, linux-bundle, macos-dmg, windows-zip, flatpak]
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/') || (inputs.replace_macos_dmg || '') != '') }}
+    needs: [python-dist, linux-bundle, macos-dmg, windows-zip, flatpak, audit]
+    if: ${{ !cancelled() && needs.audit.result == 'success' && (startsWith(github.ref, 'refs/tags/') || (inputs.replace_macos_dmg || '') != '') }}
     runs-on: ubuntu-24.04
     environment: release-signing
     permissions:

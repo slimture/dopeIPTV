@@ -209,6 +209,42 @@ def cast_cache_dir() -> str:
     return str(base)
 
 
+#: A private cast's work in memory at most this much, and at most half of
+#: what that memory has free (the rest of the system lives there too).
+PRIVATE_CAP = 1 << 30
+#: Less than this free there and a private cast is not converted at all.
+PRIVATE_LEAST = 64 << 20
+
+
+def private_cast_dir() -> str | None:
+    """Where a cast's working files live while what it plays is private
+    (core/privacy): a folder in memory that swap cannot carry to a disk
+    (core/memory_safe), with what a run that ended without tidying left
+    there swept - or None, and a private cast is converted nowhere."""
+    try:
+        from ..core import memory_safe
+        base = memory_safe.private_folder("cast")
+        if base is None:
+            return None
+        memory_safe.sweep(base)
+        return str(base)
+    except Exception as e:      # never on a disk instead
+        log.info("cast bridge: no folder in memory for a private cast (%s)", e)
+        return None
+
+
+def private_cap(folder: str, cap: int) -> int:
+    """What a private cast's work may take in *folder*: the cap Settings
+    give, PRIVATE_CAP, half of what is free there - 0 when that is too
+    little to be worth it."""
+    try:
+        free = shutil.disk_usage(folder).free
+    except OSError:
+        return 0
+    room = min(int(cap), PRIVATE_CAP, max(0, free - PRIVATE_LEAST) // 2)
+    return room if room >= PRIVATE_LEAST else 0
+
+
 def ffmpeg_path() -> str | None:
     """Which ffmpeg to run, or None when there is none.
 
@@ -1169,6 +1205,11 @@ class CastBridge:
         self._current: tuple[subprocess.Popen, "_Spool", int] | None = None
         self._readers: dict[subprocess.Popen, int] = {}
         self._tmp: str | None = None
+        #: What it converts is private (core/privacy): its work only in
+        #: memory out of a disk's reach (private_cast_dir), never on one.
+        self.private = False
+        self._private_dir: str | None = None
+        self._private_cap = 0
         self._lock = threading.Lock()
 
     @staticmethod
@@ -1194,9 +1235,8 @@ class CastBridge:
         if "://" in source:
             return source
         try:
-            self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
             link = os.path.join(
-                self._tmp, "source" + os.path.splitext(source)[1])
+                self._tmpdir(), "source" + os.path.splitext(source)[1])
         except Exception as e:
             log.info("cast bridge: could not link the file (%s)", e)
             return source
@@ -1230,6 +1270,24 @@ class CastBridge:
         the only one then served (``receiver_addresses``).
         """
         self._stop(keep=feed)
+        # What plays privately: its work in memory out of a disk's reach, or
+        # not converted at all - the run before has gone already, so nothing
+        # more of it is written anywhere.
+        from ..core import privacy
+        self.private = bool(privacy.playing_private())
+        self._private_dir, self._private_cap = None, 0
+        if self.private:
+            folder = private_cast_dir()
+            room = private_cap(folder, self.cap) if folder else 0
+            if not room:
+                if feed is not None:
+                    feed.close()
+                log.info("cast bridge: a private cast is not converted - no memory out of a "
+                         "disk's reach for its work")
+                from ..i18n import LocalizedError
+                raise LocalizedError("cast_err_private_memory")
+            self._private_dir, self._private_cap = folder, room
+            log.info("cast bridge: a private cast's work in memory (%d MB)", room >> 20)
         self.peers = receiver_addresses(receiver)
         self._refused_told = False
         self.fatal = ""          # a new run gets to fail on its own terms
@@ -1333,8 +1391,21 @@ class CastBridge:
         all deleted the moment the cast ends.
         """
         if not self._tmp:
-            self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
+            if self.private:
+                # Named for this process, so a crash's leftovers are swept
+                # (private_cast_dir); never cast_cache_dir, a disk.
+                if not self._private_dir:
+                    raise OSError("no folder in memory for a private cast")
+                self._tmp = tempfile.mkdtemp(prefix=f"{os.getpid()}-cast-",
+                                             dir=self._private_dir)
+            else:
+                self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
         return self._tmp
+
+    def on_disk(self) -> bool:
+        """Whether a run is going whose work is on the disk - for private
+        viewing turned on meanwhile, which sends the cast again."""
+        return self._server is not None and not self.private
 
     # How long the receiver may be kept waiting for the first playlist.
     # ffmpeg has to open the provider, find the streams and write a segment
@@ -1559,7 +1630,7 @@ class CastBridge:
             began = time.monotonic()
             spool = _Spool(os.path.join(self._tmpdir(),
                                         f"spool{self.generation}"),
-                           self.cap)
+                           min(self.cap, self._private_cap) if self.private else self.cap)
             th = threading.Thread(target=self._spool_out, args=(proc, spool),
                                   daemon=True)
             with self._lock:

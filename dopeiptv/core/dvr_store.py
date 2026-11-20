@@ -10,16 +10,18 @@ go (Windows cannot delete an open file).
 
 A channel watched privately from its start keeps its segments in memory
 where the system has a folder there for this user alone (``memory_base``:
-Linux's ``$XDG_RUNTIME_DIR``, a tmpfs gone at logout and at a restart), with
-a budget of its own (``memory_budget``) - so nothing of it ever reaches the
-disk. Elsewhere it is on disk as any buffer, marked (``PRIVATE_MARK``) and
-deleted as it is left, and at the next start after a crash.
+Linux's ``$XDG_RUNTIME_DIR``, a tmpfs gone at logout and at a restart) whose
+contents swap cannot carry to a disk (core/memory_safe: no swap, encrypted
+swap or zram, or a tmpfs never swapped), with a budget of its own
+(``memory_budget``) - so nothing of it ever reaches the disk. Elsewhere a
+private channel has no buffer at all (core/dvr_pool). A buffer that was on
+disk when private viewing began is marked (``PRIVATE_MARK``), deleted as it
+is left, and at the next start after a crash.
 """
 from __future__ import annotations
 
 import os
 import shutil
-import sys
 import threading
 import time
 from collections.abc import Callable, Generator
@@ -27,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from . import memory_safe
 from .log import log, open_private, private_folder
 
 TS_PACKET = 188
@@ -505,94 +508,54 @@ MEMORY_MAX = 1 << 30
 MEMORY_MIN_FREE = 64 << 20
 #: Below this a buffer in memory is not worth it: the disk, as before.
 MEMORY_LEAST = 64 << 20
-#: The kinds of file system that live in memory alone.
-_IN_MEMORY = ("tmpfs", "ramfs")
-
-
-def _unescape(field: str) -> str:
-    # /proc/mounts writes a space, a tab, a newline and a backslash in octal.
-    for code, ch in (("\\040", " "), ("\\011", "\t"), ("\\012", "\n"), ("\\134", "\\")):
-        field = field.replace(code, ch)
-    return field
-
-
 def in_memory(path: Path, mounts: str | None = None) -> bool:
     """Whether *path* is on a file system in memory, by the mount table
     (Linux's /proc/self/mounts): the longest mount point it is under."""
-    if mounts is None:
-        try:
-            with open("/proc/self/mounts", encoding="utf-8", errors="replace") as fh:
-                mounts = fh.read(1 << 20)
-        except OSError:
-            return False
-    where = os.path.realpath(str(path))
-    best, kind = "", ""
-    for line in mounts.splitlines():
-        parts = line.split()
-        if len(parts) < 3:
-            continue
-        point = _unescape(parts[1]).rstrip("/") or "/"
-        if (where == point or where.startswith(point.rstrip("/") + "/")) and len(point) > len(best):
-            best, kind = point, parts[2]
-    return kind in _IN_MEMORY
+    return memory_safe.in_memory(path, mounts)
 
 
 def memory_base(env: dict | None = None, mounts: str | None = None,
                 platform: str | None = None) -> Path | None:
     """Where a private session's buffer goes in memory: a folder under
     ``$XDG_RUNTIME_DIR`` - only on Linux, only when it is this user's own
-    (0700, theirs) and on tmpfs; None anywhere else."""
-    if (platform or sys.platform) != "linux":
-        return None
-    run = (os.environ if env is None else env).get("XDG_RUNTIME_DIR") or ""
-    if not run or not os.path.isabs(run):
-        return None
-    try:
-        st = os.stat(run)
-    except OSError:
-        return None
-    import stat as _stat
-    if not _stat.S_ISDIR(st.st_mode) or st.st_mode & 0o077 or st.st_uid != os.getuid():
-        return None
-    if not in_memory(Path(run), mounts):
-        return None
-    return Path(run) / "dopeiptv-dvr"
+    (0700, theirs) and on tmpfs; None anywhere else (core/memory_safe)."""
+    return memory_safe.private_base("dvr", env, mounts, platform)
 
 
 class NotInMemory(OSError):
-    """A folder meant to be in memory is not, or is not this user's own."""
+    """A folder meant to be in memory is not, is not this user's own, or
+    what is written there could reach a disk through swap."""
 
 
-def memory_folder(path: Path, mounts: str | None = None) -> bool:
+def memory_folder(path: Path, mounts: str | None = None, swaps: str | None = None) -> bool:
     """Whether *path* - made already - is where a buffer in memory may be
     written: a folder itself (never a link to one), this user's own, 0700
-    (narrowed when it is not), and on a file system in memory where it
-    really is (the mount table: a link above it, or a disk mounted on or
-    under it, is found so)."""
-    import stat as _stat
-    try:
-        st = os.lstat(str(path))
-        if not _stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
-            return False
-        if st.st_mode & 0o077:
-            os.chmod(str(path), 0o700)
-            if os.lstat(str(path)).st_mode & 0o077:
-                return False
-    except OSError:
+    (narrowed when it is not), on a file system in memory where it really
+    is (the mount table: a link above it, or a disk mounted on or under it,
+    is found so), and out of a disk's reach - swap none, encrypted or in
+    memory, or the file system never swapped (memory_safe.stays_in_memory)."""
+    if not memory_safe.own_folder(path):
         return False
-    return in_memory(path, mounts)
+    return memory_safe.stays_in_memory(path, mounts, swaps)[0]
 
 
-def memory_budget(base: Path, max_bytes: int, mounts: str | None = None) -> int:
+def memory_budget(base: Path, max_bytes: int, mounts: str | None = None,
+                  swaps: str | None = None) -> int:
     """What a private session may keep in memory at *base*: the rewind
     buffer's own cap, MEMORY_MAX, half of what is free there - 0 when that
-    is too little to be worth it, or when the folder made is not in memory
-    or not this user's own (memory_folder)."""
+    is too little to be worth it, or when the folder made is not in memory,
+    not this user's own or within a disk's reach (memory_folder): then a
+    private channel plays with no buffer at all - never one on a disk."""
     try:
         base.mkdir(parents=True, exist_ok=True, mode=0o700)
-        if not memory_folder(base, mounts):
-            log.warning("DVR: the folder for a private buffer in memory is not in memory "
-                        "or not this user's own - the private buffer goes on disk, marked")
+        if not memory_safe.own_folder(base):
+            log.warning("DVR: the folder for a private buffer in memory is not this user's own "
+                        "- a private channel plays with no rewind buffer")
+            return 0
+        ok, why = memory_safe.stays_in_memory(base, mounts, swaps)
+        if not ok:
+            log.warning("DVR: a private buffer could reach a disk here (%s) - a private channel "
+                        "plays with no rewind buffer", why)
             return 0
         free = shutil.disk_usage(base).free
     except OSError:

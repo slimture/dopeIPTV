@@ -76,6 +76,10 @@ def _subtitle_to_load(path: str) -> str:
         QStandardPaths.StandardLocation.CacheLocation)
     if fixed is None or not base:
         return path
+    from ..core.privacy import playing_private
+    if playing_private():
+        # A copy in the cache would say what was watched: the file as it is.
+        return path
     key = hashlib.sha1(os.path.abspath(path).encode(
         "utf-8", "surrogateescape")).hexdigest()[:12]
     folder = os.path.join(base, "subtitles", key)

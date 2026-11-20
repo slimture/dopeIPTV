@@ -1144,6 +1144,8 @@ class _DetailMixin:
             return
         if ch.get("stream_id") is None:
             return
+        if not self._rec_private_ok():
+            return
         # A portal's link would be long dead by then: such a recording asks
         # for its address when it starts.
         url, extra = self._scheduled_address(ch)

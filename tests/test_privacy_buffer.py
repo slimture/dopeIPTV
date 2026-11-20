@@ -186,15 +186,22 @@ def test_a_budget_in_memory_takes_half_of_what_is_free_and_never_too_little(tmp_
     monkeypatch.setattr(dvr_store.shutil, "disk_usage",
                         lambda p: SimpleNamespace(total=8 << 30, used=0, free=free["n"]))
     mem = f"tmpfs {tmp_path} tmpfs rw 0 0\n"
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem) == dvr_store.MEMORY_MAX
-    assert dvr_store.memory_budget(tmp_path / "m", 200 << 20, mem) == 200 << 20
+    no_swap = "Filename\tType\tSize\tUsed\tPriority\n"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem, no_swap) == dvr_store.MEMORY_MAX
+    assert dvr_store.memory_budget(tmp_path / "m", 200 << 20, mem, no_swap) == 200 << 20
     free["n"] = 600 << 20
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem) == (600 - 64) << 19
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem, no_swap) == (600 - 64) << 19
     free["n"] = 100 << 20
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem) == 0, "too little: the disk, as before"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem, no_swap) == 0, "too little: none"
     free["n"] = 4 << 30
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, f"/dev/sda1 {tmp_path} ext4 rw 0 0\n") == 0, \
-        "the folder made is on disk: none in memory"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, f"/dev/sda1 {tmp_path} ext4 rw 0 0\n",
+                                   no_swap) == 0, "the folder made is on disk: none in memory"
+    # A tmpfs whose pages swap could carry to a plain disk: none either -
+    # unless the tmpfs is never swapped.
+    plain = no_swap + "/swapfile-not-there file 1024 0 -2\n"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem, plain) == 0, "swap not encrypted"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, f"tmpfs {tmp_path} tmpfs rw,noswap 0 0\n",
+                                   plain) == dvr_store.MEMORY_MAX, "a tmpfs never swapped"
 
 
 def test_the_buffers_own_folder_is_checked_where_it_really_is(tmp_path, monkeypatch):
@@ -207,24 +214,31 @@ def test_the_buffers_own_folder_is_checked_where_it_really_is(tmp_path, monkeypa
     run = tmp_path / "run"
     run.mkdir(mode=0o700)
     mounts = f"tmpfs {run} tmpfs rw 0 0\n"
+    no_swap = "Filename\tType\tSize\tUsed\tPriority\n"
     good = run / "dopeiptv-dvr"
     good.mkdir(mode=0o700)
-    assert dvr_store.memory_folder(good, mounts)
+    assert dvr_store.memory_folder(good, mounts, no_swap)
     os.chmod(good, 0o755)
-    assert dvr_store.memory_folder(good, mounts) and (os.stat(good).st_mode & 0o077) == 0, "narrowed"
+    assert dvr_store.memory_folder(good, mounts, no_swap) and (os.stat(good).st_mode & 0o077) == 0, \
+        "narrowed"
     disk = tmp_path / "disk"
     disk.mkdir(mode=0o700)
     link = run / "linked"
     link.symlink_to(disk, target_is_directory=True)
-    assert not dvr_store.memory_folder(link, mounts), "a link to a disk folder"
-    assert not dvr_store.memory_folder(run / "missing", mounts)
+    assert not dvr_store.memory_folder(link, mounts, no_swap), "a link to a disk folder"
+    assert not dvr_store.memory_folder(run / "missing", mounts, no_swap)
     sub = run / "mounted"
     sub.mkdir(mode=0o700)
-    assert not dvr_store.memory_folder(sub, mounts + f"/dev/sdb1 {sub} ext4 rw 0 0\n"), \
+    assert not dvr_store.memory_folder(sub, mounts + f"/dev/sdb1 {sub} ext4 rw 0 0\n", no_swap), \
         "a disk mounted under the tmpfs"
+    assert not dvr_store.memory_folder(good, mounts, no_swap + "/dev/sda9 partition 1 0 -2\n"), \
+        "swap on a plain partition could carry it to the disk"
     # A store meant for memory: nothing written where the folder is not.
-    monkeypatch.setattr(dvr_store, "in_memory", lambda p, m=None: str(p).startswith(str(run)) and
-                        not str(os.path.realpath(p)).startswith(str(disk)))
+    from dopeiptv.core import memory_safe
+    monkeypatch.setattr(memory_safe, "stays_in_memory",
+                        lambda p, m=None, s=None, sys_root="": (
+                            str(p).startswith(str(run))
+                            and not str(os.path.realpath(p)).startswith(str(disk)), ""))
     import pytest
     with pytest.raises(dvr_store.NotInMemory):
         dvr_store.SegmentStore(link / "1-ab", 60.0, 10**8, memory=True)
@@ -233,13 +247,16 @@ def test_the_buffers_own_folder_is_checked_where_it_really_is(tmp_path, monkeypa
     assert store.root.is_dir()
 
 
-def test_a_private_buffer_whose_folder_is_not_in_memory_goes_on_disk_marked(tmp_path, monkeypatch):
+def test_a_private_channel_without_safe_memory_has_no_buffer_at_all(tmp_path, monkeypatch):
+    """No memory out of a disk's reach - its own folder not in memory, or
+    no room - and a private channel gets no buffer: never one on the disk,
+    and no connection opened for the try (the player opens the address)."""
     from dopeiptv.core import dvr_pool as dp
     from dopeiptv.core import dvr_store
-    from dopeiptv.core.dvr_pool import DvrPool
+    from dopeiptv.core.dvr_pool import DvrPool, NoPrivateBuffer
     disk, memory = tmp_path / "disk", tmp_path / "memory"
     monkeypatch.setattr(dp, "memory_budget", lambda base, cap: 300 << 20)
-    monkeypatch.setattr(dvr_store, "memory_folder", lambda p, mounts=None: False)
+    monkeypatch.setattr(dvr_store, "memory_folder", lambda p, mounts=None, swaps=None: False)
     opened = []
 
     class Counting(_Ingest):
@@ -248,10 +265,17 @@ def test_a_private_buffer_whose_folder_is_not_in_memory_goes_on_disk_marked(tmp_
             super().__init__(*a, **k)
     pool = DvrPool(disk, 600.0, 10**9, ingest_factory=Counting, min_free=0, memory=memory)
     try:
-        s = pool.open("http://h/live/1.ts", "1", private=True)
-        assert s.store.root.parent == disk and s.memory_cap is None
-        assert s.private and (s.store.root / dvr_store.PRIVATE_MARK).exists()
-        assert opened == [1], "one connection: none opened for the folder refused"
+        with pytest.raises(NoPrivateBuffer):
+            pool.open("http://h/live/1.ts", "1", private=True)
+        monkeypatch.setattr(dp, "memory_budget", lambda base, cap: 0)
+        with pytest.raises(NoPrivateBuffer):
+            pool.open("http://h/live/1.ts", "1", private=True)
+        no_memory = DvrPool(disk, 600.0, 10**9, ingest_factory=Counting, min_free=0, memory=None)
+        with pytest.raises(NoPrivateBuffer):
+            no_memory.open("http://h/live/1.ts", "1", private=True)
+        assert opened == [], "no connection opened"
+        assert pool.sessions == [] and not any(p.is_file() for p in tmp_path.rglob("*")), \
+            "nothing on the disk"
     finally:
         pool.close_all(wait=5.0)
 
@@ -263,7 +287,7 @@ def test_a_channel_private_from_its_start_never_touches_the_disk(tmp_path, monke
     disk, memory = tmp_path / "disk", tmp_path / "memory"
     monkeypatch.setattr(dp, "memory_budget", lambda base, cap: 300 << 20)
     monkeypatch.setattr(dvr_store, "memory_folder",
-                        lambda p, mounts=None: str(p).startswith(str(memory)))
+                        lambda p, mounts=None, swaps=None: str(p).startswith(str(memory)))
     pool = DvrPool(disk, 600.0, 10**9, ingest_factory=_Ingest, min_free=0, memory=memory)
     try:
         s = pool.open("http://h/live/1.ts", "1", private=True)
@@ -276,10 +300,10 @@ def test_a_channel_private_from_its_start_never_touches_the_disk(tmp_path, monke
         plain = pool.open("http://h/live/2.ts", "2")
         assert plain.store.root.parent == disk and plain.memory_cap is None and not plain.private
         assert _gone(s.store.root), "left privately: gone at once"
-        # Again private, but no room in memory: on disk, marked, as before.
+        # Again private, but no room in memory: no buffer at all.
         monkeypatch.setattr(dp, "memory_budget", lambda base, cap: 0)
-        s3 = pool.open("http://h/live/3.ts", "3", private=True)
-        assert s3.store.root.parent == disk and s3.memory_cap is None
+        with pytest.raises(dp.NoPrivateBuffer):
+            pool.open("http://h/live/3.ts", "3", private=True)
     finally:
         pool.close_all(wait=5.0)
     assert not any(memory.iterdir()) if memory.exists() else True
