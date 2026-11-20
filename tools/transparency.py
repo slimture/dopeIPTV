@@ -57,6 +57,19 @@ _JAIL = "deploy/nginx-dopeiptv-jail.conf"          # ...and its jail's own nginx
 _CSP = "deploy/csp.snippet.txt"                    # the CSP's row in the proxy's nginx.conf
 _MAIN = "server[server_name dopeiptv.org]"         # the proxy's server of the site itself
 CODE: dict[str, list[dict]] = {
+    "logins": [
+        {"id": "stored", "repo": "app", "path": "dopeiptv/core/stores.py", "names": ["PlaylistStore._save"],
+         "with": [{"repo": "app", "path": "dopeiptv/core/settings_files.py",
+                   "names": ["FILE_MODE", "FOLDER_MODE", "_narrow", "keep_private"]}]},
+        {"id": "log", "repo": "app", "path": "dopeiptv/providers/client.py",
+         "from": r"^\s+# From here on these two strings are masked", "to": r"^\s+register_secrets\(username, password\)",
+         "with": [{"repo": "app", "path": "dopeiptv/core/log.py",
+                   "names": ["register_secrets", "redact", "redact_text", "_RedactFilter"]}]},
+    ],
+    "watching": [
+        {"id": "tmdb", "repo": "app", "path": "dopeiptv/providers/metadata.py",
+         "names": ["TmdbClient.fetch_details"]},
+    ],
     "reports": [
         {"id": "scrub", "repo": "app", "path": "dopeiptv/core/report.py",
          "names": ["_IPV4", "_IPV6", "_MAC", "_EMAIL", "_SUPPORTER", "_KEYVAL", "_AUTH_LINE",
@@ -198,7 +211,7 @@ TESTS: dict[str, list[tuple[str, str]]] = {
 }
 
 # Every host the app's code names - what the page's two searches find
-# (site/transparency/<lang>.html, part 8), and quoted IP addresses besides -
+# (site/transparency/<lang>.html, part 4), and quoted IP addresses besides -
 # and what it is to the page: "talks" - the
 # app connects to it (when, the page says); "link" - only an address shown or
 # opened in your browser; "name" - not a place the app goes (an example, a
@@ -506,6 +519,53 @@ log = """12:04:31 INFO player: opening http://line.example-tv.net:8080/live/kall
 print(json.dumps({"before": log, "after": report.scrub(log, personal)}))
 '''
 
+# Where a login is kept, and what the log makes of it: the settings folder
+# and file as the app leaves them, and a few lines through the log's own
+# filter - with Kalle's user name and password registered, as the client
+# registers them when it is made.
+_LOGINS = r'''
+import json, logging, os, stat, tempfile
+from dopeiptv.core import log, settings_files
+folder = os.path.join(tempfile.mkdtemp(), ".config", "dopeIPTV")
+path = os.path.join(folder, "dopeIPTV.conf")
+settings_files.keep_private(path)
+files = "\n".join(stat.filemode(os.stat(p).st_mode) + "  " + n
+                  for p, n in ((folder, "~/.config/dopeIPTV/"), (path, "~/.config/dopeIPTV/dopeIPTV.conf")))
+log.register_secrets("kalle77", "secret123")
+lines = [("player: opening %s", ("http://line.example-tv.net:8080/live/kalle77/secret123/4711.ts",)),
+         ("client: GET %s", ("http://line.example-tv.net:8080/player_api.php?username=kalle77"
+                             "&password=secret123&action=get_live_categories",)),
+         ("mpv: %s", ("Failed to open http://line.example-tv.net:8080/live/kalle77/secret123/4712.ts",)),
+         ("source: logged in as %s", ("kalle77",))]
+before, after = [], []
+for msg, args in lines:
+    rec = logging.LogRecord("dopeiptv", logging.INFO, "", 0, msg, args, None)
+    before.append(rec.getMessage())
+    log._RedactFilter().filter(rec)
+    after.append(rec.getMessage())
+print(json.dumps({"files": files, "before": "\n".join(before), "after": "\n".join(after)}))
+'''
+
+# What The Movie Database is asked for a poster: the request caught before
+# it goes, from the app's own client.
+_WATCHING = r'''
+import json
+from dopeiptv.providers import metadata
+asked = {}
+class Caught(Exception):
+    pass
+class Requests:
+    def get(self, url, params=None, timeout=None):
+        asked.update(url=url, params=dict(params or {}))
+        raise Caught()
+metadata.requests = Requests()
+try:
+    metadata.TmdbClient("<the app's key>").fetch_details("The Bridge", "series", 2011)
+except Caught:
+    pass
+print(json.dumps({"tmdb": "GET " + asked["url"] + "\n" + json.dumps(asked["params"], ensure_ascii=False, indent=1)}))
+'''
+
 _SYNC = r'''
 import base64, json
 from dopeiptv.core import sync
@@ -602,12 +662,15 @@ def examples_of(app: str, site: str) -> dict:
     kalle = {"HOME": "/home/kalle", "USER": "kalle", "LOGNAME": "kalle", "USERNAME": "kalle"}
     rep, syn, tog = run(app, _REPORT, kalle), run(app, _SYNC), run(app, _TOGETHER)
     pri, upd, web = run(app, _PRIVATE), run(app, _UPDATES), run(site, _SITE)
+    lgn, wat = run(app, _LOGINS), run(app, _WATCHING)
     blob = json.loads(syn["body"])["blob"]
 
     def pretty(text: str) -> str:
         return json.dumps(json.loads(text), ensure_ascii=False, indent=1)
     # Each as the page shows it (site/transparency/<lang>.html: <!--tp:ex PART KEY-->).
     return {
+        "logins": {"files": lgn["files"], "before": lgn["before"], "after": lgn["after"]},
+        "watching": {"tmdb": wat["tmdb"]},
         "reports": {"before": rep["before"], "after": rep["after"]},
         "sync": {"inside": syn["inside"],
                  "request": syn["request"] + "\n" + json.dumps({"version_seen": 0, "blob": shorten(blob)})},

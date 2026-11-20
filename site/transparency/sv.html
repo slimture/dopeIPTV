@@ -1,13 +1,32 @@
 <div class="lead">
 <h2 id="summary">Så läser du den här sidan</h2>
-<p>Vår <a href="/privacy/">integritetspolicy</a> säger vad vi gör med uppgifter. Den här sidan visar hur – i koden som gör det, hämtad direkt ur dopeIPTV %VERSION% och ur den här webbplatsens egen kod. Varje del berättar:</p>
+<p>Vi är Solecraft AB, företaget som gör dopeIPTV och driver dopeiptv.org. Den här sidan svarar på de frågor folk ställer först om en app som vår – de som folk tvivlar mest på kommer först – och för var och en säger den rakt ut vad vi kan veta och vad vi inte kan veta. Den visar det i koden som gör det, hämtad direkt ur dopeIPTV %VERSION% och ur den här webbplatsens egen kod. Vår <a href="/privacy/">integritetspolicy</a> säger vad vi gör med uppgifter; den här sidan visar hur. Varje del berättar:</p>
 <ul>
 <li><strong>Löftet</strong>, i en mening.</li>
+<li><strong>Det här kan vi veta</strong> – också när svaret är ”ingenting”.</li>
 <li><strong>Så fungerar det</strong>, med vanliga ord.</li>
 <li><strong>Det här skyddar det inte mot</strong> – för inget skydd täcker allt, och du ska veta var vårt tar slut.</li>
 </ul>
 <p>Och under <em>Vill du se hur det fungerar bakom kulisserna?</em> finns beviset: ett riktigt exempel, framtaget genom att köra koden själv, raderna som gör det – var och en med en länk till exakt de raderna på GitHub – och hur du kontrollerar det själv.</p>
 </div>
+
+<h2 id="answers">De korta svaren</h2>
+<dl class="tp-answers">
+<dt>Kan ni se mitt användarnamn och lösenord hos min tv-leverantör?</dt>
+<dd><strong>Nej.</strong> De stannar i appens inställningar på din dator och går bara till din leverantör, för att logga in. Inget som appen skickar till oss innehåller dem, och vi har inget sätt att be appen om dem. <a href="#logins">Del 1</a></dd>
+<dt>Kan ni se vad jag tittar på?</dt>
+<dd><strong>Nej.</strong> Appen berättar ingenting för oss om vad du spelar. Din leverantör ser det – den skickar strömmen till dig – och The Movie Database ser titeln på en film eller serie när appen hämtar dess affisch, om du inte stänger av det. <a href="#watching">Del 2</a></dd>
+<dt>Vet ni vem jag är?</dt>
+<dd><strong>Nej.</strong> Det finns inget konto, ingen inloggning hos oss och inget id i appen. Det appen skickar till oss av sig själv är uppdateringskontrollen: appens namn, version och ditt system. Som varje webbplats ser vår server vilken IP-adress ett anrop kommer från; vår webbservers logg sparar den i högst två dygn. Om du ger oss dricks tar Stripe emot betalningen, och vi ser av den det en butik ser (<a href="/payments/">betalningsvillkoren</a>). <a href="#updates">Del 3</a></dd>
+<dt>Vart ansluter appen av sig själv?</dt>
+<dd>Till din leverantör; till dopeiptv.org en gång om dagen, för att leta efter en uppdatering (GitHub om vi inte svarar); och till The Movie Database, för affischer. De två sista kan du stänga av. Allt annat bara när du använder det – varje adress i appens kod finns listad. <a href="#hosts">Del 4</a></dd>
+<dt>Kan någon få in en skadlig uppdatering i min app?</dt>
+<dd>Inte utan vår releasenyckel: appen installerar ingenting som inte står på en lista som är signerad med den – inte ens från vår egen webbplats. <a href="#builds">Del 5</a></dd>
+<dt>Om någon bröt sig in på dopeiptv.org, vad skulle de hitta om mig?</dt>
+<dd>Inga inloggningar och ingenting om vad du tittar på – vi får dem aldrig. Som mest: en felrapport eller feedback som du själv valde att skicka, rensad från det som pekade ut dig; en synkkopia eller meddelanden från Titta tillsammans som de inte kan öppna; och din IP-adress i webbserverns logg från de senaste två dygnen. <a href="#webservers">Del 11</a></dd>
+<dt>Måste jag lita på ert ord?</dt>
+<dd><strong>Nej.</strong> Varje del nedan visar koden som gör det, ett riktigt exempel framtaget genom att köra den koden och en länk till exakt de raderna på GitHub – och en knapp som lämnar alltihop till valfri AI-assistent som kan granska oss.</dd>
+</dl>
 
 <div class="callout tp-ai">
 <p><strong>Kontrollera det med valfri AI.</strong> Du behöver inte kunna läsa kod för att granska oss. Bakom kulisserna i varje del finns en knapp som kopierar koden tillsammans med en färdig fråga. Klistra in den i den AI-assistent du använder – vilken som helst – så får du en förklaring av vad koden verkligen gör, och var den brister. Frågan ber AI:n leta efter svagheter, inte hålla med oss.</p>
@@ -19,20 +38,247 @@
 
 <nav class="legal-toc" aria-label="Innehåll">
 <ol>
-<li><a href="#reports">Felrapporter och feedback</a></li>
-<li><a href="#sync">Synkronisering av inställningar</a></li>
-<li><a href="#together">Titta tillsammans</a></li>
-<li><a href="#private">Privat tittande</a></li>
-<li><a href="#updates">Sökning efter uppdateringar</a></li>
-<li><a href="#website">Webbplatsens statistik</a></li>
-<li><a href="#webservers">Servrarna bakom dopeiptv.org</a></li>
-<li><a href="#hosts">Vart appen ansluter</a></li>
-<li><a href="#builds">Så vet du att appen kör den här koden</a></li>
+<li><a href="#logins">Kan ni se min inloggning hos min tv-leverantör?</a></li>
+<li><a href="#watching">Kan ni se vad jag tittar på?</a></li>
+<li><a href="#updates">Vet ni vem jag är?</a></li>
+<li><a href="#hosts">Vart ansluter appen?</a></li>
+<li><a href="#builds">Kan någon få in en skadlig uppdatering i min app?</a></li>
+<li><a href="#private">Kan appen låta bli att spara något om vad jag tittar på?</a></li>
+<li><a href="#reports">Vad står i en felrapport?</a></li>
+<li><a href="#sync">Kan ni läsa det jag synkar?</a></li>
+<li><a href="#together">Kan ni se vad vi tittar på tillsammans?</a></li>
+<li><a href="#website">Spårar den här webbplatsen mig?</a></li>
+<li><a href="#webservers">Vad ser och skriver servrarna bakom dopeiptv.org ner?</a></li>
 </ol>
 </nav>
 
-<h2 id="reports">1. Felrapporter och feedback</h2>
+<h2 id="logins">1. Kan ni se min inloggning hos min tv-leverantör?</h2>
+<p class="tp-promise">Ditt användarnamn, lösenord och din server stannar på din dator och går bara till din leverantör – aldrig till oss.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> ingenting om dem. Appen skickar dem aldrig till dopeiptv.org, så det finns inget för oss – eller för någon som tog över vår server – att läsa.</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>Du</b> skriver in dem en gång, när du lägger till en källa.</li>
+<li><b>Appen</b> sparar dem i sin inställningsfil, som bara ditt eget användarkonto kan läsa.</li>
+<li><b>Din leverantör</b> får dem varje gång appen loggar in eller öppnar en kanal – det är så den vet att det är du.</li>
+</ol>
+<p>Inget annat får dem av sig själv. Från det ögonblick appen först använder din inloggning skriver dess logg ditt användarnamn och lösenord som <code>***</code> var de än dyker upp – i en ströms adress, i ett fel från videospelaren, på en rad som skrivs långt senare. En felrapport tar bort servern, användarnamnet och lösenordet innan du ens ser den (<a href="#reports">del 7</a>). Uppdateringskontrollen innehåller inget av det (<a href="#updates">del 3</a>), och listan över varje adress i appens kod (<a href="#hosts">del 4</a>) visar vart appen annars går. Ett lösenord till Jellyfin eller Emby skickas en gång till den servern, och bara nyckeln den svarar med sparas.</p>
+<p>Där din inloggning ändå lämnar din dator är det för att du skickade den dit:</p>
+<ul>
+<li><strong>Synkronisering av inställningar</strong>, om du lägger till Källor bland det som synkas – de är inte med från början: låst på din dator med en nyckel som vi aldrig ser (<a href="#sync">del 8</a>).</li>
+<li><strong>En fullständig säkerhetskopia</strong> innehåller den – en fil som du sparar där du vill, och som aldrig skickas någonstans.</li>
+<li><strong>En tv som du castar till</strong> hämtar strömmen själv, så den får strömmens adress – och hos många leverantörer är inloggningen en del av adressen.</li>
+<li><strong>En spelare som du ger appens delade spellista</strong> (en Nerd-inställning) skickas vidare till strömmens egen adress på samma sätt.</li>
+</ul>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Inställningsmappen och -filen på Linux, så som appen lämnar dem – bara dina (<code>drwx------</code>, <code>-rw-------</code>):</p>
+<!--tp:ex logins files-->
+<p class="tp-ex-h">Det appen är på väg att skriva i sin logg när Kalles kanaler öppnas:</p>
+<!--tp:ex logins before-->
+<p class="tp-ex-h">Det som hamnar i loggfilen:</p>
+<!--tp:ex logins after-->
+<p class="fine">Framtaget genom att köra appens egen kod: dess inställningsfil hållen privat i en tom mapp, och de här raderna genom loggens filter, med en källa inloggad som <code>kalle77</code>.</p>
+<h3>Koden</h3>
+<p>Var en källa sparas – i appens inställningar – och hur inställningsfilen och dess mapp hålls till ditt eget användarkonto:</p>
+<!--tp:code logins stored-->
+<p>Hur loggen lär sig ditt användarnamn och lösenord i samma stund som appen först använder dem, och maskerar dem på varje rad den skriver:</p>
+<!--tp:code logins log-->
+<h3>Kontrollera det själv</h3>
+<p>På Linux, titta på inställningsfilen: <code>ls -l ~/.config/dopeIPTV/</code> visar att den bara är din. Slå sedan på <em>Spara en loggfil</em> (Nerd), spela en kanal och sök efter ditt lösenord i loggen – <code>grep -c 'ditt lösenord' ~/.local/state/dopeiptv/logs/dopeiptv.log</code> på Linux: det finns inte där.</p>
+<blockquote class="tp-ask" data-for="logins"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – var den sparar inloggningen till en persons tv-leverantör (användarnamn, lösenord och server) och hur dess logg maskerar den. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: skulle inloggningen kunna läsas av en annan användare av datorn, hamna i en loggfil, en felrapport eller något som appen skickar, eller nå utvecklarens server? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy logins-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Inställningsfilen är inte krypterad: den som kan logga in som du, en administratör av datorn eller ett program som du själv kör kan läsa den – som det mesta som är ditt på datorn. På Windows och macOS sparas inställningarna där systemet sparar varje användares egna.</li>
+<li>Din leverantör får din inloggning med varje anrop – det är så en inloggning fungerar. Hos en leverantör på okrypterad <code>http://</code> går den okrypterad genom nätet, och den som kan se din trafik kan läsa den.</li>
+<li>En tv som du castar till, eller en spelare som du ger den delade spellistan, får strömmens adress – hos många leverantörer med din inloggning.</li>
+</ul>
+
+<h2 id="watching">2. Kan ni se vad jag tittar på?</h2>
+<p class="tp-promise">Inget som appen skickar till oss säger vilken kanal, film eller avsnitt du spelar.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> ingenting om vad du tittar på – om du inte själv skriver det i en feedback. Det du synkar och det ni tittar på tillsammans når vår server låst, och vi kan inte öppna det.</p>
+<h3>Så fungerar det</h3>
+<p>Här är allt appen skickar till dopeiptv.org, och vad av ditt tittande som finns i det:</p>
+<ul>
+<li><strong>Uppdateringskontrollen</strong>, en gång om dagen: appens namn, version och system – ingenting om vad du tittar på (<a href="#updates">del 3</a>).</li>
+<li><strong>En felrapport eller feedback</strong>, bara när du trycker på Skicka: kanalnamn och titlar tas bort innan du ser den (<a href="#reports">del 7</a>).</li>
+<li><strong>Synkronisering av inställningar</strong>, om du slår på den: dina favoriter – och din historik, om du väljer den – låsta med en nyckel som vi aldrig ser (<a href="#sync">del 8</a>).</li>
+<li><strong>Titta tillsammans</strong>, om du startar ett rum: det som spelas, låst med en nyckel som görs av rummets kod (<a href="#together">del 9</a>).</li>
+</ul>
+<p>Andra får veta något om vad du tittar på, och du ska veta vilka:</p>
+<ul>
+<li><strong>Din leverantör</strong> ser varje kanal och film du spelar – den skickar strömmen till dig.</li>
+<li><strong>The Movie Database</strong> tillfrågas om en films eller seriers affisch och beskrivning: den får titeln och året – och, som varje tjänst, din IP-adress. Det är på från början; Inställningar › Affischer &amp; info stänger av det.</li>
+<li><strong>Trakt och Simkl</strong> får veta vad du tittar på bara om du loggar in hos dem – det är det de är till för.</li>
+<li><strong>OpenSubtitles</strong> får det du söker efter, när du söker undertexter, och <strong>radio-browser.info</strong> stationen du spelar bara om du slår på det.</li>
+</ul>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Allt som The Movie Database tillfrågas om, för att hitta affischen till Bron (2011):</p>
+<!--tp:ex watching tmdb-->
+<p class="tp-ex-h">Och varje rad som uppdateringskontrollen skickar till oss om appen – det finns ingen plats i den för vad du tittar på:</p>
+<!--tp:ex updates lines-->
+<p class="fine">Framtaget genom att köra appens egen kod, där anropet till The Movie Database fångades innan det skickades.</p>
+<h3>Koden</h3>
+<p>Anropet till The Movie Database – titeln och året, och inget annat om dig:</p>
+<!--tp:code watching tmdb-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="watching"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – anropet den gör till The Movie Database för att hitta en affisch. Förklara på enkel svenska vad den skickar. Granska den sedan kritiskt: säger något i den vem personen är, eller mer än titeln hen tittar på? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy watching-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Din leverantör ser vad du spelar, och den som kan se din nättrafik ser vilka servrar du ansluter till – och hos en leverantör på okrypterad <code>http://</code> vilka strömmar.</li>
+<li>Affischer hämtas för det du bläddrar bland, inte bara för det du spelar: en titel som du scrollar förbi kan också efterfrågas.</li>
+</ul>
+
+<h2 id="updates">3. Vet ni vem jag är?</h2>
+<p class="tp-promise">Appen har inget konto och inget eget id: när den letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering – och IP-adressen den kom från, i högst två dygn. Inte vem du är.</p>
+<h3>Så fungerar det</h3>
+<p>En gång om dagen frågar appen dopeiptv.org vilken version som är den senaste (GitHub, om vi inte svarar). Anropet innehåller en user agent och en rad till som säger om det är en officiell version. Det är allt: inget id, inga inställningar, inget om vad du tittar på.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Varje rad som uppdateringskontrollen skickar om appen (den sista raden är ett av tre ord):</p>
+<!--tp:ex updates lines-->
+<h3>Koden</h3>
+<p>User agent och raden om versionen, och var de läggs på anropet:</p>
+<!--tp:code updates headers-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="updates"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som letar efter uppdateringar. Förklara på enkel svenska, steg för steg, vad den skickar. Granska den sedan kritiskt: vad avslöjar anropet om personen eller hens dator? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy updates-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Kontrollen kommer från din IP-adress, och vår webbservers logg sparar den i högst två dygn, som för varje besök (<a href="#website">del 10</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
+<li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
+</ul>
+
+<h2 id="hosts">4. Vart ansluter appen?</h2>
+<p class="tp-promise">De nätverksmål vi hittade i appens egen kod finns med här, med när appen använder vart och ett. Det är vad en sökning hittade, inget löfte om varenda en.</p>
+<p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och med adresserna som deras egna listor anger, som kanallogotyper och tv-guider på andra servrar, och, genom yt-dlp, webbplatsen för en adress du öppnar. De kommer från dina uppgifter, inte från koden, så de finns inte i listorna nedan.</p>
+<p>Listan är det som appens egen kod namnger. Den är ingen garanti för att ingen annan anslutning kan ske: biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar, och en adress som sätts ihop medan appen kör står inte utskriven i koden. Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
+<h3>Adresser som appen ansluter till</h3>
+<table class="tp-hosts">
+<thead><tr><th>Adress</th><th>Till vad, och när</th></tr></thead>
+<tbody>
+<tr><td><!--tp:hosts talks ours--></td><td>Vi: uppdateringskontrollen, felrapporter och feedback när du skickar dem, och synk och Titta tillsammans när du slår på dem.</td></tr>
+<tr><td><!--tp:hosts talks github--></td><td>GitHub: uppdateringskontrollen när dopeiptv.org inte svarar, testversioner, och yt-dlp när du ber om det.</td></tr>
+<tr><td><!--tp:hosts talks tmdb--></td><td>The Movie Database: affischer, beskrivningar och veckans populära titlar. Appen skickar titlar och årtal. Påslaget från början; du kan stänga av det.</td></tr>
+<tr><td><!--tp:hosts talks opensubtitles--></td><td>OpenSubtitles: när du söker undertexter.</td></tr>
+<tr><td><!--tp:hosts talks trakt--></td><td>Trakt: bara om du loggar in där.</td></tr>
+<tr><td><!--tp:hosts talks simkl--></td><td>Simkl: bara om du loggar in där.</td></tr>
+<tr><td><!--tp:hosts talks plex--></td><td>Plex: inloggningen, när du lägger till en Plex-server.</td></tr>
+<tr><td><!--tp:hosts talks radio--></td><td>radio-browser.info: stationslistorna, medan du använder Radio. Vilken station du spelar berättas bara om du slår på det.</td></tr>
+<tr><td><!--tp:hosts talks hdhomerun--></td><td>SiliconDust: tablån för en HDHomeRun-mottagare som du lägger till.</td></tr>
+<tr><td><!--tp:hosts talks itunes--></td><td>Apples iTunes Search: saknade omslagsbilder till din egen musik (artist och album). Du kan stänga av det.</td></tr>
+<tr><td><!--tp:hosts talks demo--></td><td>Mux, Apple och Bitmovin: demokanalerna, bara när du spelar dem.</td></tr>
+<tr><td><!--tp:hosts talks dns--></td><td>Cloudflare, Quad9 eller Google: bara om du slår på appens egen DNS (Nerd-inställningarna) och väljer någon av dem. (<code>8.8.8.8</code> finns också i cast-koden, där ingenting skickas till den – se nedan.)</td></tr>
+</tbody>
+</table>
+<h3>Adresser som appen bara visar dig</h3>
+<p>Länkar du kan klicka på – de öppnas i din webbläsare, och appen ansluter inte själv till dem:</p>
+<table class="tp-hosts">
+<tbody>
+<tr><td><!--tp:hosts link ours--></td><td>Företaget bakom dopeIPTV, under Om.</td></tr>
+<tr><td><!--tp:hosts link tmdb--></td><td>En titels sida hos The Movie Database.</td></tr>
+<tr><td><!--tp:hosts link imdb--></td><td>En titels sida hos IMDb.</td></tr>
+<tr><td><!--tp:hosts link opensubtitles--></td><td>Där du skapar ett konto hos OpenSubtitles.</td></tr>
+<tr><td><!--tp:hosts link trakt--></td><td>Trakts inloggning och din sida hos Trakt.</td></tr>
+<tr><td><!--tp:hosts link simkl--></td><td>Simkls inloggning och din sida hos Simkl.</td></tr>
+<tr><td><!--tp:hosts link plex--></td><td>Plex sida för inloggning.</td></tr>
+<tr><td><!--tp:hosts link mpv--></td><td>Handboken till mpv, videospelaren inuti appen.</td></tr>
+</tbody>
+</table>
+<h3>Namn i koden som inte är anslutningar</h3>
+<ul>
+<li><!--tp:hosts name web--> – adresser som appen känner igen när <em>du</em> öppnar en, för att lämna den till yt-dlp.</li>
+<li><!--tp:hosts name xml--> – namn som DLNA:s XML-format kräver; inget hämtas från dem.</li>
+<li><!--tp:hosts name file--> – namnet på en fil i en Enigma2-box: dess lista över bouquets.</li>
+<li><!--tp:hosts name radio--> – en rubrik i appens inställningar.</li>
+<li><!--tp:hosts name suffix--> – slutet på ett hemnätverks namn (Tailscales) som appens hemserver godtar.</li>
+<li><!--tp:hosts name example--> – exempel: ett tablå-id i en kommentar, och en exempeladress som visas i ett tomt fält.</li>
+</ul>
+<p>En till som du hittar om du söker: <code>8.8.8.8</code> finns också i delen som castar till en tv. Där frågar den din egen dator vilket nätverkskort som leder ut på internet – ett knep som inte skickar någonting alls:</p>
+<!--tp:code hosts route-->
+<h3>Kontrollera det själv</h3>
+<p>Sök igenom koden själv. Den första sökningen hittar adresserna som är skrivna som webbadresser, den andra värdnamnen som står för sig själva – tillsammans listorna ovan, förutom påhittade exempel som <code>example.com</code>. De hittar det som står utskrivet, inte en adress som sätts ihop av delar:</p>
+<pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
+cd dopeIPTV
+git checkout %REF%
+grep -rnoE --include='*.py' "https?://[A-Za-z0-9.-]+" dopeiptv | sort -t: -k3 -u
+grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|app)[\"']" dopeiptv | sort -t: -k3 -u</code></pre>
+<p>Eller se vad appen verkligen gör: en brandvägg för program visar varje anslutning när den sker – OpenSnitch på Linux, LuLu eller Little Snitch på en Mac, eller brandväggens logg i Windows. Den visar vad som hände medan du tittade, med dina inställningar: prova funktionerna du använder, och dem du inte använder.</p>
+
+<h2 id="builds">5. Kan någon få in en skadlig uppdatering i min app?</h2>
+<p class="tp-promise">Appen du laddar ner byggs öppet från versionens tagg i den här koden, signeras, och märker om den har ändrats.</p>
+<p>En uppdatering används aldrig bara för att den har kommit fram. Varje version har en lista med sina filers kontrollsummor, signerad med vår egen releasenyckel. Appen kontrollerar signaturen och filens kontrollsumma innan den installerar något. Den som skulle kunna ändra en fil på GitHub, men inte har vår nyckel, kan inte få in en uppdatering i din app. En kopia som någon annan har byggt, utan vår nyckel, tar inte emot någon uppdatering alls.</p>
+<ul>
+<li><strong>Byggd öppet.</strong> Varje version byggs av GitHub Actions från versionens tagg i koden – inte på våra datorer. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">Byggets recept</a> finns i koden, och <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">loggen från varje bygge</a> är öppen för alla.</li>
+<li><strong>Signerad.</strong> Versionens filer listas med sina kontrollsummor, och listan är signerad med vår releasenyckel. Appen kontrollerar en uppdatering mot den, och den här webbplatsen kontrollerar också varje fil mot den innan den lämnas ut (nedan).</li>
+<li><strong>Ännu inte reproducerbar.</strong> Byggets logg och signaturen visar vad som byggdes, från vilken tagg och var. De är inget bevis byte för byte: byggena är inte reproducerbara ännu, så du kan inte bygga samma bytes själv och jämföra. Till dess är den öppna loggen och receptet det du kan kontrollera.</li>
+<li><strong>Den kontrollerar sig själv.</strong> Appen har med sig en signerad lista över sina egna filer och kontrollerar dem när den startar. En ändrad kopia vet att den är ändrad, och använder inte våra tjänster: den letar inte efter uppdateringar här och skickar inga rapporter till oss. Körd direkt från koden säger den det, och fungerar som en officiell version.</li>
+<li><strong>En artighet, inte ett lås.</strong> Kontrollen görs av appen själv, och vilken sorts version den är säger appen om sig själv. En kopia som har ändrats med flit kan ändra kontrollen också, och vem som helst kan skriva ett anrop för hand. Därför vilar inget av skyddet på den här sidan på den – det gör krypteringen och rensningen ovan. Det den ger dig är en app som vet när den inte är vår, och säger det.</li>
+</ul>
+<p>Så kontrollerar appen en uppdatering innan den installerar den – den signerade listan, och filen mot den:</p>
+<!--tp:code updates signed-->
+<!--tp:code builds allowed-->
+<p>Och så här kontrollerar webbplatsen en versions filer innan den lämnar ut någon – en lista som inte är signerad med vår nyckel, eller en fil som inte står på den, och ingenting går ut:</p>
+<!--tp:code builds site-->
+<p>Du kan också köra testerna själv, eller köra appen direkt från koden:</p>
+<pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
+cd dopeIPTV
+git checkout %REF%
+python3 -m pip install -r requirements.txt pytest
+QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
+
+<h2 id="private">6. Kan appen låta bli att spara något om vad jag tittar på?</h2>
+<p class="tp-promise">Medan privat tittande är på sparas inget av det du spelar på din dator och berättas inte för någon – tills du stänger appen.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> ingenting om det. Privat tittande handlar om vad din egen dator sparar och berättar; vi får ingenting om vad du tittar på i vilket fall (<a href="#watching">del 2</a>).</p>
+<h3>Så fungerar det</h3>
+<ol class="tp-flow">
+<li><b>En enda brytare</b> i appens minne – sparas aldrig, så den är av igen när appen startar.</li>
+<li><b>Varje ställe som sparar något</b> – tittarhistoriken, var du slutade – frågar själv brytaren innan det skriver.</li>
+<li><b>Varje ställe som berättar</b> – Trakt, Simkl, Discord, din mediaserver, statistiken, loggen – frågar den också.</li>
+</ol>
+<p>Kontrollen sitter i själva lagringen, inte i knapparna som spelar något. Därför kan ingen del av appen glömma den: hur du än startar en film vägrar historiken att skriva in den. En uppspelning som började privat förblir privat till slutet – även om strömmen kopplar upp igen efter att du har stängt av privat tittande: den sparas inte, räknas inte och berättas inte för Trakt, Simkl, Discord eller din mediaserver.</p>
+<details class="tp-proof">
+<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
+<div class="tp-proof-body">
+<h3>Så ser det ut</h3>
+<p class="tp-ex-h">Det appens logg säger om det som spelas – privat tittande av, sedan på:</p>
+<!--tp:ex private lines-->
+<h3>Koden</h3>
+<p>Brytaren, och regeln att en privat uppspelning förblir privat:</p>
+<!--tp:code private switch-->
+<p>Där historiken och positionerna att fortsätta från vägrar att skriva:</p>
+<!--tp:code private stores-->
+<p>Och där Trakt och Simkl får veta något – det frågas om uppspelningen, inte bara om knappen:</p>
+<!--tp:code private tellers-->
+<h3>Kontrollera det själv</h3>
+<blockquote class="tp-ask" data-for="private"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – dess läge för privat tittande. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: finns det något sätt för det som spelas under privat tittande att ändå sparas eller rapporteras? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<!--tp:copy private-->
+</div>
+</details>
+<h3>Det här skyddar det inte mot</h3>
+<ul>
+<li>Din tv-leverantör ser fortfarande vad du spelar – den skickar strömmen till dig – och det kan alla som ser din nätverkstrafik också. Privat tittande handlar om vad din egen dator sparar och berättar, inte om att vara osynlig.</li>
+<li>En inspelning du startar sparas ändå – du bad om den filen.</li>
+</ul>
+
+<h2 id="reports">7. Vad står i en felrapport?</h2>
 <p class="tp-promise">Inget som pekar ut dig eller det du tittar på lämnar din dator i en felrapport – och ingenting lämnar den alls förrän du trycker på Skicka.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> det du väljer att skicka – rapporten efter rensningen, som du läser först – och var ett svar hör hemma, genom en kod som bara din dator har. Aldrig din IP-adress i det vi sparar.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Appen</b> skriver rapporten och rensar den på din dator.</li>
@@ -76,8 +322,9 @@
 <li>Som alla anrop på internet kommer rapporten från din IP-adress. Vår server använder den bara i minnet, i ungefär tio minuter, för att begränsa hur många rapporter en adress kan skicka, och sparar den aldrig.</li>
 </ul>
 
-<h2 id="sync">2. Synkronisering av inställningar</h2>
+<h2 id="sync">8. Kan ni läsa det jag synkar?</h2>
 <p class="tp-promise">Det du synkar låses på din dator innan det skickas, med en nyckel vi aldrig ser – vi förvarar det, men vi kan inte läsa det eller se vems det är.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> att en låst kopia finns, hur stor den är och när den ändras – inte vad som står i den, och inte vems den är.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Din dator</b> gör en slumpad synkkod – 256 bitar, visad som 13 grupper om fyra tecken.</li>
@@ -107,7 +354,7 @@
 <!--tp:code sync counter-->
 <p>Det appen skickar med – sitt namn och sin version, inget om dig – och bara över HTTPS:</p>
 <!--tp:code sync send-->
-<p>På vår server: det som sparas för varje plats, och hur ett anrop tas emot – adressen bara för gränserna (<a href="#reports">del 1</a>).</p>
+<p>På vår server: det som sparas för varje plats, och hur ett anrop tas emot – adressen bara för gränserna (<a href="#reports">del 7</a>).</p>
 <!--tp:code sync server-->
 <p>Och webbserverns inställning som håller synk utanför loggarna (<code>access_log off</code>):</p>
 <!--tp:code sync nolog-->
@@ -124,8 +371,9 @@
 <li>Din IP-adress når vår server med varje anrop. Den används bara i minnet, för gränserna – ungefär tio minuter, ett dygn när en ny kopia skapas – och skrivs aldrig ned.</li>
 </ul>
 
-<h2 id="together">3. Titta tillsammans</h2>
+<h2 id="together">9. Kan ni se vad vi tittar på tillsammans?</h2>
 <p class="tp-promise">Vilka som är i rummet och vad ni tittar på går mellan era datorer låst – vår server skickar bara vidare meddelanden den inte kan öppna.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> att ett rum används, hur många som är i det och när de skickar – inte vilka de är, vad de tittar på eller vad de säger.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Rummets kod</b> – tio tecken du delar med dina vänner – stannar hos dem som är i rummet.</li>
@@ -164,68 +412,9 @@
 <li>En kod på åtta tecken från en äldre version är lättare att gissa. Starta ett nytt rum för att få en på tio.</li>
 </ul>
 
-<h2 id="private">4. Privat tittande</h2>
-<p class="tp-promise">Medan privat tittande är på sparas inget av det du spelar på din dator och berättas inte för någon – tills du stänger appen.</p>
-<h3>Så fungerar det</h3>
-<ol class="tp-flow">
-<li><b>En enda brytare</b> i appens minne – sparas aldrig, så den är av igen när appen startar.</li>
-<li><b>Varje ställe som sparar något</b> – tittarhistoriken, var du slutade – frågar själv brytaren innan det skriver.</li>
-<li><b>Varje ställe som berättar</b> – Trakt, Simkl, Discord, din mediaserver, statistiken, loggen – frågar den också.</li>
-</ol>
-<p>Kontrollen sitter i själva lagringen, inte i knapparna som spelar något. Därför kan ingen del av appen glömma den: hur du än startar en film vägrar historiken att skriva in den. En uppspelning som började privat förblir privat till slutet – även om strömmen kopplar upp igen efter att du har stängt av privat tittande: den sparas inte, räknas inte och berättas inte för Trakt, Simkl, Discord eller din mediaserver.</p>
-<details class="tp-proof">
-<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
-<div class="tp-proof-body">
-<h3>Så ser det ut</h3>
-<p class="tp-ex-h">Det appens logg säger om det som spelas – privat tittande av, sedan på:</p>
-<!--tp:ex private lines-->
-<h3>Koden</h3>
-<p>Brytaren, och regeln att en privat uppspelning förblir privat:</p>
-<!--tp:code private switch-->
-<p>Där historiken och positionerna att fortsätta från vägrar att skriva:</p>
-<!--tp:code private stores-->
-<p>Och där Trakt och Simkl får veta något – det frågas om uppspelningen, inte bara om knappen:</p>
-<!--tp:code private tellers-->
-<h3>Kontrollera det själv</h3>
-<blockquote class="tp-ask" data-for="private"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – dess läge för privat tittande. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: finns det något sätt för det som spelas under privat tittande att ändå sparas eller rapporteras? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
-<!--tp:copy private-->
-</div>
-</details>
-<h3>Det här skyddar det inte mot</h3>
-<ul>
-<li>Din tv-leverantör ser fortfarande vad du spelar – den skickar strömmen till dig – och det kan alla som ser din nätverkstrafik också. Privat tittande handlar om vad din egen dator sparar och berättar, inte om att vara osynlig.</li>
-<li>En inspelning du startar sparas ändå – du bad om den filen.</li>
-</ul>
-
-<h2 id="updates">5. Sökning efter uppdateringar</h2>
-<p class="tp-promise">När appen letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
-<h3>Så fungerar det</h3>
-<p>En gång om dagen frågar appen dopeiptv.org vilken version som är den senaste (GitHub, om vi inte svarar). Anropet innehåller en user agent och en rad till som säger om det är en officiell version. Det är allt: inget id, inga inställningar, inget om vad du tittar på.</p>
-<p>En uppdatering används aldrig bara för att den har kommit fram. Varje version har en lista med sina filers kontrollsummor, signerad med vår egen releasenyckel. Appen kontrollerar signaturen och filens kontrollsumma innan den installerar något. Den som skulle kunna ändra en fil på GitHub, men inte har vår nyckel, kan inte få in en uppdatering i din app. En kopia som någon annan har byggt, utan vår nyckel, tar inte emot någon uppdatering alls.</p>
-<details class="tp-proof">
-<summary>Vill du se hur det fungerar bakom kulisserna?</summary>
-<div class="tp-proof-body">
-<h3>Så ser det ut</h3>
-<p class="tp-ex-h">Varje rad som uppdateringskontrollen skickar om appen (den sista raden är ett av tre ord):</p>
-<!--tp:ex updates lines-->
-<h3>Koden</h3>
-<p>User agent och raden om versionen, och var de läggs på anropet:</p>
-<!--tp:code updates headers-->
-<p>Kontrollen av de signerade kontrollsummorna, och av den hämtade filen mot dem, innan en uppdatering installeras:</p>
-<!--tp:code updates signed-->
-<h3>Kontrollera det själv</h3>
-<blockquote class="tp-ask" data-for="updates"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som letar efter uppdateringar och kontrollerar dem innan de installeras. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: vad avslöjar anropet om personen eller hens dator, och skulle en manipulerad uppdatering kunna ta sig igenom kontrollen? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
-<!--tp:copy updates-->
-</div>
-</details>
-<h3>Det här skyddar det inte mot</h3>
-<ul>
-<li>Kontrollen kommer från din IP-adress, och vår webbservers logg sparar den i högst två dygn, som för varje besök (<a href="#website">del 6</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
-<li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
-</ul>
-
-<h2 id="website">6. Webbplatsens statistik</h2>
+<h2 id="website">10. Spårar den här webbplatsen mig?</h2>
 <p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster och utan att spara din IP-adress i statistiken.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> att någon besökte sidan, från vilket land och vilka sidor – i 30 dagar under ett id som byts varje månad, därefter bara som antal. Din IP-adress bara i webbserverns logg, i högst två dygn.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Webbservern</b> skriver varje sidvisning i en logg – med IP-adressen, och av adressen du bad om bara sidan, aldrig det en länk lade till. Loggen raderas efter högst två dygn. Frontservern före den för ingen logg över anrop.</li>
@@ -246,7 +435,7 @@
 <!--tp:ex website anon-->
 <p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad nyckel.</p>
 <h3>Koden</h3>
-<p>Webbserverns loggformat för sidvisningar – den och nedladdningarnas logg är de enda loggar som sparar din IP-adress som regel (<a href="#webservers">del 7</a> räknar upp varje logg som finns):</p>
+<p>Webbserverns loggformat för sidvisningar – den och nedladdningarnas logg är de enda loggar som sparar din IP-adress som regel (<a href="#webservers">del 11</a> räknar upp varje logg som finns):</p>
 <!--tp:code website log-->
 <p>Besökar-id:t och besöket så som det sparas:</p>
 <!--tp:code website visitor-->
@@ -272,8 +461,9 @@
 <li>Under sina första 30 dagar sparas ett besök i detalj, och tills månaden efter är slut går dess id att spåra med den månadens nyckel. Den som tog över vår server under den tiden skulle kunna knyta nya besök till adresser. Därefter är besöket anonymt och nyckeln borta.</li>
 </ul>
 
-<h2 id="webservers">7. Servrarna bakom dopeiptv.org</h2>
+<h2 id="webservers">11. Vad ser och skriver servrarna bakom dopeiptv.org ner?</h2>
 <p class="tp-promise">Ditt besök går genom två webbservrar och en liten tjänst, och av alla deras loggar sparar bara statistikens två din adress som regel – borta efter högst två dygn. Här är varje logg som finns, och inställningarna som avgör det.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> din IP-adress och sidorna du ber om, i statistikens två loggar, i högst två dygn – och ingenting alls om det appens tjänster bär.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Frontservern</b>, en TLS-proxy i en egen jail, har webbplatsens certifikat och svarar på din krypterade anslutning. Den skickar anropet vidare med din adress i ett huvud som den sätter själv, <code>X-Real-IP</code> – det din webbläsare skickade under det namnet ersätts.</li>
@@ -282,10 +472,10 @@
 </ol>
 <p>En jail är FreeBSD:s sätt att skilja delar av en och samma maskin från varandra, var och en med egna filer, användare och program. Innehållsservern och tjänsten körs i en egen jail på servern, som inte rymmer något annat – bara dem och de två schemalagda jobben som gör sidorna och läser statistikens loggar. Tjänsten körs som en egen användare, som inget annat program på maskinen delar utom de två jobben, och det någon av dem raderar är borta ur serverns säkerhetskopior inom två dygn också.</p>
 <p><strong>Vad som når dem.</strong> En brandvägg på servern släpper in i den jailen bara frontservern, och bara på den enda porten. Ut från den får jailen bara slå upp namn och öppna https-anslutningar – som tjänsten och de schemalagda jobben använder till Stripe, GitHub, webbläsarnas push-tjänster för administratörernas aviseringar och nedladdningen av landsdatabasen. nginx:s egen lista över vem som släpps in, som innehållsservern inte ens startar utan, är ett andra lås bakom brandväggen.</p>
-<p><strong>Vad var och en ser.</strong> Frontservern måste se allt för att kunna svara: din adress, adressen du ber om, det din webbläsare skickar med och ett anrops innehåll – en rapport, en synkkopia (redan låst av appen). Innehållsservern får samma anrop från den som vanlig HTTP, med din adress i <code>X-Real-IP</code>, och litar på det huvudet – därför hålls dess port till frontservern ensam, av brandväggen och en gång till av nginx. Tjänsten får bara anropen till sina egna sökvägar, med samma huvud; den håller din adress bara i minnet, för sina gränser (<a href="#reports">del 1</a>), och dess egen logg säger vad som gick fel, aldrig från vilken adress.</p>
+<p><strong>Vad var och en ser.</strong> Frontservern måste se allt för att kunna svara: din adress, adressen du ber om, det din webbläsare skickar med och ett anrops innehåll – en rapport, en synkkopia (redan låst av appen). Innehållsservern får samma anrop från den som vanlig HTTP, med din adress i <code>X-Real-IP</code>, och litar på det huvudet – därför hålls dess port till frontservern ensam, av brandväggen och en gång till av nginx. Tjänsten får bara anropen till sina egna sökvägar, med samma huvud; den håller din adress bara i minnet, för sina gränser (<a href="#reports">del 7</a>), och dess egen logg säger vad som gick fel, aldrig från vilken adress.</p>
 <p><strong>Vad som skrivs ned.</strong> Ingen av frontserverns servrar för webbplatsen – dopeiptv.org, www.dopeiptv.org, vanlig <code>http://</code> och det gamla iptv.dope.rs – för någon logg över anrop, och var och en skriver ett fel bara på den nivå som stoppar nginx själv (<code>crit</code>): annars skulle ett nekat eller trasigt anrop skrivas där med sin adress. Innehållsservern är likadan som helhet, utom två loggar, båda för statistiken:</p>
 <ul>
-<li><strong>Sidvisningar:</strong> förstasidan, hjälpsidan och <code>/hit</code>, signalen en sida skickar när den har visats (<a href="#website">del 6</a>). En rad var: din adress, tidpunkten, metoden, sidans sökväg – aldrig det en länk lade till efter den, ett <code>?fbclid=</code> eller ett <code>?utm_…</code> –, för <code>/hit</code> bara de fält signalen skickar, statusen, sidan som länkade hit utan sin frågedel eller sitt fragment, webbläsarens namn och sidans språk – webbläsarens namn avkortat vid 1 024 tecken, adresserna vid 2 048.</li>
+<li><strong>Sidvisningar:</strong> förstasidan, hjälpsidan och <code>/hit</code>, signalen en sida skickar när den har visats (<a href="#website">del 10</a>). En rad var: din adress, tidpunkten, metoden, sidans sökväg – aldrig det en länk lade till efter den, ett <code>?fbclid=</code> eller ett <code>?utm_…</code> –, för <code>/hit</code> bara de fält signalen skickar, statusen, sidan som länkade hit utan sin frågedel eller sitt fragment, webbläsarens namn och sidans språk – webbläsarens namn avkortat vid 1 024 tecken, adresserna vid 2 048.</li>
 <li><strong>Nedladdningar:</strong> <code>/dl.php</code>, som varje nedladdningslänk och appens egen uppdatering går genom: nginx:s vanliga format med samma avkortningar och inget användarnamn, av adressen som efterfrågades bara filens namn, din adress som sista fält.</li>
 </ul>
 <p>Inget annat: ingen annan sida, ingen kaka, inget som ett anrop har med sig i sitt innehåll, inget om synk, Titta tillsammans, feedback, dricks eller administrationssidan. En webbläsare som har öppnat administrationssidan lämnas utanför båda. Båda loggarna läses var femtonde minut, byts vid midnatt, och bara föregående dygn sparas – högst två dygn.</p>
@@ -344,78 +534,4 @@ curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
 <li>Gränserna räknar adresser. De som delar en – ett mobilnät, en skola – delar dess gränser, och den som har många adresser får många.</li>
 </ul>
 
-<h2 id="hosts">8. Vart appen ansluter</h2>
-<p class="tp-promise">De nätverksmål vi hittade i appens egen kod finns med här, med när appen använder vart och ett. Det är vad en sökning hittade, inget löfte om varenda en.</p>
-<p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och med adresserna som deras egna listor anger, som kanallogotyper och tv-guider på andra servrar, och, genom yt-dlp, webbplatsen för en adress du öppnar. De kommer från dina uppgifter, inte från koden, så de finns inte i listorna nedan.</p>
-<p>Listan är det som appens egen kod namnger. Den är ingen garanti för att ingen annan anslutning kan ske: biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar, och en adress som sätts ihop medan appen kör står inte utskriven i koden. Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
-<h3>Adresser som appen ansluter till</h3>
-<table class="tp-hosts">
-<thead><tr><th>Adress</th><th>Till vad, och när</th></tr></thead>
-<tbody>
-<tr><td><!--tp:hosts talks ours--></td><td>Vi: uppdateringskontrollen, felrapporter och feedback när du skickar dem, och synk och Titta tillsammans när du slår på dem.</td></tr>
-<tr><td><!--tp:hosts talks github--></td><td>GitHub: uppdateringskontrollen när dopeiptv.org inte svarar, testversioner, och yt-dlp när du ber om det.</td></tr>
-<tr><td><!--tp:hosts talks tmdb--></td><td>The Movie Database: affischer, beskrivningar och veckans populära titlar. Appen skickar titlar och årtal. Påslaget från början; du kan stänga av det.</td></tr>
-<tr><td><!--tp:hosts talks opensubtitles--></td><td>OpenSubtitles: när du söker undertexter.</td></tr>
-<tr><td><!--tp:hosts talks trakt--></td><td>Trakt: bara om du loggar in där.</td></tr>
-<tr><td><!--tp:hosts talks simkl--></td><td>Simkl: bara om du loggar in där.</td></tr>
-<tr><td><!--tp:hosts talks plex--></td><td>Plex: inloggningen, när du lägger till en Plex-server.</td></tr>
-<tr><td><!--tp:hosts talks radio--></td><td>radio-browser.info: stationslistorna, medan du använder Radio. Vilken station du spelar berättas bara om du slår på det.</td></tr>
-<tr><td><!--tp:hosts talks hdhomerun--></td><td>SiliconDust: tablån för en HDHomeRun-mottagare som du lägger till.</td></tr>
-<tr><td><!--tp:hosts talks itunes--></td><td>Apples iTunes Search: saknade omslagsbilder till din egen musik (artist och album). Du kan stänga av det.</td></tr>
-<tr><td><!--tp:hosts talks demo--></td><td>Mux, Apple och Bitmovin: demokanalerna, bara när du spelar dem.</td></tr>
-<tr><td><!--tp:hosts talks dns--></td><td>Cloudflare, Quad9 eller Google: bara om du slår på appens egen DNS (Nerd-inställningarna) och väljer någon av dem. (<code>8.8.8.8</code> finns också i cast-koden, där ingenting skickas till den – se nedan.)</td></tr>
-</tbody>
-</table>
-<h3>Adresser som appen bara visar dig</h3>
-<p>Länkar du kan klicka på – de öppnas i din webbläsare, och appen ansluter inte själv till dem:</p>
-<table class="tp-hosts">
-<tbody>
-<tr><td><!--tp:hosts link ours--></td><td>Företaget bakom dopeIPTV, under Om.</td></tr>
-<tr><td><!--tp:hosts link tmdb--></td><td>En titels sida hos The Movie Database.</td></tr>
-<tr><td><!--tp:hosts link imdb--></td><td>En titels sida hos IMDb.</td></tr>
-<tr><td><!--tp:hosts link opensubtitles--></td><td>Där du skapar ett konto hos OpenSubtitles.</td></tr>
-<tr><td><!--tp:hosts link trakt--></td><td>Trakts inloggning och din sida hos Trakt.</td></tr>
-<tr><td><!--tp:hosts link simkl--></td><td>Simkls inloggning och din sida hos Simkl.</td></tr>
-<tr><td><!--tp:hosts link plex--></td><td>Plex sida för inloggning.</td></tr>
-<tr><td><!--tp:hosts link mpv--></td><td>Handboken till mpv, videospelaren inuti appen.</td></tr>
-</tbody>
-</table>
-<h3>Namn i koden som inte är anslutningar</h3>
-<ul>
-<li><!--tp:hosts name web--> – adresser som appen känner igen när <em>du</em> öppnar en, för att lämna den till yt-dlp.</li>
-<li><!--tp:hosts name xml--> – namn som DLNA:s XML-format kräver; inget hämtas från dem.</li>
-<li><!--tp:hosts name file--> – namnet på en fil i en Enigma2-box: dess lista över bouquets.</li>
-<li><!--tp:hosts name radio--> – en rubrik i appens inställningar.</li>
-<li><!--tp:hosts name suffix--> – slutet på ett hemnätverks namn (Tailscales) som appens hemserver godtar.</li>
-<li><!--tp:hosts name example--> – exempel: ett tablå-id i en kommentar, och en exempeladress som visas i ett tomt fält.</li>
-</ul>
-<p>En till som du hittar om du söker: <code>8.8.8.8</code> finns också i delen som castar till en tv. Där frågar den din egen dator vilket nätverkskort som leder ut på internet – ett knep som inte skickar någonting alls:</p>
-<!--tp:code hosts route-->
-<h3>Kontrollera det själv</h3>
-<p>Sök igenom koden själv. Den första sökningen hittar adresserna som är skrivna som webbadresser, den andra värdnamnen som står för sig själva – tillsammans listorna ovan, förutom påhittade exempel som <code>example.com</code>. De hittar det som står utskrivet, inte en adress som sätts ihop av delar:</p>
-<pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
-cd dopeIPTV
-git checkout %REF%
-grep -rnoE --include='*.py' "https?://[A-Za-z0-9.-]+" dopeiptv | sort -t: -k3 -u
-grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|app)[\"']" dopeiptv | sort -t: -k3 -u</code></pre>
-<p>Eller se vad appen verkligen gör: en brandvägg för program visar varje anslutning när den sker – OpenSnitch på Linux, LuLu eller Little Snitch på en Mac, eller brandväggens logg i Windows. Den visar vad som hände medan du tittade, med dina inställningar: prova funktionerna du använder, och dem du inte använder.</p>
-
-<h2 id="builds">9. Så vet du att appen kör den här koden</h2>
-<p class="tp-promise">Appen du laddar ner byggs öppet från versionens tagg i den här koden, signeras, och märker om den har ändrats.</p>
-<ul>
-<li><strong>Byggd öppet.</strong> Varje version byggs av GitHub Actions från versionens tagg i koden – inte på våra datorer. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">Byggets recept</a> finns i koden, och <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">loggen från varje bygge</a> är öppen för alla.</li>
-<li><strong>Signerad.</strong> Versionens filer listas med sina kontrollsummor, och listan är signerad med vår releasenyckel. Appen kontrollerar en uppdatering mot den, och den här webbplatsen kontrollerar också varje fil mot den innan den lämnas ut (nedan).</li>
-<li><strong>Ännu inte reproducerbar.</strong> Byggets logg och signaturen visar vad som byggdes, från vilken tagg och var. De är inget bevis byte för byte: byggena är inte reproducerbara ännu, så du kan inte bygga samma bytes själv och jämföra. Till dess är den öppna loggen och receptet det du kan kontrollera.</li>
-<li><strong>Den kontrollerar sig själv.</strong> Appen har med sig en signerad lista över sina egna filer och kontrollerar dem när den startar. En ändrad kopia vet att den är ändrad, och använder inte våra tjänster: den letar inte efter uppdateringar här och skickar inga rapporter till oss. Körd direkt från koden säger den det, och fungerar som en officiell version.</li>
-<li><strong>En artighet, inte ett lås.</strong> Kontrollen görs av appen själv, och vilken sorts version den är säger appen om sig själv. En kopia som har ändrats med flit kan ändra kontrollen också, och vem som helst kan skriva ett anrop för hand. Därför vilar inget av skyddet på den här sidan på den – det gör krypteringen och rensningen ovan. Det den ger dig är en app som vet när den inte är vår, och säger det.</li>
-</ul>
-<!--tp:code builds allowed-->
-<p>Och så här kontrollerar webbplatsen en versions filer innan den lämnar ut någon – en lista som inte är signerad med vår nyckel, eller en fil som inte står på den, och ingenting går ut:</p>
-<!--tp:code builds site-->
-<p>Du kan också köra testerna själv, eller köra appen direkt från koden:</p>
-<pre class="tp-cmd"><code>git clone https://github.com/slimture/dopeIPTV
-cd dopeIPTV
-git checkout %REF%
-python3 -m pip install -r requirements.txt pytest
-QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <p>Är det något här som inte stämmer med vad koden gör? <a href="#feedback" data-feedback>Säg till</a> – eller skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>.</p>

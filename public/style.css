@@ -1118,6 +1118,17 @@ section.legal-main { padding: 30px 0 72px; }
   border-inline-start: 3px solid var(--accent); background: var(--surface);
   font-size: 17.5px; line-height: 1.5; font-weight: 600;
 }
+.legal .tp-promise + .tp-know { margin-top: -10px; }
+.legal .tp-know { margin: 0 0 20px; padding: 12px 18px; border-radius: 4px 16px 16px 4px;
+  border-inline-start: 3px solid var(--line); background: var(--surface); font-size: 16px; line-height: 1.55; }
+.legal .tp-know b { font-weight: 700; }
+.legal dl.tp-answers { display: grid; gap: 10px; margin: 8px 0 28px; }
+.legal .tp-answers dt { margin: 0; padding: 14px 18px 0; border-radius: 14px 14px 0 0; background: var(--surface);
+  font-weight: 600; font-size: 16.5px; line-height: 1.45; }
+.legal .tp-answers dd { margin: -10px 0 0; padding: 6px 18px 14px; border-radius: 0 0 14px 14px; background: var(--surface);
+  font-size: 15.5px; line-height: 1.55; }
+.legal .tp-answers dd strong { color: var(--accent); }
+.legal .tp-answers dd a { white-space: nowrap; font-weight: 600; }
 .legal ol.tp-flow { list-style: none; counter-reset: tp; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px; margin: 8px 0 16px; padding: 0; }
 .legal .tp-flow li { margin: 0; padding: 12px 14px 14px; border-radius: 14px; background: var(--surface);

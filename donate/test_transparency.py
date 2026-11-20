@@ -159,7 +159,9 @@ def test_every_log_on_the_server_is_named_on_the_page_and_in_the_policy():
     words = _words()
     for lang in ("en", "sv"):
         page = words[lang]
-        part = page[page.index('<h2 id="webservers">'):page.index('<h2 id="hosts">')]
+        start = page.index('<h2 id="webservers">')
+        end = page.find('<h2 ', start + 1)
+        part = page[start:end if end > 0 else len(page)]
         with open(os.path.join(ROOT, "site", "legal", lang, "privacy.html"), encoding="utf-8") as fh:
             policy = fh.read()
         for name in names:
