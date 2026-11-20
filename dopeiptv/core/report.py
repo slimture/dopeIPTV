@@ -67,11 +67,12 @@ def _hide_value(m: re.Match[str]) -> str:
 
 
 def _not_an_address(text: str) -> bool:
-    """Loopback - or the app's own test build's version, which has four
-    numbers too ("1.6.0.123": the version and the build's run)."""
-    from .. import __version__
-    base = ".".join(__version__.split(".")[:3])
-    return text.startswith("127.") or text.startswith(base + ".")
+    """Keep explicit loopback addresses used by local diagnostics.
+
+    Do not exempt IPs that look like a version and build number: for example
+    1.6.8.10 is a valid public IPv4 address and must be redacted.
+    """
+    return text.startswith("127.")
 
 
 def scrub(text: str, personal: Iterable[str] = ()) -> str:
