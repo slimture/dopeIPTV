@@ -33,19 +33,28 @@
     function addCode(src) {
       if (code.indexOf(src) < 0) { code.push(src); }
     }
-    for (var el = h && h.nextElementSibling; el && el.tagName !== "H2"; el = el.nextElementSibling) {
-      if (el.classList.contains("tp-promise")) {
-        words.push((lab.promise ? lab.promise + " " : "") + clean(el));
-      } else if (el.classList.contains("tp-know")) {
-        words.push(clean(el));
-      } else if (el.matches("table.tp-hosts")) {
-        words.push(headOf(el) + [].map.call(el.querySelectorAll("tbody tr"), function (tr) {
+    // The page's words may sit in a block of their own (Read more, the
+    // limits' box): looked for inside each, never inside the proof.
+    var WORDS = ".tp-promise, .tp-know, table.tp-hosts, ul.tp-limits, ul.tp-names";
+    function take(x) {
+      if (x.classList.contains("tp-promise")) {
+        words.push((lab.promise ? lab.promise + " " : "") + clean(x));
+      } else if (x.classList.contains("tp-know")) {
+        words.push(clean(x));
+      } else if (x.matches("table.tp-hosts")) {
+        words.push(headOf(x) + [].map.call(x.querySelectorAll("tbody tr"), function (tr) {
           return "- " + [].map.call(tr.cells, clean).join(" – ");
         }).join("\n"));
-      } else if (el.matches("ul.tp-limits, ul.tp-names")) {
-        words.push(headOf(el) +
-          [].map.call(el.children, function (li) { return "- " + clean(li); }).join("\n"));
+      } else {
+        words.push(headOf(x) +
+          [].map.call(x.children, function (li) { return "- " + clean(li); }).join("\n"));
       }
+    }
+    for (var el = h && h.nextElementSibling; el && el.tagName !== "H2"; el = el.nextElementSibling) {
+      if (el.matches(WORDS)) { take(el); }
+      [].forEach.call(el.querySelectorAll(WORDS), function (x) {
+        if (!x.closest(".tp-proof")) { take(x); }
+      });
       [].forEach.call(el.querySelectorAll(".tp-src"), addCode);
     }
     [].forEach.call(document.querySelectorAll('.tp-src[data-for="' + part + '"]'), addCode);

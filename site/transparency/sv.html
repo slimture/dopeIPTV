@@ -1,5 +1,11 @@
-<div class="lead">
-<h2 id="summary">Så läser du den här sidan</h2>
+<div class="tp-tiles">
+<div class="tp-tile tp-i-user"><b>Inget konto</b><span>Ingen inloggning hos oss och inget id i appen – vi vet inte vem du är.</span></div>
+<div class="tp-tile tp-i-eye"><b>Inget om vad du tittar på</b><span>Appen berättar ingenting för oss om vad du spelar.</span></div>
+<div class="tp-tile tp-i-code"><b>Kontrollera själv</b><span>Varje löfte visas i koden som håller det, med länk till raderna på GitHub.</span></div>
+</div>
+<details class="tp-more tp-howto">
+<summary>Så läser du den här sidan</summary>
+<div class="tp-more-body">
 <p>Vi är Solecraft AB, företaget som gör dopeIPTV och driver dopeiptv.org. Den här sidan svarar på de frågor folk ställer först om en app som vår – de som folk tvivlar mest på kommer först – och för var och en säger den rakt ut vad vi kan veta och vad vi inte kan veta. Den visar det i koden som gör det, hämtad direkt ur dopeIPTV %VERSION% och ur den här webbplatsens egen kod. Vår <a href="/privacy/">integritetspolicy</a> säger vad vi gör med uppgifter; den här sidan visar hur. Varje del berättar:</p>
 <ul>
 <li><strong>Löftet</strong>, i en mening.</li>
@@ -9,31 +15,51 @@
 </ul>
 <p>Och under <em>Vill du se hur det fungerar bakom kulisserna?</em> finns beviset: ett riktigt exempel, framtaget genom att köra koden själv, raderna som gör det – var och en med en länk till exakt de raderna på GitHub – och hur du kontrollerar det själv.</p>
 </div>
+</details>
 
 <h2 id="answers">De korta svaren</h2>
 <dl class="tp-answers">
+<div class="tp-answer">
 <dt>Kan ni se mitt användarnamn och lösenord hos min tv-leverantör?</dt>
 <dd><strong>Nej.</strong> De stannar i appens inställningar på din dator och går bara till din leverantör, för att logga in. Inget som appen skickar till oss innehåller dem, och vi har inget sätt att be appen om dem. <a href="#logins">Del 1</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Kan ni se vad jag tittar på?</dt>
 <dd><strong>Nej.</strong> Appen berättar ingenting för oss om vad du spelar. Din leverantör ser det – den skickar strömmen till dig – och The Movie Database ser titeln på en film eller serie när appen hämtar dess affisch, om du inte stänger av det. <a href="#watching">Del 2</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Vet ni vem jag är?</dt>
 <dd><strong>Nej.</strong> Det finns inget konto, ingen inloggning hos oss och inget id i appen. Det appen skickar till oss av sig själv är uppdateringskontrollen: appens namn, version och ditt system. Som varje webbplats ser vår server vilken IP-adress ett anrop kommer från; den skriver inte ned den någonstans – ingen av våra loggar sparar den. Om du ger oss dricks tar Stripe emot betalningen, och vi ser av den det en butik ser (<a href="/payments/">betalningsvillkoren</a>). <a href="#updates">Del 3</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Vart ansluter appen av sig själv?</dt>
 <dd>Till din leverantör; till dopeiptv.org en gång om dagen, för att leta efter en uppdatering (GitHub om vi inte svarar); och till The Movie Database, för affischer. De två sista kan du stänga av. Allt annat bara när du använder det – varje adress i appens kod finns listad. <a href="#hosts">Del 4</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Kan någon få in en skadlig uppdatering i min app?</dt>
 <dd>Inte utan vår releasenyckel: appen installerar ingenting som inte står på en lista som är signerad med den – inte ens från vår egen webbplats. <a href="#builds">Del 5</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Om någon bröt sig in på dopeiptv.org, vad skulle de hitta om mig?</dt>
 <dd>Inga inloggningar och ingenting om vad du tittar på – vi får dem aldrig. Som mest: en felrapport eller feedback som du själv valde att skicka, rensad från det appen kände igen som ditt; en synkkopia eller meddelanden från Titta tillsammans som de inte kan öppna. Din IP-adress finns inte i något av det: servrarna skriver inte ned den någonstans. <a href="#webservers">Del 11</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Måste jag lita på ert ord?</dt>
 <dd><strong>Nej.</strong> Varje del nedan visar koden som gör det, ett riktigt exempel framtaget genom att köra den koden och en länk till exakt de raderna på GitHub – och en knapp som lämnar alltihop till valfri AI-assistent som kan granska oss.</dd>
+</div>
 </dl>
 
-<div class="callout tp-ai">
+<div class="callout tp-ai tp-ai-ico">
 <p><strong>Kontrollera det med valfri AI.</strong> Du behöver inte kunna läsa kod för att granska oss. Bakom kulisserna i varje del finns en knapp som kopierar koden tillsammans med en färdig fråga. Klistra in den i den AI-assistent du använder – vilken som helst – så får du en förklaring av vad koden verkligen gör, och var den brister. Frågan ber AI:n leta efter svagheter, inte hålla med oss.</p>
 <p><strong>Eller allt på en gång.</strong> Den här knappen kopierar varje del nedan – varje fråga med sin kod – under en enda fråga som ber om en tabell över alla svagheter som hittas och ett samlat omdöme. Det blir långt: klistra in det i en AI-assistent som tar långa texter.</p>
-<blockquote class="tp-ask" data-for="all" data-promise="Sidans löfte:" data-limits="Med frågan följer sidans eget löfte och de gränser den själv anger (”Det här skyddar det inte mot”). Räkna en sådan gräns som en svaghet bara där koden är sämre än den säger, men säg till om du tycker att den inte borde godtas."><p>Nedan finns dopeIPTV:s säkerhet och integritet i flera delar – en tv-spelare med öppen källkod, koden från den version som sidan anger. Varje del har en egen fråga och koden den gäller (varje block inleds med adressen till de raderna på GitHub). Besvara varje del i tur och ordning: förklara på enkel svenska vad koden gör, granska den sedan som en angripare skulle och säg var den brister. Ge sedan, sist, en tabell över alla svagheter du hittat i alla delar – delen, filen och raden, vem som skulle kunna utnyttja den (en leverantör, en enhet i nätverket, en webbsida, en annan användare av datorn, någon på vägen i nätet, utvecklarens egen server), vad de skulle kunna göra, hur allvarligt det är (kritiskt, högt, medel, lågt) och hur det åtgärdas – och ett samlat omdöme. Leta också efter sätt att kombinera delarna. Gissa inte: säg till där något beror på kod som inte är med, och lita inte på kommentarernas ord om vad koden gör. Med varje del följer också sidans eget löfte och de gränser den själv anger (”Det här skyddar det inte mot”): räkna en sådan gräns som en svaghet bara där koden är sämre än den säger, men säg till om du tycker att den inte borde godtas.</p></blockquote>
 <!--tp:copyall-->
-<p>En AI kan ha fel. Den är en hjälp att förstå koden, inte beviset. Beviset är själva koden, och testerna som kontrollerar den varje gång appen byggs. Vill du vara säker på att koden du klistrar in är den riktiga, öppna länken till GitHub och kopiera den därifrån.</p>
+<details class="tp-more tp-question">
+<summary>Frågan som kopieras</summary>
+<div class="tp-more-body">
+<blockquote class="tp-ask" data-for="all" data-promise="Sidans löfte:" data-limits="Med frågan följer sidans eget löfte och de gränser den själv anger (”Det här skyddar det inte mot”). Räkna en sådan gräns som en svaghet bara där koden är sämre än den säger, men säg till om du tycker att den inte borde godtas."><p>Nedan finns dopeIPTV:s säkerhet och integritet i flera delar – en tv-spelare med öppen källkod, koden från den version som sidan anger. Varje del har en egen fråga och koden den gäller (varje block inleds med adressen till de raderna på GitHub). Besvara varje del i tur och ordning: förklara på enkel svenska vad koden gör, granska den sedan som en angripare skulle och säg var den brister. Ge sedan, sist, en tabell över alla svagheter du hittat i alla delar – delen, filen och raden, vem som skulle kunna utnyttja den (en leverantör, en enhet i nätverket, en webbsida, en annan användare av datorn, någon på vägen i nätet, utvecklarens egen server), vad de skulle kunna göra, hur allvarligt det är (kritiskt, högt, medel, lågt) och hur det åtgärdas – och ett samlat omdöme. Leta också efter sätt att kombinera delarna. Gissa inte: säg till där något beror på kod som inte är med, och lita inte på kommentarernas ord om vad koden gör. Med varje del följer också sidans eget löfte och de gränser den själv anger (”Det här skyddar det inte mot”): räkna en sådan gräns som en svaghet bara där koden är sämre än den säger, men säg till om du tycker att den inte borde godtas.</p></blockquote>
+</div>
+</details>
+<p class="fine">En AI kan ha fel. Den är en hjälp att förstå koden, inte beviset. Beviset är själva koden, och testerna som kontrollerar den varje gång appen byggs. Vill du vara säker på att koden du klistrar in är den riktiga, öppna länken till GitHub och kopiera den därifrån.</p>
 </div>
 
 <nav class="legal-toc" aria-label="Innehåll">
@@ -52,15 +78,19 @@
 </ol>
 </nav>
 
+<section class="tp-part tp-i-logins">
 <h2 id="logins">1. Kan ni se min inloggning hos min tv-leverantör?</h2>
-<p class="tp-promise">Ditt användarnamn, lösenord och din server stannar på din dator och går bara till din leverantör – aldrig till oss.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> ingenting om dem. Appen skickar dem aldrig till dopeiptv.org, så det finns inget för oss – eller för någon som tog över vår server – att läsa.</p>
+<p class="tp-promise tp-promise-ico">Ditt användarnamn, lösenord och din server stannar på din dator och går bara till din leverantör – aldrig till oss.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> ingenting om dem. Appen skickar dem aldrig till dopeiptv.org, så det finns inget för oss – eller för någon som tog över vår server – att läsa.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Du</b> skriver in dem en gång, när du lägger till en källa.</li>
 <li><b>Appen</b> sparar dem i sin inställningsfil, som bara ditt eget användarkonto kan läsa.</li>
 <li><b>Din leverantör</b> får dem varje gång appen loggar in eller öppnar en kanal – det är så den vet att det är du.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>Inget annat får dem av sig själv. Från det ögonblick appen först använder din inloggning skriver dess logg ditt användarnamn och lösenord som <code>***</code> var de än dyker upp – i en ströms adress, i ett fel från videospelaren, på en rad som skrivs långt senare. En felrapport tar bort servern, användarnamnet och lösenordet innan du ens ser den (<a href="#reports">del 7</a>). Uppdateringskontrollen innehåller inget av det (<a href="#updates">del 3</a>), och listan över varje adress i appens kod (<a href="#hosts">del 4</a>) visar vart appen annars går. Ett lösenord till Jellyfin eller Emby skickas en gång till den servern, och bara nyckeln den svarar med sparas.</p>
 <p>Där din inloggning ändå lämnar din dator är det för att du skickade den dit:</p>
 <ul>
@@ -69,6 +99,8 @@
 <li><strong>En tv som du castar till</strong> hämtar strömmen själv, så den får strömmens adress – och hos många leverantörer är inloggningen en del av adressen.</li>
 <li><strong>En spelare som du ger appens delade spellista</strong> (en Nerd-inställning) skickas vidare till strömmens egen adress på samma sätt.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -93,6 +125,7 @@
 <!--tp:copy logins-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Inställningsfilen är inte krypterad: den som kan logga in som du, en administratör av datorn eller ett program som du själv kör kan läsa den – som det mesta som är ditt på datorn. På Windows och macOS sparas inställningarna där systemet sparar varje användares egna.</li>
@@ -100,10 +133,16 @@
 <li>En tv som du castar till, eller en spelare som du ger den delade spellistan, får strömmens adress – hos många leverantörer med din inloggning.</li>
 <li>När appen spelar in över en egen anslutning, eller öppnar VLC eller mpv som egna program, ger den programmet strömmens adress – hos många leverantörer med din inloggning i – och på Linux och macOS kan andra användarkonton på samma dator se ett programs kommandorad medan det körs.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-watching">
 <h2 id="watching">2. Kan ni se vad jag tittar på?</h2>
-<p class="tp-promise">Inget som appen skickar till oss säger vilken kanal, film eller avsnitt du spelar.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> ingenting om vad du tittar på – om du inte själv skriver det i en feedback. Det du synkar och det ni tittar på tillsammans når vår server låst, och vi kan inte öppna det.</p>
+<p class="tp-promise tp-promise-ico">Inget som appen skickar till oss säger vilken kanal, film eller avsnitt du spelar.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> ingenting om vad du tittar på – om du inte själv skriver det i en feedback. Det du synkar och det ni tittar på tillsammans når vår server låst, och vi kan inte öppna det.</p>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <h3>Så fungerar det</h3>
 <p>Här är allt appen skickar till dopeiptv.org, och vad av ditt tittande som finns i det:</p>
 <ul>
@@ -119,6 +158,8 @@
 <li><strong>Trakt och Simkl</strong> får veta vad du tittar på bara om du loggar in hos dem – det är det de är till för.</li>
 <li><strong>OpenSubtitles</strong> får det du söker efter, när du söker undertexter, och <strong>radio-browser.info</strong> stationen du spelar bara om du slår på det.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -136,17 +177,26 @@
 <!--tp:copy watching-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Din leverantör ser vad du spelar, och den som kan se din nättrafik ser vilka servrar du ansluter till – och hos en leverantör på okrypterad <code>http://</code> vilka strömmar.</li>
 <li>Affischer hämtas för det du bläddrar bland, inte bara för det du spelar: en titel som du scrollar förbi kan också efterfrågas.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-updates">
 <h2 id="updates">3. Vet ni vem jag är?</h2>
-<p class="tp-promise">Appen har inget konto och inget eget id: när den letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering – inte från vilken adress, och inte vem du är.</p>
+<p class="tp-promise tp-promise-ico">Appen har inget konto och inget eget id: när den letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering – inte från vilken adress, och inte vem du är.</p>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <h3>Så fungerar det</h3>
 <p>En gång om dagen frågar appen dopeiptv.org vilken version som är den senaste (GitHub, om vi inte svarar). Anropet innehåller en user agent och en rad till som säger om det är en officiell version. Det är allt: inget id, inga inställningar, inget om vad du tittar på.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -161,14 +211,21 @@
 <!--tp:copy updates-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Kontrollen kommer från din IP-adress, som servrarna inte skriver ned någonstans (<a href="#webservers">del 11</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
 <li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-hosts">
 <h2 id="hosts">4. Vart ansluter appen?</h2>
-<p class="tp-promise">De nätverksmål vi hittade i appens egen kod finns med här, med när appen använder vart och ett. Det är vad en sökning hittade, inget löfte om varenda en.</p>
+<p class="tp-promise tp-promise-ico">De nätverksmål vi hittade i appens egen kod finns med här, med när appen använder vart och ett. Det är vad en sökning hittade, inget löfte om varenda en.</p>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och med adresserna som deras egna listor anger, som kanallogotyper och tv-guider på andra servrar, och, genom yt-dlp, webbplatsen för en adress du öppnar. De kommer från dina uppgifter, inte från koden, så de finns inte i listorna nedan.</p>
 <p>Listan är det som appens egen kod namnger. Den är ingen garanti för att ingen annan anslutning kan ske: biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar, och en adress som sätts ihop medan appen kör står inte utskriven i koden. Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
 <h3>Adresser som appen ansluter till</h3>
@@ -212,6 +269,8 @@
 <li><!--tp:hosts name suffix--> – slutet på ett hemnätverks namn (Tailscales) som appens hemserver godtar.</li>
 <li><!--tp:hosts name example--> – exempel: ett tablå-id i en kommentar, och en exempeladress som visas i ett tomt fält.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -229,9 +288,14 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <!--tp:copy hosts-->
 </div>
 </details>
+</section>
 
+<section class="tp-part tp-i-builds">
 <h2 id="builds">5. Kan någon få in en skadlig uppdatering i min app?</h2>
-<p class="tp-promise">Appen du laddar ner byggs öppet från versionens tagg i den här koden, signeras, och märker om den har ändrats.</p>
+<p class="tp-promise tp-promise-ico">Appen du laddar ner byggs öppet från versionens tagg i den här koden, signeras, och märker om den har ändrats.</p>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>En uppdatering används aldrig bara för att den har kommit fram. Varje version har en lista med sina filers kontrollsummor, signerad med vår egen releasenyckel. Appen kontrollerar signaturen och filens kontrollsumma innan den installerar något. Den som skulle kunna ändra en fil på GitHub, men inte har vår nyckel, kan inte få in en uppdatering i din app. En kopia som någon annan har byggt, utan vår nyckel, tar inte emot någon uppdatering alls.</p>
 <ul class="tp-limits">
 <li><strong>Byggd öppet.</strong> Varje version byggs av GitHub Actions från versionens tagg i koden – inte på våra datorer. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">Byggets recept</a> finns i koden, och <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">loggen från varje bygge</a> är öppen för alla.</li>
@@ -241,6 +305,8 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <li><strong>Den kontrollerar sig själv.</strong> Appen har med sig en signerad lista över sina egna filer och kontrollerar dem när den startar. En ändrad kopia vet att den är ändrad, och använder inte våra tjänster: den letar inte efter uppdateringar här och skickar inga rapporter till oss. Körd direkt från koden säger den det, och fungerar som en officiell version.</li>
 <li><strong>En artighet, inte ett lås.</strong> Kontrollen görs av appen själv, och vilken sorts version den är säger appen om sig själv. En kopia som har ändrats med flit kan ändra kontrollen också, och vem som helst kan skriva ett anrop för hand. Därför vilar inget av skyddet på den här sidan på den – det gör krypteringen och rensningen ovan. Det den ger dig är en app som vet när den inte är vår, och säger det.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -262,10 +328,12 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy builds-->
 </div>
 </details>
+</section>
 
+<section class="tp-part tp-i-private">
 <h2 id="private">6. Kan appen låta bli att spara något om vad jag tittar på?</h2>
-<p class="tp-promise">Medan privat läge är på sparas inget av det du spelar, ingenting berättas för någon och inget av det skrivs till en disk – tills du stänger appen.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> ingenting om det. Privat läge handlar om vad din egen dator sparar och berättar; vi får ingenting om vad du tittar på i vilket fall (<a href="#watching">del 2</a>).</p>
+<p class="tp-promise tp-promise-ico">Medan privat läge är på sparas inget av det du spelar, ingenting berättas för någon och inget av det skrivs till en disk – tills du stänger appen.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> ingenting om det. Privat läge handlar om vad din egen dator sparar och berättar; vi får ingenting om vad du tittar på i vilket fall (<a href="#watching">del 2</a>).</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>En enda brytare</b> i appens minne – sparas aldrig, så den är av igen när appen startar.</li>
@@ -273,8 +341,13 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>Varje ställe som berättar</b> – Trakt, Simkl, Discord, din mediaserver, statistiken, loggen – frågar den också.</li>
 <li><b>Det som måste skrivas medan det spelas</b> – bakåtspolningsbufferten, en cast som appen konverterar åt tv:n, en undertext du hämtar – hamnar bara i minne som inte kan nå en disk, eller görs inte alls.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>Kontrollen sitter i själva lagringen, inte i knapparna som spelar något. Därför kan ingen del av appen glömma den: hur du än startar en film vägrar historiken att skriva in den. En uppspelning som började privat förblir privat till slutet – även om strömmen kopplar upp igen efter att du har stängt av privat läge: den sparas inte, räknas inte och berättas inte för Trakt, Simkl, Discord eller din mediaserver.</p>
 <p>Minne räknas bara när det verkligen är minne: på Linux en egen mapp på ett filsystem i minnet (tmpfs), och bara när det systemet flyttar ut ur minnet inte kan läsas från en disk efteråt – ingen swap, krypterad swap eller zram utan disk bakom. Där det inte finns sådant minne – på macOS och Windows, eller med swap på en vanlig disk – spelas en privat kanal utan bufferten, appen säger varför en cast som behöver konverteras inte går, och en undertext når spelaren utan att bli en fil. Slår du på privat läge medan en kanal spelas från en buffert på disken öppnas den igen på det privata sättet; en cast som konverteras på disken stannar inom en sekund och skickas igen. Innan en inspelning startar i privat läge frågar appen först.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -301,6 +374,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy private-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Din tv-leverantör ser fortfarande vad du spelar – den skickar strömmen till dig – och det kan alla som ser din nätverkstrafik också. Privat läge handlar om vad din egen dator sparar och berättar, inte om att vara osynlig.</li>
@@ -309,20 +383,28 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>En cast som konverteras på disken när du slår på privat läge fortsätter i upp till en sekund innan den stannar; det den skrev raderas då.</li>
 <li>På macOS och Windows finns inget sådant minne för appen: där har en privat kanal ingen buffert, och en cast som behöver konverteras konverteras inte.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-reports">
 <h2 id="reports">7. Vad står i en felrapport?</h2>
-<p class="tp-promise">En felrapport rensas på din dator från det appen känner igen som ditt eller som det du tittar på, du läser hela först – och ingenting lämnar den alls förrän du trycker på Skicka.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> det du väljer att skicka – rapporten efter rensningen, som du läser först – och var ett svar hör hemma, genom en kod som bara din dator har. Aldrig din IP-adress i det vi sparar.</p>
+<p class="tp-promise tp-promise-ico">En felrapport rensas på din dator från det appen känner igen som ditt eller som det du tittar på, du läser hela först – och ingenting lämnar den alls förrän du trycker på Skicka.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> det du väljer att skicka – rapporten efter rensningen, som du läser först – och var ett svar hör hemma, genom en kod som bara din dator har. Aldrig din IP-adress i det vi sparar.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Appen</b> skriver rapporten och rensar den på din dator.</li>
 <li><b>Du</b> läser hela, ändrar eller tar bort vad du vill och bestämmer om den ska skickas.</li>
 <li><b>Vår server</b> rensar den en gång till och sparar den utan din IP-adress.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>Rensningen sker på två sätt. Först letar den efter <em>mönster</em>: allt som ser ut som en webbadress – med eller utan <code>http://</code> före –, en IP- eller MAC-adress, en e-postadress, ett telefonnummer, ett lösenord, en nyckel eller en inloggning skriven som <code>namn=värde</code>, inom citattecken, som JSON eller i en mening som ”lösenord: …”, en nyckel som står ensam (en JWT, en nyckel som börjar med en tjänsts prefix, en lång slumpad sträng), och en inloggningsrubrik eller kaka. Sedan tar den bort <em>det appen vet är ditt</em>: dina källors namn, servrar och inloggningar, dina kanalnamn, titlarna du har tittat på, ditt användarnamn och varje kontos hemkatalog. Allt ersätts med en platshållare som <code>&lt;private&gt;</code>, så att rapporten fortfarande säger oss något utan att säga vem du är. Den del som skickar kör mönstren en gång till på exakt det som går iväg, vilken väg texten än kom, och skickar den bara över HTTPS till vår egen adress – aldrig efter en omdirigering någon annanstans.</p>
 <p>Ber du om svar gör appen en slumpad kod som stannar på din dator och skickar bara en hashsumma av den – ett envägsfingeravtryck som vi inte kan göra om till koden. Senare frågar appen om den hashsumman har fått ett svar. Hashsumman är densamma varje gång appen frågar, så vår server kan se att frågorna hör ihop, men inte vem som frågar. Ett svar du skriver på ett av våra svar rensas på samma sätt som rapporten.</p>
 <p>Vår server sparar en rapport i 12 månader och tar sedan bort den av sig själv – med varje svar vi skrev på den och varje svar du skickade på ett av dem. Ett svar vi skriver på ett helt problem på en gång (”rättat i 1.5.1”, till alla som rapporterade det) innehåller bara våra egna ord och finns kvar tills vi tar bort det.</p>
 <p>Feedback har med sig det du väljer i den – ämnet, vilken del av appen och hur ofta det händer – och, om appen har en supporternyckel, fältet <code>"supporter": "yes"</code>, så att vi läser den först. Aldrig nyckeln.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -352,26 +434,35 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy reports-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Rensningen känner till mönster och det appen vet är ditt. Ord du själv skriver i en feedback, eller ett namn den aldrig har sett – ett filnamn, en kanal ur en lista du har tagit bort – blir kvar som de är. Därför ser du hela rapporten innan något skickas.</li>
 <li>Vår servers andra rensning är enklare än appens: den letar efter samma mönster, men känner inte till dina namn. Den finns för en gammal app eller ett handgjort anrop; det är appens rensning som räknas.</li>
 <li>Som alla anrop på internet kommer rapporten från din IP-adress. Vår server använder den bara i minnet, i ungefär tio minuter, för att begränsa hur många rapporter en adress kan skicka, och sparar den aldrig.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-sync">
 <h2 id="sync">8. Kan ni läsa det jag synkar?</h2>
-<p class="tp-promise">Det du synkar låses på din dator innan det skickas, med en nyckel vi aldrig ser – vi förvarar det, men vi kan inte läsa det eller se vems det är.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> att en låst kopia finns, hur stor den är och när den ändras – inte vad som står i den, och inte vems den är.</p>
+<p class="tp-promise tp-promise-ico">Det du synkar låses på din dator innan det skickas, med en nyckel vi aldrig ser – vi förvarar det, men vi kan inte läsa det eller se vems det är.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att en låst kopia finns, hur stor den är och när den ändras – inte vad som står i den, och inte vems den är.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Din dator</b> gör en slumpad synkkod – 256 bitar, visad som 13 grupper om fyra tecken.</li>
 <li><b>Ur koden</b> tas två värden fram som inte har med varandra att göra: en <em>plats</em> (där kopian förvaras) och en <em>nyckel</em> (som låser den).</li>
 <li><b>Vår server</b> får platsen och den låsta kopian. Aldrig koden, aldrig nyckeln.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>De två värdena tas fram ur koden med <strong>HKDF-SHA256</strong>, ett standardsätt att göra flera nycklar av en hemlighet: att känna till platsen säger ingenting om nyckeln. Kopian packas och krypteras sedan med <strong>ChaCha20-Poly1305</strong>, ett av chiffren som skyddar HTTPS-anslutningar på webben. Det märker också varje ändring: en kopia som någon har manipulerat går inte att öppna.</p>
 <p>Ur koden tas på samma sätt fram ett tredje värde: ett lösen för platsen. Vår server sparar bara en hash av det, och när en kopia väl är skriven kan ingen läsa, ändra eller radera den platsen utan det – att känna till en plats räcker inte.</p>
 <p>Det vår server ändå skulle kunna göra är att lämna tillbaka en tidigare kopia som den har sparat. Därför har varje kopia en räknare, låst tillsammans med resten och ett steg högre för varje uppladdning. En dator som redan har sett en senare kopia märker det, behåller sina egna nyare värden, lägger tillbaka sin kopia och säger till dig. Dina andra datorer får samma kod av dig – inskriven eller inklistrad – och tar därför fram samma plats och nyckel. En spellistas anslutningsinställningar som en kopia har med sig – en proxy, rubriker, en omskrivningsregel och liknande – sätts aldrig på plats utan att du blir tillfrågad: appen visar dem, och du väljer.</p>
 <p>Anropet innehåller appens namn och version, om det är en officiell version, platsen, dess lösen och den låsta kopian. Inget konto, ingen e-postadress, inget namn. Det går bara över HTTPS, och aldrig efter en omdirigering någon annanstans. Webbservern loggar inte synkanrop alls, och en kopia som ingen dator har läst eller skrivit på 180 dagar raderas.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -401,6 +492,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy sync-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Den som har din synkkod kan läsa och ändra det du synkar. Förvara den som ett lösenord. Tappar du bort den kan vi inte hjälpa dig att få tillbaka den – vi har aldrig haft den.</li>
@@ -408,17 +500,25 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Vår server skulle kunna fortsätta visa dina datorer den nyaste kopian som en av dem har sett och hålla inne det som en annan skickar senare. Räknaren fångar en kopia som är äldre än en din dator har sett, inte en som bara slutar ändras – och en dator som går med för första gången har inte sett något än.</li>
 <li>Din IP-adress når vår server med varje anrop. Den används bara i minnet, för gränserna – ungefär tio minuter, ett dygn när en ny kopia skapas – och skrivs aldrig ned.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-together">
 <h2 id="together">9. Kan ni se vad vi tittar på tillsammans?</h2>
-<p class="tp-promise">Vilka som är i rummet och vad ni tittar på går mellan era datorer låst – vår server skickar bara vidare meddelanden den inte kan öppna.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> att ett rum används, hur många som är i det och när de skickar – inte vilka de är, vad de tittar på eller vad de säger.</p>
+<p class="tp-promise tp-promise-ico">Vilka som är i rummet och vad ni tittar på går mellan era datorer låst – vår server skickar bara vidare meddelanden den inte kan öppna.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att ett rum används, hur många som är i det och när de skickar – inte vilka de är, vad de tittar på eller vad de säger.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Rummets kod</b> – tio tecken du delar med dina vänner – stannar hos dem som är i rummet.</li>
 <li><b>Ur koden</b> tar varje dator fram samma rumsnamn och samma nyckel.</li>
 <li><b>Vår server</b> skickar de låsta meddelandena vidare, håller dem bara i minnet och glömmer rummet en timme efter det senaste anropet.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>Tio tecken går fort att skriva, men ensamma skulle de gå lättare att gissa än en nyckel bör. Därför sträcks koden först ut med <strong>PBKDF2</strong> – 600 000 varv SHA-256, så att det skulle hålla ett grafikkort sysselsatt i århundraden att prova varje kod mot ett rum – och görs sedan om till ett rumsnamn och en nyckel med HKDF, som för synken. Varje meddelande – vem som kom in, vad som spelas, play, paus och spolning – krypteras med ChaCha20-Poly1305 och fylls ut till en av fyra fasta storlekar, så att längden säger lite om innehållet. Var och en får en egen nyckel för varje rum (Ed25519) och känns igen där på en hash av nyckelns publika halva: varje meddelande signeras med den nyckeln, så att ingen – inte heller servern – kan tala som någon annan, och ett meddelande utan signatur lämnas utanför. Varje meddelande har också ett löpnummer, som appen minns resten av sin körning: ett som skickas vidare två gånger används en gång, och ett från långt innan du kom in, eller långt från serverns tid, används inte. En kod på åtta tecken från 1.6.7 kommer inte längre in: appen säger det, och ett nytt rum ger en på tio. Appen pratar bara med servern över HTTPS, och följer aldrig en omdirigering någon annanstans.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -446,6 +546,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy together-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Den som får rummets kod kan gå in i rummet och se namnen och vad som spelas. Dela den bara med dem du tittar med. Ett rum tar högst åtta personer.</li>
@@ -454,10 +555,13 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Den som har koden är med i rummet, så långt appen kan se: appen kan inte skilja en vän från någon som koden har skickats vidare till.</li>
 <li>Vår server kan inte kontrollera signaturerna – de ligger inne i det krypterade, och servern har inte nyckeln. Den som känner till rummets id – vår server, eller den som har koden – kan därför lägga meddelanden i rummet som medlemmarnas appar sedan slänger, inom gränserna för hur många och hur stora: det kan störa ett rum, men inte tala i det.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-website">
 <h2 id="website">10. Spårar den här webbplatsen mig?</h2>
-<p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster – och utan att din IP-adress någonsin skrivs ned, inte ens i en logg.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> att någon besökte sidan, från vilket land och vilka sidor – i 14 dagar som ett besök bara den dagen, därefter bara som antal. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
+<p class="tp-promise tp-promise-ico">Vi räknar besök utan kakor, utan externa tjänster – och utan att din IP-adress någonsin skrivs ned, inte ens i en logg.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att någon besökte sidan, från vilket land och vilka sidor – i 14 dagar som ett besök bara den dagen, därefter bara som antal. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Webbservern</b> skriver ingenting: den lämnar varje sidvisning direkt till en egen liten tjänst, genom en socket på samma maskin – med IP-adressen, och av adressen du bad om bara sidan, aldrig det en länk lade till. Frontservern före den för ingen logg över anrop.</li>
@@ -465,9 +569,14 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>Det som skrivs</b> är besöket utan adressen och utan märket: besökaren namngiven bara för den dagen, tiden på en halvtimme när, vilken sorts skärm, aldrig dess storlek.</li>
 <li><b>Efter 14 dagar</b> – aldrig längre, vad serverns inställningar än säger (<code>VISITS_DAYS_MAX</code>) – raderas dagens besök, vartenda ett. Efter varje körning letar tjänsten efter allt som borde vara borta och raderar det igen; det den inte kan radera säger den i sin logg och högst upp på adminsidan tills det är borta (<code>left_behind</code>, <code>sweep_left</code>). Det som finns kvar är antal: hur många besök, sidor och nedladdningar, och listor som inte nämner något land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen – resten är "övrigt", och ingen lista lägger ihop dagar igen under ett namn.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>Besökarmärket är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel för månaden, och kortas till tolv tecken. Nyckeln hålls bara i minnet – i tjänstens eget, eller i en fil på ett filsystem i minnet (tmpfs) så att en omstart av tjänsten behåller den; aldrig på en disk, alltså aldrig i en säkerhetskopia – och glöms efter två månader, eller direkt när datorn startar om. Det systemet flyttar ut ur minnet hamnar i swap som är krypterad med en egen nyckel som en omstart glömmer: tjänsten frågar systemet (<code>swap_state</code>) och adminsidan varnar när swap inte är krypterad, eller när systemet inte kan svara på det. Inom en månad får samma besökare samma märke, så att vi kan räkna unika och återkommande besökare – men själva märket skrivs aldrig ned. Ett sparat besök har två saker i märkets ställe: ett namn på besökaren som gäller bara den dagen – inget som sparas knyter ihop en besökares besök från två dagar – och märket förseglat med månadens nyckel, slumpmässigt för den som inte har den. Bara den körande tjänsten kan öppna det, medan den har nyckeln: så att ett besök kan fortsätta efter en omstart.</p>
 <p>Hur många olika besökare som kom under flera dagar sparas som <strong>skisser</strong>: ett fält med 131 072 bitar för varje dag, där varje besökare sätter två – vilka två vet bara nyckeln. Tillsammans räknar de en veckas eller en månads besökare på några tusendelar när; de innehåller inget märke, ingen lista och ingen ordning. En besökare sätter samma två bitar varje dag samma månad, så två lugna dagars skisser bredvid varandra skulle kunna antyda att någon kom båda dagarna – därför sparas de bara där nyckeln finns: i tjänstens minne eller bredvid nyckeln på ett filsystem i minnet, aldrig på en disk eller i en säkerhetskopia. Efter månaden därpå finns bara antalen kvar.</p>
 <p>Hur länge varje del sparas: din IP-adress – aldrig; i högst en minut i minnet. Varje besök i detalj – bara den dagen, tiden på en halvtimme när, webbläsarens huvudversion, vilken sorts skärm, sidans språk och webbläsarens utan sitt land, webbplatsen som länkade under sitt registrerade namn – 14 dagar, sedan raderat; ingen rad av ett besök sparas efter det, inte ens en anonym. Skisserna, bara i minnet, tills månaden efter är slut, sedan bara antalet olika besökare den månaden och dess veckor. Dagens summor för alltid – per väg in (sök, sociala medier…) också hur många besök som läste vidare, laddade ned eller öppnade stödrutan – utan land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen. En betalning noteras aldrig på ett besök – dricks räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -503,22 +612,29 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy website-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
 <li>Medan tjänsten körs passerar din adress dess minne, och månadens nyckel finns där. Den som tog över den körande servern skulle kunna se anropen när de kommer, som på vilken webbserver som helst – det som finns på dess diskar, nu eller i en säkerhetskopia, leder inte tillbaka till dig.</li>
 <li>Ett besök som sparas i 14 dagar säger vad som gjordes under det, på en halvtimme när. Den som redan visste att du besökte sidan ungefär då – och vad du gjorde – skulle kunna plocka ut det besöket bland dagens, och en lugn dag säger även summorna att en besökare kom från ett visst land. Det gör det mycket svårare, inte omöjligt, att veta vem som besökte sidan; mer än så lovar vi inte.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-webservers">
 <h2 id="webservers">11. Vad ser och skriver servrarna bakom dopeiptv.org ner?</h2>
-<p class="tp-promise">Ingen av loggarna bakom dopeiptv.org sparar din adress som regel: statistikens rader går direkt till tjänstens minne, och inget anrop skrivs ned utom nedladdningsräknarens, som inte innehåller någon adress. Här är varje logg som finns.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> sidorna du ber om – din IP-adress bara medan tjänsten räknar dem i minnet, i högst en minut – och ingenting alls av det som appens tjänster för med sig.</p>
+<p class="tp-promise tp-promise-ico">Ingen av loggarna bakom dopeiptv.org sparar din adress som regel: statistikens rader går direkt till tjänstens minne, och inget anrop skrivs ned utom nedladdningsräknarens, som inte innehåller någon adress. Här är varje logg som finns.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> sidorna du ber om – din IP-adress bara medan tjänsten räknar dem i minnet, i högst en minut – och ingenting alls av det som appens tjänster för med sig.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Frontservern</b> har webbplatsens certifikat och svarar på din krypterade anslutning.</li>
 <li><b>Innehållsservern</b> bakom den lämnar ut sidorna och filerna – alla gjorda i förväg; inget program körs för en sida.</li>
 <li><b>En liten tjänst</b> svarar på det som inte är en fil: dricks och supporternyckeln, feedback och felrapporter, synkronisering, Titta tillsammans och administrationssidan. Den nås bara genom innehållsservern.</li>
 </ol>
+<details class="tp-more">
+<summary>Läs mer</summary>
+<div class="tp-more-body">
 <p>För att alls kunna svara ser de din adress, adressen du ber om och det du skickar – i minnet, medan de svarar. Vad de skriver ned står nedan; det som raderas är borta ur serverns säkerhetskopior inom två dygn också.</p>
 <p><strong>Vad som skrivs ned.</strong> Ingen server för webbplatsen för någon logg över anrop, och var och en skriver ett fel bara på den nivå som stoppar nginx självt (<code>crit</code>). Statistikens rader – förstasidan, hjälpsidan, <code>/hit</code> (signalen en sida skickar när den har visats, <a href="#website">del 10</a>) och en nedladdning – går till tjänstens minne, utan det en länk lade till i adressen (ett <code>?fbclid=</code>, ett <code>?utm_…</code>); de räknas inom en minut och är sedan borta, och ingen fil innehåller dem. En webbläsare som har öppnat administrationssidan lämnas utanför. Ingenting om synk, Titta tillsammans, feedback, dricks eller administrationssidan skrivs ned alls.</p>
 <p><strong>Varje logg som finns</strong> – vad var och en innehåller, hur länge den sparas och vem som kan läsa den:</p>
@@ -530,6 +646,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 </ul>
 <p>Utöver dem bara FreeBSD:s egna systemloggar, som inte innehåller något om ett anrop.</p>
 <p><strong>Vad som skyddar dem.</strong> Varje väg in har en gräns per adress och en största storlek på det som skickas; nginx håller räkningarna, och allt du skickar, i minnet – så inget du skickar hamnar i en fil på disk. Varje svar bär samma säkerhetshuvuden: en innehållspolicy som låter en sida ladda bara det som kommer från dopeiptv.org självt (och, för dricksrutan, Stripes och Google Pays formulär), bara https, ingen annan webbplats får visa en sida i en ram, bara webbplatsens namn går till nästa webbplats du öppnar, och ingen kamera, mikrofon eller liknande. Den enda kaka webbplatsen ger en besökare är språket, när du väljer ett. Inget namn som börjar med en punkt lämnas ut (en bortglömd <code>.git</code> eller <code>.env</code>), utom <code>/.well-known/security.txt</code>, som säger hur du berättar för oss om ett säkerhetsproblem.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
@@ -558,6 +676,7 @@ curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
 <!--tp:copy webservers-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>För att alls kunna svara ser servrarna din adress och ditt anrop när de passerar – i minnet, i det ögonblicket. Den som har makten över maskinen skulle kunna läsa dem där, eller slå på loggarna.</li>
@@ -568,5 +687,7 @@ curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
 <li>Ett fel i tjänsten som lät någon köra kod där skulle kunna ändra webbplatsen.</li>
 <li>Gränserna räknar adresser: de som delar en delar dess gränser, och den som har många adresser får många.</li>
 </ul>
+</div>
+</section>
 
 <p>Är det något här som inte stämmer med vad koden gör? <a href="#feedback" data-feedback>Säg till</a> – eller skriv till <a href="mailto:info@solecraft.se">info@solecraft.se</a>.</p>

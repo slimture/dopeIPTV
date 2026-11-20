@@ -1,5 +1,11 @@
-<div class="lead">
-<h2 id="summary">How to read this page</h2>
+<div class="tp-tiles">
+<div class="tp-tile tp-i-user"><b>No account</b><span>No sign-in with us and no ID in the app – we do not know who you are.</span></div>
+<div class="tp-tile tp-i-eye"><b>Nothing of what you watch</b><span>The app tells us nothing about what you play.</span></div>
+<div class="tp-tile tp-i-code"><b>Check it yourself</b><span>Every promise is shown in the code that keeps it, linked to its lines on GitHub.</span></div>
+</div>
+<details class="tp-more tp-howto">
+<summary>How to read this page</summary>
+<div class="tp-more-body">
 <p>We are Solecraft AB, the company that makes dopeIPTV and runs dopeiptv.org. This page answers the questions people ask first about an app like ours – the ones people doubt most come first – and for each one it says plainly what we can know and what we cannot. It shows it in the code that does it, taken straight from dopeIPTV %VERSION% and from this website's own code. Our <a href="/privacy/">privacy policy</a> says what we do with data; this page shows how. Every part says:</p>
 <ul>
 <li><strong>The promise</strong>, in one sentence.</li>
@@ -9,31 +15,51 @@
 </ul>
 <p>And under <em>Want to see how it works behind the scenes?</em> the proof: a real example made by running the code itself, the lines that do it – each with a link to exactly those lines on GitHub – and how to check it yourself.</p>
 </div>
+</details>
 
 <h2 id="answers">The short answers</h2>
 <dl class="tp-answers">
+<div class="tp-answer">
 <dt>Can you see my user name and password for my TV provider?</dt>
 <dd><strong>No.</strong> They stay in the app's settings on your computer and go only to your provider, to log in. Nothing the app sends us carries them, and we have no way to ask the app for them. <a href="#logins">Part 1</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Can you see what I watch?</dt>
 <dd><strong>No.</strong> The app tells us nothing about what you play. Your provider sees it – it sends you the stream – and The Movie Database sees a film's or a series' title when the app looks up its poster, unless you turn that off. <a href="#watching">Part 2</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Do you know who I am?</dt>
 <dd><strong>No.</strong> There is no account, no sign-in to us and no ID in the app. What it sends us by itself is the update check: the app's name, its version and your system. Like every website, our server sees the IP address a request comes from; it writes it nowhere – no log of ours keeps it. If you tip us, Stripe takes the payment, and we see of it what a shop sees (<a href="/payments/">payment terms</a>). <a href="#updates">Part 3</a></dd>
+</div>
+<div class="tp-answer">
 <dt>What does the app connect to by itself?</dt>
 <dd>Your provider; dopeiptv.org once a day, to look for an update (GitHub if we do not answer); and The Movie Database, for posters. You can turn off the last two. Everything else only when you use it – every address in the app's code is listed. <a href="#hosts">Part 4</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Could someone get a harmful update into my app?</dt>
 <dd>Not without our release key: the app installs nothing that is not on a list signed with it – not even from our own website. <a href="#builds">Part 5</a></dd>
+</div>
+<div class="tp-answer">
 <dt>If someone broke into dopeiptv.org, what would they find of mine?</dt>
 <dd>No logins and nothing of what you watch – we never get them. At most: an error report or feedback you chose to send, cleaned of what the app recognized as yours; a sync copy or Watch together messages they cannot open. Your IP address is in none of it: the servers write it down nowhere. <a href="#webservers">Part 11</a></dd>
+</div>
+<div class="tp-answer">
 <dt>Do I have to take your word for it?</dt>
 <dd><strong>No.</strong> Each part below shows the code that does it, a real example made by running that code, and a link to the very lines on GitHub – and a button that hands it all to any AI assistant to check us.</dd>
+</div>
 </dl>
 
-<div class="callout tp-ai">
+<div class="callout tp-ai tp-ai-ico">
 <p><strong>Check it with any AI.</strong> You do not need to read code to check us. Behind the scenes of each part, a button copies its code together with a ready question. Paste it into the AI assistant you use – any of them – and you get an explanation of what the code really does, and where it falls short. The question asks the AI to look for weaknesses, not to agree with us.</p>
 <p><strong>Or all of it at once.</strong> This button copies every part below – each question with its code – under one question that asks for a single table of every weakness found and an overall verdict. It is long: paste it into an AI assistant that takes long texts.</p>
-<blockquote class="tp-ask" data-for="all" data-promise="The page's promise:" data-limits="With the question come the page's own promise and the limits it names itself (“What it does not protect against”). Count such a limit as a weakness only where the code is worse than it says, but say so if you think one should not be accepted."><p>Below is dopeIPTV's security and privacy in several parts – an open-source TV player, the code of the version named on this page. Each part has its own question and the code it is about (each block headed with the address of those lines on GitHub). Answer every part in turn: explain in plain English what the code does, then review it as an attacker would and say where it falls short. Then, at the end, give one table of every weakness you found across all parts – the part, the file and line, who could use it (a provider, a device on the network, a web page, another user of the computer, someone on the network path, the developer's own server), what they could do, how serious it is (critical, high, medium, low), and how to fix it – and an overall assessment. Look for ways the parts could be combined, too. Do not guess: say so where something depends on code that is not included, and do not take the comments' word for what the code does. With each part come the page's own promise and the limits it names itself (“What it does not protect against”), too: count such a limit as a weakness only where the code is worse than it says, but say so if you think one should not be accepted.</p></blockquote>
 <!--tp:copyall-->
-<p>An AI can be wrong. It is a help to understand the code, not the proof. The proof is the code itself, and the tests that check it every time the app is built. If you want to be sure the code you paste is the real code, open the link to GitHub and copy it from there.</p>
+<details class="tp-more tp-question">
+<summary>The question that is copied</summary>
+<div class="tp-more-body">
+<blockquote class="tp-ask" data-for="all" data-promise="The page's promise:" data-limits="With the question come the page's own promise and the limits it names itself (“What it does not protect against”). Count such a limit as a weakness only where the code is worse than it says, but say so if you think one should not be accepted."><p>Below is dopeIPTV's security and privacy in several parts – an open-source TV player, the code of the version named on this page. Each part has its own question and the code it is about (each block headed with the address of those lines on GitHub). Answer every part in turn: explain in plain English what the code does, then review it as an attacker would and say where it falls short. Then, at the end, give one table of every weakness you found across all parts – the part, the file and line, who could use it (a provider, a device on the network, a web page, another user of the computer, someone on the network path, the developer's own server), what they could do, how serious it is (critical, high, medium, low), and how to fix it – and an overall assessment. Look for ways the parts could be combined, too. Do not guess: say so where something depends on code that is not included, and do not take the comments' word for what the code does. With each part come the page's own promise and the limits it names itself (“What it does not protect against”), too: count such a limit as a weakness only where the code is worse than it says, but say so if you think one should not be accepted.</p></blockquote>
+</div>
+</details>
+<p class="fine">An AI can be wrong. It is a help to understand the code, not the proof. The proof is the code itself, and the tests that check it every time the app is built. If you want to be sure the code you paste is the real code, open the link to GitHub and copy it from there.</p>
 </div>
 
 <nav class="legal-toc" aria-label="Contents">
@@ -52,15 +78,19 @@
 </ol>
 </nav>
 
+<section class="tp-part tp-i-logins">
 <h2 id="logins">1. Can you see my login to my TV provider?</h2>
-<p class="tp-promise">Your user name, password and server stay on your computer and go only to your provider – never to us.</p>
-<p class="tp-know"><b>What we can know:</b> nothing of them. The app never sends them to dopeiptv.org, so there is nothing for us – or for anyone who took over our server – to read.</p>
+<p class="tp-promise tp-promise-ico">Your user name, password and server stay on your computer and go only to your provider – never to us.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> nothing of them. The app never sends them to dopeiptv.org, so there is nothing for us – or for anyone who took over our server – to read.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>You</b> type them once, when you add a source.</li>
 <li><b>The app</b> keeps them in its settings file, which only your own user account can read.</li>
 <li><b>Your provider</b> gets them each time the app logs in or opens a channel – that is how it knows it is you.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>Nothing else gets them by itself. From the moment the app first uses your login, its log writes your user name and password as <code>***</code> wherever they turn up – in a stream's address, in an error from the video player, in a line written long after. An error report takes out the server, the user name and the password before you even see it (<a href="#reports">part 7</a>). The update check carries none of it (<a href="#updates">part 3</a>), and the list of every address in the app's code (<a href="#hosts">part 4</a>) shows where else the app goes. A Jellyfin or Emby password is sent once to that server, and only the token it answers with is kept.</p>
 <p>Where your login does leave your computer, it is because you sent it there:</p>
 <ul>
@@ -69,6 +99,8 @@
 <li><strong>A TV you cast to</strong> fetches the stream itself, so it gets the stream's address – and with many providers the login is part of that address.</li>
 <li><strong>A player you give the app's shared playlist</strong> (a Nerd setting) is sent on to the stream's own address the same way.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -93,6 +125,7 @@
 <!--tp:copy logins-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>The settings file is not encrypted: anyone who can sign in as you, an administrator of the computer, or a program you run yourself can read it – as they could most of what is yours on the computer. On Windows and macOS the settings are kept where the system keeps each user's own.</li>
@@ -100,10 +133,16 @@
 <li>A TV you cast to, or a player you give the shared playlist, gets the stream's address – with many providers, your login with it.</li>
 <li>When the app records over a connection of its own, or opens VLC or mpv on their own, it hands the program the stream's address – with many providers your login in it – and on Linux and macOS other user accounts on the same computer can see a program's command line while it runs.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-watching">
 <h2 id="watching">2. Can you see what I watch?</h2>
-<p class="tp-promise">Nothing the app sends us says which channel, film or episode you play.</p>
-<p class="tp-know"><b>What we can know:</b> nothing of what you watch – unless you write it in feedback yourself. What you sync and what you watch together reach our server locked, and we cannot open it.</p>
+<p class="tp-promise tp-promise-ico">Nothing the app sends us says which channel, film or episode you play.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> nothing of what you watch – unless you write it in feedback yourself. What you sync and what you watch together reach our server locked, and we cannot open it.</p>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <h3>How it works</h3>
 <p>Here is everything the app sends to dopeiptv.org, and what of your watching is in it:</p>
 <ul>
@@ -119,6 +158,8 @@
 <li><strong>Trakt and Simkl</strong> get what you watch only if you sign in to them – that is what they are for.</li>
 <li><strong>OpenSubtitles</strong> gets what you search for, when you search for subtitles, and <strong>radio-browser.info</strong> the station you play only if you turn that on.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -136,17 +177,26 @@
 <!--tp:copy watching-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Your provider sees what you play, and anyone who can see your network traffic sees which servers you connect to – and with a provider on plain <code>http://</code>, which streams.</li>
 <li>Posters are looked up for what you browse, not only for what you play: a title you scroll past may be asked for too.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-updates">
 <h2 id="updates">3. Do you know who I am?</h2>
-<p class="tp-promise">The app has no account and no ID of its own: when it looks for an update it says which app and version it is, on which system – and nothing else.</p>
-<p class="tp-know"><b>What we can know:</b> that a copy of dopeIPTV of this version, on this kind of system, looked for an update – not from which address, and not who you are.</p>
+<p class="tp-promise tp-promise-ico">The app has no account and no ID of its own: when it looks for an update it says which app and version it is, on which system – and nothing else.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that a copy of dopeIPTV of this version, on this kind of system, looked for an update – not from which address, and not who you are.</p>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <h3>How it works</h3>
 <p>Once a day the app asks dopeiptv.org which version is the newest (GitHub, if we do not answer). The request carries a user agent and one more line saying whether this is an official build. That is all: no ID, no settings, nothing about what you watch.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -161,14 +211,21 @@
 <!--tp:copy updates-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>The check arrives from your IP address, which the servers write down nowhere (<a href="#webservers">part 11</a>). We count an update you download – the version it came from, the system and processor, the country, at its hour and for 30 days – never with the address.</li>
 <li>You can turn the check off in the app: <em>Check for updates on startup</em>.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-hosts">
 <h2 id="hosts">4. What does the app connect to?</h2>
-<p class="tp-promise">The network destinations we found in the app's own code are listed here, with when the app uses each. It is what a search found, not a promise of every one.</p>
+<p class="tp-promise tp-promise-ico">The network destinations we found in the app's own code are listed here, with when the app uses each. It is what a search found, not a promise of every one.</p>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>The list is made by searching the app's code for every host name in it – the same search you can run yourself. The app also talks to what you add yourself: your sources, and the boxes, TVs and servers on your network – and to the addresses their own lists name, such as channel logos and guides on other servers, and, through yt-dlp, the site of an address you open. Those come from your data, not from the code, so they are not in the lists below.</p>
 <p>The list is what the app's own code names. It is not a guarantee that no other connection can happen: the libraries it is built on, the video player inside it (mpv and FFmpeg), yt-dlp and your operating system can make connections of their own, and an address put together while the app runs is not written out in the code. What you can do is read the linked code and watch the app's traffic yourself – both below.</p>
 <h3>Addresses the app connects to</h3>
@@ -212,6 +269,8 @@
 <li><!--tp:hosts name suffix--> – the ending of a home network's name (Tailscale's) that the app's home server accepts.</li>
 <li><!--tp:hosts name example--> – examples: a guide ID in a comment, and a sample address shown in an empty field.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -229,9 +288,14 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <!--tp:copy hosts-->
 </div>
 </details>
+</section>
 
+<section class="tp-part tp-i-builds">
 <h2 id="builds">5. Could someone get a harmful update into my app?</h2>
-<p class="tp-promise">The app you download is built in public from the version's tag in this code, signed, and it can tell when it has been changed.</p>
+<p class="tp-promise tp-promise-ico">The app you download is built in public from the version's tag in this code, signed, and it can tell when it has been changed.</p>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>An update is never used just because it arrived. Every release comes with a list of its files' checksums, signed with our own release key. The app checks the signature and the file's checksum before it installs anything. Someone who could change a file on GitHub, but does not hold our key, cannot get an update into your app. A copy built by someone else, without our key, takes no update at all.</p>
 <ul class="tp-limits">
 <li><strong>Built in public.</strong> Every release is built by GitHub Actions from the version's tag in the code – not on our computers. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">The build's recipe</a> is in the code, and <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">the log of every build</a> is open to anyone.</li>
@@ -241,6 +305,8 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <li><strong>It checks itself.</strong> The app carries a signed list of its own files and checks them when it starts. A changed copy knows it is changed, and does not use our services: it looks for no updates here and sends no reports to us. Run straight from the code, it says so, and works as an official build.</li>
 <li><strong>A courtesy, not a lock.</strong> The check is made by the app itself, and what kind of build it is the app says about itself. A copy changed on purpose can change the check too, and anyone can write a request by hand. So none of the protection on this page rests on it – that is the encryption and the cleaning above. What it gives you is an app that knows when it is not ours, and says so.</li>
 </ul>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -262,10 +328,12 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy builds-->
 </div>
 </details>
+</section>
 
+<section class="tp-part tp-i-private">
 <h2 id="private">6. Can the app keep nothing of what I watch?</h2>
-<p class="tp-promise">While private viewing is on, nothing you play is kept or told to anyone, and nothing of it is written to a disk – until you close the app.</p>
-<p class="tp-know"><b>What we can know:</b> nothing of it. Private viewing is about what your own computer keeps and tells; we get nothing of what you watch either way (<a href="#watching">part 2</a>).</p>
+<p class="tp-promise tp-promise-ico">While private viewing is on, nothing you play is kept or told to anyone, and nothing of it is written to a disk – until you close the app.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> nothing of it. Private viewing is about what your own computer keeps and tells; we get nothing of what you watch either way (<a href="#watching">part 2</a>).</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>One switch</b> in the app's memory – never saved, so it is off again when the app starts.</li>
@@ -273,8 +341,13 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>Each place that tells</b> – Trakt, Simkl, Discord, your media server, the statistics, the log – asks it too.</li>
 <li><b>What must be written while it plays</b> – the rewind buffer, a cast the app converts for the TV, a subtitle you fetch – goes only to memory that cannot reach a disk, or is not made at all.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>The check sits in the stores themselves, not in the buttons that play something. So no part of the app can forget it: whichever way you start a film, the history refuses to write it. A playback that began in private stays private to its end – even if the stream reconnects after you turn private viewing off: it is not kept, not counted and not told to Trakt, Simkl, Discord or your media server.</p>
 <p>Memory counts only when it really is memory: on Linux, a folder of your own on a file system in memory (tmpfs), and only when what the system moves out of memory cannot be read from a disk afterwards – no swap, encrypted swap, or zram with no disk behind it. Where there is no such memory – on macOS and Windows, or with swap on a plain disk – a private channel plays without the rewind buffer, the app says why a cast that needs converting cannot be made, and a subtitle reaches the player without becoming a file. Turn private viewing on while a channel plays from a buffer on the disk, and it is opened again the private way; a cast being converted on the disk stops within a second and is sent again. A recording while you watch privately is asked about first.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -301,6 +374,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy private-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Your TV provider still sees what you play – it sends you the stream – and so can anyone who can see your network traffic. Private viewing is about what your own computer keeps and tells, not about being invisible.</li>
@@ -309,20 +383,28 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>A cast being converted on the disk when you turn private viewing on goes on for up to a second before it stops; what it wrote is deleted then.</li>
 <li>On macOS and Windows there is no such memory for the app: a private channel has no rewind buffer there, and a cast that needs converting is not converted.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-reports">
 <h2 id="reports">7. What is in an error report?</h2>
-<p class="tp-promise">An error report is cleaned on your computer of what the app recognizes as yours or as what you watch, you read all of it first – and nothing leaves at all until you press Send.</p>
-<p class="tp-know"><b>What we can know:</b> what you choose to send – the report after its cleaning, which you read first – and an answer's place in the line, by a code only your computer has. Never your IP address in what we keep.</p>
+<p class="tp-promise tp-promise-ico">An error report is cleaned on your computer of what the app recognizes as yours or as what you watch, you read all of it first – and nothing leaves at all until you press Send.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> what you choose to send – the report after its cleaning, which you read first – and an answer's place in the line, by a code only your computer has. Never your IP address in what we keep.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>The app</b> writes the report and cleans it on your computer.</li>
 <li><b>You</b> read all of it, change or delete anything, and decide whether to send it.</li>
 <li><b>Our server</b> cleans it once more and keeps it without your IP address.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>The cleaning works in two ways. First it looks for <em>patterns</em>: anything shaped like a web address – with or without <code>http://</code> in front –, an IP or MAC address, an e-mail address, a phone number, a password, token or login written as <code>name=value</code>, in quotes, as JSON or in a sentence such as “password: …”, a token on its own (a JWT, a key with a service's prefix, a long random string), and a login header or cookie. Then it removes <em>what the app knows is yours</em>: the names, servers and logins of your sources, your channel names, the titles you have watched, your user name and any account's home folder. Each is replaced by a placeholder such as <code>&lt;private&gt;</code>, so the report still makes sense to us without saying who you are. The part that sends runs the patterns once more on exactly what goes, whichever way the text came, and sends it only over HTTPS to our own address – never after a redirect elsewhere.</p>
 <p>If you ask for an answer, the app makes a random code that stays on your computer and sends only a hash of it – a one-way fingerprint we cannot turn back into the code. Later the app asks whether that hash has an answer. The hash is the same each time it asks, so our server can tell that the questions belong together, but not who asks. A reply you write to one of our answers is cleaned the same way as the report.</p>
 <p>Our server keeps a report for 12 months and then removes it by itself – with every answer we wrote to it and every reply you sent to one. An answer we write to a whole problem at once (“fixed in 1.5.1”, for everyone who reported it) holds only our own words and stays until we remove it.</p>
 <p>Feedback carries what you pick in it – the topic, the part of the app and how often it happens – and, if the app has a supporter key, the field <code>"supporter": "yes"</code>, so we read it first. Never the key.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -352,26 +434,35 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy reports-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>The cleaning knows patterns and what the app knows is yours. Words you type yourself in a piece of feedback, or a name it has never seen – a file name, a channel from a list you have since removed – stay as they are. That is why you see the whole report before anything is sent.</li>
 <li>Our server's second cleaning is simpler than the app's: it looks for the same patterns, but it does not know your names. It is there for an old app or a hand-made request; the app's cleaning is the one that counts.</li>
 <li>Like every request on the internet, the report arrives from your IP address. Our server uses it only in memory, for about ten minutes, to limit how many reports one address can send, and never stores it.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-sync">
 <h2 id="sync">8. Can you read what I sync?</h2>
-<p class="tp-promise">What you sync is locked on your computer before it is sent, with a key we never see – we keep it, but we cannot read it or tell whose it is.</p>
-<p class="tp-know"><b>What we can know:</b> that a locked copy exists, how big it is and when it changes – not what is in it, nor whose it is.</p>
+<p class="tp-promise tp-promise-ico">What you sync is locked on your computer before it is sent, with a key we never see – we keep it, but we cannot read it or tell whose it is.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that a locked copy exists, how big it is and when it changes – not what is in it, nor whose it is.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>Your computer</b> makes a random sync code – 256 bits, shown as 13 groups of four.</li>
 <li><b>From the code</b> come two unrelated values: a <em>slot</em> (where the copy is kept) and a <em>key</em> (which locks it).</li>
 <li><b>Our server</b> gets the slot and the locked copy. Never the code, never the key.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>The two values come from the code through <strong>HKDF-SHA256</strong>, a standard way to make several keys from one secret: knowing the slot says nothing about the key. The copy is compressed and then encrypted with <strong>ChaCha20-Poly1305</strong>, one of the ciphers that protect HTTPS connections on the web. It also detects any change: a copy someone has tampered with does not open.</p>
 <p>A third value comes from the code the same way: a password for the slot. Our server keeps only a hash of it, and once a copy is written nobody can read, change or delete that slot without it – knowing a slot is not enough.</p>
 <p>What our server could still do is hand back an earlier copy it kept. So every copy carries a counter, locked with the rest and one higher with every upload. A computer that has already seen a later copy notices, keeps its own newer values, puts its copy back and tells you so. Your other computers get the same code from you – typed or pasted – and so make the same slot and key. A playlist's connection settings that a copy brings – a proxy, headers, a rewrite rule and the like – are never put in place unasked: the app shows them, and you choose.</p>
 <p>The request carries the app's name and version, whether it is an official build, the slot, its password and the locked copy. No account, no e-mail address, no name. It goes only over HTTPS, and never after a redirect elsewhere. The web server does not log sync requests at all, and a copy no computer has read or written for 180 days is deleted.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -401,6 +492,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy sync-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Whoever has your sync code can read and change your synced data. Keep it like a password. If you lose it, we cannot help you get it back – we never had it.</li>
@@ -408,17 +500,25 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Our server could keep showing your computers the newest copy one of them has seen and hold back what another sends later. The counter catches a copy older than one your computer has seen, not one that simply stops changing – and a computer that joins for the first time has seen nothing yet.</li>
 <li>Your IP address reaches our server with each request. It is used only in memory, for the limits – about ten minutes, a day when a new copy is made – and is never written down.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-together">
 <h2 id="together">9. Can you see what we watch together?</h2>
-<p class="tp-promise">Who is in the room and what you watch go between your computers locked – our server only passes on messages it cannot open.</p>
-<p class="tp-know"><b>What we can know:</b> that a room is in use, how many are in it and when they send – not who they are, what they watch or what they say.</p>
+<p class="tp-promise tp-promise-ico">Who is in the room and what you watch go between your computers locked – our server only passes on messages it cannot open.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that a room is in use, how many are in it and when they send – not who they are, what they watch or what they say.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>The room code</b> – ten characters you share with your friends – stays with the people in the room.</li>
 <li><b>From the code</b> each computer makes the same room name and the same key.</li>
 <li><b>Our server</b> passes the locked messages on, keeps them only in memory, and forgets the room an hour after the last request.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>Ten characters are quick to type, but on their own they would be quicker to guess than a key should be. So the code is first stretched with <strong>PBKDF2</strong> – 600,000 rounds of SHA-256, so trying every code against one room would keep a graphics card busy for centuries – and then turned into a room name and a key with HKDF, as for sync. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Each person gets a key of their own for each room (Ed25519) and is known in it by a hash of the key's public half: every message is signed with that key, so nobody – the relay included – can speak as someone else, and a message without a signature is left out. Each message also carries a count, remembered for the rest of the app's run: one passed on twice is used once, and one from well before you joined, or far from the relay's time, is not acted on. A code of eight characters from 1.6.7 no longer joins: the app says so, and a new room gives one of ten. The app talks to the relay only over HTTPS, and never follows a redirect elsewhere.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -446,6 +546,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy together-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Anyone who gets the room code can join the room and see the names and what plays. Share it only with the people you watch with. A room takes at most eight people.</li>
@@ -454,10 +555,13 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Whoever has the code is in the room, as far as the app can tell: the app cannot tell a friend from someone the code was passed on to.</li>
 <li>Our server cannot check the signatures – they are inside what is encrypted, and it has no key. Whoever knows the room's id – our server, or someone with the code – can therefore put messages in the room that the members' apps then drop, within the limits on how many and how large: that can disturb a room, but not speak in it.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-website">
 <h2 id="website">10. Does this website track me?</h2>
-<p class="tp-promise">We count visits without cookies, without outside services – and without your IP address ever being written down, not even in a log.</p>
-<p class="tp-know"><b>What we can know:</b> that someone visited, from which country and which pages – for 14 days as a visit of that day alone, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
+<p class="tp-promise tp-promise-ico">We count visits without cookies, without outside services – and without your IP address ever being written down, not even in a log.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that someone visited, from which country and which pages – for 14 days as a visit of that day alone, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>The web server</b> writes nothing: it hands each page view straight to a small service of ours, over a socket on the same machine – with the IP address, and of the address you asked for only the page, never what a link added to it. The front server before it keeps no log of requests.</li>
@@ -465,9 +569,14 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>What is written</b> is the visit without the address and without the mark: its visitor named for that day alone, its time to the half hour, the kind of screen, never its size.</li>
 <li><b>After 14 days</b> – never more, whatever the server's settings say (<code>VISITS_DAYS_MAX</code>) – the day's visits are deleted, every one. After every run the service looks for anything that should be gone and deletes it again; what it cannot delete it says in its log and at the top of the admin page until it is gone (<code>left_behind</code>, <code>sweep_left</code>). What stays is counts: how many visits, pages and downloads, and lists that name no country, language, version, site or tag fewer than five visitors had that day – the rest is "other", and no list adds days up again under a name.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>The visitor mark is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key of the month, cut to twelve characters. The key is kept only in memory – in the service's own, or in a file on a file system held in memory (tmpfs) so that a restart of the service keeps it; never on a disk, so never in a backup – and is forgotten after two months, or at once when the computer starts again. What the system moves out of memory goes to swap encrypted with a key of its own that a restart forgets: the service asks the system (<code>swap_state</code>) and the admin page warns when swap is not encrypted, or when the system cannot say. Within a month the same visitor gets the same mark, so we can count unique and returning visitors – but the mark itself is never written down. A visit kept carries two things in its place: a name for its visitor that holds for that day alone – nothing kept ties a visitor's visits of two days together – and the mark sealed with the month's key, random to anyone without it. Only the running service can open it, while it holds the key: so that a visit can go on after a restart.</p>
 <p>How many different visitors came over several days is kept as <strong>sketches</strong>: a field of 131,072 bits for each day, in which each visitor sets two – which two only the key says. Put together they count the visitors of a week or a month within a few in a thousand; they hold no mark, no list and no order. A visitor sets the same two bits on every day of its month, so two quiet days' sketches side by side could hint that someone came on both – which is why they are kept only where the key is: in the service's memory or beside the key on a file system in memory, never on a disk or in a backup. After the month that follows, only the numbers stay.</p>
 <p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – of that day alone, its time to the half hour, the browser's main version, the kind of screen, the page's language and the browser's without its country, the site that linked by its registered name – 14 days, then deleted; no row of a visit is kept after that, not even an anonymous one. The sketches, in memory alone, until the month after has ended, then only the number of different visitors in that month and its weeks. The day's counts for good – per way in (search, social…) how many visits read on, downloaded or opened the support dialog, too – with no country, language, version, site or tag fewer than five visitors had that day. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -503,22 +612,29 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:copy website-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Unlike the app, our server is not something you can inspect: you have to trust that it runs this code. What you can check yourself is what your browser loads and keeps.</li>
 <li>While the service runs, your address passes its memory and the month's key is there. Someone who took over the running server could watch requests as they come, as on any web server – what is on its disks, now or in a backup, does not lead back to you.</li>
 <li>A visit kept for 14 days says what was done in it, to the half hour. Someone who already knew that you visited at about that time – and what you did – could pick that visit out among the day's, and on a quiet day the counts too say that one visitor came from a country. That makes it much harder, not impossible, to tell who visited; we do not claim more.</li>
 </ul>
+</div>
+</section>
 
+<section class="tp-part tp-i-webservers">
 <h2 id="webservers">11. What do the servers behind dopeiptv.org see and write down?</h2>
-<p class="tp-promise">None of the logs behind dopeiptv.org keeps your address as a rule: the statistics' lines go straight to the service's memory, and no request is written down but the download counter's, which holds no address. Here is every log there is.</p>
-<p class="tp-know"><b>What we can know:</b> the pages you ask for – your IP address only while the service counts them in memory, a minute at the most – and nothing at all of what the app's services carry.</p>
+<p class="tp-promise tp-promise-ico">None of the logs behind dopeiptv.org keeps your address as a rule: the statistics' lines go straight to the service's memory, and no request is written down but the download counter's, which holds no address. Here is every log there is.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> the pages you ask for – your IP address only while the service counts them in memory, a minute at the most – and nothing at all of what the app's services carry.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>The front server</b> holds the site's certificate and answers your encrypted connection.</li>
 <li><b>The content server</b> behind it serves the pages and files – all made in advance; no program runs for a page.</li>
 <li><b>A small service</b> answers what is not a file: a tip and its supporter key, feedback and error reports, settings sync, Watch together and the admin page. It is reached only through the content server.</li>
 </ol>
+<details class="tp-more">
+<summary>Read more</summary>
+<div class="tp-more-body">
 <p>To answer at all, they see your address, the address you ask for and what you send – in memory, while they answer. What they write down is below; what anything deletes is gone from the server's backups within two days as well.</p>
 <p><strong>What is written down.</strong> No server for the site keeps a log of requests, and each writes an error only at the level of what stops nginx itself (<code>crit</code>). The statistics' lines – the front page, the help page, <code>/hit</code> (the signal a page sends once it is shown, <a href="#website">part 10</a>) and a download – go to the service's memory, without what a link added to the address (a <code>?fbclid=</code>, a <code>?utm_…</code>); they are counted within a minute and gone, and no file holds them. A browser that has opened the admin page is left out. Nothing of sync, Watch together, feedback, tips or the admin page is written down at all.</p>
 <p><strong>Every log there is</strong> – what each holds, how long it is kept and who can read it:</p>
@@ -530,6 +646,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 </ul>
 <p>Beside them only FreeBSD's own system logs, which hold nothing of a request.</p>
 <p><strong>What guards them.</strong> Every way in has a limit per address and a largest body; nginx keeps the counts, and anything you send, in memory – so nothing you send lies in a file on disk. Every answer carries the same security headers: a content security policy that lets a page load only what comes from dopeiptv.org itself (and, for the tip dialog, Stripe's and Google Pay's forms), https only, no other site may show a page in a frame, only the site's name goes to the next site you open, and no camera, microphone or the like. The one cookie the site gives a visitor is the language, when you pick one. No name with a dot first is served (a forgotten <code>.git</code> or <code>.env</code>), but <code>/.well-known/security.txt</code>, which says how to tell us about a security problem.</p>
+</div>
+</details>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
@@ -558,6 +676,7 @@ curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
 <!--tp:copy webservers-->
 </div>
 </details>
+<div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>To answer at all, the servers see your address and your request as they pass – in memory, for that moment. Whoever controls the machine could read them there, or turn the logs on.</li>
@@ -568,5 +687,7 @@ curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
 <li>A flaw in the service that let someone run code there could change the site.</li>
 <li>The limits count addresses: people who share one share its limits, and someone with many addresses gets many.</li>
 </ul>
+</div>
+</section>
 
 <p>Something here that does not match what the code does? <a href="#feedback" data-feedback>Tell us</a> – or write to <a href="mailto:info@solecraft.se">info@solecraft.se</a>.</p>
