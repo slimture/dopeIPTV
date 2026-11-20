@@ -81,7 +81,7 @@ def tmdb_url_from_provider(url: str | None) -> str | None:
     return f"https://image.tmdb.org/t/p/w500/{token}.{ext}"
 
 
-def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
+def choose_cover_url(title_tmdb, raw_provider, kind, is_dead, rewrite: bool = True):
     """Pick the cover URL for a list row, in priority order:
 
       1. the TMDB title-search poster (None when there's no TMDB key
@@ -99,8 +99,10 @@ def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
     Pure function shared by MainWindow.cover_url and the tests so the
     two can't drift; the no-TMDB path is exercised directly by passing
     title_tmdb=None."""
+    # *rewrite* False (TMDB turned off): the provider's address as it is,
+    # never one on image.tmdb.org that the provider did not name.
     embed = (tmdb_url_from_provider(raw_provider)
-             if kind in ("vod", "series") else None)
+             if rewrite and kind in ("vod", "series") else None)
     if title_tmdb and not is_dead(title_tmdb):
         return title_tmdb
     if embed:

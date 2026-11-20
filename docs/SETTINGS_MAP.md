@@ -139,7 +139,9 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - Music: `music_art_online`
 
 **Posters & info** (`metadata`)
-- (untitled): `metadata_source`, `tmdb_api_key` (Test)
+- (untitled): `metadata_source` (`tmdb` built-in key, `custom` own key,
+  `playlist` the provider's artwork - TMDB still asked for Trakt's ids -,
+  `off` the provider's artwork and nothing asked of TMDB), `tmdb_api_key` (Test)
 - Popular right now (TMDB's chart, what the source has), at the top of:
   `popular_movies` (Movies), `popular_series` (Series) - "Hide this row" on
   its heading writes these same keys

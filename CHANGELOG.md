@@ -56,6 +56,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   first other address that asks for a run's stream, anyone else refused.
 - A login of three characters or fewer is masked in the log as a word of
   its own.
+- TMDB can be turned off altogether: **Provider artwork, TMDB off** under
+  Settings → Posters & info asks it nothing - no titles, no searches, no
+  ids for Trakt or Simkl, no chart of the week, no picture moved onto
+  TMDB's server. Provider artwork alone still asks TMDB for Trakt's ids,
+  as before.
 - The audit of the packages a release ships fails when it could not check
   them all, and a release is not signed until it passed.
 - A channel watched privately from its start keeps its rewind buffer in

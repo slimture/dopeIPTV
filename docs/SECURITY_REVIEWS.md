@@ -220,7 +220,8 @@ was done:
 | Local servers | Server mode's tuner open to the whole home network | answered | Already off by default since 1.6.9 (`home_server.OPEN_OFF`): the tuner takes its token in its own address unless the person lets named devices or the home in |
 | Profiles | A four-digit PIN is weak | answered | 4 to 8 digits; PBKDF2 with 600 000 rounds and growing waits after two wrong tries (`core/pins.py`); a longer one is the person's choice |
 | Commands from outside | A link or the media keys change channel without asking | answered | A link that plays an address is asked first, the whole address shown; a channel change by `--channel` or the media keys comes from this user's own session (its socket and session bus), as a key pressed does |
-| TMDB, player TLS, credentials on command lines, the OS keyring, default-encrypted backups | Titles go to TMDB even with the provider's artwork (Trakt's ids, the watched marks); the rest known limits | open | Written down in docs/SECURITY.md; the order to take them in is the maintainer's to decide |
+| Viewing metadata | Titles go to TMDB even with the provider's artwork (Trakt's ids, the watched marks) | low | 1.6.9: **Provider artwork, TMDB off** asks TMDB nothing at all - no resolver, no chart, no picture moved onto image.tmdb.org (`services/coverart.OFF`); a picture the provider itself keeps on TMDB's server still loads from there |
+| Player TLS, credentials on command lines, the OS keyring, default-encrypted backups | Known limits | open | Written down in docs/SECURITY.md; the order to take them in is the maintainer's to decide |
 
 ## The next round
 

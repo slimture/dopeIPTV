@@ -371,7 +371,8 @@ class _DetailMixin:
         # If the provider icon embeds a TMDB path, prefer the direct
         # image.tmdb.org URL - the panel's own proxy is often the one
         # that's 404ing/down. Same rewrite the list delegate uses.
-        fallback_url = tmdb_url_from_provider(raw_cover) or raw_cover
+        fallback_url = (None if getattr(getattr(self, "cover", None), "off", False)
+                        else tmdb_url_from_provider(raw_cover)) or raw_cover
         key = self._current_key
 
         def logo(pm) -> None:

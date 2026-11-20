@@ -14,8 +14,20 @@ from typing import Any, Callable
 from PyQt6.QtCore import QThreadPool
 
 from ..core import picture_files
+from ..core.log import log
 from ..core.workers import choose_cover_url, is_tmdb_image_url
 from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
+
+
+#: The artwork choice that asks TMDB nothing at all (Settings > Posters &
+#: info): no title search, no ids for Trakt or Simkl, no chart, no picture
+#: from image.tmdb.org that the provider did not name itself.
+OFF = "off"
+
+
+def tmdb_off(settings) -> bool:
+    """Whether the person turned TMDB off (``metadata_source`` "off")."""
+    return (settings.value("metadata_source", "") or "") == OFF
 
 
 class CoverArtService:
@@ -33,6 +45,8 @@ class CoverArtService:
         # the provider's own image (the resolver still runs either way, to
         # feed Trakt id resolution and the watched badges).
         self.prefer_tmdb = False
+        #: TMDB turned off: nothing at all is asked of it (OFF).
+        self.off = False
         self._pool: QThreadPool | None = None
         self.reload()
 
@@ -62,6 +76,14 @@ class CoverArtService:
         #   "custom"   - the user's own key
         #   "playlist" - the provider's own artwork
         source = self._settings.value("metadata_source", "") or ""
+        self.off = source == OFF
+        if self.off:
+            # Off: no resolver - every caller (the detail panel, a series'
+            # page, Trakt, Simkl, the local library, Popular right now, the
+            # manual match) already does without one.
+            self.prefer_tmdb = False
+            log.info("tmdb: turned off - nothing is asked of it")
+            return
         if not source:
             source = "tmdb" if bundled else ("custom" if user_key
                                              else "playlist")
@@ -186,7 +208,7 @@ class CoverArtService:
             title_tmdb = None
         return choose_cover_url(
             title_tmdb, self._provider_cover(it),
-            eff, self._logos.is_dead)
+            eff, self._logos.is_dead, rewrite=not self.off)
 
     def should_fetch(self, url: Any, it: dict, kind: str) -> bool:
         """Whether the delegate should queue a network fetch for *url*

@@ -439,7 +439,8 @@ class _SeriesPageMixin:
         raw = ctx.get("cover") or ctx.get("stream_icon") or info.get("cover")
         try:
             poster = (self.cover.cover_url(ctx, "series") if not local
-                      else None) or tmdb_url_from_provider(raw) or raw
+                      else None) or (None if self.cover.off
+                                     else tmdb_url_from_provider(raw)) or raw
         except Exception:
             poster = raw
         poster = str(td.get("poster_url") or poster or "")

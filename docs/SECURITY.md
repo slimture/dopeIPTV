@@ -566,6 +566,22 @@ are caught for this computer and link-local hosts only (`dest_guard`).
 *Why:* a box's picons and a media server's artwork are at home addresses,
 and a playlist on a server at home is common - those are home sources.
 
+### TMDB learns what is looked up
+
+With the built-in key - the default - a film's or a series' title and year
+go to The Movie Database for its poster and details, and with them this
+computer's address, as to any service; never a login or the provider's
+address (`providers/metadata.py`). Nothing is asked about what plays
+privately (`privacy.title_private`). **Provider artwork, TMDB off**
+(Settings → Posters & info: `services/coverart.OFF`) asks TMDB nothing at
+all: no title search, no ids for Trakt or Simkl, no chart of the week, no
+picture of the provider's moved onto image.tmdb.org. A picture the
+provider's own list names on TMDB's server is still loaded from there -
+the provider chose where it is.
+
+*Why:* posters and details are what most people want from a list of
+films; turning them off is one choice away, said where it is chosen.
+
 ### The player and the recorder look names up themselves
 
 The app's own requests are checked where they land (`core/dest_guard.py`).

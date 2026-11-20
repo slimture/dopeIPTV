@@ -94,3 +94,37 @@ def test_is_tmdb_image_url_checks_host_not_substring():
     assert not is_tmdb_image_url("http://prefix-image.tmdb.org/x.jpg")
     assert not is_tmdb_image_url(None)
     assert not is_tmdb_image_url("")
+
+
+def test_tmdb_off_asks_tmdb_nothing(monkeypatch):
+    # Settings > Posters & info, "Provider artwork, TMDB off": no resolver at
+    # all, even with a key - so no title search, no ids for Trakt or Simkl,
+    # no chart; and no provider picture moved onto image.tmdb.org.
+    import inspect
+
+    from dopeiptv.services import coverart
+    made = []
+    monkeypatch.setattr(coverart, "TmdbClient", lambda key: made.append(key))
+    monkeypatch.setattr(coverart, "bundled_tmdb_key", lambda: "built-in")
+    svc, _ = _service({"metadata_source": "off", "tmdb_api_key": "mine"})
+    assert svc.off and svc.resolver is None and not svc.prefer_tmdb
+    assert made == [], "no TMDB client is made"
+    assert coverart.tmdb_off(FakeSettings({"metadata_source": "off"}))
+    assert not coverart.tmdb_off(FakeSettings({"metadata_source": "playlist"}))
+    proxied = "http://panel:2095/images/movies/AbCdEfGhIjKlMnOpQrStUvWxYz1.jpg"
+    it = {"name": "Some Movie", "stream_icon": proxied}
+    assert svc.cover_url(it, "vod") == proxied, "the provider's own address, as it is"
+    monkeypatch.setattr(coverart, "bundled_tmdb_key", lambda: "")
+    on, _ = _service({"metadata_source": "playlist"})
+    assert on.cover_url(it, "vod").startswith("https://image.tmdb.org/"), "as before when TMDB is on"
+    # The other places that would move a provider's picture onto TMDB's
+    # server, and Popular right now's chart kept on disk, ask the switch.
+    from dopeiptv.ui import mw_detail, mw_popular, mw_series_page
+    assert '"off", False)' in inspect.getsource(mw_detail._DetailMixin._load_detail_poster)
+    assert "self.cover.off" in inspect.getsource(mw_series_page)
+    chart = inspect.getsource(mw_popular._PopularMixin._popular_chart_now)
+    assert chart.index('"off", False)') < chart.index("popular.load(")
+    # And the setting is offered, with its note.
+    from dopeiptv.ui import set_content
+    src = inspect.getsource(set_content.build_metadata)
+    assert '("off", tr("meta_src_off"))' in src and 'tr("meta_hint_off")' in src

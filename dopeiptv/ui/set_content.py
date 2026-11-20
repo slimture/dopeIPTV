@@ -377,6 +377,8 @@ def build_metadata(ctx: SettingsContext) -> None:
         _options.append(("tmdb", tr("meta_src_builtin")))
     _options.append(("custom", tr("meta_src_own")))
     _options.append(("playlist", tr("meta_src_provider")))
+    # Nothing asked of TMDB at all (coverart.OFF).
+    _options.append(("off", tr("meta_src_off")))
     _default_src = win.settings.value(
         "metadata_source",
         "tmdb" if _bundled else
@@ -397,14 +399,20 @@ def build_metadata(ctx: SettingsContext) -> None:
     tmdb_status = QLabel()
     tmdb_status.setWordWrap(True)
     status_row = c.widget(tmdb_status)
-    c.note(tr("meta_hint_builtin") if _bundled
-           else tr("meta_hint_own"))
+    on_note = c.note(tr("meta_hint_builtin") if _bundled
+                     else tr("meta_hint_own"))
+    off_note = c.note(tr("meta_hint_off"))
 
     def custom_source() -> bool:
         return meta_source_box.currentData() == "custom"
 
+    def tmdb_off() -> bool:
+        return meta_source_box.currentData() == "off"
+
     c.shown_if(key_row, custom_source)
     c.shown_if(status_row, custom_source)
+    c.shown_if(on_note.parentWidget(), lambda: not tmdb_off())
+    c.shown_if(off_note.parentWidget(), tmdb_off)
     meta_card = c
 
     def test_tmdb_key() -> None:

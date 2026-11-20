@@ -1310,6 +1310,7 @@ class _SettingsMixin:
                 self._places_look_changed("settings")
             if changed & {"metadata_source", "tmdb_api_key"}:
                 self.cover.reload()
+                self._popular_changed()     # TMDB on or off: the tops ask again
             if changed & player_keys and self.player:
                 self.player.apply_default_options()
             if "show_stream_info" in changed and self.player:
