@@ -7,7 +7,7 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
-## [1.6.9] - 2026-11-20
+## [1.6.9]
 
 ### Fixed
 
