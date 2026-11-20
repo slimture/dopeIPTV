@@ -130,7 +130,10 @@ ALL_ASK = (
     "how serious it is (critical, high, medium, low), and how to fix it - and an overall "
     "assessment. Look for ways the parts could be combined, too. Do not guess: say so where "
     "something depends on code that is not included, and do not take the comments' word for what "
-    "the code does."
+    "the code does. Last, score each part and the whole from 1 to 10 against the project's own "
+    "threat model ({threat}): 10 when none of the attackers it names can use anything you found, "
+    "1 when one of them can take what matters now - each score with one line on why, in a table "
+    "at the very top of your answer."
 )
 
 _ASK = re.compile(r'<blockquote class="tp-ask" data-for="([a-z]+)">(.*?)</blockquote>', re.S)
@@ -230,7 +233,8 @@ def main(argv: list[str]) -> int:
         ref = _git(app, "rev-parse", "HEAD")
     parts = kit(app, ref, a.lang)
     os.makedirs(a.out, exist_ok=True)
-    head = ALL_ASK.format(n=len(parts), ref=ref)
+    head = ALL_ASK.format(n=len(parts), ref=ref,
+                          threat=f"{transparency.REPO}/blob/{ref}/docs/SECURITY.md")
     for i, (part, text) in enumerate(parts, 1):
         with open(os.path.join(a.out, f"{i:02d}-{part}.txt"), "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
