@@ -286,6 +286,19 @@ class _DetailMixin:
         pos, _dur = self._film_progress(it)
         self._film_play(it, pos if pos > 0 else None)
 
+    def _detail_follow_episode(self, ep, key) -> None:
+        """An episode started - from its series' page, Continue, the phone
+        or the next one by itself: its series' poster and words under the
+        video, the episode's name over them. The column follows the list's
+        pick, and an episode is never that pick, so the poster stayed on
+        the row picked before - the last TV channel - and its button would
+        have started that channel. A row picked afterwards shows as ever."""
+        series = self.series_ctx
+        if not isinstance(ep, dict) or not series:
+            return
+        self._current_key = key
+        self._show_detail({**ep, "_kind": "episode", "_series_ctx": series})
+
     def _show_continue_episode_detail(self, it) -> None:
         """Continue-watching episode row: show the series' poster + info (plot,
         cast, genre) with the episode's name, since the row itself carries no

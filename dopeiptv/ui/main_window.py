@@ -2560,6 +2560,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                "web": "web"}.get(kind)
         # A series' page marks what plays and goes to it (autoplay's next).
         self._sp_playback_started(key, kind)
+        # ...and the column under the video shows the episode's series.
+        if kind == "episode":
+            try:
+                self._detail_follow_episode(item, key)
+            except Exception as e:
+                log.debug("episode detail refresh failed: %s", e)
         # ...and the Movies place and a film's page mark it (mw_place_films).
         pf = getattr(self, "_pf_playback_started", None)
         if pf is not None:

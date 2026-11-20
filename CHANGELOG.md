@@ -17,6 +17,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   finds its handler before it decodes, with Python's lock held
   (`core/workers.ready`); a test runs workers and the window's thread
   decoding at once.
+- An episode playing shows its series' poster under the video, with the
+  episode's name - the column followed only the list's pick, so it kept the
+  last TV channel's logo, and its button would have started that channel.
+  Every way an episode starts goes through it (the series' page, Continue,
+  the next episode, TV mode, the phone, watch together).
 - Ctrl+C in the terminal the app was started from closes the window as its
   close button does (the player, recordings and settings let go in order);
   it was raised inside whatever Qt callback ran then and offered as a crash
