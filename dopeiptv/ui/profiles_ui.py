@@ -334,9 +334,9 @@ class ProfileDialog(QDialog):
     emoji, a PIN (four digits, or none) and whether it is a kids profile."""
 
     def __init__(self, parent: QWidget, store: profiles.ProfileStore,
-                 profile: Profile | None = None) -> None:
+                 profile: Profile | None = None, parental: Any = None) -> None:
         super().__init__(parent)
-        self.store, self.profile = store, profile
+        self.store, self.profile, self.parental = store, profile, parental
         self.setWindowTitle(tr("profile_edit_title") if profile else tr("profile_add_title"))
         self.setMinimumWidth(440)
         lay = QVBoxLayout(self)
@@ -450,6 +450,16 @@ class ProfileDialog(QDialog):
     def _preview(self) -> None:
         self.preview.set_profile(Profile("_", self.name.text() or "?", self._colour(), self._emoji()))
 
+    def _grown_up_pin(self, typed: str) -> bool:
+        """Whether a grown-up's PIN exists once this is saved: the parental
+        PIN, or a PIN of a profile that is not a kids one - this one's own
+        too, when it is being made a grown-up's (never for a kids profile:
+        its own PIN is the child's)."""
+        if self.parental is not None and self.parental.has_pin():
+            return True
+        me = self.profile.id if self.profile else ""
+        return any(not p.kids and p.has_pin for p in self.store.profiles() if p.id != me)
+
     def _fail(self, key: str) -> None:
         self.error.setText(tr(key))
         self.error.show()
@@ -465,6 +475,12 @@ class ProfileDialog(QDialog):
             return
         if pin and not profiles.valid_pin(pin):
             self._fail("profile_err_pin")
+            return
+        if self.kids.isChecked() and not self._grown_up_pin(pin):
+            # A kids profile is a boundary only with a PIN a grown-up keeps:
+            # without one, it leaves for another profile or opens Settings
+            # as it likes.
+            self._fail("profile_err_kids_pin")
             return
         try:
             if self.profile is None:
@@ -557,7 +573,7 @@ class ProfilesPage:
         return row
 
     def _add(self) -> None:
-        dlg = ProfileDialog(self.d, self.w.profiles)
+        dlg = ProfileDialog(self.d, self.w.profiles, parental=getattr(self.w, "parental", None))
         if dlg.exec() and dlg.saved is not None:
             self.w._profiles_changed()
             self.refresh()
@@ -566,7 +582,7 @@ class ProfilesPage:
         p = self.w.profiles.get(pid)
         if p is None or not self.w._profile_unlock(p, self.d):
             return
-        dlg = ProfileDialog(self.d, self.w.profiles, p)
+        dlg = ProfileDialog(self.d, self.w.profiles, p, parental=getattr(self.w, "parental", None))
         if dlg.exec():
             self.w._profiles_changed()
             self.refresh()

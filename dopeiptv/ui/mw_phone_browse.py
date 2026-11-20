@@ -158,6 +158,10 @@ class _PhoneBrowseMixin:
         if snap.get("locked"):
             out.update(pb.paged([], 0), locked=True)
             return out
+        if snap.get("kids") and head in ("local", "rec"):
+            # Never a kids profile's (mw_profiles.KIDS_NEVER), whatever asks.
+            out.update(pb.paged([], 0))
+            return out
         if head in ("vod", "series"):
             title, rows = (self._pb_titles(snap, head, rest) if rest
                            else (snap["section"], self._pb_categories(snap, head)))
@@ -712,6 +716,8 @@ class _PhoneBrowseMixin:
             raise ValueError("no such title")
         self._phone_asked()
         self._come_forward()
+        if kind in ("local", "rec") and self._profile_kids():
+            raise ValueError("no such title")       # never a kids profile's
         if kind == "continue" and not self._pb_continue_allowed(value):
             raise ValueError("no such title")
         if kind == "history" and not self._pb_history_shown([value]):

@@ -296,7 +296,7 @@ def test_search_in_tv_mode_forgets_the_profile_before():
 
 class _Prof:
     def __init__(self, pid, name, pin=""):
-        self.id, self.name, self._pin = pid, name, pin
+        self.id, self.name, self._pin, self.kids = pid, name, pin, False
 
     @property
     def has_pin(self):

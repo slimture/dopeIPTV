@@ -244,6 +244,15 @@ pump(10)
 assert w._profile_picker is None and w._tv_page.current == "profiles"
 scr = w._tv_page.screens["profiles"]
 assert [t.profile.name for t in scr.tiles] == ["Me", "Lisa"]
+# Leaving the kids profile for a grown-up's takes a grown-up's PIN - the
+# parental one here: a wrong one leaves it where it is.
+profiles_ui.ask_pin = lambda *a, **k: "1111"
+w._tv_page.focus_into()
+w._tv_page.handle("left")
+w._tv_page.handle("ok")
+pump(10)
+assert profiles.active_id() == kid.id
+profiles_ui.ask_pin = lambda *a, **k: "9999"
 w._tv_page.focus_into()
 w._tv_page.handle("left")
 w._tv_page.handle("ok")

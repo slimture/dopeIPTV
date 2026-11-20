@@ -51,6 +51,10 @@ class _ListsMixin:
     # -- modes and categories ------------------------------------------------------
 
     def switch_mode(self, mode: str) -> None:
+        # Local files and Recordings are never a kids profile's, by any way
+        # in (a key, the palette, a menu): mw_profiles.KIDS_NEVER.
+        if mode in ("local", "rec") and getattr(self, "_profile_kids", lambda: False)():
+            mode = "live"
         # Any mode switch shows the three-column window (in TV mode: where
         # leaving it lands - TV mode holds the window).
         if getattr(self, "_center_stack", None) is not None and not self._tv_land_on(0):

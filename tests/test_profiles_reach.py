@@ -321,8 +321,10 @@ def test_on_the_windows_thread_a_row_waits_for_its_category_to_be_known():
     assert _wait(w, lambda: w.refreshed), "drawn again once they are in"
     assert [r["stream_id"] for r in _ROWS if w._kids_keep("live")(r)] == [1]
     assert w._kids_only(_ROWS) == [_ROWS[0]]
-    # A row without a category; an episode whose series is for adults.
-    assert w._kids_allows({"stream_id": 9, "name": "Clip"})
+    # A row without a category, or of one the source does not list; an
+    # episode whose series is for adults: none of them for a kid.
+    assert not w._kids_allows({"stream_id": 9, "name": "Clip"})
+    assert not w._kids_allows({"stream_id": 9, "name": "Clip", "category_id": "77"})
     assert not w._kids_allows({"_kind": "episode", "id": 5,
                                "_series_ctx": {"series_id": 4, "is_adult": "1"}})
     # Anyone else: every row, nothing to test.

@@ -67,7 +67,11 @@ class _PlaceLookMixin:
         btns = getattr(self, "nav_btns", None)
         if not btns:
             return
-        gone = places.hidden(self.settings)
+        gone = set(places.hidden(self.settings))
+        # A kids profile has no Local files and no Recordings: nothing says
+        # what is in them (mw_profiles.KIDS_NEVER).
+        if getattr(self, "_profile_kids", lambda: False)():
+            gone |= {"local", "rec"}
         avail = getattr(self, "_nav_avail", None) or {}
         for key, b in btns.items():
             place = places.PLACE_OF_NAV.get(key, key)

@@ -2446,6 +2446,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         restart = reconnect or catchup or (
             key is not None and str(key) == str(getattr(self, "_playing_key", None))
             and getattr(self, "_playing_group", None) is not None)
+        # A kids profile plays only what its lists may show, however it was
+        # asked (mw_profiles).
+        if not self._kids_may_play(kind, item):
+            return
         if not self._guard_stream_switch(url, title):
             return
         # The guard is about streams: the user's own files always play.
