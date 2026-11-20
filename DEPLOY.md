@@ -452,28 +452,25 @@ How it counts, so the numbers are honest:
   request is counted too, robots and all, so the page shows how much was
   left out.
 - A visitor is a keyed hash (HMAC-SHA256) of address and browser; no
-  address is written down. The key is the month's own
-  (`STATS_DIR/visitor-keys.json`, 0600): a new one each month, and a
-  month's key deleted once the month after it has ended - from then on
-  nobody can tell an address from its hashes, this server's administrators
-  included. A visitor is the same visitor within a month and is told
-  returning from the month before at the most; unique visitors over a
-  longer span are the months' summed. (Before November 2026 one secret
-  was kept for 25 months; the first run of this version deletes it.) The
-  hashes go with their month's key: the month is counted once more into
-  `uniques-months.json` (different visitors in the month and each week,
-  people and robots) and its hashes deleted. Single visits are
-  kept 30 days (`STATS_VISITS_DAYS`: a visit in detail - its time to the
-  second, versions, screen, languages, the page that linked - can point to
-  one person; it was 400 days in November 2026, a `STATS_VISITS_DAYS`
-  line in the config file overrides this); then they are made anonymous -
-  no id, no time of day, no versions or screen, only the day, country,
-  browser and system, device, how the visitor came, pages, time and whether
-  there was a download or the donate dialog - and kept for good, as are the
-  counts per day; once a month is whole they are made k-anonymous (each
-  like at least four others of the month, a rarer one told less field by
-  field or left out: `k_anonymous`) - each combination kept is shared by at
-  least five visits, which need not be five people. Countries come from DB-IP's free database
+  address is written down, and neither is the key: the month's own, in the
+  service's memory alone (or beside it on a tmpfs, `STATS_KEYS_DIR`), a new
+  one each month, forgotten two months on. A visitor is the same visitor
+  within a month and is told returning from the month before at the most;
+  unique visitors over a longer span are the months' summed. How many
+  different visitors came is kept in the days' sketches - in memory beside
+  the key, never on a disk, since a visitor sets the same bits every day of
+  its month - and once the month after has ended only as numbers
+  (`uniques-months.json`). Single visits are kept 14 days
+  (`STATS_VISITS_DAYS`; a line in the config file overrides it - a longer
+  span keeps more that could point to one person), each naming its
+  visitor for its day alone, its start to the half hour; then the day's
+  visits are deleted, every one, and only its counts stay - per way in too
+  (`funnel_of`) - with no name in its lists that fewer than five visitors
+  brought that day (`fold_day`). No row of a visit, anonymous or not, is
+  kept past those days. (Until November 2026 the visits went on as
+  anonymous rows, k-anonymous by month, and the months kept lists of the
+  rarer names; the first run of this version makes those rows counts and
+  deletes them, and drops those lists.) Countries come from DB-IP's free database
   (CC BY 4.0), fetched once a month by the quarter-hour run and looked up
   on the server - nothing is sent anywhere.
 - What visitors do on a page (`public/events.js`, since November 2026):
@@ -483,8 +480,8 @@ How it counts, so the numbers are honest:
   followed (its host only). Each once a page, through the same `/hit`, sent
   by nothing in an automated browser; the service keeps only what
   `donate/stats_events.py` lists and drops anything else. They live on the
-  visit (`acts`) and go with it after 30 days - the anonymous visit keeps
-  none of them.
+  visit (`acts`) and go with it after 14 days - the day's counts keep
+  only how many.
 - Updates the app fetches for itself (from 1.4.5): the app asks
   `releases.json` for the newest version and fetches the file through
   `/dl.php` as `dopeIPTV/<version> (<system>; <cpu>)`. `stats_collect.py`
@@ -604,62 +601,32 @@ invite <name>'` prints a new invite link for a new name; `... list` shows
 the admins, `... remove <name>` takes one away, `... signout <name>` ends
 their sessions.
 
-**The files and the log (jail):**
+**The files (jail).** The statistics need no log file and no scheduled
+job: nginx hands its lines to the donate service over a socket, and the
+service counts them in its memory - "No address written down, keys in
+memory" below has the whole setup and the commands, and "Statistics in
+memory alone" (1.6.9 review, fourth round) the latest. Never make
+`iptv.dope.rs-stats.log` or a crontab line for `stats_collect.py` again:
+that log held addresses. The counts live in `/usr/local/www/iptv/stats/` -
+outside the web root - and are the `iptv` user's alone: every file 0600,
+every folder 0700:
 
 ```sh
-cd ~/dopeiptv && git pull origin website
-cp -R donate /usr/local/www/iptv/
 install -d -o iptv -g iptv -m 700 /usr/local/www/iptv/stats
-install -m 640 -o root -g iptv /dev/null /var/log/nginx/iptv.dope.rs-stats.log
-install -m 600 -o iptv -g iptv /dev/null /var/log/iptv-stats.log
-service iptv_donate restart
-echo '5,20,35,50 * * * * iptv /usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py >> /var/log/iptv-stats.log 2>&1' >> /etc/crontab
-echo '/var/log/nginx/iptv.dope.rs-stats.log        root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30' \
-    >> /usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf
-newsyslog -nv 2>&1 | grep stats
 ```
 
-The log is made before nginx opens it, so it belongs to the `iptv` group
-(`stats_collect.py` runs as `iptv`); newsyslog turns it over at midnight,
-keeps only the day before (two days of addresses at the most), and leaves
-that one uncompressed so a line written
-just before midnight is still read. The counts live in
-`/usr/local/www/iptv/stats/` - outside the web root - and are the `iptv`
-user's alone: every file 0600, every folder 0700. The service starts with
-umask 077 and narrows anything left wider at each start (reports,
-supporters, the counts were 0644 before November 2026, the folders 0750),
-and `stats_collect.py` writes its files the same way, so the `iptv` group
-reads none of it. Something else that reads them - a backup - runs as
-root or as `iptv`.
+The service starts with umask 077 and narrows anything
+left wider at each start, and `stats_collect.py` writes its files the same
+way, so the `iptv` group reads none of it. Something else that reads them -
+a backup - runs as root or as `iptv`.
 
-**nginx (host)** - the content server's file as in step 8, which now has the
-`iptv_stats` log for `/` and `/help/` and the `/admin/` location:
-
-```sh
-C=/usr/local/bastille/jails/pontusweb/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
-cp /root/iptv-static/deploy/content-iptv.dope.rs.conf "$C"
-bastille cmd pontusweb nginx -t && bastille cmd pontusweb service nginx reload
-```
-
-**Check:** open the site in a private window (no admin cookie there), then
-`tail -n 2 /var/log/nginx/iptv.dope.rs-stats.log` (jail) shows the page and
-its `/hit` as JSON lines. `https://iptv.dope.rs/admin/` asks for the
-password and shows the visit under *Visitors*. `/var/log/iptv-stats.log`
-says when the country database was fetched, or why not. The visitors start with the new log. The downloads per day can go
-back as far as the server kept its download log, read once on a fresh
-start (jail):
-
-```sh
-rm -f /usr/local/www/iptv/stats/stats.json /usr/local/www/iptv/stats/state.json
-su -m iptv -c '/usr/local/bin/python3 -I /usr/local/www/iptv/donate/stats_collect.py --backfill'
-```
-
-A download is a click sent on to the file, from a real browser (robots,
-scripts and download checkers are left out), counted once per visitor and
-file a day - stricter than the site's public counter (downloads.json),
-which counts every click. Once per visitor needs the visitor's address in
-/dl.php's log, the `iptv_dl` format in the content server's file; lines
-written before it count each click.
+**Check:** open the site in a private window (no admin cookie there), wait
+a minute, and the admin page's *Visitors* shows the visit;
+`/var/log/iptv-donate.log` says when the country database was fetched, or
+why not. A download is a click sent on to the file, from a real browser
+(robots, scripts and download checkers are left out), counted once per
+visitor and file a day - stricter than the site's public counter
+(downloads.json), which counts every click.
 
 ## Signed in for good, and told of support
 
@@ -1384,6 +1351,12 @@ to `/usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/nginx.conf`.
 
 ## Every log, and port 8081 closed
 
+> **Superseded for the statistics** by "No address written down, keys in
+> memory" and "Statistics in memory alone" below: the statistics' own log
+> (`iptv.dope.rs-stats.log`) and its cron job are gone, and must never be
+> made again - they held visitors' addresses. What this section says of
+> them is how it was.
+
 What a second review of the site found, and what changed (each commit
 says it in full). Nothing changes for a visitor, for the app - 1.6.7, 1.6.8
 and newer sync, send feedback, watch together, update and tip as before -
@@ -1729,11 +1702,9 @@ jexec dopeiptv rm /usr/local/www/iptv/public/link-check.txt
   sh deploy/check-live.sh dopeiptv.org <the content jail's public-facing address>
   ```
 
-- The statistics' months are made k-anonymous by **people**: a combination
-  kept is shared by at least five different visitors, told apart by a short
-  hash of the month's visitor id (`who`) that goes in the same step - one
-  person who came five times no longer counts as five (`stats_collect.py`,
-  `k_anonymous`). Months already made so stay as they are.
+- (Superseded in the fourth round: no row of a visit is kept past its
+  days any more.) The statistics' months were made k-anonymous by
+  **people** (`k_anonymous`).
 - A feedback report's code hash (`reply`) goes once its thread has been quiet
   for `CODE_DAYS` (120): nothing asks after it then, and nothing links the
   report to the copy of the app that sent it (`feedback.forget_codes`, run
@@ -1776,12 +1747,10 @@ sketches now, within a few in a thousand).
   site everyone knows. The lists of visitors' marks (`uniques.json`,
   `kinds.json`) become each day's sketches (`sketches.json`: two bits a
   visitor, no mark) and are deleted.
-- **Kept for good, and anonymous for good.** The months' anonymous visits are
-  k-anonymous by different people, told apart by their sealed marks (a key
-  gone: one person at the most). A day's lists of who came (countries,
-  languages, versions, sites, tags) keep no name counted fewer than five
-  times once the day is a month old - those are the month's, where too a
-  name fewer than five times is "other" once the month is whole.
+- **Kept for good, and anonymous for good.** (Changed in the fourth round,
+  below: no row of a visit is kept past its days, and no month gathers the
+  rarer names.) The months' anonymous visits were k-anonymous by different
+  people, and a day's rarer names were the month's.
 
 ### This round's deploy (host)
 
@@ -1878,3 +1847,68 @@ nothing of a request. The statistics' lines are in the service's memory for
 a minute and then only as what `stats_collect.py` keeps; the content
 server's other requests none (`access_log off`), the proxy's servers for
 the site none, the service none of a request.
+
+## Statistics in memory alone (1.6.9 review, fourth round)
+
+The fourth review found that a few things kept could still tie a visitor's
+days together, or count one person as five. All of it is fixed in the
+code; nothing changes for a visitor.
+
+- **The days' sketches never on a disk.** A visitor sets the same two bits
+  on every day of its month, so two quiet days' sketches side by side could
+  tell that someone came on both. They are kept only where the month's key
+  is: beside it in `STATS_KEYS_DIR` (the tmpfs below), or in the service's
+  memory alone. `stats/sketches.json` is read into memory once and deleted.
+- **No row of a visit past its days.** Visits are kept in detail for 14 days
+  (`STATS_VISITS_DAYS`, was 30), their start to the half hour (was ten
+  minutes), and then deleted, every one: only the day's counts stay - per
+  way in too (`funnel_of`, the admin page's "by way in"). The anonymous
+  visits of before (`stats/visits-anon/`) are made those counts once and
+  deleted, folder and all. No device mark is made any more.
+- **No name kept from summed days.** A day's lists keep no name fewer than
+  five visitors brought that day; the rest is "other", and nothing adds
+  days up again under a name (one person on five days was five). The
+  months' own lists of the rarer names (`rest` in `stats.json`) are dropped.
+- **Keys kept two months** (was three).
+
+### This round's deploy (host)
+
+The files and the service:
+
+```sh
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+service -j dopeiptv iptv_donate restart
+jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
+```
+
+The keys' tmpfs holds the sketches now as well - two months of them, a few
+hundred kilobytes on a quiet site, more on a busy one - so it gets room
+for them: 16 MB. `IPTV_UID` and `IPTV_GID` as when it was made
+(`jexec dopeiptv id -u iptv`, `id -g iptv`). Growing it in place keeps the
+keys; if `mount -u` refuses, the second way empties it - the month's
+visitors before and after count twice, nothing more:
+
+```sh
+sed -i '' 's|tmpfs rw,size=1m,|tmpfs rw,size=16m,|' /usr/local/bastille/jails/dopeiptv/fstab
+grep iptv-stats-keys /usr/local/bastille/jails/dopeiptv/fstab
+mount -u -o size=16m /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys \
+  || { umount /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys && mount -t tmpfs -o size=16m,mode=0700,uid=IPTV_UID,gid=IPTV_GID tmpfs /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys && service -j dopeiptv iptv_donate restart; }
+jexec dopeiptv df -h /var/db/iptv-stats-keys
+```
+
+Then, a minute later, nothing of the statistics' rows or sketches is on
+the disk any more:
+
+```sh
+jexec dopeiptv ls /usr/local/www/iptv/stats/
+jexec dopeiptv ls /var/db/iptv-stats-keys/
+```
+
+The first shows no `sketches.json` and no `visits-anon`; the second
+`keys.json` and `sketches.json`. A backup of the jail taken before this
+round holds `stats/sketches.json` and `stats/visits-anon/`: delete them
+there too. Then from any other computer, as after every round:
+
+```sh
+sh deploy/check-live.sh dopeiptv.org <the content jail's public-facing address>
+```

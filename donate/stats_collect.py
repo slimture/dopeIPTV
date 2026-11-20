@@ -57,34 +57,27 @@ how the visitor came (the site that linked by the name its owner
 registered, our own links' tag), the pages and how long each was looked
 at, downloads, the donate dialog, what was done on the page (stats_events)
 - and on how many earlier days the visitor came. Its start is kept to the
-ten minutes and what happened in it to ten seconds from there. Its visitor
+half hour and what happened in it to ten seconds from there. Its visitor
 is named for that day alone (day_id): nothing kept ties a visit to the
 visitor's visits of another day. Beside it the visitor's mark is sealed
 (seal: random to anyone without the month's key), which only this service
 can open while the key is in its memory - so that a visit can go on after a
-restart, and so that people can be told apart when the month is made
-k-anonymous. A payment is never on a visit, only in the day's count: the
+restart. A payment is never on a visit, only in the day's count: the
 visit's time, country and browser beside the payment service's record of
 who paid would tie the two together. A visit ends after 30 minutes without
-a page. After STATS_VISITS_DAYS days (30) a visit is made anonymous rather
-than deleted: it moves to STATS_DIR/visits-anon/<month>.json with its day,
-country, browser and system without versions, device, page language, how
-the visitor came, the number of pages, the time rounded to ten seconds, and
-whether there was a download or the donate dialog - no visitor, no time of
-day, no screen, mixed in the month so their order tells nothing. Once a
-month is whole they are made k-anonymous (k_anonymous, K_ANON = 5): pages
-and time in a few steps, and a visit unlike those of four other people of
-its month in everything kept is told less - its site, channel, language,
-browser and so on, field by field, its day as its week - until it is like
-them, or left out (its counts stay in the day's). Each combination kept is
-then shared by the visits of at least five different people (the sealed
-marks tell them apart, and go in that same step; where a key went, its
-visits count as one person at the most). The day's own lists of who came
-(countries, languages, browser and system versions, sites, pages that
-linked, tags) keep no name counted fewer than K_DAY (5) times once the day
-is a month old: those go into the month's own lists (fold_day), where too
-a name fewer than five times is "other" once the month is whole. Those, the
-anonymous visits and the counts per day are kept for good.
+a page. After STATS_VISITS_DAYS days (14) a day's visits are deleted, every
+one: no row of a visit is kept past them, in detail or made anonymous.
+What stays of them for good is counts: the day's totals and lists, and per
+way in (search, social...) how many visits read more than one page, how
+long they looked, downloaded, opened the support dialog (funnel_of, the
+day's "funnel"). The day's lists of who came (countries, languages,
+browser and system versions, sites, tags) then keep no name counted fewer
+than K_DAY (5) times that day - the rest is "other" - and nothing adds
+those days up again under a name (fold_day): a name is kept only from a day
+when five different visitors brought it. Those counts per day are kept for
+good. (Until November 2026 the visits went on as anonymous rows and the
+month kept its own list of the rarer names; both go at the first run -
+_old_rows_off.)
 
 Each update the app fetched for itself goes to STATS_DIR/updates/<day>.json
 for the same log: the hour it came in, the file, the version it came from,
@@ -97,14 +90,22 @@ A visitor is a keyed hash (HMAC-SHA256) of address and browser, made in
 memory: the key is the month's own (MonthKeys) and in this service's
 memory alone - never in a file on a disk (STATS_KEYS_DIR may name a folder
 on a file system kept in memory, tmpfs, so a restart keeps them), a new one
-each month, forgotten three months on. So a visitor is the same visitor
+each month, forgotten two months on. So a visitor is the same visitor
 within a month, and is told returning from the month before at the most.
 How many different visitors came over several days is kept in each day's
-sketches (sketch.py, sketches.json: every visitor, those not robots, the
-people) - two bits a visitor in a field of 131 072, no mark and no list -
-for this month and the one before; then the month is counted once more
-(different visitors in the month and each of its weeks, people and robots)
-into uniques-months.json, and its sketches are deleted (freeze_months).
+sketches (sketch.py: every visitor, those not robots, the people) - two
+bits a visitor in a field of 131 072, no mark and no list. A visitor sets
+the same two bits on every day of its month, so two days' sketches side by
+side could tell that someone came on both: they are kept only where the
+month's key is - beside it in STATS_KEYS_DIR, a file system in memory, or in
+this service's memory alone - and never on a disk (sketches_file), for this
+month and the one before; then the month is counted once more (different
+visitors in the month and each of its weeks, people and robots) into
+uniques-months.json, numbers alone, and its sketches are deleted
+(freeze_months). Whoever could read them could open the sealed marks with
+the key beside them anyway; nobody with only the disks, a backup or a copy
+of STATS_DIR can. A restart that loses the keys loses the sketches with
+them: the admin page then sums the days' visitors for those days.
 Unique visitors over a span longer than a month are the months' summed. A
 restart without its keys starts new ones: a visitor before and after it
 counts twice that month. Robots that say so, scripts and empty browser
@@ -188,27 +189,30 @@ GEO_URL = "https://download.db-ip.com/free/dbip-country-lite-{month}.mmdb.gz"
 GEO_MAX = 256 << 20       # the database is a few megabytes; nothing larger is taken for it
 KEEP_PER_DAY = 40         # a day's longest lists (sites, files): the top 40, the rest summed
 VISITS_DIR = os.path.join(STATS_DIR, "visits")
+#: The anonymous visits of before (until November 2026): read once into the
+#: days' counts and deleted (_old_rows_off).
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
 UPDATES_DIR = os.path.join(STATS_DIR, "updates")
 try:
-    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "30")))
+    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "14")))
 except ValueError:
-    VISITS_DAYS = 30
+    VISITS_DAYS = 14
 #: The app's updates one by one, each at its hour, for the visitor log; the
 #: counts per day stay.
 UPDATES_DAYS = 30
 VISIT_GAP = 30 * 60       # a visit ends after half an hour without a page
-#: A kept visit's start, to the ten minutes; what happened in it, to ten
+#: A kept visit's start, to the half hour; what happened in it, to ten
 #: seconds from that start (at_rest). Exact only in memory, for the run.
-COARSE = 600
+COARSE = 1800
 STEP = 10
 #: A folder on a file system kept in memory (tmpfs) where the month keys may
 #: wait through a restart of the service; "" keeps them in its memory alone.
 KEYS_DIR = CONF.get("STATS_KEYS_DIR", "")
 #: Where nginx hands the statistics' lines (stats_inbox, donate.py).
 SOCKET = CONF.get("STATS_SOCKET", "unix:/var/run/iptv_donate/stats.sock")
-#: A day's lists kept for good tell no name fewer than this many counted
-#: once the day is a month old (fold_day): the rest is the month's.
+#: A day's lists kept for good tell no name fewer than this many visitors
+#: brought that day, once its visits are gone (fold_day): the rest is
+#: "other", and nothing adds days up again under a name.
 K_DAY = 5
 
 # Anyone can send the page's signal, with any browser name and any address
@@ -587,10 +591,9 @@ def _month_before(month: str) -> str:
     return f"{year - 1}-12" if mon == 1 else f"{year}-{mon - 1:02d}"
 
 
-#: The months a key is kept for: this one, the one before (a visitor is told
-#: returning from there) and the one before that (its visits are made
-#: k-anonymous once the last of its days leaves the visitor log).
-KEPT_MONTHS = 3
+#: The months a key is kept for: this one and the one before (a visitor is
+#: told returning from there, and the visits in detail reach back into it).
+KEPT_MONTHS = 2
 
 
 def _months_back(month: str, n: int) -> list:
@@ -670,6 +673,62 @@ class MonthKeys:
 
 
 _KEYS: list = []
+
+#: The days' sketches when no folder in memory holds them: in this
+#: service's memory alone (sketches_file). "full": the folder could not take
+#: them once - from then on they are here alone (_keep_sketches).
+_SKETCHES: dict = {}
+_SKETCHES_HERE = {"full": False}
+
+
+def sketches_file() -> str:
+    """Where the days' sketches wait through a restart: beside the month
+    keys, in STATS_KEYS_DIR on a file system kept in memory (MonthKeys) -
+    or "" for this service's memory alone. Never STATS_DIR, a disk: a
+    visitor sets the same two bits on every day of its month, so two days'
+    sketches side by side could tell that someone came on both. They are
+    kept only where the key they are made with is."""
+    folder = keys_now().folder
+    if not folder or _SKETCHES_HERE["full"]:
+        return ""
+    return os.path.join(folder, "sketches.json")
+
+
+def _keep_sketches(path: str, sketches: dict) -> None:
+    """The sketches written beside the keys - or, the folder in memory too
+    full for them, held in this service's memory from then on (said once,
+    and never put on a disk instead)."""
+    try:
+        _save(path, sketches)
+    except OSError as e:
+        for left in glob.glob(os.path.join(os.path.dirname(path), ".tmp-*")):
+            with contextlib.suppress(OSError):
+                os.unlink(left)
+        _SKETCHES.clear()
+        _SKETCHES.update(sketches)
+        _SKETCHES_HERE["full"] = True
+        print(f"[stats] the sketches could not be kept beside the keys ({e.strerror or e}) - "
+              "they are kept in this service's memory alone from now on", flush=True)
+
+
+def sketches_now() -> dict:
+    """The days' sketches as they are kept now - for the admin page."""
+    with _RUN:
+        path = sketches_file()
+        return _load(path, {}) if path else dict(_SKETCHES)
+
+
+def _sketches_off_disk(sketches: dict) -> None:
+    """Once: the sketches of before, kept in STATS_DIR on the disk, taken
+    where they are kept now - and that file deleted."""
+    old = os.path.join(STATS_DIR, "sketches.json")
+    if not os.path.exists(old):
+        return
+    for day, entry in _load(old, {}).items():
+        if isinstance(entry, dict):
+            sketches.setdefault(day, entry)
+    with contextlib.suppress(OSError):
+        os.unlink(old)
 
 
 def keys_now(today: date | None = None) -> MonthKeys:
@@ -1006,17 +1065,16 @@ def at_rest(v: dict, day: str, state: dict) -> dict:
     """A visit as it is written down. Its visitor named for this day alone
     (day_id: no two days of one visitor alike) beside the mark sealed
     (seal: nothing to anyone without the month's key, which is in memory
-    alone), its start to the ten minutes and what happened in it to ten
+    alone), its start to the half hour and what happened in it to ten
     seconds from there, a screen by its kind, the browser's language without
     its country, a link's site and tag as site_of and source_of keep them -
-    and nothing else: no address, no page that linked, no exact time."""
+    and nothing else: no address, no page that linked, no exact time, no
+    mark of the device."""
     vid = v.get("id") or ""
     if "did" not in v:
         v["did"] = day_id(state, day, vid) if vid and not v.get("_lost") else vid
     if "w" not in v and vid and not v.get("_lost"):
         v["w"], v["e"] = seal(state, day, vid)
-    if "f" not in v and v.get("dev") and v.get("e") and not v.get("_lost"):
-        v["f"] = seal(state, day, v["dev"])[0]       # under the same key as "w"
     try:
         start = int(v.get("start") or 0)
     except (TypeError, ValueError):
@@ -1047,7 +1105,7 @@ def at_rest(v: dict, day: str, state: dict) -> dict:
            "events": [[t(e[0]), *e[1:]] for e in v.get("events") or () if isinstance(e, list) and e]}
     if v.get("acts"):
         out["acts"] = [[t(a[0]), *a[1:]] for a in v["acts"] if isinstance(a, list) and a]
-    for k in ("channel", "lang", "hl", "acted", "kind", "why", "w", "e", "f"):
+    for k in ("channel", "lang", "hl", "acted", "kind", "why", "w", "e"):
         if k in v:
             out[k] = v[k]
     if "channel" in v:
@@ -1296,11 +1354,6 @@ def _page_line(stats: dict, state: dict, r: dict, db, visits: Visits) -> None:
         if ref_page:
             visit["ref_page"] = ref_page        # in memory, for robot_share; never kept
         visit["screen"] = screen_of(q.get("w", ""), q.get("h", ""))[1]
-        # The device without its address (browser, language, exact screen):
-        # one person whose address changes is one device. In memory alone;
-        # kept only sealed (at_rest), to count people (_people_at_least).
-        visit["dev"] = _hash(state, day, "dev", ua, q.get("l", "")[:5],
-                             f'{q.get("w", "")[:5]}x{q.get("h", "")[:5]}')
         _bump(d.setdefault("visit_channels", {}), visit["channel"])
         if visit["screen"]:
             _bump(d.setdefault("screens", {}), visit["screen"])
@@ -1525,10 +1578,9 @@ def _lines(path: str, state: dict, key: str) -> list:
 def collect(with_fetch: bool = False, lines: list | None = None) -> None:
     """One run: the lines waiting in memory (INBOX, or *lines*: [(tag, line)])
     counted, the touched days' visits judged and written as they are kept,
-    and what has aged made anonymous."""
+    and what has aged made counts alone (_forget_old)."""
     stats_path = os.path.join(STATS_DIR, "stats.json")
     state_path = os.path.join(STATS_DIR, "state.json")
-    sketches_path = os.path.join(STATS_DIR, "sketches.json")
     with _RUN, _locked():
         today = datetime.now().astimezone().date()
         IGNORED[:] = _ignored_nets()
@@ -1540,8 +1592,12 @@ def collect(with_fetch: bool = False, lines: list | None = None) -> None:
             state.pop(gone, None)
         state["_keys"] = keys_now(today)
         state["_seen_dl"] = _SEEN_DL
-        _migrate(state, sketches_path)
-        sketches = _load(sketches_path, {})
+        # The sketches where the key is (sketches_file), never on a disk.
+        sketches_path = sketches_file()
+        sketches = _load(sketches_path, {}) if sketches_path else _SKETCHES
+        _sketches_off_disk(sketches)
+        _migrate(state, sketches)
+        _old_rows_off(stats)
         visits = Visits(sketches, state)
         if with_fetch:
             fetch_geo(state)
@@ -1614,24 +1670,22 @@ def collect(with_fetch: bool = False, lines: list | None = None) -> None:
             # only made-up ones could make these long.
             for k in ("langs", "os_versions", "browser_versions"):
                 _keep_top(d, k, KEEP_WIDE)
-        for rest in (stats.get("rest") or {}).values():
-            if isinstance(rest, dict):
-                rest.pop("ref_pages", None)
         stats["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         stats["geo"] = db is not None
         visits.save(today)
         _drop_payments(state)
         _updates_to_the_hour(state)
         _forget_old_updates(state)
-        _anonymize_old(stats, state)
-        _save(sketches_path, sketches)
+        _forget_old(stats)
+        if sketches_path:
+            _keep_sketches(sketches_path, sketches)
         _save(stats_path, stats)
         for k in [k for k in state if k.startswith("_")]:
             state.pop(k)                        # the keys and marks: memory's alone
         _save(state_path, state)
 
 
-def _migrate(state: dict, sketches_path: str) -> None:
+def _migrate(state: dict, sketches: dict) -> None:
     """Once, from how the statistics were kept before: the month keys' file
     deleted unread (from now on a key is in memory alone), the lists of
     visitors' marks (uniques.json, kinds.json) made the days' sketches and
@@ -1645,7 +1699,6 @@ def _migrate(state: dict, sketches_path: str) -> None:
     kinds_path = os.path.join(STATS_DIR, "kinds.json")
     uniques, kinds = _load(uniques_path, {}), _load(kinds_path, {})
     if uniques or kinds:
-        sketches = _load(sketches_path, {})
         for day in {*uniques, *kinds}:
             marks = [m for m in uniques.get(day) or () if isinstance(m, str)]
             entry = sketches.setdefault(day, {})
@@ -1655,7 +1708,6 @@ def _migrate(state: dict, sketches_path: str) -> None:
                 robots = set(k.get("r") or ())
                 entry["n"] = sketch.encode(sketch.of(m for m in marks if m not in robots))
                 entry["p"] = sketch.encode(sketch.of(m for m in k.get("p") or () if isinstance(m, str)))
-        _save(sketches_path, sketches)
     for path in (uniques_path, kinds_path):
         with contextlib.suppress(OSError):
             os.unlink(path)
@@ -1714,26 +1766,69 @@ def _family(os_version: str) -> str:
     return os_version.split(" (")[0].split(" ")[0] if os_version else "Other"
 
 
-def anonymous(v: dict, day: str) -> dict:
-    """A visit with nothing left that points to a person. "w" and "e" - its
-    visitor's mark as sealed with the month's key (seal) - go with it until
-    the month is made k-anonymous, which tells people apart by them
-    (k_anonymous) and then drops them: random to anyone without that key,
-    which is in this service's memory alone."""
-    events = {e[1] for e in v.get("events") or []}
-    return {"w": v.get("w") or "", "e": v.get("e") or "", "f": v.get("f") or "", "day": day,
-            "country": v.get("country") or "", "browser": v.get("browser") or "Other",
-            "os": _family(v.get("os") or ""), "device": v.get("device") or "",
-            "lang": v.get("lang") or "", "channel": v.get("channel") or "",
-            "site": v.get("ref") or "", "pages": len(v.get("pages") or []),
-            "time": round((v.get("time") or 0) / 10) * 10, "timed": bool(v.get("time")),
-            "returning": bool(v.get("returning")), "downloaded": bool(v.get("downloads")),
-            "donate": "donate" in events, "kind": v.get("kind") or ""}
+#: A day's visits per way in, kept for good once they are gone: visits,
+#: those that read more than one page, seconds looked at (of those timed),
+#: timed, downloaded, opened the support dialog (funnel_of).
+FUNNEL = ("visits", "more", "time", "timed", "downloaded", "donate")
+
+
+def _funnel_add(out: dict, channel: str, pages: int, secs: int, timed: bool,
+                downloaded: bool, donate: bool) -> None:
+    row = out.setdefault(channel or "", [0] * len(FUNNEL))
+    row[0] += 1
+    row[1] += pages > 1
+    row[2] += max(0, int(secs or 0)) if timed else 0
+    row[3] += bool(timed)
+    row[4] += bool(downloaded)
+    row[5] += bool(donate)
+
+
+def funnel_of(visits: list) -> dict:
+    """A day's visits as counts per way in ({channel: FUNNEL}) - what the
+    admin page's "by way in" reads of a day whose visits are gone. Likely
+    robots left out, as everywhere."""
+    out: dict = {}
+    for v in visits:
+        if not isinstance(v, dict) or not v.get("pages") or v.get("kind") == "robot":
+            continue
+        secs = v.get("time") or 0
+        _funnel_add(out, v.get("channel") or "", len(v["pages"]), secs, secs > 0,
+                    bool(v.get("downloads")),
+                    any(isinstance(e, list) and e[1:2] == ["donate"] for e in v.get("events") or ()))
+    return out
+
+
+def _old_rows_off(stats: dict) -> None:
+    """Once, from how visits were kept before (until November 2026): the
+    anonymous visits of STATS_DIR/visits-anon made their days' counts
+    (funnel_of) and deleted, folder and all; the month's own list of the
+    rarer names - its days counted them in "other" already - dropped."""
+    days = stats.setdefault("days", {})
+    stats.pop("rest", None)
+    for f in sorted(glob.glob(os.path.join(ANON_DIR, "*.json"))):
+        month = _load(f, {})
+        rows = month.get("visits") if isinstance(month, dict) else None
+        counted: dict = {}
+        for a in rows if isinstance(rows, list) else ():
+            if not isinstance(a, dict) or not a.get("pages") or a.get("kind") == "robot":
+                continue
+            day = str(a.get("day") or "")[:10]
+            if day not in days or "funnel" in days[day]:
+                continue
+            _funnel_add(counted.setdefault(day, {}), a.get("channel") or "", int(a.get("pages") or 0),
+                        int(a.get("time") or 0), bool(a.get("timed", (a.get("time") or 0) > 0)),
+                        bool(a.get("downloaded")), bool(a.get("donate")))
+        for day, funnel in counted.items():
+            days[day]["funnel"] = funnel
+        with contextlib.suppress(OSError):
+            os.unlink(f)
+    with contextlib.suppress(OSError):
+        os.rmdir(ANON_DIR)
 
 
 def _drop_payments(state: dict) -> None:
     """Once: a payment marked on a visit before payments were counted per
-    day only, taken off every visit kept - in detail and anonymous."""
+    day only, taken off every visit kept."""
     if state.get("payments_off_visits"):
         return
     for f in glob.glob(os.path.join(VISITS_DIR, "*.json")):
@@ -1746,14 +1841,6 @@ def _drop_payments(state: dict) -> None:
                 changed = True
         if changed:
             _save(f, lst)
-    for f in glob.glob(os.path.join(ANON_DIR, "*.json")):
-        month = _load(f, {})
-        rows = month.get("visits")
-        if isinstance(rows, list) and any(isinstance(a, dict) and "donated" in a for a in rows):
-            for a in rows:
-                if isinstance(a, dict):
-                    a.pop("donated", None)
-            _save(f, month)
     state["payments_off_visits"] = 1
 
 
@@ -1815,140 +1902,24 @@ def freeze_months(sketches: dict, frozen: dict, today: date) -> int:
     return len(months)
 
 
-#: Each visit kept for good is like those of at least K_ANON - 1 other
-#: people of its month in every field kept (k_anonymous): each combination
-#: of them is shared by at least K_ANON different visitors - one person who
-#: came five times is one of them, not five.
-K_ANON = 5
-#: The fields a kept visit could be told by, together.
-_QI = ("day", "country", "browser", "os", "device", "lang", "channel", "site", "pages",
-       "time", "timed", "returning", "downloaded", "donate", "kind")
-_TIMES = (0, 10, 30, 60, 180, 600, 1800)
-
-
-def _week_in_month(day: str) -> str:
-    return max(week_of(day), day[:8] + "01")
-
-
-#: What a visit unlike K_ANON - 1 others is told less by, in this order -
-#: the least telling first, the day (to its week) and the country last.
-_LESS = (
-    ("site", lambda a: ""), ("channel", lambda a: ""), ("lang", lambda a: ""),
-    ("kind", lambda a: ""), ("browser", lambda a: "Other"), ("os", lambda a: "Other"),
-    ("device", lambda a: ""), ("time", lambda a: 0), ("pages", lambda a: 1),
-    ("returning", lambda a: None), ("downloaded", lambda a: None),
-    ("donate", lambda a: None), ("timed", lambda a: None),
-    ("day", lambda a: _week_in_month(a["day"])), ("country", lambda a: ""),
-)
-
-
-def _people_at_least(group: list, keys: MonthKeys | None) -> int:
-    """How many different people a group of anonymous visits is at the
-    least. Each visit's mark is unsealed with its month's key ("e" names
-    which); marks under one key are one person each. Under different keys
-    (the service started again without its keys) one person may have two
-    marks, so only the largest number under one key counts; a key that is
-    gone makes its visits one person at the most. A visit kept before marks
-    were sealed counts by "who" (its month's visitor), and one from before
-    that as a person of its own, as it was counted then."""
-    by_key: dict = {}
-    devices: dict = {}
-    for i, a in enumerate(group):
-        if a.get("who"):
-            by_key.setdefault("who", set()).add(a["who"])
-            continue
-        e = a.get("e") or ""
-        if not e:
-            by_key.setdefault("visit", set()).add(i)
-            continue
-        day = a.get("day") or ""
-        mark = unseal(keys, day, a.get("w"), e) if keys is not None else ""
-        by_key.setdefault(e, set()).add(mark or "")
-        # Its device too ("f": browser, language and exact screen, no
-        # address): a person whose address changed is one device, so of the
-        # two counts the smaller is taken.
-        dev = unseal(keys, day, a.get("f"), e) if keys is not None and a.get("f") else ""
-        devices.setdefault(e, set()).add(("d", dev) if dev else ("m", mark or ""))
-    return max((min(len(v), len(devices[k])) if k in devices else len(v) for k, v in by_key.items()),
-               default=0)
-
-
-def k_anonymous(rows: list, k: int = K_ANON, keys: MonthKeys | None = None) -> list:
-    """A whole month's anonymous visits with every one like those of at
-    least k - 1 other people in all of _QI: the pages and the time in a few
-    steps first, then a rarer visit told less, field by field (_LESS), until
-    it is; one still rare after all of them is left out (the day's counts
-    keep it). People are told apart by their sealed marks
-    (_people_at_least), which go here."""
-    if keys is None and _KEYS:
-        keys = _KEYS[0]
-
-    def key(a: dict) -> tuple:
-        return tuple(a.get(f) for f in _QI)
-
-    def people(group: list) -> dict:
-        found: dict = {}
-        for a in group:
-            found.setdefault(key(a), []).append(a)
-        return {q: _people_at_least(g, keys) for q, g in found.items()}
-    out = []
-    for a in rows:
-        if not isinstance(a, dict) or not a.get("day"):
-            continue
-        pages = int(a.get("pages") or 0)
-        t = max(int(a.get("time") or 0), 0)
-        out.append(dict(a, pages=pages if pages <= 3 else 5 if pages <= 5 else 6,
-                        time=max(x for x in _TIMES if x <= t)))
-    for field, less in _LESS:
-        counts = people(out)
-        rare = [a for a in out if counts[key(a)] < k]
-        if not rare:
-            break
-        for a in rare:
-            a[field] = less(a)
-    counts = people(out)
-    kept = [a for a in out if counts[key(a)] >= k]
-    for a in kept:
-        for gone in ("who", "w", "e", "f"):
-            a.pop(gone, None)
-    return kept
-
-
-def _close_months() -> None:
-    """A month of anonymous visits that is whole - before this one, and no
-    day of it left in detail - made k-anonymous once."""
-    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
-    left = {os.path.basename(f)[:7] for f in glob.glob(os.path.join(VISITS_DIR, "*.json"))}
-    for f in sorted(glob.glob(os.path.join(ANON_DIR, "*.json"))):
-        m = os.path.basename(f)[:7]
-        if m >= this_month or m in left:
-            continue
-        month = _load(f, {})
-        if not isinstance(month, dict) or month.get("k"):
-            continue
-        month["visits"] = k_anonymous(month.get("visits") or [])
-        month["visits"].sort(key=lambda a: tuple(str(a.get(x)) for x in _QI))
-        month["k"] = K_ANON
-        _save(f, month)
-
-
 #: The lists of a day that tell who visited (countries, languages, versions,
-#: sites, tags): kept with no name fewer than K_DAY once the day is a month
-#: old - the rest goes into its month's (fold_day).
+#: sites, tags): kept with no name fewer than K_DAY once the day's visits are
+#: gone - the rest is "other" (fold_day).
 FOLD = ("countries", "langs", "os_versions", "browser_versions", "refs", "sources")
 
 
 def fold_day(stats: dict, day: str) -> None:
     """A day's lists in FOLD, kept for good: the likely robots' part taken
     out first (as the admin page takes it), then a name counted fewer than
-    K_DAY times moved into its month's own lists (stats["rest"]) and the day
-    says "other" for it - a quiet day's few visitors are then no longer a
-    country, a language and a browser version side by side. Once."""
+    K_DAY times - fewer than five different visitors brought it that day -
+    said as "other". It is never added up with other days under its name:
+    one person on five days is not five people. A quiet day's few visitors
+    are then no longer a country, a language and a browser version side by
+    side. Once."""
     d = stats["days"].get(day)
     if not isinstance(d, dict) or d.get("folded"):
         return
     robot_lists = (d.get("robots") or {}).get("lists") or {}
-    rest = stats.setdefault("rest", {}).setdefault(day[:7], {})
     for k in FOLD:
         if k not in d and k not in robot_lists:
             continue
@@ -1964,7 +1935,6 @@ def fold_day(stats: dict, day: str) -> None:
             if name == "other" or n >= K_DAY:
                 kept[name] = n
             else:
-                _bump(rest.setdefault(k, {}), name, n)
                 moved += n
         if moved:
             kept["other"] = kept.get("other", 0) + moved
@@ -1972,55 +1942,23 @@ def fold_day(stats: dict, day: str) -> None:
     d["folded"] = 1
 
 
-def _close_rest(stats: dict, this_month: str) -> None:
-    """A month whose days are all folded: its own lists keep no name fewer
-    than K_DAY either - those go to "other". Once."""
-    days = stats.get("days") or {}
-    for m, rest in (stats.get("rest") or {}).items():
-        if not isinstance(rest, dict) or rest.get("k") or m >= this_month:
-            continue
-        if any(not (days[d] or {}).get("folded") for d in days if d[:7] == m):
-            continue
-        for k, lst in list(rest.items()):
-            if not isinstance(lst, dict):
-                continue
-            small = sum(n for name, n in lst.items() if name != "other" and n < K_DAY)
-            rest[k] = {name: n for name, n in lst.items() if name == "other" or n >= K_DAY}
-            if small:
-                rest[k]["other"] = rest[k].get("other", 0) + small
-        rest["k"] = K_DAY
-
-
-def _anonymize_old(stats: dict | None = None, state: dict | None = None) -> None:
-    """Visits older than STATS_VISITS_DAYS: into the month's anonymous file,
-    then the day's file goes. A day already in the month file is never
-    added twice, so a run stopped halfway costs nothing. The day's lists of
-    who came are folded with it (fold_day)."""
+def _forget_old(stats: dict | None = None) -> None:
+    """Visits older than STATS_VISITS_DAYS: their day's counts per way in
+    kept (funnel_of), then the day's file deleted - no row of a visit
+    stays. The day's lists of who came are folded with it (fold_day)."""
     cutoff = (datetime.now(timezone.utc).date() - timedelta(days=VISITS_DAYS)).isoformat()
     for f in sorted(glob.glob(os.path.join(VISITS_DIR, "*.json"))):
         day = os.path.basename(f)[:10]
         if day >= cutoff:
             continue
-        month_path = os.path.join(ANON_DIR, day[:7] + ".json")
-        month = _load(month_path, {"days": [], "visits": []})
-        if day not in month["days"]:
-            month["visits"] += [anonymous(v, day) for v in _load_list(f)
-                                if isinstance(v, dict) and (v.get("pages") or v.get("downloads"))]
-            # Mixed in the month, so their order tells nothing.
-            month["visits"].sort(key=lambda a: (a["day"], a["country"], a["browser"], a["os"], a["device"],
-                                                a["channel"], a["site"], a["pages"], a["time"],
-                                                a.get("w") or ""))
-            month["days"] = sorted(month["days"] + [day])
-            _private_dir(ANON_DIR)
-            _save(month_path, month)
+        if stats is not None and day in (stats.get("days") or {}):
+            stats["days"][day]["funnel"] = funnel_of(_load_list(f))
         with contextlib.suppress(OSError):
             os.unlink(f)
     if stats is not None:
         for day in sorted(stats.get("days") or {}):
             if day < cutoff:
                 fold_day(stats, day)
-        _close_rest(stats, datetime.now(timezone.utc).strftime("%Y-%m"))
-    _close_months()
     # The app's updates of then: counted in stats.json already, so they go.
     gone_updates = (datetime.now(timezone.utc).date() - timedelta(days=UPDATES_DAYS)).isoformat()
     for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):

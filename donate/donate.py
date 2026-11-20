@@ -1326,7 +1326,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, admin.find(stats_dir, query.get("by", ""), query.get("value", "")[:200], days))
             body = admin.data(days, stats_dir, downloads_json, _secret(), API_VERSION)
             body["dl"] = admin.download_counts(stats_dir, downloads_json)
-            body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "30") or 30)
+            body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "14") or 14)
             try:
                 import analysis
                 body["help"] = analysis.help_questions(admin.SITE)

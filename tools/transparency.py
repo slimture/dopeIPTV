@@ -161,8 +161,7 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "site", "path": "donate/stats_collect.py",
                    "from": r"^    if ev in \(\"donate\", \"donated\"\):", "to": r"^        return$"}]},
         {"id": "anon", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["anonymous", "freeze_months", "K_ANON", "_QI", "_LESS", "_people_at_least", "k_anonymous",
-                   "FOLD", "fold_day"]},
+         "names": ["sketches_file", "freeze_months", "FUNNEL", "funnel_of", "FOLD", "fold_day", "_forget_old"]},
     ],
     "webservers": [
         {"id": "path", "repo": "site", "path": _PROXY, "nginx": [_MAIN + " > location /"],
@@ -646,7 +645,7 @@ s._page_line({"days": {}}, state, leave, Geo(), visits)
 (visit,) = visits.day("2026-11-19")
 kept = s.at_rest(visit, "2026-11-19", state)
 print(json.dumps({"log": json.dumps(line), "visit": json.dumps(kept, ensure_ascii=False),
-                  "anon": json.dumps(s.anonymous(kept, "2026-11-19"), ensure_ascii=False)}))
+                  "anon": json.dumps(s.funnel_of([kept]), ensure_ascii=False)}))
 '''
 
 

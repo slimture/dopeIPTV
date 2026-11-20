@@ -7,10 +7,11 @@ stats_inbox.py, analysis.py, admin.py):
 - the month keys are in memory alone - never a file on a disk;
 - a visit kept names its visitor for its day alone, its mark sealed, its
   times coarse, a screen by its kind, a site by its registered name;
-- how many different visitors came is kept in sketches, never as marks;
-- a whole month of anonymous visits is k-anonymous by different people,
-  told apart by their sealed marks - a key gone counts as one person;
-- a quiet day's lists keep no name fewer than five once a month old;
+- how many different visitors came is kept in sketches, never as marks -
+  and the sketches only where the month's key is, never on a disk;
+- no row of a visit is kept past STATS_VISITS_DAYS: only the day's counts;
+- a quiet day's lists keep no name fewer than five once its visits are
+  gone, and no days are added up again under a name;
 - a tip is counted per day only, never on a visit, and a payment marked on
   a visit kept from before is taken off once.
 
@@ -68,8 +69,8 @@ def test_a_payment_is_counted_per_day_and_never_on_the_visit():
     (visit,) = visits.day("2026-11-19")
     assert [e[1] for e in visit["events"]] == ["donate"]
     assert "donated" not in json.dumps(visit)
-    anon = sc.anonymous(visit, "2026-11-19")
-    assert anon["donate"] is True and "donated" not in anon
+    funnel = sc.funnel_of([visit])
+    assert list(funnel.values()) == [[1, 0, 0, 0, 0, 1]] and "donated" not in json.dumps(funnel)
 
     import analysis
     assert "donated" not in analysis.FIELDS
@@ -79,20 +80,14 @@ def test_a_payment_is_counted_per_day_and_never_on_the_visit():
 def test_a_payment_kept_on_a_visit_from_before_is_taken_off_once():
     sc, stats = _module()
     os.makedirs(sc.VISITS_DIR)
-    os.makedirs(sc.ANON_DIR)
     day = os.path.join(sc.VISITS_DIR, "2026-10-01.json")
     with open(day, "w") as fh:
         json.dump([{"id": "a", "events": [[1, "donate"], [2, "donated"]], "pages": [[1, "/", 0]]},
                    {"id": "b", "events": [], "pages": [[1, "/", 0]]}], fh)
-    month = os.path.join(sc.ANON_DIR, "2025-09.json")
-    with open(month, "w") as fh:
-        json.dump({"days": ["2025-09-01"], "visits": [{"day": "2025-09-01", "donate": True, "donated": True}]}, fh)
     state: dict = {}
     sc._drop_payments(state)
     with open(day) as fh:
         assert [v["events"] for v in json.load(fh)] == [[[1, "donate"]], []]
-    with open(month) as fh:
-        assert json.load(fh)["visits"] == [{"day": "2025-09-01", "donate": True}]
     assert state["payments_off_visits"] == 1
     os.unlink(day)
     sc._drop_payments(state)                         # once: not looked for again
@@ -120,7 +115,7 @@ def test_a_visitor_is_a_keyed_hash_with_keys_in_memory_alone():
     sc, stats = _module()
     keys = sc.MonthKeys(date(2026, 11, 19), keys={"2026-11": "1" * 64, "2026-10": "2" * 64,
                                                   "2026-09": "3" * 64, "2026-08": "4" * 64})
-    assert sorted(keys.keys) == ["2026-09", "2026-10", "2026-11"]       # older keys forgotten
+    assert sorted(keys.keys) == ["2026-10", "2026-11"]                  # older keys forgotten
     assert not keys.folder, "no folder on a disk is ever used for them"
     state = {"_keys": keys}
     vid = sc._hash(state, "2026-11-19", IP, UA)
@@ -197,7 +192,11 @@ def test_no_address_and_no_key_is_ever_written():
     assert visit["start"] % sc.COARSE == 0 and visit["screen"] == "Large screen" and visit["blang"] == "sv"
     assert visit["ref"] == "example.net" and "ref_page" not in visit
     assert visit["downloads"][0][1] == "dopeIPTV-1.6.8-x86_64.AppImage"
-    assert stat.S_IMODE(os.stat(os.path.join(stats, "sketches.json")).st_mode) == 0o600
+    # The sketches: where the key is (here, no folder in memory: the
+    # service's memory alone), never beside the statistics on the disk.
+    assert not os.path.exists(os.path.join(stats, "sketches.json"))
+    assert sc.sketches_file() == "" and now.date().isoformat() in sc.sketches_now()
+    assert stat.S_IMODE(os.stat(os.path.join(stats, "stats.json")).st_mode) == 0o600
     # A key gone (the service started again without it): the mark cannot be opened.
     from datetime import date
     assert sc.unseal(sc.MonthKeys(date.today()), now.date().isoformat(), visit["w"], visit["e"]) == ""
@@ -216,8 +215,9 @@ def test_a_visit_kept_names_its_visitor_for_its_day_alone():
     again = sc.at_rest({"id": vid, "start": 1763550900, "end": 1763550900, "pages": []}, "2026-11-19", state)
     assert one["id"] == again["id"] != two["id"], "the same name within a day, another the next"
     assert one["w"] != again["w"], "a new nonce each time: two visits' seals look nothing alike"
-    # The start to the ten minutes; what came after it, to ten seconds from there.
-    assert one["start"] == 1763550123 - 1763550123 % 600 and one["end"] - one["start"] == 80
+    # The start to the half hour; what came after it, to ten seconds from there.
+    assert sc.COARSE == 1800
+    assert one["start"] == 1763550123 - 1763550123 % 1800 and one["end"] - one["start"] == 80
     assert one["pages"] == [[one["start"], "/", 50]] and one["time"] == 50
     assert one["source"] == "other" and one["ref"] == "example.net" and one["screen"] == "Phone"
     assert one["blang"] == "sv" and one["os"] == "Linux" and "ref_page" not in one
@@ -325,29 +325,34 @@ def test_the_old_keys_and_lists_are_made_sketches_once_and_deleted():
                     "bv": "140", "device": "Computer", "country": "SE", "returning": 0,
                     "downloads": [], "events": []}], fh)
     state: dict = {"_keys": sc.keys_now()}
-    sc._migrate(state, os.path.join(stats, "sketches.json"))
+    sk: dict = {}
+    sc._migrate(state, sk)
     for gone in ("visitor-keys.json", "uniques.json", "kinds.json"):
         assert not os.path.exists(os.path.join(stats, gone))
+    assert not os.path.exists(os.path.join(stats, "sketches.json")), "made in memory, not on the disk"
     import admin
-    sk = sc._load(os.path.join(stats, "sketches.json"), {})
     assert admin._union(sk, ["2026-11-18"], {"2026-11-18": {"visitors": 3}}) == 2
     assert admin._judged(sk, ["2026-11-18"], {"2026-11-18": {"visitors": 3}})["robots"] == 1
     (v,) = sc._load_list(os.path.join(sc.VISITS_DIR, "2026-11-18.json"))
     assert v["id"] != a and a not in json.dumps(v) and v["screen"] == "Large screen" and v["blang"] == "en"
     assert sc.unseal(state["_keys"], "2026-11-18", v["w"], v["e"]) == a
     assert state["kept_since"] == 2
-    sc._migrate(state, os.path.join(stats, "sketches.json"))              # once
+    sc._migrate(state, sk)                                                 # once
     assert sc._load_list(os.path.join(sc.VISITS_DIR, "2026-11-18.json")) == [v]
 
 
-def test_a_quiet_days_lists_keep_no_name_fewer_than_five_once_a_month_old():
+def test_a_quiet_days_lists_keep_no_name_fewer_than_five_and_never_add_days_up():
+    """A name fewer than five visitors brought on a day is "other" once its
+    visits are gone - and stays so: no month sums the days again, so one
+    person on five days is never five."""
     sc, _dir = _module()
-    import admin
     stats = {"days": {
         "2026-09-01": {"countries": {"SE": 7, "IS": 1}, "langs": {"sv": 6, "is": 1}, "views": 8,
                        "robots": {"lists": {"countries": {"SE": 1}, "pages": {"/": 1}}}},
         "2026-09-02": {"countries": {"SE": 6, "IS": 2}, "langs": {"sv": 8}, "views": 8},
         "2026-09-03": {"countries": {"NO": 3}, "views": 3}}}
+    for i in range(4, 9):                       # one person from Iceland, five days running
+        stats["days"]["2026-09-%02d" % i] = {"countries": {"SE": 5, "IS": 1}}
     for d in list(stats["days"]):
         sc.fold_day(stats, d)
         sc.fold_day(stats, d)                   # once
@@ -355,19 +360,87 @@ def test_a_quiet_days_lists_keep_no_name_fewer_than_five_once_a_month_old():
     assert d1["countries"] == {"SE": 6, "other": 1} and d1["langs"] == {"sv": 6, "other": 1}
     assert "countries" not in d1["robots"]["lists"] and d1["robots"]["lists"]["pages"] == {"/": 1}
     assert stats["days"]["2026-09-03"]["countries"] == {"other": 3}
-    rest = stats["rest"]["2026-09"]
-    assert rest["countries"] == {"IS": 3, "NO": 3} and rest["langs"] == {"is": 1}
-    sc._close_rest(stats, "2026-11")
-    assert rest["countries"] == {"other": 6} and rest["langs"] == {"other": 1} and rest["k"] == 5
-    # A month whole in the span: its own names are shown again, out of "other".
-    stats2 = {"days": {"2026-09-01": {"countries": {"SE": 9, "other": 6}}},
-              "rest": {"2026-09": {"countries": {"IS": 6}}}}
-    sums = {"countries": {"SE": 9, "other": 6}}
-    admin._add_rest(sums, stats2, ["2026-09-01"])
-    assert sums["countries"] == {"SE": 9, "IS": 6}
-    part = {"countries": {"SE": 9, "other": 6}}
-    admin._add_rest(part, {"days": {"2026-09-01": {}, "2026-09-02": {}}, "rest": stats2["rest"]}, ["2026-09-01"])
-    assert part["countries"] == {"SE": 9, "other": 6}, "a month only in part stays as it is"
+    assert "rest" not in stats, "no list of a month gathers the rarer names"
+    assert "IS" not in json.dumps(stats), "one person on five days is never kept under a name"
+    import admin
+    assert not hasattr(admin, "_add_rest")
+    # The month's list of before: dropped (its days count those in "other").
+    old = {"days": dict(stats["days"]), "rest": {"2026-09": {"countries": {"IS": 6}, "k": 5}}}
+    sc._old_rows_off(old)
+    assert "rest" not in old
+
+
+def test_no_row_of_a_visit_is_kept_past_its_days():
+    """After STATS_VISITS_DAYS a day's visits go, every one - neither in
+    detail nor as anonymous rows. What stays is counts: its totals and lists,
+    and per way in how many read on, looked how long, downloaded, opened
+    the support dialog."""
+    from datetime import date, timedelta
+    sc, stats = _module()
+    assert sc.VISITS_DAYS == 14
+    old = (date.today() - timedelta(days=20)).isoformat()
+    recent = (date.today() - timedelta(days=2)).isoformat()
+    os.makedirs(sc.VISITS_DIR)
+    rows = [{"id": "a", "start": 0, "pages": [[0, "/", 20], [30, "/help/", 40]], "time": 60,
+             "channel": "Search", "downloads": [[40, "x.AppImage"]], "events": [[50, "donate"]],
+             "country": "IS", "browser": "Lynx"},
+            {"id": "b", "start": 0, "pages": [[0, "/", 0]], "time": 0, "channel": "", "events": []},
+            {"id": "c", "start": 0, "pages": [[0, "/", 5]], "time": 5, "channel": "Search", "kind": "robot"}]
+    for day in (old, recent):
+        with open(os.path.join(sc.VISITS_DIR, day + ".json"), "w") as fh:
+            json.dump(rows, fh)
+    data = {"days": {old: {"views": 3}, recent: {"views": 3}}}
+    sc._forget_old(data)
+    assert not os.path.exists(os.path.join(sc.VISITS_DIR, old + ".json")), "its visits gone"
+    assert os.path.exists(os.path.join(sc.VISITS_DIR, recent + ".json")), "two weeks in detail"
+    assert data["days"][old]["funnel"] == {"Search": [1, 1, 60, 1, 1, 1], "": [1, 0, 0, 0, 0, 0]}
+    assert "Lynx" not in json.dumps(data) and "IS" not in json.dumps(data)
+    assert not os.path.exists(sc.ANON_DIR)
+    import inspect
+    src = inspect.getsource(sc)
+    for gone in ("def anonymous(", "def k_anonymous(", "_people_at_least", "def _close_months("):
+        assert gone not in src, gone
+    # The admin page's "by way in" reads the days' counts where the visits are gone.
+    import admin
+    with open(os.path.join(stats, "stats.json"), "w") as fh:
+        json.dump(data, fh)
+    rows_by = dict(admin.by_channel(stats, old, recent))
+    assert rows_by["Search"]["visits"] == 2 and rows_by["Search"]["donate"] == 2
+    assert rows_by["Direct or unknown"]["visits"] == 2
+
+
+def test_the_anonymous_rows_of_before_become_counts_and_go():
+    sc, _dir = _module()
+    os.makedirs(sc.ANON_DIR)
+    base = {"day": "2026-09-01", "country": "SE", "browser": "Firefox", "channel": "Social", "site": "",
+            "pages": 2, "time": 40, "timed": True, "downloaded": True, "donate": False, "kind": "",
+            "w": "ab" * 12, "e": "cd" * 4, "f": "ef" * 12}
+    with open(os.path.join(sc.ANON_DIR, "2026-09.json"), "w") as fh:
+        json.dump({"days": ["2026-09-01"], "k": 5,
+                   "visits": [base, dict(base, pages=1, downloaded=False), dict(base, kind="robot")]}, fh)
+    stats = {"days": {"2026-09-01": {"views": 3}}}
+    sc._old_rows_off(stats)
+    assert stats["days"]["2026-09-01"]["funnel"] == {"Social": [2, 1, 80, 2, 1, 0]}
+    assert not os.path.exists(sc.ANON_DIR), "the folder of anonymous visits: gone"
+
+
+def test_the_sketches_are_never_kept_on_a_disk():
+    """A visitor sets the same two bits on every day of its month, so the
+    days' sketches are kept only where its key is: beside it in a folder in
+    memory, or in the service's memory alone. Kept on the disk before: taken
+    into memory once, and that file deleted."""
+    import sketch
+    sc, stats = _module()
+    old = os.path.join(stats, "sketches.json")
+    with open(old, "w") as fh:
+        json.dump({"2026-11-01": {"u": sketch.encode(sketch.of(["a" * 12]))}}, fh)
+    held: dict = {}
+    sc._sketches_off_disk(held)
+    assert not os.path.exists(old) and "2026-11-01" in held
+    assert sc.sketches_file() == "", "no folder in memory: the service's memory alone"
+    import inspect
+    src = inspect.getsource(sc.collect)
+    assert 'os.path.join(STATS_DIR, "sketches.json")' not in src and "sketches_file()" in src
 
 
 def test_the_socket_hands_nginxs_lines_to_memory():
@@ -418,77 +491,15 @@ def test_an_update_is_kept_at_its_hour_and_for_thirty_days():
     assert sc.UPDATES_DAYS == 30
 
 
-def test_a_whole_month_of_visits_is_k_anonymous():
-    sc, _dir = _module()
-    base = {"country": "SE", "browser": "Firefox", "os": "Linux", "device": "desktop", "lang": "sv",
-            "channel": "", "site": "", "pages": 2, "time": 40, "timed": True, "returning": False,
-            "downloaded": False, "donate": False, "kind": ""}
-    rows = [dict(base, day="2026-09-%02d" % (1 + i % 3)) for i in range(15)]
-    lone = dict(base, day="2026-09-17", country="IS", browser="Lynx", site="example.org",
-                pages=37, time=1234, donate=True)
-    rows.append(lone)
-    out = sc.k_anonymous(rows)
-    key = lambda a: tuple(a.get(f) for f in sc._QI)  # noqa: E731
-    counts: dict = {}
-    for a in out:
-        counts[key(a)] = counts.get(key(a), 0) + 1
-    assert all(n >= sc.K_ANON for n in counts.values())
-    assert not any(a.get("site") == "example.org" or a.get("browser") == "Lynx" for a in out)
-    assert all(a["pages"] in (1, 2, 3, 5, 6) and a["time"] in sc._TIMES for a in out)
-    # Fewer than K_ANON visits in a month: none kept one by one.
-    assert sc.k_anonymous(rows[:3]) == []
-    # The month is made so once it is whole, and only once.
-    os.makedirs(sc.ANON_DIR, exist_ok=True)
-    path = os.path.join(sc.ANON_DIR, "2026-09.json")
-    with open(path, "w") as fh:
-        json.dump({"days": ["2026-09-01"], "visits": rows}, fh)
-    sc._close_months()
-    with open(path) as fh:
-        month = json.load(fh)
-    assert month["k"] == sc.K_ANON and len(month["visits"]) == len(out)
-    sc._close_months()
-
-
-def test_k_anonymity_counts_different_people_not_visits():
-    """One person who came five times is one of the five, not five: a
-    combination kept is shared by five different visitors, told apart by
-    their sealed marks - which are never kept. A mark whose key is gone
-    counts as one person at the most."""
-    from datetime import date
-    sc, _dir = _module()
-    keys = sc.MonthKeys(date(2026, 10, 19))
-    state = {"_keys": keys}
-    base = {"day": "2026-09-01", "country": "SE", "browser": "Firefox", "os": "Linux",
-            "device": "desktop", "lang": "sv", "channel": "", "site": "", "pages": 2, "time": 40,
-            "timed": True, "returning": False, "downloaded": False, "donate": False, "kind": ""}
-
-    def sealed(vid):
-        w, e = sc.seal(state, "2026-09-01", vid)
-        return dict(base, w=w, e=e)
-    one = hashlib_hex("p1")
-    assert sc.k_anonymous([sealed(one) for _ in range(6)], keys=keys) == [], "six visits of one person"
-    five = [sealed(hashlib_hex(f"p{i}")) for i in range(5)]
-    out = sc.k_anonymous(five, keys=keys)
-    assert len(out) == 5 and not any(k in a for a in out for k in ("w", "e", "who"))
-    gone = sc.MonthKeys(date(2026, 10, 19))             # the service started again without them
-    assert sc.k_anonymous(five, keys=gone) == [], "a key gone: one person at the most"
-    # Kept before marks were sealed: "who" told people apart, as then.
-    assert len(sc.k_anonymous([dict(base, who=f"p{i}") for i in range(5)], keys=keys)) == 5
-    # One person on one device whose address changed five times: five
-    # visitor marks, one device - one person.
-    dev = hashlib_hex("one phone")
-
-    def moved(i):
-        w, e = sc.seal(state, "2026-09-01", hashlib_hex(f"addr{i}"))
-        return dict(base, w=w, e=e, f=sc.seal(state, "2026-09-01", dev)[0])
-    assert sc.k_anonymous([moved(i) for i in range(5)], keys=keys) == [], "one device, five addresses"
-    devs = [dict(sealed(hashlib_hex(f"p{i}")), f=sc.seal(state, "2026-09-01", hashlib_hex(f"d{i}"))[0])
-            for i in range(5)]
-    out = sc.k_anonymous(devs, keys=keys)
-    assert len(out) == 5 and not any("f" in a for a in out), "five people, five devices: kept, marks gone"
-    a = sc.anonymous({"id": one, "w": "ab" * 12, "e": "cd" * 4, "pages": ["/"], "browser": "Firefox"},
-                     "2026-09-01")
-    assert a["w"] == "ab" * 12 and "id" not in a and one not in json.dumps(a)
+def test_a_folder_in_memory_too_full_keeps_the_sketches_in_the_service_alone():
+    sc, stats = _module()
+    sc._SKETCHES_HERE["full"] = False
+    folder = os.path.join(stats, "not-there")
+    sc._keep_sketches(os.path.join(folder, "sketches.json"), {"2026-11-01": {"u": "x"}})
+    assert sc._SKETCHES_HERE["full"] and sc._SKETCHES == {"2026-11-01": {"u": "x"}}
+    assert sc.sketches_file() == "" and not os.path.exists(os.path.join(stats, "sketches.json")), \
+        "never put on the disk instead"
+    sc._SKETCHES_HERE["full"] = False
 
 
 if __name__ == "__main__":
@@ -507,4 +518,4 @@ def test_the_page_that_linked_is_never_kept():
     src = inspect.getsource(sc)
     assert '_bump(d.setdefault("ref_pages"' not in src and 'add("ref_pages"' not in src
     assert "ref_pages" not in sc.FOLD
-    assert 'd.pop("ref_pages", None)' in src and 'rest.pop("ref_pages", None)' in src
+    assert 'd.pop("ref_pages", None)' in src

@@ -20,7 +20,8 @@ service's socket (X-Admin-User) proves nothing once the first admin exists.
 
 Visitors come from stats_collect.py's STATS_DIR/stats.json, without what
 the visits judged likely robots added (kept apart there; how many different
-people and robots in the days' sketches, sketches.json); the all-time
+people and robots in the days' sketches, kept in memory beside the month
+keys - stats_collect.sketches_now); the all-time
 download counts from the site's downloads.json; tips and monthly support
 from Stripe itself - the succeeded payments on dopeIPTV's own account, found
 with Stripe's search and kept for five minutes. Donations taken before the
@@ -207,6 +208,17 @@ def _frozen_part(f: dict, days: list, per_day: dict):
     return n + sum((per_day.get(d) or {}).get("visitors", 0) for d in want - covered)
 
 
+def _sketches() -> dict:
+    """The days' sketches as the statistics keep them: beside the month
+    keys in memory, never on a disk (stats_collect.sketches_file)."""
+    try:
+        import stats_collect
+    except ImportError:
+        return {}
+    now = getattr(stats_collect, "sketches_now", None)
+    return now() if callable(now) else {}
+
+
 class _Fields:
     """The days' sketches (stats_collect.py, sketch.py), each read once."""
 
@@ -288,30 +300,6 @@ def _judged(sketches, days: list, per_day: dict, frozen: dict | None = None) -> 
             "all": all(d in judged_set for d in days if (per_day.get(d) or {}).get("visitors"))}
 
 
-def _add_rest(sums: dict, stats: dict, range_days: list) -> None:
-    """A month's own lists (stats_collect.fold_day: the names its days
-    counted fewer than five times) where the span holds every day of it
-    that was counted: those names again, out of "other"."""
-    want = set(range_days)
-    days = stats.get("days") or {}
-    for m, rest in (stats.get("rest") or {}).items():
-        if not isinstance(rest, dict):
-            continue
-        counted = [d for d in days if d[:7] == m]
-        if not counted or not set(counted) <= want:
-            continue
-        for k, lst in rest.items():
-            if k not in sums or not isinstance(lst, dict):
-                continue
-            for name, n in lst.items():
-                if name == "other" or not isinstance(n, int):
-                    continue
-                sums[k][name] = sums[k].get(name, 0) + n
-                sums[k]["other"] = sums[k].get("other", 0) - n
-            if sums[k].get("other", 0) <= 0:
-                sums[k].pop("other", None)
-
-
 SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning", "timed")
 
 
@@ -338,7 +326,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
     robots are left out of every count, and told apart in "judged"."""
     days = days if days in RANGES else 30
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
-    fields = _Fields(_load(os.path.join(stats_dir, "sketches.json"), {}))
+    fields = _Fields(_sketches())
     frozen = _load(os.path.join(stats_dir, "uniques-months.json"), {})
     per_day = {d: _net(row) for d, row in (stats.get("days") or {}).items()}
     today = datetime.now().astimezone().date()  # the server's day, as the logs' dates
@@ -372,7 +360,6 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         totals["updates"] = totals.get("updates", 0) + _updates(row)
         for k, total in sums.items():
             _sum_into(total, row.get(k))
-    _add_rest(sums, stats, range_days)
     if step != "day":                           # a week's or month's different visitors
         for key_b, ds in bucket_days.items():
             u = _union(fields, ds, per_day, frozen)
@@ -455,7 +442,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
 def by_channel(stats_dir: str, first: str, last: str) -> list:
     """Per way in (search, social...): visits, and how many of them read more
     than one page, downloaded, opened the donate dialog - from the visits of
-    the last weeks and the anonymous ones before them."""
+    the last two weeks and, before them, the days' own counts of them."""
     rows: dict = {}
 
     def add(channel: str, pages: int, secs: int, downloaded: bool, donate: bool, timed: bool) -> None:
@@ -473,18 +460,19 @@ def by_channel(stats_dir: str, first: str, last: str) -> list:
                 if v.get("pages") and v.get("kind") != "robot":
                     add(v.get("channel", ""), len(v["pages"]), v.get("time", 0), bool(v.get("downloads")),
                         any(e[1] == "donate" for e in v.get("events") or []), v.get("time", 0) > 0)
-    try:
-        months = sorted(n[:7] for n in os.listdir(os.path.join(stats_dir, "visits-anon")) if n.endswith(".json"))
-    except OSError:
-        months = []
-    for m in months:
-        if not (first[:7] <= m <= last[:7]):
+    # A day whose visits are gone: its counts per way in (stats_collect.funnel_of).
+    kept = set(visit_days(stats_dir))
+    stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
+    for day, row in (stats.get("days") or {}).items():
+        if not (first <= day <= last) or day in kept or not isinstance(row, dict):
             continue
-        month = _load(os.path.join(stats_dir, "visits-anon", m + ".json"), {})
-        for a in month.get("visits") or []:
-            if first <= a.get("day", "") <= last and a.get("pages") and a.get("kind") != "robot":
-                add(a.get("channel", ""), a["pages"], a.get("time", 0), a.get("downloaded", False),
-                    a.get("donate", False), a.get("timed", a.get("time", 0) > 0))
+        for channel, f in (row.get("funnel") or {}).items():
+            if not (isinstance(f, list) and len(f) == 6 and all(isinstance(n, int) for n in f)):
+                continue
+            r = rows.setdefault(channel or "Direct or unknown",
+                                {"visits": 0, "more": 0, "time": 0, "timed": 0, "downloaded": 0, "donate": 0})
+            for k, n in zip(("visits", "more", "time", "timed", "downloaded", "donate"), f, strict=True):
+                r[k] += max(0, n)
     return sorted(([k, v] for k, v in rows.items()), key=lambda kv: -kv[1]["visits"])
 
 
@@ -610,28 +598,11 @@ def live(stats_dir: str, downloads_json: str) -> dict:
             "recent": recent, "updates_recent": upd, "dl": download_counts(stats_dir, downloads_json)}
 
 
-def _anon_by_day(stats_dir: str) -> dict:
-    """The anonymous visits (STATS_DIR/visits-anon/<month>.json), by day."""
-    by_day: dict = {}
-    try:
-        names = sorted(n for n in os.listdir(os.path.join(stats_dir, "visits-anon")) if n.endswith(".json"))
-    except OSError:
-        return by_day
-    for name in names:
-        month = _load(os.path.join(stats_dir, "visits-anon", name), {})
-        for d in month.get("days") or []:
-            by_day.setdefault(d, [])
-        for a in month.get("visits") or []:
-            if a.get("day"):
-                by_day.setdefault(a["day"], []).append(dict(a, anon=True))
-    return by_day
-
-
 def visits(stats_dir: str, day: str, span: str = "day") -> dict:
-    """The visits of one day, week, month or year, newest first: one by one
-    for the last STATS_VISITS_DAYS days, and before that as they were made
-    anonymous (no time of day, no visitor; marked anon). "periods" are the
-    starts of the spans that have any."""
+    """The visits of one day, week, month or year, newest first, one by one
+    for the last STATS_VISITS_DAYS days - none is kept as a row before that
+    (only the days' counts). "periods" are the starts of the spans that
+    have any."""
     span = span if span in SPANS else "day"
     try:
         at = date.fromisoformat(day)
@@ -639,9 +610,8 @@ def visits(stats_dir: str, day: str, span: str = "day") -> dict:
         at = datetime.now().astimezone().date()
     detailed = visit_days(stats_dir)
     kept = set(detailed)
-    anon = _anon_by_day(stats_dir)
     updated = set(visit_days(stats_dir, "updates"))
-    periods = sorted({_span_start(date.fromisoformat(d), span).isoformat() for d in kept | set(anon) | updated},
+    periods = sorted({_span_start(date.fromisoformat(d), span).isoformat() for d in kept | updated},
                      reverse=True)
     start = _span_start(at, span)
     end = _span_end(start, span)
@@ -651,8 +621,6 @@ def visits(stats_dir: str, day: str, span: str = "day") -> dict:
         iso = d.isoformat()
         if iso in kept:
             lst += [dict(v, day=iso) for v in _visits_file(stats_dir, iso) if v.get("pages") or v.get("downloads")]
-        else:
-            lst += [a for a in anon.get(iso, []) if a.get("pages") or a.get("downloaded")]
         if iso in updated:
             lst += _update_rows(stats_dir, iso)
         d += timedelta(days=1)

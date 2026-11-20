@@ -414,26 +414,26 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 
 <h2 id="website">10. Does this website track me?</h2>
 <p class="tp-promise">We count visits without cookies, without outside services – and without your IP address ever being written down, not even in a log.</p>
-<p class="tp-know"><b>What we can know:</b> that someone visited, from which country and which pages – for 30 days as a visit of that day alone, after that only as counts and as anonymous visits each shared by at least five different people. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
+<p class="tp-know"><b>What we can know:</b> that someone visited, from which country and which pages – for 14 days as a visit of that day alone, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>The web server</b> writes nothing: it hands each page view straight to a small service of ours, over a socket on the same machine – with the IP address, and of the address you asked for only the page, never what a link added to it. The front server before it keeps no log of requests.</li>
 <li><b>Within a minute</b> the service counts it, in its memory: the address becomes a country (looked up on our own server) and a visitor mark, and is forgotten. No log, no file and no backup ever holds it.</li>
-<li><b>What is written</b> is the visit without the address and without the mark: its visitor named for that day alone, its time to the ten minutes, the kind of screen, never its size.</li>
-<li><b>After 30 days</b> a visit loses even that, and is kept only if it looks like the visits of at least four other people of its month. A day's counts keep no country, language or version fewer than five people had.</li>
+<li><b>What is written</b> is the visit without the address and without the mark: its visitor named for that day alone, its time to the half hour, the kind of screen, never its size.</li>
+<li><b>After 14 days</b> the day's visits are deleted, every one. What stays is counts: how many visits, pages and downloads, and lists that name no country, language, version, site or tag fewer than five visitors had that day – the rest is "other", and no list adds days up again under a name.</li>
 </ol>
-<p>The visitor mark is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key of the month, cut to twelve characters. The key exists only in the service's memory – never in a file on a disk, so never in a backup – and is forgotten after three months, or at once when the service starts again. Within a month the same visitor gets the same mark, so we can count unique and returning visitors – but the mark itself is never written down. A visit kept carries two things in its place: a name for its visitor that holds for that day alone – nothing kept ties a visitor's visits of two days together – and the mark sealed with the month's key, random to anyone without it. Only the running service can open it, while it holds the key: so that a visit can go on after a restart, and so that, when a month is made anonymous, five different people can be told from one person who came five times.</p>
-<p>How many different visitors came over several days is kept as <strong>sketches</strong>: a field of 131,072 bits for each day, in which each visitor sets two – which two only the key says. Put together they count the visitors of a week or a month within a few in a thousand; they hold no mark, no list and no order, and without the key they say nothing about anyone.</p>
-<p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – of that day alone, its time to the ten minutes, the browser's main version, the kind of screen, the page's language and the browser's without its country, the site that linked by its registered name – 30 days. The sketches until the month after has ended, then only the number of different visitors in that month and its weeks. The anonymous visits after that for good, each like those of at least four other people of their month – people, not visits: told apart by the sealed marks, which go in that same step – or removed. The day's counts for good, with no country, language, version, site or tag fewer than five had once the day is a month old. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
+<p>The visitor mark is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key of the month, cut to twelve characters. The key exists only in the service's memory – never in a file on a disk, so never in a backup – and is forgotten after two months, or at once when the service starts again. Within a month the same visitor gets the same mark, so we can count unique and returning visitors – but the mark itself is never written down. A visit kept carries two things in its place: a name for its visitor that holds for that day alone – nothing kept ties a visitor's visits of two days together – and the mark sealed with the month's key, random to anyone without it. Only the running service can open it, while it holds the key: so that a visit can go on after a restart.</p>
+<p>How many different visitors came over several days is kept as <strong>sketches</strong>: a field of 131,072 bits for each day, in which each visitor sets two – which two only the key says. Put together they count the visitors of a week or a month within a few in a thousand; they hold no mark, no list and no order. A visitor sets the same two bits on every day of its month, so two quiet days' sketches side by side could hint that someone came on both – which is why they are kept only where the key is: in the service's memory or beside the key on a file system in memory, never on a disk or in a backup. After the month that follows, only the numbers stay.</p>
+<p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – of that day alone, its time to the half hour, the browser's main version, the kind of screen, the page's language and the browser's without its country, the site that linked by its registered name – 14 days, then deleted; no row of a visit is kept after that, not even an anonymous one. The sketches, in memory alone, until the month after has ended, then only the number of different visitors in that month and its weeks. The day's counts for good – per way in (search, social…) how many visits read on, downloaded or opened the support dialog, too – with no country, language, version, site or tag fewer than five visitors had that day. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
 <details class="tp-proof">
 <summary>Want to see how it works behind the scenes?</summary>
 <div class="tp-proof-body">
 <h3>What it looks like</h3>
 <p class="tp-ex-h">A line as the web server hands it to the service – in memory, never written down (a made-up visitor, from the documentation range of IP addresses):</p>
 <!--tp:ex website log-->
-<p class="tp-ex-h">What the statistics keep of that visit – no IP address, no mark, its time to the ten minutes:</p>
+<p class="tp-ex-h">What the statistics keep of that visit – no IP address, no mark, its time to the half hour:</p>
 <!--tp:ex website visit-->
-<p class="tp-ex-h">The same visit after 30 days, until its month is made anonymous:</p>
+<p class="tp-ex-h">What is left of it after 14 days – a count among the day's, per way in (visits, read on, seconds, timed, downloaded, support dialog):</p>
 <!--tp:ex website anon-->
 <p class="fine">Made by running the site's own code, with a made-up key.</p>
 <h3>The code</h3>
@@ -447,7 +447,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code website sketch-->
 <p>How long the visits are kept, and the one place a tip is counted – per day, never on the visit:</p>
 <!--tp:code website kept-->
-<p>What a visit keeps after 30 days, how a month is made anonymous by people, and a day's counts once a month old:</p>
+<p>Where the sketches are kept, what is left of a day's visits after 14 days, and a day's lists then:</p>
 <!--tp:code website anon-->
 <h3>Check it yourself</h3>
 <p>Here you can check more than the code. Open your browser's developer tools on any page of this site:</p>
@@ -464,7 +464,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <ul>
 <li>Unlike the app, our server is not something you can inspect: you have to trust that it runs this code. What you can check yourself is what your browser loads and keeps.</li>
 <li>While the service runs, your address passes its memory and the month's key is there. Someone who took over the running server could watch requests as they come, as on any web server – what is on its disks, now or in a backup, does not lead back to you.</li>
-<li>A visit kept for 30 days says what was done in it, to the ten minutes. Someone who already knew that you visited at about that time could pick that visit out among the day's – never your visits of another day.</li>
+<li>A visit kept for 14 days says what was done in it, to the half hour. Someone who already knew that you visited at about that time – and what you did – could pick that visit out among the day's, and on a quiet day the counts too say that one visitor came from a country. That makes it much harder, not impossible, to tell who visited; we do not claim more.</li>
 </ul>
 
 <h2 id="webservers">11. What do the servers behind dopeiptv.org see and write down?</h2>

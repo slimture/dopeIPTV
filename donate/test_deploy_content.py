@@ -689,11 +689,12 @@ def test_every_log_is_turned_over_and_readable_only_by_its_own():
     rc = open(os.path.join(ROOT, "deploy", "iptv_donate"), encoding="utf-8").read()
     service = re.search(r"^: \$\{iptv_donate_log:=(\S+)\}$", rc, re.M).group(1)
     cron = set(re.findall(r">> (/var/log/\S+) 2>&1", deploy))
-    assert cron == {"/var/log/iptv-sync.log", "/var/log/iptv-stats.log"}
-    # stats_collect.py's cron line is taken out in the newest round: the
-    # service counts the statistics itself.
+    # No cron line for stats_collect.py any more (the service counts the
+    # statistics itself), and the round that took the old one out says how.
+    assert cron == {"/var/log/iptv-sync.log"}
     assert "/stats_collect\\.py/d" in deploy[deploy.rindex("<<'LOGS'") - 6000:]
-    cron -= {"/var/log/iptv-stats.log"}
+    assert "iptv.dope.rs-stats.log" not in "".join(
+        line for line in deploy.splitlines(True) if line.startswith(("install ", "echo ")))
     assert written == {"/var/log/nginx/iptv.dope.rs-dl-counts.log"}
     assert set(kept) == written | {service} | cron
     for path in written:                         # daily, the day before kept as it is for the reader

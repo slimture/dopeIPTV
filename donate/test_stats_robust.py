@@ -181,7 +181,7 @@ def test_a_day_keeps_no_more_visits_than_a_day_may():
     day = _json(root, "stats.json")["days"][TODAY]
     assert len(_json(root, "visits", TODAY + ".json")) == 1000
     import sketch
-    assert abs(sketch.count(sketch.decode(_json(root, "sketches.json")[TODAY]["u"])) - 1000) <= 5
+    assert abs(sketch.count(sketch.decode(sc.sketches_now()[TODAY]["u"])) - 1000) <= 5
     assert day["views"] == 1300 and day["visitors"] == 1000 and day["capped"] == 300
     # A visitor already there goes on being counted; a download past the
     # limit is the day's, with no visit of its own.
@@ -277,8 +277,9 @@ def test_what_the_run_writes_is_the_services_alone_to_read():
     def mode(*path: str) -> int:
         return stat.S_IMODE(os.stat(os.path.join(stats, *path)).st_mode)
     assert mode() == 0o700 and mode("visits") == 0o700
-    for name in ("stats.json", "state.json", "sketches.json", os.path.join("visits", TODAY + ".json")):
+    for name in ("stats.json", "state.json", os.path.join("visits", TODAY + ".json")):
         assert mode(name) == 0o600, name
+    assert not os.path.exists(os.path.join(stats, "sketches.json")), "the sketches: never on the disk"
     # No key, no list of visitors' marks: nothing on disk leads back to one.
     for gone in ("visitor-keys.json", "uniques.json", "kinds.json"):
         assert not os.path.exists(os.path.join(stats, gone)), gone

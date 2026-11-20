@@ -851,7 +851,7 @@
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
   // How long single visits are kept (donate.py: STATS_VISITS_DAYS), in words.
   function keptFor() {
-    const n = (data && data.visits_days) || 30;
+    const n = (data && data.visits_days) || 14;
     return n < 60 ? n + " days" : Math.round(n / 30.44) + " months";
   }
   // From iOS 26 Safari says iOS 18 for every newer system; its own version is
@@ -878,32 +878,6 @@
     if (showDay) { cell.append(mk("span", "d", dayFmt.format(when))); }
     cell.append(document.createTextNode(clock.format(when)));
     return cell;
-  }
-  // A visit kept only anonymously (after STATS_VISITS_DAYS): its day, no
-  // time of day and no visitor - what stats_collect.py's anonymous() keeps.
-  function anonRow(a) {
-    const row = mk("details", "visit with-day anon" + (a.kind === "robot" ? " robot" : ""));
-    const sum = mk("summary");
-    const cell = mk("span", "v-time");
-    cell.append(mk("span", "d", dayFmt.format(day(a.day))));
-    sum.append(cell,
-      mk("span", "v-where", flag(a.country) + countryName(a.country)),
-      mk("span", "v-what", [a.browser, a.os, a.device].filter(Boolean).join(" · ")),
-      mk("span", "v-from", a.channel ? a.channel + (a.site ? " · " + a.site : "") : (a.downloaded ? "Straight to a download" : "")),
-      mk("span", "v-pages", (a.pages ? a.pages + (a.pages === 1 ? " page" : " pages") : "") +
-         (a.timed ? " · about " + duration(a.time) : a.pages ? " · time unknown" : "")));
-    const tags = mk("span", "v-tags");
-    if (a.kind === "robot") { tags.append(badge("Likely robot", "robot")); }
-    if (a.returning) { tags.append(badge("Returning")); }
-    if (a.downloaded) { tags.append(badge("Downloaded", "good")); }
-    if (a.donate) { tags.append(badge("Opened donate", "soft-heart")); }
-    sum.append(tags);
-    row.append(sum);
-    const body = mk("div", "v-body");
-    body.append(mk("p", "muted", "Kept without details after " + keptFor() + ": no time of day and no visitor, " +
-                   "the time rounded to ten seconds."));
-    row.append(body);
-    return row;
   }
   function visitRow(v, showDay, fromVisitor) {
     const row = mk("details", "visit" + (v.kind === "robot" ? " robot" : "") + (showDay ? " with-day" : ""));
@@ -1258,18 +1232,16 @@
     const ups = logList.filter(isUpdate).length;
     const counted = logList.filter((v) => v.kind !== "robot" && !isUpdate(v));
     const robots = logList.filter((v) => v.kind === "robot").length;
-    const anon = counted.filter((v) => v.anon).length;
-    const people = new Set(counted.filter((v) => !v.anon).map((v) => v.id)).size;
+    const people = new Set(counted.map((v) => v.id)).size;
     let span = "";
     if (f) {
-      const kept = (data && data.visits_days) || 30;
+      const kept = (data && data.visits_days) || 14;
       span = !days || days > kept ? " in the last " + keptFor() + " (single visits are kept that long)"
                                   : " in the last " + days + " days";
     }
     const visitsText = counted.length || !ups
       ? num.format(counted.length) + (counted.length === 1 ? " visit" : " visits") +
-        (anon ? " \u00b7 " + num.format(anon) + " kept without details"
-              : " by " + num.format(people) + (people === 1 ? " visitor" : " visitors"))
+        " by " + num.format(people) + (people === 1 ? " visitor" : " visitors")
       : "No visits";
     $("day-sum").textContent = (f ? f.label + " \u00b7 " : "") + visitsText + span +
       (ups ? " · " + num.format(ups) + (ups === 1 ? " app update" : " app updates") : "") +
@@ -1289,7 +1261,7 @@
     const list = showRobots ? logList : logList.filter((v) => v.kind !== "robot");
     const none = f ? "No visits kept for this." : "No visits this " + logSpan + ".";
     const many = !!f || logSpan !== "day";
-    const row = (v) => (isUpdate(v) ? updateRow(v, many) : v.anon ? anonRow(v) : visitRow(v, many));
+    const row = (v) => (isUpdate(v) ? updateRow(v, many) : visitRow(v, many));
     const LT = window.LogTools, shownFor = f ? "group" : logSpan;
     if (LT) { LT.bar($("log-tools"), list, shownFor, drawLog); }
     $("visit-list").replaceChildren(...(!list.length ? [mk("p", "empty", robots ? "Only likely robots." : none)]
