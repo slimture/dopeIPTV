@@ -55,6 +55,28 @@ def _classes() -> dict[str, Any]:
         class ResponseTooLarge(real.exceptions.RequestException):
             """An answer past its ceiling: not read further."""
 
+        class RedirectRefused(real.exceptions.RequestException):
+            """A redirect core/dest_guard.py does not let on: not followed."""
+
+        from urllib3.connection import HTTPConnection, HTTPSConnection
+        from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+
+        from . import dest_guard
+
+        class _Http(HTTPConnection):
+            def _new_conn(self) -> Any:
+                return dest_guard.check_peer(self, super()._new_conn())
+
+        class _Https(HTTPSConnection):
+            def _new_conn(self) -> Any:
+                return dest_guard.check_peer(self, super()._new_conn())
+
+        class _HttpPool(HTTPConnectionPool):
+            ConnectionCls = _Http
+
+        class _HttpsPool(HTTPSConnectionPool):
+            ConnectionCls = _Https
+
         class _Counted:
             """An answer's body that ends the read past *limit* bytes."""
 
@@ -107,6 +129,12 @@ def _classes() -> dict[str, Any]:
             #: The session's own ceiling, where it says one.
             max_response: int | None = None
 
+            def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+                # Each connection is looked at once it is made, before a
+                # byte is sent (core/dest_guard.py: where a name may land).
+                super().init_poolmanager(*args, **kwargs)
+                self.poolmanager.pool_classes_by_scheme = {"http": _HttpPool, "https": _HttpsPool}
+
             def send(self, request: Any, stream: bool = False, *args: Any, **kwargs: Any) -> Any:
                 r = super().send(request, stream, *args, **kwargs)
                 if type(r) is real.Response:
@@ -142,6 +170,22 @@ def _classes() -> dict[str, Any]:
                     adapter.max_response = self._max_response
                 super().mount(prefix, adapter)
 
+            def get_redirect_target(self, resp: Any) -> Any:
+                # Every redirect requests would follow - and the one it
+                # only notes when a caller follows them by hand - is
+                # looked at first (core/dest_guard.py).
+                target = super().get_redirect_target(resp)
+                if target:
+                    nxt = real.compat.urljoin(resp.url or "", target)
+                    why = dest_guard.redirect_refusal(resp.url or "", nxt)
+                    if why:
+                        try:
+                            resp.close()
+                        except Exception:
+                            pass
+                        raise RedirectRefused(f"a redirect to {why} - not followed")
+                return target
+
         def request(method: str, url: str, **kwargs: Any) -> Any:
             with Session() as session:
                 return session.request(method=method, url=url, **kwargs)
@@ -160,6 +204,7 @@ def _classes() -> dict[str, Any]:
         verbs = ("get", "post", "put", "patch", "delete", "head", "options")
         _made.update(Session=Session, session=Session, request=request,
                      CappedAdapter=CappedAdapter, ResponseTooLarge=ResponseTooLarge,
+                     RedirectRefused=RedirectRefused,
                      Response=Response, **{m: _verb(m) for m in verbs})
         # requests' own, as they were when it was imported: one replaced
         # since (a test's stand-in for the network) is the one to call.
@@ -171,7 +216,7 @@ def _classes() -> dict[str, Any]:
 _POSITIONAL = {"get": ("params",), "post": ("data", "json"), "put": ("data",), "patch": ("data",)}
 #: What this stand-in answers itself; every other name is requests' own.
 _OWN = frozenset(("Session", "session", "request", "get", "post", "put", "patch", "delete",
-                  "head", "options", "ResponseTooLarge"))
+                  "head", "options", "ResponseTooLarge", "RedirectRefused"))
 
 
 def capped_adapter() -> Any:

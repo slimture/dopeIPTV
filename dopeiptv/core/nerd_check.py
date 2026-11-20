@@ -117,7 +117,7 @@ def check_request(url: str, user_agent: str = "", headers: dict[str, str] | None
                   secrets: list[str] | None = None, about_proxy: bool = False) -> Check:
     """Ask *url* the way the app would with these settings. *about_proxy*:
     the check is the proxy's (its own words when the proxy is what fails)."""
-    import requests
+    from ._lazy_requests import requests
     secrets = list(secrets or [])
     hdrs = dict(headers or {})
     if user_agent:

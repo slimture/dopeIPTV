@@ -319,7 +319,7 @@ def check_archive(url: str, user_agent: str = "", headers: dict[str, str] | None
     """Ask the archive address as the app's probe does (the first bytes,
     with the source's user agent, headers and proxy) and say what came
     back. *channel*: whose archive it is, for the line."""
-    import requests
+    from ._lazy_requests import requests
     secrets = list(secrets or [])
     hdrs = dict(headers or {})
     if user_agent:

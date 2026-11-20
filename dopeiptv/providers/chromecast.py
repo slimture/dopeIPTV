@@ -120,6 +120,7 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
     no worse than before.
     """
     try:
+        from ..core import dest_guard
         from ..core._lazy_requests import requests
         # Ask for the redirect only - never open the stream itself. Fetching
         # it (allow_redirects=True) made the panel reset the connection: it
@@ -145,7 +146,16 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
                 r.close()
                 break
             r.close()
-            final = requests.compat.urljoin(final, loc)
+            nxt = requests.compat.urljoin(final, loc)
+            # Each hop as the app's own requests take one (core/dest_guard):
+            # a provider's redirect never sends this request to this
+            # computer, a link-local host or - from the internet - the home
+            # network. Refused, the receiver is handed what was asked for.
+            why = dest_guard.redirect_refusal(final, nxt)
+            if why:
+                log.warning("cast: a redirect to %s was not followed", why)
+                return url, None
+            final = nxt
         if final != url:
             log.info("cast: resolved redirect -> %s", final)
         # text/html is the panel's error page, never a media type - ignore it.

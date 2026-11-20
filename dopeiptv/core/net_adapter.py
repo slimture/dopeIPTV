@@ -19,7 +19,7 @@ import socket
 import threading
 from typing import Any, Callable
 
-from . import cert_pin, net_route
+from . import cert_pin, dest_guard, net_route
 from .net_route import Route
 
 
@@ -35,10 +35,10 @@ def _classes(route: Route, resolve: bool) -> dict[str, type]:
         host = str(conn.host)
         if (not resolve or getattr(conn, "_tunnel_host", None) or getattr(conn, "proxy", None)
                 or not route.changes(host, conn.port, "http")):
-            return base._new_conn(conn)
+            return dest_guard.check_peer(conn, base._new_conn(conn))
         try:
-            return net_route.open_connection(route, host, conn.port, conn.timeout,
-                                             conn.source_address, conn.socket_options)
+            return dest_guard.check_peer(conn, net_route.open_connection(
+                route, host, conn.port, conn.timeout, conn.source_address, conn.socket_options))
         except (socket.timeout, TimeoutError) as e:
             raise ConnectTimeoutError(conn, f"Connection to {host} timed out. "
                                             f"(connect timeout={conn.timeout})") from e
@@ -147,7 +147,7 @@ MAX_SESSIONS = 8
 
 def session_for(route: Route) -> Any:
     """A session of its own for *route* (kept, so connections are reused)."""
-    import requests
+    from ._lazy_requests import requests
     with _lock:
         s = _sessions.get(route)
         if s is None:

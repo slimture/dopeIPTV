@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from dopeiptv.core import cert_pin, doh, live_latency, nerd, net_adapter, net_bridge, net_route
+from dopeiptv.core import cert_pin, dest_guard, doh, live_latency, nerd, net_adapter, net_bridge, net_route
 from dopeiptv.core.net_route import Route
 
 TS = (Path(__file__).parent / "data" / "tiny.ts").read_bytes()
@@ -37,11 +37,19 @@ def on(**kw) -> nerd.Nerd:
     return nerd.Nerd(S(nerd_enabled="true", **kw))
 
 
+_PEER_REFUSAL = dest_guard.peer_refusal
+
+
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
     # The test machine's own proxy would take the requests made here.
     for k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
         monkeypatch.delenv(k, raising=False)
+    # The servers here are on this computer under names own DNS gives them
+    # (provider.example -> 127.0.0.1): exactly what core/dest_guard.py
+    # refuses a real source, so it is set aside for these tests -
+    # test_own_dns_that_answers_this_computer_is_refused checks it here.
+    monkeypatch.setattr(dest_guard, "peer_refusal", lambda host, peer: "")
     doh.clear_cache()
     yield
     nerd.install(None)
@@ -386,6 +394,21 @@ def test_requests_connect_to_the_address_own_dns_gives_and_keep_the_name(servers
     assert r.status_code == 200 and r.content == TS
     assert origin.requests[0]["host"] == f"provider.example:{origin.port}"
     assert any(a[0] == "wire" for a in dns.asked)
+
+
+def test_own_dns_that_answers_this_computer_is_refused(servers, monkeypatch):
+    """A name of the internet that own DNS answers with this computer's
+    address (DNS rebinding, by the provider's own DNS) is not connected to:
+    not a byte reaches the service there."""
+    import requests
+    monkeypatch.setattr(dest_guard, "peer_refusal", _PEER_REFUSAL)
+    dns = servers(FakeDoh, {"provider.example": ["127.0.0.1"]})
+    origin = servers(Origin)
+    s = requests.Session()
+    assert net_adapter.mount(s, Route(servers=(dns.url,)))
+    with pytest.raises(requests.exceptions.ConnectionError):
+        s.get(f"http://provider.example:{origin.port}/player_api.php", timeout=5)
+    assert origin.requests == []
 
 
 def test_a_pinned_certificate_and_only_that_one(servers, tmp_path):

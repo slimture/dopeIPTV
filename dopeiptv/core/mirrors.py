@@ -324,7 +324,7 @@ def probe(address: str, kind: str, source: dict | None = None, user_agent: str =
     Xtream server its player_api.php with the source's login, a playlist its
     first bytes, a portal its own page. (answers, HTTP status or None, a
     line for the details)."""
-    import requests
+    from ._lazy_requests import requests
     s = source or {}
     if kind == "xtream":
         url = f"{normalize(address)}/player_api.php?" + urlencode(
