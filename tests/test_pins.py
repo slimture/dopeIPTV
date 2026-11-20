@@ -241,7 +241,7 @@ def _window(tmp_path, monkeypatch, answers):
     asked: list[str] = []
     typed = list(answers)
 
-    def ask(_parent, _title, text):
+    def ask(_parent, _title, text, longest=8):
         asked.append(text)
         return typed.pop(0)
     monkeypatch.setattr(profiles_ui, "ask_pin", ask)

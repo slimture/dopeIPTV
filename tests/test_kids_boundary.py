@@ -15,7 +15,7 @@ from dopeiptv.ui import profiles_ui
 from dopeiptv.ui.profiles_ui import ProfileDialog
 
 asked = []
-profiles_ui.ask_pin = lambda parent, title, text: asked.append(text) or answer[0]
+profiles_ui.ask_pin = lambda parent, title, text, longest=8: asked.append(text) or answer[0]
 answer = [None]
 started = []
 
