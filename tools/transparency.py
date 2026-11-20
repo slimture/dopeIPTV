@@ -152,7 +152,7 @@ CODE: dict[str, list[dict]] = {
                   {"repo": "site", "path": "deploy/iptv_donate",
                    "from": r"^: \$\{iptv_donate_enable", "to": r"^\}$"},
                   {"repo": "site", "path": "donate/donate.py",
-                   "names": ["SOCKET_GROUP", "SOCKET_OPEN", "SocketNotPrivate", "open_to_nginx", "main"]}]},
+                   "names": ["SOCKET_GROUP", "SocketNotPrivate", "open_to_nginx", "main"]}]},
         {"id": "nolog", "repo": "site", "path": _PROXY, "nginx": ["server > access_log off", "server > error_log"],
          "with": [{"repo": "site", "path": _OLD_PROXY, "nginx": ["server > access_log off", "server > error_log"]},
                   {"repo": "site", "path": _CONTENT, "nginx": ["server > access_log off", "server > error_log"]},

@@ -100,11 +100,9 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             iptv_donate_socket_group, names the same one).
                             Where it cannot be - no such group here, or one
                             this user may not give - the service does not
-                            start, and says why.
-    SOCKET_OPEN             yes: only for a machine without such a group (a
-                            developer's) - the socket is then 0666, any user
-                            here may connect, and the start line says so.
-                            Anything else, or not set: never open.
+                            start, and says why. On a developer's machine
+                            name a group of one's own (``id -gn``). The
+                            socket is never open to every user.
     ADMIN_USERS             only until the new sign-in has its first admin,
                             and only with nginx's old password prompt still
                             in front: who of it may open /admin/. Empty (the
@@ -1946,11 +1944,9 @@ LISTEN = CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")
 #: socket's folder iptv:www 0750 with the same group
 #: (iptv_donate_socket_group in rc.conf; the two name one group).
 SOCKET_GROUP = CONF.get("SOCKET_GROUP", "www")
-#: A machine without that group (a developer's) may say SOCKET_OPEN = yes:
-#: the socket is then 0666 and open to every user here. Nothing else opens
-#: it - not set, the service does not start on a socket it cannot keep to
-#: nginx's group (open_to_nginx).
-SOCKET_OPEN = CONF.get("SOCKET_OPEN", "").strip().lower() == "yes"
+#: Nothing opens the socket wider: the service does not start on one it
+#: cannot keep to that group (open_to_nginx). A developer's machine names a
+#: group of its own user's.
 
 
 def _gb(n: int) -> str:
@@ -2084,20 +2080,16 @@ class SocketNotPrivate(Exception):
     service does not start (main). Its words say why, for the log."""
 
 
-def open_to_nginx(path: str, group: str = SOCKET_GROUP, open_ok: bool = SOCKET_OPEN) -> str:
+def open_to_nginx(path: str, group: str = SOCKET_GROUP) -> str:
     """The socket at *path* for nginx's workers and this service alone:
     its group *group*, mode 0660. In the rc file's folder (iptv:www 0750) a
     new file already has the folder's group, as FreeBSD gives every new
     file; elsewhere it is given it. Where the group does not exist, or this
     user may not give it (it is not one of the group's), it fails closed:
     SocketNotPrivate, the socket as it was made (0660, never wider), and
-    the service does not start. Only *open_ok* (SOCKET_OPEN = yes, for a
-    machine without such a group) makes it 0666 then - nginx's workers
-    reach it whoever they run as - with its folder, if it is this service's
-    own, one the others can only pass through (0711): nothing else put in
-    it, nothing listed. What was done, for the start line."""
+    the service does not start - there is no way to open it to every user.
+    What was done, for the start line."""
     import grp
-    import stat
     try:
         gid = grp.getgrnam(group).gr_gid if group else None
     except KeyError:
@@ -2116,22 +2108,10 @@ def open_to_nginx(path: str, group: str = SOCKET_GROUP, open_ok: bool = SOCKET_O
         why = f"no group {group!r} here"
     else:
         why = "SOCKET_GROUP is empty"
-    if not open_ok:
-        raise SocketNotPrivate(
-            f"the socket {path} cannot be nginx's and this service's alone: {why}. SOCKET_GROUP in "
-            f"{CONFIG_FILE} names the group nginx's workers run as, the same as the rc file's "
-            "iptv_donate_socket_group; on a machine without one, SOCKET_OPEN = yes there lets any "
-            "user here connect")
-    os.chmod(path, 0o666)
-    folder = os.path.dirname(os.path.abspath(path))
-    try:
-        st = os.stat(folder)
-        want = (stat.S_IMODE(st.st_mode) & 0o700) | 0o011
-        if st.st_uid == os.geteuid() and stat.S_IMODE(st.st_mode) != want:
-            os.chmod(folder, want)
-    except OSError:
-        pass
-    return f"0666: {why}, so any user here may connect (SOCKET_OPEN = yes)"
+    raise SocketNotPrivate(
+        f"the socket {path} cannot be nginx's and this service's alone: {why}. SOCKET_GROUP in "
+        f"{CONFIG_FILE} names the group nginx's workers run as, the same as the rc file's "
+        "iptv_donate_socket_group (on a developer's machine, a group of its own user's)")
 
 
 def _connection():

@@ -1414,8 +1414,7 @@ or for the admin page. Written for the dopeiptv jail (above).
   socket is 0666 as before - nginx still reaches it whoever it runs as -
   in a folder of the service's own that others can only pass through
   (0711), and the start line says so (since "Fail closed, answers in
-  memory, no links followed" the service does not start then, unless its
-  config says `SOCKET_OPEN = yes`). In the dopeiptv jail only nginx
+  memory, no links followed" the service does not start then). In the dopeiptv jail only nginx
   (`www`) and the service (`iptv`) run, so the socket is theirs alone.
 - **The logs keep less of the address asked for.** A page view (`/`,
   `/help/`) keeps its path, never its query - `?fbclid=`, `?utm_...`,
@@ -1605,9 +1604,9 @@ Written for the dopeiptv jail.
   as, ...` - and leaves no socket behind; before, it went on with the
   socket 0666, open to every user in the jail. daemon(8) starts it again
   every 5 seconds, so the line comes back until the config is right.
-  Only `SOCKET_OPEN = yes` in `iptv-donate.conf` - for a machine without
-  such a group, a developer's - keeps the old way, and the start line
-  then ends `so any user here may connect (SOCKET_OPEN = yes)`. In the
+  Nothing opens it to every user: there is no setting for that (a
+  developer's machine names a group of its own user's in `SOCKET_GROUP`;
+  a `SOCKET_OPEN = yes` left in a config does nothing). In the
   dopeiptv jail `www` is there and the socket is 0660 `iptv:www` already:
   nothing changes but the day the group is gone.
 - **No answer in a temporary file.** A request's body has been held in
