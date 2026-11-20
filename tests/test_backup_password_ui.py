@@ -235,6 +235,8 @@ def unlock_exec(dlg):
 
 dialogs.RestoreBackupDialog.exec = restore_exec
 dialogs.UnlockBackupDialog.exec = unlock_exec
+asked_plain = []
+type(w)._backup_without_password_ok = lambda self, parent: asked_plain.append(1) or True
 
 def run(self):
     shell = self.findChild(SettingsShell)
@@ -253,6 +255,13 @@ def run(self):
     back.click()
     assert said[-1] == "WARN " + tr("backup_pw_mismatch") and not os.path.exists(out)
     assert not saved                                         # not even asked where
+    # Too short: said, nothing written.
+    pw.setText("short")
+    again.setText("short")
+    back.click()
+    assert said[-1] == "WARN " + tr("backup_pw_short", n=backup.PASSWORD_MIN), said[-1]
+    assert not os.path.exists(out) and not saved
+    pw.setText(PW)
     # The same: written encrypted, the fields emptied.
     again.setText(PW)
     back.click()
@@ -263,6 +272,7 @@ def run(self):
     assert saved[-1].endswith(".json")                        # the same name as ever
     assert pw.text() == "" and again.text() == "" and not again.isEnabled()
     assert said[-1].startswith(tr("backup_done_locked", what="", path="").split("\n")[0]), said[-1]
+    assert asked_plain == [], "a backup with a password is not asked about"
     # Restored: the password asked (a wrong one first), what it holds shown.
     restore.click()
     assert shown and tr("backup_count", what=tr("backup_kind_sources"), n=1) in shown[-1].holds.text()
@@ -270,6 +280,7 @@ def run(self):
     # Without a password: the file as it always was.
     os.remove(out)
     back.click()
+    assert asked_plain == [1], "made only once the person said so"
     doc = json.load(open(out, encoding="utf-8"))
     assert doc["dopeiptv_backup"] == 1 and json.loads(doc["stores"]["main"]["playlists"])[0]["password"] == "pl-secret"
     assert said[-1].startswith(tr("backup_done", what="", path="").split("\n")[0])

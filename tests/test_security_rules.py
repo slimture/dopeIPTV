@@ -252,6 +252,7 @@ OWN_WORDS = {
     ("ui/mw_settings.py", "tr('pl_export_failed', error=exc)"): "the file the person picked",
     ("ui/mw_settings.py", "done"): "backup_done's counts and the file the person picked",
     ("ui/mw_settings.py", "tr('pl_import_done', n=added)"): "a number",
+    ("ui/mw_settings.py", "tr('backup_pw_short', n=backup.PASSWORD_MIN)"): "a number",
 }
 
 

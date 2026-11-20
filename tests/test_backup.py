@@ -583,6 +583,9 @@ def restore_exec(dlg):
 
 dialogs.RestoreBackupDialog.exec = restore_exec
 mw_settings.confirm = lambda *a, **k: True
+# A backup without a password is asked about first; here it is wanted.
+asked_plain = []
+type(w)._backup_without_password_ok = lambda self, parent: asked_plain.append(1) or True
 closed = []
 w.close = lambda: closed.append(1) or True
 
@@ -596,6 +599,7 @@ def run(self):
     assert tr("backup_btn") not in [b.text() for b in plists.findChildren(QPushButton)]
     # Back up: one file, everything but what stays out.
     mine[tr("backup_btn")].click()
+    assert asked_plain == [1], "a backup without a password is asked about"
     doc = json.load(open(out, encoding="utf-8"))
     assert doc["dopeiptv_backup"] == 1 and "favorites_a" in doc["stores"]["main"]
     assert "window_geometry" not in doc["stores"]["main"]

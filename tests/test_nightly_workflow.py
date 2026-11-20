@@ -19,14 +19,21 @@ def test_the_release_workflow_can_be_called_with_a_nightly_version():
     # its token not left in the clone), and only for a nightly.
     checkouts = re.findall(r"      - uses: (actions/checkout@[0-9a-f]{40}   # v[\d.]+)\n", RELEASE)
     assert len(set(checkouts)) == 1
+    # Between the two, the yt-dlp release the ytdlp-pin job named.
+    pin = re.search(r"      - name: The yt-dlp release this build names \(the ytdlp-pin job\)\n"
+                    r"        uses: actions/download-artifact@[0-9a-f]{40}   # v[\d.]+\n"
+                    r"        with:\n          name: ytdlp-pin\n          path: dopeiptv/core\n", RELEASE)
+    assert pin is not None
     stamp = (f"      - uses: {checkouts[0]}\n"
              "        with:\n"
              "          persist-credentials: false\n"
+             + pin.group(0) +
              "      - name: Nightly version\n"
              "        if: ${{ inputs.nightly_version }}\n")
     assert RELEASE.count(stamp) == 5
-    # The sixth checkout is the checksums job's, which builds nothing.
-    assert RELEASE.count("uses: actions/checkout@") == len(checkouts) == 6
+    # The other two checkouts are the checksums job's and the ytdlp-pin
+    # job's, which build nothing.
+    assert RELEASE.count("uses: actions/checkout@") == len(checkouts) == 7
 
 
 def test_a_release_still_attaches_only_on_a_tag():
