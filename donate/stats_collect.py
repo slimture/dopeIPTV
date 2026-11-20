@@ -65,8 +65,11 @@ can open while the key is in its memory - so that a visit can go on after a
 restart. A payment is never on a visit, only in the day's count: the
 visit's time, country and browser beside the payment service's record of
 who paid would tie the two together. A visit ends after 30 minutes without
-a page. After STATS_VISITS_DAYS days (14) a day's visits are deleted, every
-one: no row of a visit is kept past them, in detail or made anonymous.
+a page. After STATS_VISITS_DAYS days (14, and never more: VISITS_DAYS_MAX)
+a day's visits are deleted, every one: no row of a visit is kept past them,
+in detail or made anonymous. Every run then looks for what should be gone
+(left_behind) and deletes it again; what cannot be deleted is said in the
+log and on the admin page until it is gone (TROUBLE, trouble).
 What stays of them for good is counts: the day's totals and lists, and per
 way in (search, social...) how many visits read more than one page, how
 long they looked, downloaded, opened the support dialog (funnel_of, the
@@ -88,9 +91,13 @@ stay).
 
 A visitor is a keyed hash (HMAC-SHA256) of address and browser, made in
 memory: the key is the month's own (MonthKeys) and in this service's
-memory alone - never in a file on a disk (STATS_KEYS_DIR may name a folder
-on a file system kept in memory, tmpfs, so a restart keeps them), a new one
-each month, forgotten two months on. So a visitor is the same visitor
+memory - never in a file on a disk (STATS_KEYS_DIR may name a folder on a
+file system kept in memory, tmpfs, so a restart of the service keeps them;
+a restart of the computer does not), a new one each month, forgotten two
+months on. What the system swaps out of memory reaches a disk only as the
+swap keeps it: the server's swap is encrypted with a key of its own that a
+restart forgets (DEPLOY.md), and swap_state asks the system - swap that
+keeps what it is given is said on the admin page and in the log. So a visitor is the same visitor
 within a month, and is told returning from the month before at the most.
 How many different visitors came over several days is kept in each day's
 sketches (sketch.py: every visitor, those not robots, the people) - two
@@ -148,6 +155,7 @@ library only.
 from __future__ import annotations
 
 import contextlib
+import errno
 import fcntl
 import glob
 import gzip
@@ -193,10 +201,14 @@ VISITS_DIR = os.path.join(STATS_DIR, "visits")
 #: days' counts and deleted (_old_rows_off).
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
 UPDATES_DIR = os.path.join(STATS_DIR, "updates")
+#: A day's visits in detail are kept this many days at most, whatever
+#: STATS_VISITS_DAYS says: the privacy policy promises 14, so a larger value
+#: is cut to it (said at the start, donate.start_statistics).
+VISITS_DAYS_MAX = 14
 try:
-    VISITS_DAYS = max(1, int(CONF.get("STATS_VISITS_DAYS", "14")))
+    VISITS_DAYS = min(VISITS_DAYS_MAX, max(1, int(CONF.get("STATS_VISITS_DAYS", "14"))))
 except ValueError:
-    VISITS_DAYS = 14
+    VISITS_DAYS = VISITS_DAYS_MAX
 #: The app's updates one by one, each at its hour, for the visitor log; the
 #: counts per day stay.
 UPDATES_DAYS = 30
@@ -727,8 +739,7 @@ def _sketches_off_disk(sketches: dict) -> None:
     for day, entry in _load(old, {}).items():
         if isinstance(entry, dict):
             sketches.setdefault(day, entry)
-    with contextlib.suppress(OSError):
-        os.unlink(old)
+    _gone(old)
 
 
 def keys_now(today: date | None = None) -> MonthKeys:
@@ -1677,6 +1688,7 @@ def collect(with_fetch: bool = False, lines: list | None = None) -> None:
         _updates_to_the_hour(state)
         _forget_old_updates(state)
         _forget_old(stats)
+        sweep_left(today)
         if sketches_path:
             _keep_sketches(sketches_path, sketches)
         _save(stats_path, stats)
@@ -1693,8 +1705,7 @@ def _migrate(state: dict, sketches: dict) -> None:
     a day's name for its visitor, its mark sealed, its times coarse)."""
     if state.get("kept_since") == 2:
         return
-    with contextlib.suppress(OSError):
-        os.unlink(os.path.join(STATS_DIR, "visitor-keys.json"))
+    _gone(os.path.join(STATS_DIR, "visitor-keys.json"))
     uniques_path = os.path.join(STATS_DIR, "uniques.json")
     kinds_path = os.path.join(STATS_DIR, "kinds.json")
     uniques, kinds = _load(uniques_path, {}), _load(kinds_path, {})
@@ -1709,8 +1720,7 @@ def _migrate(state: dict, sketches: dict) -> None:
                 entry["n"] = sketch.encode(sketch.of(m for m in marks if m not in robots))
                 entry["p"] = sketch.encode(sketch.of(m for m in k.get("p") or () if isinstance(m, str)))
     for path in (uniques_path, kinds_path):
-        with contextlib.suppress(OSError):
-            os.unlink(path)
+        _gone(path)
     for f in glob.glob(os.path.join(VISITS_DIR, "*.json")):
         day = os.path.basename(f)[:10]
         try:
@@ -1820,10 +1830,8 @@ def _old_rows_off(stats: dict) -> None:
                         bool(a.get("downloaded")), bool(a.get("donate")))
         for day, funnel in counted.items():
             days[day]["funnel"] = funnel
-        with contextlib.suppress(OSError):
-            os.unlink(f)
-    with contextlib.suppress(OSError):
-        os.rmdir(ANON_DIR)
+        _gone(f)
+    _gone_folder(ANON_DIR)
 
 
 def _drop_payments(state: dict) -> None:
@@ -1953,8 +1961,7 @@ def _forget_old(stats: dict | None = None) -> None:
             continue
         if stats is not None and day in (stats.get("days") or {}):
             stats["days"][day]["funnel"] = funnel_of(_load_list(f))
-        with contextlib.suppress(OSError):
-            os.unlink(f)
+        _gone(f)
     if stats is not None:
         for day in sorted(stats.get("days") or {}):
             if day < cutoff:
@@ -1963,8 +1970,163 @@ def _forget_old(stats: dict | None = None) -> None:
     gone_updates = (datetime.now(timezone.utc).date() - timedelta(days=UPDATES_DAYS)).isoformat()
     for f in glob.glob(os.path.join(UPDATES_DIR, "*.json")):
         if os.path.basename(f)[:10] < gone_updates:
-            with contextlib.suppress(OSError):
-                os.unlink(f)
+            _gone(f)
+
+
+#: What should be gone but could not be deleted: {path: why}. Tried again
+#: on every run (_gone, sweep_left), said in the log once per path and on
+#: the admin page (trouble) until it is gone.
+TROUBLE: dict = {}
+
+
+def _gone(path: str) -> bool:
+    """*path* deleted - or, where that fails, noted in TROUBLE, said once
+    in the log and tried again on the next run (sweep_left). A file that is
+    not there is gone."""
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        if path not in TROUBLE:
+            print(f"[stats] could not delete {path} ({e.strerror or type(e).__name__}) - "
+                  "tried again on every run until it is gone", flush=True)
+        TROUBLE[path] = e.strerror or type(e).__name__
+        return False
+    TROUBLE.pop(path, None)
+    return True
+
+
+def _gone_folder(path: str) -> None:
+    """An emptied folder of before removed; one that still holds a file
+    stays until that file is gone (the file itself is in TROUBLE)."""
+    with contextlib.suppress(FileNotFoundError):
+        try:
+            os.rmdir(path)
+        except OSError as e:
+            if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
+                _gone(path)
+
+
+def left_behind(today: date | None = None) -> list:
+    """Every file that should no longer exist and still does: the keys,
+    marks and sketches kept on the disk before (visitor-keys.json,
+    uniques.json, kinds.json, sketches.json), the anonymous visits of before
+    (visits-anon), a day's visits past VISITS_DAYS and an update past
+    UPDATES_DAYS. Asked after every run, never assumed."""
+    today = today or datetime.now(timezone.utc).date()
+    out = [p for p in (os.path.join(STATS_DIR, n) for n in
+                       ("visitor-keys.json", "uniques.json", "kinds.json", "sketches.json"))
+           if os.path.lexists(p)]
+    out += sorted(glob.glob(os.path.join(ANON_DIR, "*")))
+    cutoff = (today - timedelta(days=VISITS_DAYS)).isoformat()
+    out += [f for f in sorted(glob.glob(os.path.join(VISITS_DIR, "*.json")))
+            if _is_day(os.path.basename(f)[:10]) and os.path.basename(f)[:10] < cutoff]
+    updates = (today - timedelta(days=UPDATES_DAYS)).isoformat()
+    out += [f for f in sorted(glob.glob(os.path.join(UPDATES_DIR, "*.json")))
+            if _is_day(os.path.basename(f)[:10]) and os.path.basename(f)[:10] < updates]
+    return out
+
+
+def _is_day(text: str) -> bool:
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
+def sweep_left(today: date | None = None) -> list:
+    """What left_behind finds deleted once more; what still stays is
+    returned (and in TROUBLE). What is no longer there is forgotten."""
+    for path in list(TROUBLE):
+        if not os.path.lexists(path):
+            TROUBLE.pop(path, None)
+    stays = [p for p in left_behind(today) if not _gone(p)]
+    _gone_folder(ANON_DIR)
+    return stays
+
+
+#: How long swap_state's answer is kept: swap is set up when a server
+#: starts, not while it runs.
+SWAP_TTL = 3600
+_SWAP: dict = {}
+
+
+def swap_listed(text: str) -> list:
+    """The devices in a swap listing - Linux's /proc/swaps or FreeBSD's
+    swapctl -l: a heading, then a device's path first on each line."""
+    return [line.split()[0] for line in text.splitlines()[1:]
+            if line.split() and line.split()[0].startswith("/")]
+
+
+def _swap_devices() -> list | None:
+    """The swap devices in use, as the system names them - None where it
+    cannot be asked. Linux's /proc/swaps, else FreeBSD's swapctl -l (a jail
+    reads it too)."""
+    try:
+        with open("/proc/swaps", encoding="utf-8") as f:
+            return swap_listed(f.read())
+    except OSError:
+        pass
+    try:
+        out = subprocess.run(["swapctl", "-l"], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return swap_listed(out.stdout)
+
+
+def _linux_encrypted(device: str) -> bool:
+    """Whether a Linux swap device keeps nothing readable after a restart:
+    zram (in memory) or a dm-crypt mapping (its uuid starts CRYPT-)."""
+    real = os.path.realpath(device)
+    name = os.path.basename(real)
+    if name.startswith("zram"):
+        return True
+    if not name.startswith("dm-"):
+        return False
+    try:
+        with open(f"/sys/block/{name}/dm/uuid", encoding="ascii") as f:
+            return f.read().startswith("CRYPT-")
+    except OSError:
+        return False
+
+
+def swap_state(now: float | None = None) -> dict:
+    """Whether what this service keeps in memory - the month keys, the
+    sketches, a folder in memory (STATS_KEYS_DIR) - could reach a disk
+    through the system's swap: {"state": ..., "plain": [devices]}.
+    "none": no swap. "encrypted": every swap device keeps nothing readable
+    once the computer restarts (FreeBSD's .eli with a one-time key, Linux's
+    dm-crypt or zram). "plain": a swap device that keeps what it is given -
+    said on the admin page and in the log (DEPLOY.md: encrypted swap).
+    "unknown": the system could not be asked."""
+    now = time.time() if now is None else now
+    if _SWAP and now - _SWAP.get("at", 0) < SWAP_TTL:
+        return dict(_SWAP["answer"])
+    devices = _swap_devices()
+    if devices is None:
+        answer: dict = {"state": "unknown", "plain": []}
+    elif not devices:
+        answer = {"state": "none", "plain": []}
+    else:
+        plain = [d for d in devices if not (d.endswith(".eli") or _linux_encrypted(d))]
+        answer = {"state": "plain" if plain else "encrypted", "plain": plain}
+    _SWAP.clear()
+    _SWAP.update(at=now, answer=answer)
+    return dict(answer)
+
+
+def trouble() -> list:
+    """What the admin page warns about: each file that should be gone and is
+    not, with why - and swap that keeps what it is given."""
+    out = [{"what": "delete", "path": p, "why": why} for p, why in sorted(TROUBLE.items())]
+    swap = swap_state()
+    if swap["state"] == "plain":
+        out.append({"what": "swap", "path": ", ".join(swap["plain"]), "why": "not encrypted"})
+    return out
 
 
 def collect_if_stale(seconds: int = 20) -> None:

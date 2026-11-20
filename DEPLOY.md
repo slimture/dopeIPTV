@@ -461,8 +461,8 @@ How it counts, so the numbers are honest:
   the key, never on a disk, since a visitor sets the same bits every day of
   its month - and once the month after has ended only as numbers
   (`uniques-months.json`). Single visits are kept 14 days
-  (`STATS_VISITS_DAYS`; a line in the config file overrides it - a longer
-  span keeps more that could point to one person), each naming its
+  (`STATS_VISITS_DAYS`; a line in the config file can shorten it, never
+  lengthen it - `VISITS_DAYS_MAX`, what the privacy policy promises), each naming its
   visitor for its day alone, its start to the half hour; then the day's
   visits are deleted, every one, and only its counts stay - per way in too
   (`funnel_of`) - with no name in its lists that fewer than five visitors
@@ -1912,3 +1912,116 @@ there too. Then from any other computer, as after every round:
 ```sh
 sh deploy/check-live.sh dopeiptv.org <the content jail's public-facing address>
 ```
+
+## The promises as the code keeps them (1.6.9 review, fifth round)
+
+The fifth review found that a few of the statistics' promises were kept by
+habit rather than by the code, and that the privacy policy still described
+how things were before. The code now keeps them, and says when it cannot.
+
+- **14 days, never more.** `STATS_VISITS_DAYS` can shorten how long a
+  day's visits are kept, never lengthen it: a larger value is cut to 14
+  (`VISITS_DAYS_MAX`), and the start line says so.
+- **Deleted, and looked at again.** After every run the service lists what
+  should be gone - the keys, marks and sketches of before on the disk, the
+  anonymous visits of before, a day's visits past 14 days, an update past
+  30 - and deletes it again (`left_behind`, `sweep_left`). What it cannot
+  delete it says in its log once and at the top of the admin page until it
+  is gone.
+- **Swap encrypted.** The month keys and the sketches are only in memory -
+  but the system may move memory out to swap. On this server swap is
+  encrypted with a one-time key that a reboot forgets (FreeBSD's `.eli`
+  swap). The service asks the system (`swap_state`): the start line says
+  `swap encrypted`, and swap that keeps what it is given is said at the top
+  of the admin page and in the start line.
+- **The error logs turned over.** nginx's `error.log` in both jails was
+  turned over by nothing: a rare line with an address stayed until removed
+  by hand. Both are now turned over every night with six days kept - a week
+  at the most.
+- **The privacy policy as it is.** The key and the sketches are in memory
+  (a file on a tmpfs where `STATS_KEYS_DIR` says so), a reboot forgets
+  them, the error logs are kept a week, and the statistics write no address
+  down - `donate/test_policy_text.py` fails on the old sentences.
+
+### This round's deploy (host)
+
+Swap first, on the host. `swapctl -l` lists the swap devices; each must end
+in `.eli`:
+
+```sh
+swapctl -l
+grep -n swap /etc/fstab
+```
+
+A device without `.eli` - `/dev/ada0p3`, say, or `/dev/mirror/swap` - gets
+it in `/etc/fstab` (`/dev/ada0p3.eli  none  swap  sw  0  0`): `swapon`
+then attaches it through geli with a one-time key of its own, which no disk
+keeps. Switch it over (`swapoff` needs the room in memory for what is
+swapped out now; at a quiet hour, or reboot instead):
+
+```sh
+swapoff /dev/ada0p3 && swapon /dev/ada0p3.eli
+swapctl -l
+jexec dopeiptv swapctl -l
+```
+
+The files and the service:
+
+```sh
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+service -j dopeiptv iptv_donate restart
+jexec dopeiptv grep "statistics:" /var/log/iptv-donate.log | tail -1
+```
+
+The line ends `..., keys in memory and /var/db/iptv-stats-keys, swap
+encrypted, visits kept 14 days`. `SWAP NOT ENCRYPTED` there means the step
+above is not done; `swap could not be asked` that the jail cannot read
+`swapctl -l` - then the host's answer above is the one to trust.
+
+The site's newsyslog file, whole - the content server's error log turned
+over at midnight, six days kept, nginx told to reopen it:
+
+```sh
+cat > /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'LOGS'
+/var/log/nginx/iptv.dope.rs-dl-counts.log    root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
+/var/log/nginx/error.log                     root:wheel     600  6     *    @T00 J     /var/run/nginx.pid 30
+/var/log/iptv-sync.log                       iptv:iptv      600  5     1024 *    JN
+/var/log/iptv-donate.log                     iptv:iptv      600  5     1024 *    J     /var/run/iptv_donate/iptv_donate.pid
+LOGS
+jexec dopeiptv sh -c 'newsyslog -nv 2>&1 | grep -e iptv -e error.log'
+```
+
+The proxy's error log the same, in a file of its own in the webproxy jail
+(its nginx's pid file where `jexec webproxy ls /var/run/nginx.pid` finds
+it):
+
+```sh
+mkdir -p /usr/local/bastille/jails/webproxy/root/usr/local/etc/newsyslog.conf.d
+cat > /usr/local/bastille/jails/webproxy/root/usr/local/etc/newsyslog.conf.d/nginx-error.conf <<'PROXYLOGS'
+/var/log/nginx/error.log                     root:wheel     600  6     *    @T00 J     /var/run/nginx.pid 30
+PROXYLOGS
+jexec webproxy sh -c 'newsyslog -nv 2>&1 | grep error.log'
+```
+
+Both dry runs list the error log, rotating nothing until midnight. Then from
+any other computer, as after every round:
+
+```sh
+sh deploy/check-live.sh dopeiptv.org <the content jail's public-facing address>
+```
+
+### Every log on the server
+
+| Log | Jail | What it holds | Kept | Mode |
+|---|---|---|---|---|
+| `/var/log/nginx/iptv.dope.rs-dl-counts.log` | dopeiptv | `/dl.php`: the method, the file's name and the protocol, the answer, and whether a browser, the app, a robot or nothing asked - no address, no time, no browser's name | turned over at midnight, the day before kept: two days at the most (`1 * @T00`) | 640 `www:iptv` (newsyslog makes it `root:iptv`, nginx's reopen gives it to its workers' user) |
+| `/var/log/nginx/error.log` | dopeiptv | the jail's nginx, the site's alone; `crit` only: what stops nginx - a file it cannot open, the service's socket gone or refused. Such a line names the request and the proxy's address, not the visitor's | turned over at midnight, six days kept: a week at the most (`6 * @T00`) | 600 |
+| `/var/log/nginx/error.log` | webproxy | the proxy's, shared with the other sites behind it; the site's servers write `crit` only - a TLS handshake nginx cannot make sense of, a worker out of files. There the address on a line is the visitor's | the same | 600 |
+| `/var/log/iptv-donate.log` | dopeiptv | the service's (daemon `-o`): its start line and set-up (swap's state, how long visits are kept), files it narrowed, a fault by its kind and file:line (never its words), Stripe's refusals in Stripe's fixed codes, a push that failed and the push service's host, an admin sign-in refused and why (an admin's name, never what was typed or from where), once a day how many sync copies, rooms, reports and modified builds' requests came and went, sync's space; the statistics' own lines - the country database fetched, how many lines could not be read or were dropped (a count, never a line), a day that held as many visits as a day may, a file of theirs that could not be deleted (its path). Never an address, a request or its path, nor anything a visitor sent | five old copies of up to 1 MB (`5 1024 *`): months, perhaps years | 600 `iptv` |
+| `/var/log/iptv-sync.log` | dopeiptv | `sync-releases.sh`'s - the release mirroring and page rendering: GitHub's release, each file fetched or already current, how many downloads counted (a number), the pages rendered, nightly.json | five old copies of up to 1 MB: months | 600 `iptv` |
+
+Beside them only FreeBSD's own (cron, messages, auth.log...), which hold
+nothing of a request. The statistics' lines are in the service's memory for
+a minute and then only as what `stats_collect.py` keeps; the content
+server's other requests none (`access_log off`), the proxy's servers for
+the site none, the service none of a request.

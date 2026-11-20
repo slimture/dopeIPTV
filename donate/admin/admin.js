@@ -683,6 +683,26 @@
     box.replaceChildren(row);
     if (list.length && P.ready) { box.append(mk("div", "muted devices", "Getting them: " + [...new Set(list)].join(", "))); }
   }
+  // What the statistics could not do as the privacy policy says
+  // (stats_collect.trouble): a file that should be gone and is not - tried
+  // again every run - and swap that keeps what it is given.
+  function statsTrouble() {
+    const T = data.trouble || [], warn = $("stats-warn");
+    warn.hidden = !T.length;
+    if (!T.length) { warn.textContent = ""; return; }
+    const files = T.filter((t) => t.what === "delete"), swap = T.find((t) => t.what === "swap");
+    const said = [];
+    if (files.length) {
+      said.push(files.length + (files.length === 1 ? " file that should be deleted is" : " files that should be deleted are") +
+        " still there (" + files.slice(0, 3).map((t) => t.path + ": " + t.why).join("; ") +
+        (files.length > 3 ? "; …" : "") + "). Tried again every run - delete by hand if it stays.");
+    }
+    if (swap) {
+      said.push("Swap is not encrypted (" + swap.path + "): what is kept in memory could reach the disk. See DEPLOY.md, encrypted swap.");
+    }
+    T.filter((t) => t.what === "check").forEach((t) => said.push("The statistics' own check failed (" + t.why + ")."));
+    warn.textContent = said.join(" ");
+  }
   // Settings sync (donate/sync.py): the space all the copies take together,
   // and a word at the top of the page past 80 % of it.
   function syncSpace() {
@@ -1481,7 +1501,7 @@
     const S = data.series, best = S.reduce((a, d, i) => (d.downloads > (S[a] || {}).downloads ? i : a), 0);
     $("n-downloads").textContent = num.format(T.downloads) + (T.downloads === 1 ? " download" : " downloads") +
       (T.downloads && S[best] ? " · most on " + pointLabel(S[best].date, best) : "");
-    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys(); syncSpace(); refusedBuilds();
+    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys(); syncSpace(); statsTrouble(); refusedBuilds();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
     $("kept").textContent = keptFor();
   }

@@ -692,13 +692,21 @@ def test_every_log_is_turned_over_and_readable_only_by_its_own():
     # No cron line for stats_collect.py any more (the service counts the
     # statistics itself), and the round that took the old one out says how.
     assert cron == {"/var/log/iptv-sync.log"}
-    assert "/stats_collect\\.py/d" in deploy[deploy.rindex("<<'LOGS'") - 6000:]
+    assert "/stats_collect\\.py/d" in deploy
     assert "iptv.dope.rs-stats.log" not in "".join(
         line for line in deploy.splitlines(True) if line.startswith(("install ", "echo ")))
     assert written == {"/var/log/nginx/iptv.dope.rs-dl-counts.log"}
-    assert set(kept) == written | {service} | cron
+    # nginx's error log too (fifth round): turned over every night, six days
+    # kept - a week at the most -, nginx told to reopen it. The proxy's the
+    # same, in a file of its own in the webproxy jail.
+    error = "/var/log/nginx/error.log"
+    assert set(kept) == written | {service} | cron | {error}
     for path in written:                         # daily, the day before kept as it is for the reader
         assert kept[path][3:] == ("1", "*", "@T00", "JP"), path
+    assert kept[error][1:] == ("root:wheel", "600", "6", "*", "@T00", "J"), kept[error]
+    proxy = re.findall(r"<<'PROXYLOGS'\n(.*?)\nPROXYLOGS\n", deploy, re.S)[-1]
+    assert [f[1:] for f in _ROTATION.findall(proxy)] == [kept[error][1:]]
+    assert "/usr/local/bastille/jails/webproxy/root/usr/local/etc/newsyslog.conf.d/" in deploy[deploy.rindex("<<'PROXYLOGS'") - 300:]
     # ...and every one, the error logs too, in the list of what each holds.
     table = deploy[deploy.rindex("### Every log on the server"):]
     table = table[:table.index("\n\n", table.index("|---"))]

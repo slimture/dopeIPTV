@@ -153,7 +153,7 @@ CODE: dict[str, list[dict]] = {
         {"id": "inbox", "repo": "site", "path": "donate/stats_inbox.py", "names": ["FRAME", "Inbox", "Receiver"],
          "with": [{"repo": "site", "path": "donate/donate.py", "names": ["start_statistics"]}]},
         {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest"]},
+         "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest", "swap_state"]},
         {"id": "sketch", "repo": "site", "path": "donate/sketch.py",
          "names": ["BITS", "spots", "add", "has", "count"]},
         {"id": "kept", "repo": "site", "path": "donate/stats_collect.py",
@@ -161,7 +161,8 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "site", "path": "donate/stats_collect.py",
                    "from": r"^    if ev in \(\"donate\", \"donated\"\):", "to": r"^        return$"}]},
         {"id": "anon", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["sketches_file", "freeze_months", "FUNNEL", "funnel_of", "FOLD", "fold_day", "_forget_old"]},
+         "names": ["sketches_file", "freeze_months", "FUNNEL", "funnel_of", "FOLD", "fold_day", "_forget_old",
+                   "_gone", "left_behind", "sweep_left"]},
     ],
     "webservers": [
         {"id": "path", "repo": "site", "path": _PROXY, "nginx": [_MAIN + " > location /"],

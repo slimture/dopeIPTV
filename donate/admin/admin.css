@@ -796,7 +796,7 @@ tr:last-child td { border-bottom: 0; }
 .sync-meter span { display: block; height: 100%; width: 0; background: var(--up); }
 .sync-meter span.warn { background: var(--down); }
 .sync-used { font-size: 13px; margin: 6px 0 0; }
-#sync-warn { margin: 0 0 12px; }
+#sync-warn, #stats-warn { margin: 0 0 12px; }
 .sk-row { flex-wrap: wrap; }
 .sk-out { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .sk-out:empty { display: none; }

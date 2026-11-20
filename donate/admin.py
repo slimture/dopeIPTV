@@ -219,6 +219,21 @@ def _sketches() -> dict:
     return now() if callable(now) else {}
 
 
+def _trouble() -> list:
+    """What the statistics could not do as the privacy policy says: a file
+    that should be gone and is not, swap that keeps what it is given
+    (stats_collect.trouble) - the page says it at the top."""
+    try:
+        import stats_collect
+    except ImportError:
+        return []
+    asked = getattr(stats_collect, "trouble", None)
+    try:
+        return asked() if callable(asked) else []
+    except Exception as e:  # noqa: BLE001 - the page all the same, and the reason said
+        return [{"what": "check", "path": "", "why": type(e).__name__}]
+
+
 class _Fields:
     """The days' sketches (stats_collect.py, sketch.py), each read once."""
 
@@ -417,6 +432,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         "step": step,
         "updated": stats.get("updated"),
         "geo": bool(stats.get("geo")),
+        "trouble": _trouble(),
         "today": {k: (per_day.get(today.isoformat()) or {}).get(k, 0) for k in ("views", "visitors")},
         "totals": totals,
         "judged": _judged(fields, range_days, per_day, frozen),

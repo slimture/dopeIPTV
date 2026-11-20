@@ -1326,7 +1326,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, admin.find(stats_dir, query.get("by", ""), query.get("value", "")[:200], days))
             body = admin.data(days, stats_dir, downloads_json, _secret(), API_VERSION)
             body["dl"] = admin.download_counts(stats_dir, downloads_json)
-            body["visits_days"] = int(CONF.get("STATS_VISITS_DAYS", "14") or 14)
+            try:
+                import stats_collect
+                body["visits_days"] = int(getattr(stats_collect, "VISITS_DAYS", 14))
+            except ImportError:
+                body["visits_days"] = 14
             try:
                 import analysis
                 body["help"] = analysis.help_questions(admin.SITE)
@@ -2182,8 +2186,16 @@ def start_statistics() -> str:
         raise SystemExit(0)
     if threading.current_thread() is threading.main_thread():
         signal.signal(signal.SIGTERM, stop)
+    swap = stats_collect.swap_state()
+    swap_said = {"none": "no swap", "encrypted": "swap encrypted",
+                 "plain": "SWAP NOT ENCRYPTED (" + ", ".join(swap["plain"]) + ") - see DEPLOY.md",
+                 "unknown": "swap could not be asked"}[swap["state"]]
+    asked = CONF.get("STATS_VISITS_DAYS", "14")
+    cut = f" (STATS_VISITS_DAYS {asked} cut to {stats_collect.VISITS_DAYS_MAX})" \
+        if asked.strip().isdigit() and int(asked) > stats_collect.VISITS_DAYS_MAX else ""
     print(f"[donate] statistics: lines from nginx at {path} ({how}), counted every {STATS_EVERY} s, "
-          f"keys {'in memory and ' + stats_collect.KEYS_DIR if stats_collect.keys_now().folder else 'in memory alone'}",
+          f"keys {'in memory and ' + stats_collect.KEYS_DIR if stats_collect.keys_now().folder else 'in memory alone'}, "
+          f"{swap_said}, visits kept {stats_collect.VISITS_DAYS} days{cut}",
           file=sys.stderr, flush=True)
     return how
 
