@@ -702,5 +702,6 @@
     "tip_pay": "השאירו טיפ של {amount}",
     "tip_apple": "השאירו טיפ עם Apple Pay",
     "tip_google": "שלמו עם Google Pay",
-    "tip_more": "רוצים לתת יותר? כתבו אל {email}"
+    "tip_more": "רוצים לתת יותר? כתבו אל {email}",
+    "tp_only_en": "הדף הזה קיים רק באנגלית ובשוודית – הנה הוא באנגלית."
 }

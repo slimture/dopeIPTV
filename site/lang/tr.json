@@ -702,5 +702,6 @@
     "tip_pay": "{amount} ile destek ol",
     "tip_apple": "Apple Pay ile destek ol",
     "tip_google": "Google Pay ile öde",
-    "tip_more": "Daha fazla destek olmak mı istiyorsunuz? {email} adresine yazın"
+    "tip_more": "Daha fazla destek olmak mı istiyorsunuz? {email} adresine yazın",
+    "tp_only_en": "Bu sayfa yalnızca İngilizce ve İsveççe – işte İngilizcesi."
 }

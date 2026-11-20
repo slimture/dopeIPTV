@@ -702,5 +702,6 @@
     "tip_pay": "Daj {amount} napiwku",
     "tip_apple": "Daj napiwek przez Apple Pay",
     "tip_google": "Zapłać przez Google Pay",
-    "tip_more": "Chcesz dać więcej? Napisz na {email}"
+    "tip_more": "Chcesz dać więcej? Napisz na {email}",
+    "tp_only_en": "Ta strona jest dostępna tylko po angielsku i szwedzku – oto wersja angielska."
 }

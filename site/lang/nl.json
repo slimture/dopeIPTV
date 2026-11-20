@@ -702,5 +702,6 @@
     "tip_pay": "Geef {amount} fooi",
     "tip_apple": "Geef een fooi met Apple Pay",
     "tip_google": "Betaal met Google Pay",
-    "tip_more": "Wil je meer geven? Schrijf naar {email}"
+    "tip_more": "Wil je meer geven? Schrijf naar {email}",
+    "tp_only_en": "Deze pagina is er alleen in het Engels en Zweeds – hier staat ze in het Engels."
 }

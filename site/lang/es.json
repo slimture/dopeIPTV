@@ -702,5 +702,6 @@
     "tip_pay": "Dar {amount} de propina",
     "tip_apple": "Dar propina con Apple Pay",
     "tip_google": "Pagar con Google Pay",
-    "tip_more": "¿Quieres dar más? Escribe a {email}"
+    "tip_more": "¿Quieres dar más? Escribe a {email}",
+    "tp_only_en": "Esta página solo está en inglés y sueco; aquí la tienes en inglés."
 }

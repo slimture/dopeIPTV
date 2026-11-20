@@ -702,5 +702,6 @@
     "tip_pay": "Gửi {amount} tiền tip",
     "tip_apple": "Gửi tiền tip bằng Apple Pay",
     "tip_google": "Thanh toán bằng Google Pay",
-    "tip_more": "Muốn gửi nhiều hơn? Hãy viết cho {email}"
+    "tip_more": "Muốn gửi nhiều hơn? Hãy viết cho {email}",
+    "tp_only_en": "Trang này chỉ có bằng tiếng Anh và tiếng Thụy Điển – đây là bản tiếng Anh."
 }

@@ -702,5 +702,6 @@
     "tip_pay": "Dar {amount} de gorjeta",
     "tip_apple": "Dar gorjeta com Apple Pay",
     "tip_google": "Pagar com Google Pay",
-    "tip_more": "Quer dar mais? Escreva para {email}"
+    "tip_more": "Quer dar mais? Escreva para {email}",
+    "tp_only_en": "Esta página só existe em inglês e sueco – aqui está ela em inglês."
 }

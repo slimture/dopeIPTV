@@ -702,5 +702,6 @@
     "tip_pay": "Beri tip {amount}",
     "tip_apple": "Beri tip dengan Apple Pay",
     "tip_google": "Bayar dengan Google Pay",
-    "tip_more": "Ingin memberi lebih? Tulis ke {email}"
+    "tip_more": "Ingin memberi lebih? Tulis ke {email}",
+    "tp_only_en": "Halaman ini hanya tersedia dalam bahasa Inggris dan Swedia – berikut versi bahasa Inggrisnya."
 }

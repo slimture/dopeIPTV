@@ -702,5 +702,6 @@
     "tip_pay": "Toa bakshishi ya {amount}",
     "tip_apple": "Toa bakshishi kwa Apple Pay",
     "tip_google": "Lipa kwa Google Pay",
-    "tip_more": "Ungependa kutoa zaidi? Tuandikie kwa {email}"
+    "tip_more": "Ungependa kutoa zaidi? Tuandikie kwa {email}",
+    "tp_only_en": "Ukurasa huu upo kwa Kiingereza na Kiswidi pekee – huu hapa kwa Kiingereza."
 }

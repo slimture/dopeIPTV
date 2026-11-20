@@ -702,5 +702,6 @@
     "tip_pay": "{amount} Trinkgeld geben",
     "tip_apple": "Mit Apple Pay Trinkgeld geben",
     "tip_google": "Mit Google Pay bezahlen",
-    "tip_more": "Möchtest du mehr geben? Schreib an {email}"
+    "tip_more": "Möchtest du mehr geben? Schreib an {email}",
+    "tp_only_en": "Diese Seite gibt es nur auf Englisch und Schwedisch – hier ist sie auf Englisch."
 }

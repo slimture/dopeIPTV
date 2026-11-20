@@ -702,5 +702,6 @@
     "tip_pay": "Laisser {amount} de pourboire",
     "tip_apple": "Laisser un pourboire avec Apple Pay",
     "tip_google": "Payer avec Google Pay",
-    "tip_more": "Vous souhaitez verser davantage ? Écrivez à {email}"
+    "tip_more": "Vous souhaitez verser davantage ? Écrivez à {email}",
+    "tp_only_en": "Cette page n'existe qu'en anglais et en suédois – la voici en anglais."
 }

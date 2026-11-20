@@ -702,5 +702,6 @@
     "tip_pay": "打赏 {amount}",
     "tip_apple": "用 Apple Pay 打赏",
     "tip_google": "用 Google Pay 支付",
-    "tip_more": "想多打赏一些？请发邮件至 {email}"
+    "tip_more": "想多打赏一些？请发邮件至 {email}",
+    "tp_only_en": "本页只有英文和瑞典文版本——以下为英文版。"
 }

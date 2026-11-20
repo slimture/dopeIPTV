@@ -702,5 +702,6 @@
     "tip_pay": "Lascia {amount} di mancia",
     "tip_apple": "Lascia una mancia con Apple Pay",
     "tip_google": "Paga con Google Pay",
-    "tip_more": "Vuoi dare di più? Scrivi a {email}"
+    "tip_more": "Vuoi dare di più? Scrivi a {email}",
+    "tp_only_en": "Questa pagina è solo in inglese e svedese: eccola in inglese."
 }

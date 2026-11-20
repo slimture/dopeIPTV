@@ -702,5 +702,6 @@
     "tip_pay": "{amount} 후원하기",
     "tip_apple": "Apple Pay로 후원하기",
     "tip_google": "Google Pay로 결제하기",
-    "tip_more": "더 후원하고 싶으신가요? {email}로 연락해 주세요"
+    "tip_more": "더 후원하고 싶으신가요? {email}로 연락해 주세요",
+    "tp_only_en": "이 페이지는 영어와 스웨덴어로만 제공됩니다. 영어로 보여 드립니다."
 }

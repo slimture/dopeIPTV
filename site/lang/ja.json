@@ -702,5 +702,6 @@
     "tip_pay": "{amount} のチップを贈る",
     "tip_apple": "Apple Pay でチップを贈る",
     "tip_google": "Google Pay で支払う",
-    "tip_more": "もっと贈りたい場合は {email} までご連絡ください"
+    "tip_more": "もっと贈りたい場合は {email} までご連絡ください",
+    "tp_only_en": "このページは英語とスウェーデン語のみです。英語版を表示しています。"
 }

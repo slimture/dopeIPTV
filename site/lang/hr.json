@@ -702,5 +702,6 @@
     "tip_pay": "Daj napojnicu od {amount}",
     "tip_apple": "Daj napojnicu putem Apple Pay",
     "tip_google": "Plati putem Google Pay",
-    "tip_more": "Želite dati više? Pišite na {email}"
+    "tip_more": "Želite dati više? Pišite na {email}",
+    "tp_only_en": "Ova stranica postoji samo na engleskom i švedskom – evo je na engleskom."
 }
