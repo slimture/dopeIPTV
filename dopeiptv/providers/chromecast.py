@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ipaddress
+import socket
 import threading
 import time
+from urllib.parse import urlsplit
 
 from ..core.log import log, redact_url
 from ..i18n import LocalizedError
@@ -97,6 +100,35 @@ def _log_playlist_head(response) -> None:
         log.debug("cast: playlist peek failed (%s)", e)
 
 
+def _safe_cast_probe_url(url: str, *, local_source: bool = False) -> bool:
+    """Reject probes redirected from Internet sources into private networks.
+
+    Explicitly configured literal LAN addresses may still be probed. DNS
+    checks mitigate private-address redirects, but do not pin the address
+    used by requests, so this is not a complete DNS-rebinding defense.
+    """
+    try:
+        parsed = urlsplit(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        if parsed.username is not None or parsed.password is not None:
+            return False
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        host = parsed.hostname
+        if local_source:
+            return True
+        try:
+            addresses = [ipaddress.ip_address(host.split("%", 1)[0])]
+        except ValueError:
+            addresses = [
+                ipaddress.ip_address(info[4][0].split("%", 1)[0])
+                for info in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+            ]
+        return bool(addresses) and all(addr.is_global for addr in addresses)
+    except (OSError, ValueError):
+        return False
+
+
 def _resolve_redirects(url: str) -> tuple[str, str | None]:
     """Follow the provider's redirects here, so the receiver is handed the
     address the stream actually lives at.
@@ -120,6 +152,16 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
     """
     try:
         from ..core._lazy_requests import requests
+        # An explicitly configured LAN IP is an intentional local source;
+        # external sources must not redirect preparation GETs to LAN services.
+        try:
+            initial_ip = ipaddress.ip_address(
+                (urlsplit(url).hostname or "").split("%", 1)[0])
+            local_source = not initial_ip.is_global
+        except ValueError:
+            local_source = False
+        if not _safe_cast_probe_url(url, local_source=local_source):
+            return url, None
         # Ask for the redirect only - never open the stream itself. Fetching
         # it (allow_redirects=True) made the panel reset the connection: it
         # costs one of the account's simultaneous connections, and this runs
@@ -135,6 +177,9 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
         read = 75 if ("/timeshift/" in url or "timeshift.php" in url) else 8
         final, ctype = url, ""
         for _ in range(4):          # follow a short chain, never a loop
+            if not _safe_cast_probe_url(final, local_source=local_source):
+                log.warning("cast: unsafe redirect destination blocked")
+                return url, None
             r = requests.get(final, headers=headers, timeout=(3.05, read),
                              allow_redirects=False, stream=True)
             loc = r.headers.get("Location")
@@ -144,7 +189,11 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
                 r.close()
                 break
             r.close()
-            final = requests.compat.urljoin(final, loc)
+            next_url = requests.compat.urljoin(final, loc)
+            if not _safe_cast_probe_url(next_url, local_source=local_source):
+                log.warning("cast: unsafe redirect destination blocked")
+                return url, None
+            final = next_url
         if final != url:
             log.info("cast: resolved redirect -> %s", final)
         # text/html is the panel's error page, never a media type - ignore it.
