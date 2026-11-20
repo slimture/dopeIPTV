@@ -115,10 +115,15 @@ WHOLE = [
      "Private viewing promises that nothing is kept or sent about what plays. Check every place that "
      "keeps or sends something about a playback - history, resume points, statistics, Trakt, Simkl, "
      "media servers, Discord, events, MQTT, the media controls, the remote API, TMDB lookups, the "
-     "rewind buffer on disk, logs - and whether each asks about that very playback.",
+     "rewind buffer, a cast's converter (its HLS segments and spool), recordings, subtitles, mpv's own "
+     "cache, logs - and whether each asks about that very playback and keeps nothing on a disk "
+     "(core/memory_safe.py: what counts as memory, swap included).",
      ["dopeiptv/core/privacy.py", "dopeiptv/ui/mw_privacy.py", "dopeiptv/ui/main_window.py",
       "dopeiptv/ui/mw_trakt.py", "dopeiptv/ui/mw_mpris.py", "dopeiptv/ui/mw_remote.py",
-      "dopeiptv/core/events.py", "dopeiptv/core/dvr_pool.py", "dopeiptv/providers/metadata.py"]),
+      "dopeiptv/core/events.py", "dopeiptv/core/dvr_pool.py", "dopeiptv/providers/metadata.py",
+      "dopeiptv/core/memory_safe.py", "dopeiptv/core/dvr_store.py", "dopeiptv/media/dvr_player.py",
+      "dopeiptv/providers/cast_bridge.py", "dopeiptv/providers/airplay_bridge.py",
+      "dopeiptv/ui/mw_cast.py", "dopeiptv/ui/mw_recording.py", "dopeiptv/ui/subtitle_search.py"]),
     ("build", "how a release is built, signed and checked",
      "Could someone who takes over a dependency, a GitHub Action, the website or the release key's "
      "storage get a changed build to users? What is pinned, what is checked, and what is only "
