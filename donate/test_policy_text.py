@@ -10,6 +10,7 @@ finds them too).
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -85,9 +86,13 @@ def test_the_key_is_said_to_be_in_memory_and_swap_encrypted():
         policy = _pages(lang)["legal/" + lang + "/privacy.html"]
         for w in words:
             assert w in policy, (lang, w)
+        # The page says it in plain words; how it is done is in its code.
         page = _pages(lang)["transparency/" + lang + ".html"]
-        assert "<code>swap_state</code>" in page and "<code>VISITS_DAYS_MAX</code>" in page, lang
-        assert "<code>left_behind</code>" in page, lang
+        assert {"en": "The key is only in memory", "sv": "Nyckeln finns bara i minnet"}[lang] in page, lang
+    with open(os.path.join(ROOT, "site", "transparency.json"), encoding="utf-8") as fh:
+        shown = "\n".join(p["code"] for blk in json.load(fh)["code"]["website"] for p in blk["parts"])
+    for name in ("def swap_state", "VISITS_DAYS_MAX", "def left_behind", "def sweep_left"):
+        assert name in shown, name
 
 
 if __name__ == "__main__":
