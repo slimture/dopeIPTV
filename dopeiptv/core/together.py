@@ -37,18 +37,12 @@ own delay): only the channel is shared.
 Who said it. Everyone in the room holds the room's key, so the key says
 only "someone in the room". Each member therefore makes an Ed25519 key
 pair for the room (core/ed25519.py) and its id is the first 20 bytes of
-SHA-256 of a label and the public key (member_of) - 40 hex, where an app
-up to 1.6.8 has 16 random hex. A message from a 40-hex id carries the public key ("pk") and, as the
-last field of its JSON, a signature ("sg") over the room id and the exact
-bytes before it; one whose key does not hash to its id or whose signature
-does not hold is dropped, so no member can speak as another. A 16-hex id
-is taken as before - an older app's, which ignores the two fields it does
-not know and so follows a newer one's messages too. (Such an older member
-can still be spoken for by another member: updating ends that.) An
-unsigned message never speaks for a key-bound id: not as its sender, nor
-as who chose the state it carries (Room.receive). Unsigned members are
-taken for one release of overlap only - an app of UNSIGNED_UNTIL or later
-refuses them - and the log says once per room that one is in it. Signing
+SHA-256 of a label and the public key (member_of) - 40 hex. Every
+message carries the public key ("pk") and, as the last field of its JSON,
+a signature ("sg") over the room id and the exact bytes before it; one
+whose key does not hash to its id or whose signature does not hold is
+dropped, and so is every unsigned one (an app up to 1.6.8, whose ids were
+16 random hex bound to nothing): no member can speak as another. Signing
 takes about 5 ms and checking about 3.5 ms of plain Python - every
 message is signed, on the link's threads, never the window's.
 
@@ -111,17 +105,16 @@ MAX_MEMBERS = 8
 WAIT = 25.0
 
 ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-#: A new room's code: 10 of the 31 characters, about 50 bits - read aloud in
-#: two groups of five. A code of 8 (from 1.6.7) still joins its room.
+#: A room's code: 10 of the 31 characters, about 50 bits - read aloud in
+#: two groups of five. 1.6.7's codes of 8 (about 40 bits, fewer rounds) join
+#: nothing: is_old_code says why one is refused.
 CODE_LEN = 10
 OLD_LEN = 8
 _SALT = b"dopeIPTV together v1"
 _AAD = b"dopeIPTV together v1"
 #: PBKDF2 rounds before HKDF: the code is short, and the relay knows the
-#: room id - each guess at a code costs it this much more. A code of the
-#: old length keeps its old rounds, so its room is the same room.
+#: room id - each guess at a code costs it this much more.
 STRETCH = 600_000
-OLD_STRETCH = 120_000
 FORMAT = 1
 #: A message's plain text is padded up to one of these, so the sizes the
 #: relay sees say little about what was sent.
@@ -138,14 +131,9 @@ STATUSES = ("ok", "miss", "idle", "load")
 NAME_MAX = 24
 TEXT_MAX = 120
 
-#: A member's id: 16 hex from an app up to 1.6.8 (random, bound to nothing),
-#: 40 hex from one with a key of its own (the hash of its public key).
-OLD_ID_LEN = 16
+#: A member's id: the hash of its public key (an app up to 1.6.8 had 16
+#: random hex, bound to nothing - never taken).
 ID_LEN = 40
-#: The first version that takes no unsigned member (an OLD_ID_LEN id): 1.6.9
-#: takes 1.6.8's for one release of overlap (tests/test_together.py fails
-#: once the app's version reaches this, so it is not forgotten).
-UNSIGNED_UNTIL = "1.7.0"
 _ID_CTX = b"dopeIPTV together member v1"
 _SIGN_CTX = b"dopeIPTV together signed v1"
 _SIG_HEAD = b',"sg":"'
@@ -186,17 +174,21 @@ def format_code(raw: str) -> str:
 def parse_code(text: str) -> str | None:
     """A code as typed or pasted (any case, any separators) in its shown
     form, or None for anything that is not one."""
-    s = "".join(ch for ch in str(text or "").upper() if ch.isalnum())
-    if len(s) not in (CODE_LEN, OLD_LEN) or any(ch not in ALPHABET for ch in s):
+    s = _raw(text)
+    if len(s) != CODE_LEN or any(ch not in ALPHABET for ch in s):
         return None
     return format_code(s)
 
 
-def is_old_code(code: str) -> bool:
-    """Whether *code* is one of the short ones 1.6.7 made (about 40 bits,
-    OLD_STRETCH rounds): still joined, never made, and said to be weaker."""
-    shown = parse_code(code)
-    return shown is not None and len(shown.replace("-", "")) == OLD_LEN
+def _raw(text: str) -> str:
+    return "".join(ch for ch in str(text or "").upper() if ch.isalnum())
+
+
+def is_old_code(text: str) -> bool:
+    """Whether *text* is one of the short codes 1.6.7 made (about 40 bits):
+    never joined - the window says why, so nobody takes it for a typo."""
+    s = _raw(text)
+    return len(s) == OLD_LEN and all(ch in ALPHABET for ch in s)
 
 
 @functools.lru_cache(maxsize=8)
@@ -210,8 +202,7 @@ def derive(code: str) -> tuple[str, bytes]:
     raw = shown.replace("-", "")
     # Whoever has the code is in the room: never in a log.
     register_secrets(shown, raw, shown.lower())
-    rounds = OLD_STRETCH if len(raw) == OLD_LEN else STRETCH
-    seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, rounds, 32)
+    seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, STRETCH, 32)
     return hkdf(seed, _SALT, b"room", 32).hex(), hkdf(seed, _SALT, b"key", 32)
 
 
@@ -338,16 +329,14 @@ def open_frame(key: bytes, room: str, blob: bytes) -> dict[str, Any] | None:
 
 
 def open_message(key: bytes, room: str, blob: bytes) -> Message | None:
-    """The message in *blob*, well formed and from who it says: under a
-    key-bound id (ID_LEN hex) only with that key's signature; under an
-    older app's id as it is. None for anything else."""
+    """The message in *blob*, well formed and from who it says: with the
+    signature of the key its sender's id is the hash of. None for anything
+    else - an older app's unsigned message among them."""
     text = _open_text(key, room, blob)
     d = _loads(text)
     msg = parse(d)
     if msg is None or text is None or d is None:
         return None
-    if len(msg.sender) != ID_LEN:
-        return msg
     if not _signature_holds(room, text, d, msg.sender):
         log.debug("together: a message not signed by its sender was dropped")
         return None
@@ -381,7 +370,7 @@ def _int(value: Any, lo: int = 0, hi: int = 1 << 53) -> int | None:
 def _member_id(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
-    if len(value) in (OLD_ID_LEN, ID_LEN) and all(ch in "0123456789abcdef" for ch in value):
+    if len(value) == ID_LEN and all(ch in "0123456789abcdef" for ch in value):
         return value
     return None
 
@@ -477,7 +466,7 @@ class Message:
     answer: bool = False
     status: str = ""
     state: PlayState | None = None
-    #: Proven to be its sender's (open_message); an older app's never is.
+    #: Proven to be its sender's (open_message); Room.receive takes no other.
     signed: bool = False
 
 
@@ -588,8 +577,6 @@ class Room:
         self._born = clock.mono()
         #: Per sender: the highest "n" seen and when (this computer's seconds).
         self._last_n: dict[str, tuple[int, float]] = {}
-        #: Whether the log has said an unsigned (older app's) member is here.
-        self._told_unsigned = False
 
     # -- out
     def _make(self, kind: str, **fields: Any) -> dict[str, Any]:
@@ -649,18 +636,14 @@ class Room:
         computer's own, an old one handed again or one out of its time."""
         if msg.sender == self.me:
             return []
-        if len(msg.sender) == ID_LEN and not msg.signed:
-            log.debug("together: an unsigned message under a key's id was dropped")
+        if not msg.signed:
+            log.debug("together: an unsigned message was dropped")
             return []
         if not self._timely(msg):
             log.debug("together: a message out of its time was ignored")
             return []
         if not self._counted(msg, now):
             return []
-        if not msg.signed and not self._told_unsigned:
-            self._told_unsigned = True
-            log.info("together: a member on dopeIPTV 1.6.8 or older is in the room - their "
-                     "messages are not signed (taken until %s)", UNSIGNED_UNTIL)
         events: list[tuple[str, Any]] = []
         if msg.kind == "bye":
             gone = self.members.pop(msg.sender, None)
@@ -687,10 +670,6 @@ class Room:
         state = msg.state
         if state is not None and msg.kind == "st" and state.by != msg.sender:
             state = None        # a choice is told by whoever made it
-        if state is not None and not msg.signed and len(state.by) == ID_LEN:
-            # An older member passing on what plays never says a key's
-            # holder chose it: the state is taken as theirs.
-            state = dataclasses.replace(state, by=msg.sender)
         if (state is not None and self.state is not None
                 and state.ver > self.state.ver + VER_JUMP):
             state = None

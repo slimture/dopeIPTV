@@ -133,7 +133,6 @@ class _TogetherMixin:
             return view
         state = room.state
         view.update(code=room.code, me=room.name, conn=self._together_conn[0],
-                    old_code=together.is_old_code(room.code),
                     joined=self._together_joining, note=self._together_note,
                     members=[(m.name, m.status) for m in
                              sorted(room.members.values(), key=lambda m: m.name.casefold())],
@@ -198,7 +197,7 @@ class _TogetherMixin:
     def together_join(self, code: str, name: str) -> str | None:
         shown = together.parse_code(code)
         if shown is None:
-            return tr("together_code_bad")
+            return tr("together_code_old" if together.is_old_code(code) else "together_code_bad")
         return self._together_enter(shown, name, joining=True)
 
     def _together_enter(self, code: str, name: str, joining: bool) -> str | None:

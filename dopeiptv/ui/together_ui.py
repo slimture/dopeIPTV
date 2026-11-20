@@ -50,8 +50,6 @@ def note_text(view: dict) -> str:
         notes.append(view["note"])
     if view.get("live"):
         notes.append(tr("together_live_note"))
-    if view.get("old_code"):
-        notes.append(tr("together_old_code"))
     if not notes and not view.get("members") and view.get("conn") == "ok":
         notes.append(tr("together_alone_join") if view.get("joined") else tr("together_alone"))
     return "\n".join(notes)
