@@ -35,10 +35,25 @@ tunnel is refused when that fails. Only the pinned host goes by its pin.
 Only this computer connects (127.0.0.1), each route has a bridge of its own
 on a port of its own, and what is not a proxy's request (a web page's
 GET /...) is refused.
+
+And only the app's own player and recorder use it. A port on 127.0.0.1 is
+every program's on this computer, and every account's: without a key the
+bridge was an open proxy for all of them - out onto the network as this
+person, through their route. Each bridge makes a key as it starts (kept in
+memory, gone with the app) and is handed out as the proxy's login, in its
+address (``Bridge.address``: http://dopeiptv:<key>@127.0.0.1:<port>), which
+is how mpv and ffmpeg take a proxy's login. A request without it gets 407
+and nothing else: no lookup, no connection. ffmpeg (and so mpv) sends a
+proxy's login only once the proxy has asked for it, so each of its
+connections is asked once - a round trip on this computer - before it goes
+through.
 """
 
 from __future__ import annotations
 
+import base64
+import hmac
+import secrets
 import selectors
 import socket
 import ssl
@@ -54,24 +69,55 @@ PIN_RECHECK = 600.0
 TRUST_RECHECK = 600.0
 CONNECT_TIMEOUT = 10.0
 HEAD_MAX = 64 * 1024
+#: Connections a bridge serves at once - the player's and the recorder's
+#: need a handful. One more is closed before a thread is made for it: a
+#: program of another account on this computer that opens thousands gets
+#: nothing but closed sockets.
+MAX_SERVING = 64
+#: A connection that has not sent its request with the key by then is let go.
+HEAD_TIMEOUT = 10.0
 _HOP = (b"proxy-connection", b"proxy-authorization", b"connection", b"keep-alive")
+#: The name in the bridge's login; its key is the password (Bridge.secret).
+USER = "dopeiptv"
+_CHALLENGE = (b"HTTP/1.1 407 Proxy Authentication Required\r\n"
+              b'Proxy-Authenticate: Basic realm="dopeIPTV"\r\n'
+              b"Content-Length: 0\r\nConnection: close\r\n\r\n")
 
 
 class Refused(Exception):
     pass
 
 
-def _read_head(sock: socket.socket) -> tuple[bytes, bytes] | None:
+def _read_head(sock: socket.socket, within: float | None = None) -> tuple[bytes, bytes] | None:
+    """A request's head, read in *within* seconds at most in all (a sender
+    that trickles a byte at a time is let go too)."""
     buf = b""
+    deadline = None if within is None else time.monotonic() + within
     while b"\r\n\r\n" not in buf:
         if len(buf) > HEAD_MAX:
             return None
+        if deadline is not None:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return None
+            sock.settimeout(left)
         data = sock.recv(8192)
         if not data:
             return None
         buf += data
     head, _sep, rest = buf.partition(b"\r\n\r\n")
     return head, rest
+
+
+def proxy_login(fields: bytes) -> bytes:
+    """What a request's headers give as the proxy's login: the word after
+    ``Proxy-Authorization: Basic`` (b"" for none, or another scheme)."""
+    for raw in fields.split(b"\r\n"):
+        name, sep, value = raw.partition(b":")
+        if sep and name.strip().lower() == b"proxy-authorization":
+            scheme, _sp, word = value.strip().partition(b" ")
+            return word.strip() if scheme.lower() == b"basic" else b""
+    return b""
 
 
 def _reply(sock: socket.socket, code: int, text: str) -> None:
@@ -157,12 +203,26 @@ class Bridge:
         self._sock.bind(("127.0.0.1", 0))
         self._sock.listen(64)
         self.port = int(self._sock.getsockname()[1])
-        self.address = f"http://127.0.0.1:{self.port}"
+        #: Where it listens, as a log line may say it.
+        self.where = f"127.0.0.1:{self.port}"
+        #: This bridge's key, made now and never kept anywhere: whoever asks
+        #: without it is turned away (the module's docstring).
+        self.secret = secrets.token_urlsafe(24)
+        self._login = base64.b64encode(f"{USER}:{self.secret}".encode("ascii"))
+        #: What the player and the recorder are handed: the key is the
+        #: proxy's login, which mpv and ffmpeg take from its address.
+        self.address = f"http://{USER}:{self.secret}@{self.where}"
         self.served = 0
+        #: Requests turned away for want of the key (a player's first try
+        #: at each connection among them).
+        self.unkeyed = 0
         self.failures: list[str] = []        # the last few, for the log and the tests
         self._pins_ok: dict[tuple[str, int], float] = {}
         self._lock = threading.Lock()
         self._closed = False
+        self._slots = threading.BoundedSemaphore(MAX_SERVING)
+        #: Connections closed because MAX_SERVING were being served.
+        self.turned_away = 0
         threading.Thread(target=self._accept, name="net-bridge", daemon=True).start()
 
     def close(self) -> None:
@@ -181,10 +241,20 @@ class Bridge:
                     return
                 time.sleep(0.05)
                 continue
-            if peer[0] != "127.0.0.1":
+            if peer[0] != "127.0.0.1" or not self._slots.acquire(blocking=False):
+                if peer[0] == "127.0.0.1":
+                    with self._lock:
+                        self.turned_away += 1
                 conn.close()
                 continue
-            threading.Thread(target=self._serve, args=(conn,), name="net-bridge-conn", daemon=True).start()
+            threading.Thread(target=self._serve_slot, args=(conn,), name="net-bridge-conn",
+                             daemon=True).start()
+
+    def _serve_slot(self, client: socket.socket) -> None:
+        try:
+            self._serve(client)
+        finally:
+            self._slots.release()
 
     def _failed(self, what: str) -> None:
         log.info("net bridge: %s", what)
@@ -230,16 +300,27 @@ class Bridge:
         up: socket.socket | None = None
         where = "?"
         try:
-            client.settimeout(20.0)
-            got = _read_head(client)
+            got = _read_head(client, HEAD_TIMEOUT)
             if got is None:
                 return
+            client.settimeout(20.0)
             head, rest = got
             line, _sep, fields = head.partition(b"\r\n")
             parts = line.decode("latin-1").split(" ")
             if len(parts) != 3:
                 raise Refused("not a request")
             method, target, version = parts
+            if not hmac.compare_digest(proxy_login(fields), self._login):
+                # Not the app's own player or recorder - or their first try,
+                # before the proxy has asked: asked for the key, and nothing
+                # looked up or connected for it.
+                with self._lock:
+                    self.unkeyed += 1
+                try:
+                    client.sendall(_CHALLENGE)
+                except OSError:
+                    pass
+                return
             if method.upper() == "CONNECT":
                 host, port = split_target(target, 443)
                 where = f"{host}:{port}"
@@ -292,7 +373,7 @@ def bridge_for(route: Route) -> Bridge:
                 # on); eight routes at once is more than any setup has.
                 _bridges.pop(next(iter(_bridges))).close()
             b = _bridges[route] = Bridge(route)
-            log.info("net bridge for the player on %s (%s)", b.address, describe(route))
+            log.info("net bridge for the player on %s (%s)", b.where, describe(route))
         return b
 
 

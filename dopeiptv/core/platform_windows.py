@@ -11,6 +11,8 @@ import glob
 import os
 import sys
 
+from .player_exec import system_program
+
 
 def _libmpv_candidate_dirs() -> list[str]:
     """Where a bundled ``mpv-2.dll`` may sit: the frozen bundle, the exe's
@@ -170,7 +172,8 @@ def create_shortcut(desktop: bool = True, start_menu: bool = True,
                 "$s.Save()"
             )
             subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                [system_program("WindowsPowerShell", "v1.0", "powershell.exe"),
+                 "-NoProfile", "-NonInteractive", "-Command", ps],
                 creationflags=0x08000000,   # CREATE_NO_WINDOW - no console flash
                 timeout=15, check=True,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import series_view as sv
+from .num import digits, number, whole
 
 #: A film the source added within this many days wears the New pill.
 NEW_DAYS = 14
@@ -30,7 +31,7 @@ _TAIL_YEAR = re.compile(r"\s[\-–|]\s*((?:19|20)\d{2})\s*$")
 
 def _int(value: Any) -> int | None:
     m = _DIGITS.search(str(value or ""))
-    return int(m.group(0)) if m else None
+    return digits(m.group(0)) if m else None
 
 
 def _dicts(*values: Any) -> list[dict]:
@@ -85,8 +86,9 @@ def minutes_of(row: dict, *more: Any, dur_secs: float = 0.0) -> int:
             n = _int(d.get(k))
             if n and 0 < n < 1000:
                 return n
-    if dur_secs and dur_secs > 0:
-        return max(1, round(dur_secs / 60))
+    secs = number(dur_secs, lo=0)
+    if secs:
+        return max(1, round(secs / 60))
     return 0
 
 
@@ -97,11 +99,9 @@ def rating_of(row: dict, *more: Any) -> float | None:
     for d in _dicts(row, *more):
         values.append(d.get("rating"))
         five = d.get("rating_5based")
-        try:
-            if five is not None and five != "" and 0 < float(five) <= 5:
-                values.append(float(five) * 2)
-        except (TypeError, ValueError):
-            pass
+        stars = number(five, lo=0, hi=5)
+        if stars:
+            values.append(stars * 2)
     return sv.rating_of(*values)
 
 
@@ -115,10 +115,7 @@ def plot_of(*values: Any) -> str:
 
 
 def added_at(row: dict) -> int:
-    try:
-        return int(float(row.get("added") or 0))
-    except (TypeError, ValueError):
-        return 0
+    return whole(row.get("added") or 0, 0)
 
 
 def is_new(row: dict, now: float | None = None, days: int = NEW_DAYS) -> bool:
@@ -145,7 +142,7 @@ def primary(pos: float, dur: float, minutes: int = 0) -> Primary:
     resume point kept none."""
     if dur <= 0 and minutes > 0:
         dur = minutes * 60.0
-    prog = sv.Progress(max(0.0, float(pos or 0.0)), max(0.0, float(dur or 0.0)))
+    prog = sv.Progress(number(pos, 0.0, lo=0.0), number(dur, 0.0, lo=0.0))
     if prog.started:
         return Primary(True, prog.pos, prog)
     return Primary(False, 0.0, prog)

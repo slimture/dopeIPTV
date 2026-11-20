@@ -92,6 +92,11 @@ _TIMEOUT = (6.0, 30.0)
 _SLOW = (6.0, 120.0)
 #: The most a backup downloaded from the box may be.
 MAX_BACKUP = 64 * 1024 * 1024
+#: How far a tar is read for the editor's mark: an editor's backup is a
+#: few hundred lists and a few MB unpacked; a compressed bomb is not
+#: unpacked past this, nor its members counted past that.
+_UNPACKED_MAX = 1 << 30
+_MEMBERS_MAX = 20_000
 
 
 def _types(radio: bool) -> str:
@@ -240,11 +245,18 @@ def backup_name(now: float | None = None) -> str:
 
 
 def is_backup(data: bytes) -> bool:
-    """Whether *data* is a tar the editor made (the only kind it restores)."""
+    """Whether *data* is a tar the editor made (the only kind it restores):
+    read a member at a time to its mark, and no further than any backup of
+    the editor's goes (_UNPACKED_MAX, _MEMBERS_MAX)."""
     try:
         with tarfile.open(fileobj=io.BytesIO(data or b""), mode="r:*") as tf:
-            return any(m.name.lstrip("./").rstrip("/") == CHECK_FILE for m in tf.getmembers())
-    except (tarfile.TarError, OSError, EOFError):
+            for count, m in enumerate(iter(tf.next, None)):
+                if m.name.lstrip("./").rstrip("/") == CHECK_FILE:
+                    return True
+                if count >= _MEMBERS_MAX or m.offset_data + m.size > _UNPACKED_MAX:
+                    return False
+            return False
+    except Exception:           # damaged, cut short, a compression error: no backup
         return False
 
 

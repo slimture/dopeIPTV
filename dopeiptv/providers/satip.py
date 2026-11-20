@@ -73,11 +73,11 @@ from typing import Any, Iterable
 from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 
-from ..core import rtsp, tuners
+from ..core import rtsp, safe_xml, tuners
 from ..core._lazy_requests import requests
 from ..core.log import log
 from ..i18n import LocalizedError, tr
-from . import dlna
+from . import device_urls, dlna
 from .boxes import USER_AGENT, BoxClient, clean_text, parse_xml
 
 ST = "urn:ses-com:device:SatIPServer:1"
@@ -104,12 +104,17 @@ FRITZ_LISTS = (("/dvb/m3u/tvhd.m3u", "satip_tv_hd"), ("/dvb/m3u/tvsd.m3u", "sati
 #: the loopback, every address.
 _STAND_INS = ("sat.ip", "localhost", "0.0.0.0", "::", "::1")
 MAX_XML = 512 * 1024
+#: The most a channel list file is read: a satellite's every service is a
+#: few MB.
+LIST_MAX = 256 << 20
 TRANSPORTS = ("tcp", "udp", "http")
 
-_EXTINF = re.compile(r'#EXTINF:\s*-?[\d.]*(?P<attrs>(?:[^,"]|"[^"]*")*),(?P<name>.*)')
-_ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+# As providers/client.py reads an M3U line: linear on any line.
+_EXTINF = re.compile(r'#EXTINF:\s*+-?[\d.]*+(?P<attrs>(?:[^,"]|"[^"]*")*+),(?P<name>.*)')
+_ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
 _NUMBERED = re.compile(r"^(\d{1,4})\.\s+(.+)$")
-_LISTS = re.compile(r"[\s,;|]+(?=(?:https?://|file:))", re.I)
+# A run of separators is tried from its start only: linear on a long one.
+_LISTS = re.compile(r"(?<![\s,;|])[\s,;|]++(?=(?:https?://|file:))", re.I)
 
 
 # -- what a server says ---------------------------------------------------------------
@@ -143,10 +148,14 @@ def _local(tag: Any) -> str:
 def parse_description(content: bytes, location: str) -> dict | None:
     """A device description, when it is a SAT>IP server's: {"name",
     "model", "manufacturer", "udn", "caps", "m3u" (absolute, or ""),
-    "location"}; None for anything else (a router's, a TV's)."""
-    if not content or len(content) > MAX_XML or b"<!ENTITY" in content:
+    "location"}; None for anything else (a router's, a TV's), and for one
+    that declares a DTD of its own (core/safe_xml.py). Its list is taken
+    over http or https on the server's own host (*location*'s) - never a
+    file of this computer, nor another host (providers/device_urls.py)."""
+    if not content or len(content) > MAX_XML:
         return None
     try:
+        safe_xml.refuse_dtd(content, "A SAT>IP description")
         root = parse_xml(content)
     except (ET.ParseError, ValueError):
         return None
@@ -161,11 +170,15 @@ def parse_description(content: bytes, location: str) -> dict | None:
             for k, n in parse_caps(el.text).items():
                 caps[k] = caps.get(k, 0) + n
         m3u = (dev.findtext("X_SATIPM3U") or "").strip()
+        try:
+            m3u = device_urls.on_host(urljoin(base, m3u), device_urls.host_of(location)) if m3u else ""
+        except ValueError:
+            m3u = ""
         return {"name": clean_text(dev.findtext("friendlyName")),
                 "model": clean_text(dev.findtext("modelName")),
                 "manufacturer": clean_text(dev.findtext("manufacturer")),
                 "udn": (dev.findtext("UDN") or "").strip(),
-                "caps": caps, "m3u": urljoin(base, m3u) if m3u else "", "location": location}
+                "caps": caps, "m3u": m3u, "location": location}
     return None
 
 
@@ -176,13 +189,17 @@ def _netloc(host: str, port: int | None) -> str:
 
 def describe(location: str, session: Any = None, timeout: tuple[float, float] = (2.0, 5.0)
              ) -> dict | None:
-    """The SAT>IP server whose description is at *location*, or None."""
+    """The SAT>IP server whose description is at *location*, or None. As it
+    stands - no redirect followed - and read no further than MAX_XML, as a
+    DLNA description is (providers/dlna.py)."""
     http = session or requests
     try:
-        r = http.get(location, timeout=timeout, headers={"User-Agent": USER_AGENT})
+        r = http.get(location, timeout=timeout, headers={"User-Agent": USER_AGENT},
+                     allow_redirects=False, stream=True)
         if r.status_code != 200:
+            r.close()
             return None
-        return parse_description(r.content, location)
+        return parse_description(dlna._read_body(r, MAX_XML), location)
     except Exception as e:
         log.debug("satip: no description at %s (%s)", location, type(e).__name__)
         return None
@@ -265,7 +282,7 @@ def parse_m3u(text: str) -> tuple[list[dict], str]:
             name = (m.group("name") if m else line.split(",", 1)[-1]).strip() or attrs.get("tvg-name", "")
             chno = attrs.get("tvg-chno", "").strip()
             pending = {"name": name, "group": attrs.get("group-title", ""), "logo": attrs.get("tvg-logo", ""),
-                       "tvg_id": attrs.get("tvg-id", ""), "chno": int(chno) if chno.isdigit() else 0}
+                       "tvg_id": attrs.get("tvg-id", ""), "chno": int(chno) if chno.isdecimal() and len(chno) <= 9 else 0}
         elif line.startswith("#EXTGRP:"):
             group = line[len("#EXTGRP:"):].strip()
         elif not line.startswith("#"):
@@ -317,7 +334,7 @@ def service_pid(pids: str) -> str:
     the stuffing (8191); "" when there is none."""
     for p in (pids or "").split(","):
         p = p.strip()
-        if p.isdigit() and 32 <= int(p) < 8191:
+        if p.isdecimal() and len(p) <= 5 and 32 <= int(p) < 8191:
             return str(int(p))
     return ""
 
@@ -462,13 +479,32 @@ class SatIPClient(BoxClient):
         given = split_lists(self.opt("m3u", ""))
         if given:
             return [(a, "") for a in given], True
-        own = str(self.description.get("m3u") or "")
+        own = self._named_list()
         if own:
             return [(own, "")], False
         return [(self.url(path), tr(key)) for path, key in FRITZ_LISTS], False
 
-    def _read_list(self, address: str) -> str:
-        if address.lower().startswith(("http://", "https://")):
+    def _named_list(self) -> str:
+        """The list the server's description names, on the server's own host
+        over http(s) - else "" (providers/device_urls.py)."""
+        return device_urls.on_host(self.description.get("m3u"),
+                                   device_urls.host_of(self.description.get("location")) or self.host())
+
+    def _read_list(self, address: str, named: bool = False) -> str:
+        """A channel list's text: one the person gave - a web address, or a
+        file of this computer (a path or file://) - or a Fritz!Box's on the
+        server they gave; or, *named*, the one the server's description
+        names: its word, read over http or https on the server and nowhere
+        a redirect points - never a file."""
+        if named:
+            if not address.lower().startswith(("http://", "https://")):
+                raise ValueError("a server's own list is read over http only")
+            r = self.session.get(address, timeout=(4.0, 60.0), allow_redirects=False)
+            r.raise_for_status()
+            if r.status_code != 200:
+                raise ValueError("the server's list is elsewhere")
+            data = r.content
+        elif address.lower().startswith(("http://", "https://")):
             data = self.get(address, absolute=True, timeout=(4.0, 60.0)).content
         else:
             path = address
@@ -476,7 +512,9 @@ class SatIPClient(BoxClient):
                 from urllib.request import url2pathname
                 path = url2pathname(urlsplit(address).path)
             with open(path, "rb") as fh:
-                data = fh.read()
+                data = fh.read(LIST_MAX + 1)
+            if len(data) > LIST_MAX:
+                raise ValueError("the list is larger than any channel list")
         try:
             return data.decode("utf-8-sig")
         except UnicodeDecodeError:
@@ -488,9 +526,10 @@ class SatIPClient(BoxClient):
         keys: set[str] = set()
         read = 0
         guide = ""
+        named = "" if given else self._named_list()
         for address, group in lists:
             try:
-                text = self._read_list(address)
+                text = self._read_list(address, bool(named) and address == named)
             except LocalizedError:
                 raise
             except Exception as e:

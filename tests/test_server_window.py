@@ -74,8 +74,16 @@ assert json.loads(body)["FriendlyName"] == "dopeIPTV"
 status, headers, body = fetch(st["addresses"]["page"].replace(st["addresses"]["tuner"],
                                                               f"http://127.0.0.1:{port}"))
 assert status == 200 and "script-src" in headers["Content-Security-Policy"]
-status, _h, body = fetch(f"http://127.0.0.1:{port}/api/settings?token=" + str(s.value("nerd_server_token")))
+status, _h, body = fetch(f"http://127.0.0.1:{port}/api/settings?token=" + str(s.value("nerd_server_admin_token")))
 assert json.loads(body)["port"] == port
+# The playlist's token, which every TV and player holds, opens no settings.
+import urllib.error
+try:
+    fetch(f"http://127.0.0.1:{port}/api/settings?token=" + str(s.value("nerd_server_token")))
+    raise AssertionError("the playlist's token opened the settings")
+except urllib.error.HTTPError as e:
+    assert e.code == 401, e.code
+assert s.value("nerd_server_admin_token") != s.value("nerd_server_token")
 lines = w._in_use_lines(ask=False)
 assert any("dopeIPTV" in text for _kind, text in lines), lines
 w._server_make_room()                       # nothing to let go: no error

@@ -29,6 +29,8 @@ provider nothing (the segments go on being written).
 
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import json
 import os
 import secrets
@@ -43,8 +45,8 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..core.log import log
-from ..core.player_exec import NO_WINDOW
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
 
 # What a Cast receiver decodes. Anything outside these has to be re-encoded;
@@ -207,6 +209,58 @@ def cast_cache_dir() -> str:
     return str(base)
 
 
+#: A private cast's work in memory at most this much, and at most half of
+#: what that memory has free (the rest of the system lives there too).
+PRIVATE_CAP = 1 << 30
+#: Less than this free there and a private cast is not converted at all.
+PRIVATE_LEAST = 64 << 20
+
+
+def private_cast_dir() -> str | None:
+    """Where a cast's working files live while what it plays is private
+    (core/privacy): a folder in memory that swap cannot carry to a disk
+    (core/memory_safe), with what a run that ended without tidying left
+    there swept - or None, and a private cast is converted nowhere."""
+    try:
+        from ..core import memory_safe
+        base = memory_safe.private_folder("cast")
+        if base is None:
+            return None
+        memory_safe.sweep(base)
+        return str(base)
+    except Exception as e:      # never on a disk instead
+        log.info("cast bridge: no folder in memory for a private cast (%s)", e)
+        return None
+
+
+def private_cap(folder: str, cap: int) -> int:
+    """What a private cast's work may take in *folder*: the cap Settings
+    give, PRIVATE_CAP, half of what is free there - 0 when that is too
+    little to be worth it."""
+    try:
+        free = shutil.disk_usage(folder).free
+    except OSError:
+        return 0
+    room = min(int(cap), PRIVATE_CAP, max(0, free - PRIVATE_LEAST) // 2)
+    return room if room >= PRIVATE_LEAST else 0
+
+
+#: How often a running converter looks at private viewing and its room.
+WATCH_EVERY = 1.0
+
+
+def folder_bytes(folder: str | None) -> int:
+    """What the files under *folder* take - a converter's work."""
+    total = 0
+    for root, _dirs, files in os.walk(folder or ""):
+        for name in files:
+            try:
+                total += os.lstat(os.path.join(root, name)).st_size
+            except OSError:
+                pass
+    return total
+
+
 def ffmpeg_path() -> str | None:
     """Which ffmpeg to run, or None when there is none.
 
@@ -267,6 +321,18 @@ def lan_address() -> str:
 BITMAP_SUBS = {"dvb_subtitle", "dvd_subtitle", "hdmv_pgs_subtitle", "xsub"}
 
 
+def probe_args(exe: str, source: str) -> list[str]:
+    """ffprobe's command for *source*. The address is -i's value - a
+    playlist's line that starts with a dash is never an option of
+    ffprobe's - and what it leads to stays a stream's
+    (player_exec.ffmpeg_protocols)."""
+    return [exe, "-v", "error",
+            *(["-user_agent", _UA] if "://" in source else []),
+            *ffmpeg_protocols(source),
+            "-print_format", "json", "-show_streams", "-show_format",
+            "-i", source]
+
+
 def probe_tracks(source: str, exe: str | None = None) -> dict:
     """List the audio and subtitle tracks in *source* with ffprobe.
 
@@ -284,12 +350,10 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
     if not exe:
         return out
     try:
-        raw = subprocess.run(
-            [exe, "-v", "error", *(["-user_agent", _UA]
-                                   if "://" in source else []),
-             "-print_format", "json", "-show_streams", "-show_format",
-             source],
-            capture_output=True, timeout=25, creationflags=NO_WINDOW).stdout
+        raw = subprocess.run(probe_args(exe, source),
+                             capture_output=True, timeout=25,
+                             stdin=subprocess.DEVNULL,
+                             creationflags=NO_WINDOW).stdout
         probed = json.loads(raw or b"{}")
         streams = probed.get("streams", [])
         # The runtime comes along for the ride: a resume point is only worth
@@ -465,6 +529,9 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         # what it carries in its first PMT, so a megabyte is plenty.
         *_probe_limits(source),
         *_input_options(source),
+        # What the address leads to stays a stream's (a redirect, a
+        # playlist's segments): never this computer's own files.
+        *ffmpeg_protocols(source),
         # Seeking before -i is the cheap kind: ffmpeg jumps in the container
         # instead of decoding its way there, which is what makes resuming an
         # hour into a film instant rather than a minute of waiting.
@@ -524,6 +591,7 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         exe, "-hide_banner", "-loglevel", "error",
         *_probe_limits(source),
         *_input_options(source),
+        *ffmpeg_protocols(source),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         "-fflags", "+genpts", "-i", source,
         "-map", "0:v:0", "-map", f"0:a:{audio}", "-map", f"0:s:{subs}",
@@ -838,7 +906,21 @@ def _autoselect_subtitles(body: bytes, lang: str = "") -> bytes:
     return b"\n".join(out)
 
 
-class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
+def _same(given: str, own: str | None) -> bool:
+    """Whether *given* (off the network) is *own* - an address with the
+    run's token in it - compared in the same time whatever the two share:
+    how soon a comparison stops says how much of a guess was right."""
+    if not own:
+        return False
+    return hmac.compare_digest(given.encode("utf-8", "replace"), own.encode("utf-8"))
+
+
+def _under(path: str, prefix: str | None) -> bool:
+    """Whether *path* starts with the run's *prefix* (its token)."""
+    return bool(prefix) and _same(path[:len(prefix or "")], prefix)
+
+
+class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     """The bridge's own HTTP server, with the shouting turned off.
 
     A Chromecast opens connections, probes them and drops them as a matter
@@ -898,11 +980,51 @@ def _hls_file(folder: str | None, name: str) -> str | None:
     return None
 
 
+def _peer(address: str) -> str:
+    """An address as it is compared: an IPv4-mapped IPv6 as its IPv4."""
+    try:
+        ip = ipaddress.ip_address(str(address or "").split("%", 1)[0])
+    except ValueError:
+        return str(address or "")
+    mapped = getattr(ip, "ipv4_mapped", None)
+    return str(mapped or ip)
+
+
+def receiver_addresses(receiver: str) -> frozenset[str]:
+    """The addresses the receiver *receiver* (its address or name, as the
+    cast found it) may fetch from: the address itself, or what its name
+    resolves to - empty when that is not known, and then the token alone
+    guards the stream, as before."""
+    host = str(receiver or "").strip().strip("[]")
+    if not host:
+        return frozenset()
+    try:
+        return frozenset({_peer(str(ipaddress.ip_address(host.split("%", 1)[0])))})
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError:
+        return frozenset()
+    return frozenset(_peer(str(info[4][0])) for info in infos)
+
+
 class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):        # noqa: A003 - stdlib hook
         pass                                  # the app has its own log
+
+    def _from_receiver(self) -> bool:
+        """Whether the request comes from the receiver the cast went to:
+        anyone else on the network who saw the address on its way (plain
+        http) gets nothing of the stream, nor a converter of its own."""
+        bridge = self.server.bridge
+        if bridge.admits(_peer(self.client_address[0]), self.path):
+            return True
+        bridge.refused_peer(self.client_address[0])
+        self.send_error(403)
+        return False
 
     def _headers(self) -> None:
         self.send_response(200)
@@ -914,7 +1036,9 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_HEAD(self) -> None:
-        if self.path != self.server.bridge.path:
+        if not self._from_receiver():
+            return
+        if not _same(self.path, self.server.bridge.path):
             self.send_error(404)
             return
         self._headers()
@@ -995,10 +1119,12 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         bridge = self.server.bridge
-        if bridge.hls and self.path.startswith(bridge.prefix or "\0"):
+        if not self._from_receiver():
+            return
+        if bridge.hls and _under(self.path, bridge.prefix):
             self._serve_hls()
             return
-        if self.path != bridge.path:
+        if not _same(self.path, bridge.path):
             self.send_error(404)
             return
         proc, spool = bridge.first_frames()
@@ -1083,6 +1209,9 @@ class CastBridge:
         # belongs to the run it began in - see first_frames().
         self.generation = 0
         self.exe: str | None = None          # overridable, for tests
+        #: The receiver's addresses, the only ones served (empty: any).
+        self.peers: frozenset[str] = frozenset()
+        self._refused_told = False
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._procs: list[subprocess.Popen] = []
@@ -1092,7 +1221,17 @@ class CastBridge:
         self._current: tuple[subprocess.Popen, "_Spool", int] | None = None
         self._readers: dict[subprocess.Popen, int] = {}
         self._tmp: str | None = None
+        #: What it converts is private (core/privacy): its work only in
+        #: memory out of a disk's reach (private_cast_dir), never on one.
+        self.private = False
+        self._private_dir: str | None = None
+        self._private_cap = 0
+        #: A run on the disk stopped because private viewing began - the
+        #: window sends the cast again (ui/mw_cast._cast_private_on).
+        self.private_stopped = False
         self._lock = threading.Lock()
+        # One run at a time between start() and the watch that may end it.
+        self._run_lock = threading.RLock()
 
     @staticmethod
     def available() -> bool:
@@ -1117,9 +1256,8 @@ class CastBridge:
         if "://" in source:
             return source
         try:
-            self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
             link = os.path.join(
-                self._tmp, "source" + os.path.splitext(source)[1])
+                self._tmpdir(), "source" + os.path.splitext(source)[1])
         except Exception as e:
             log.info("cast bridge: could not link the file (%s)", e)
             return source
@@ -1140,7 +1278,55 @@ class CastBridge:
               audio: int = 0, subs: int | None = None,
               sub_codec: str = "", start_at: float = 0.0,
               quality: str = "original", sub_lang: str = "",
-              feed: cast_feed.Feed | None = None) -> str:
+              feed: cast_feed.Feed | None = None, receiver: str = "") -> str:
+        """Begin serving *source* re-muxed for the receiver; returns the URL
+        (_start) - and watch the run while it lasts (_watch)."""
+        with self._run_lock:
+            url = self._start(source, codecs, audio, subs, sub_codec, start_at,
+                              quality, sub_lang, feed, receiver)
+            gen = self.generation
+        threading.Thread(target=self._watch, args=(gen,), name="cast-watch",
+                         daemon=True).start()
+        return url
+
+    def _watch(self, gen: int) -> None:
+        """Once a second while run *gen* lasts: private viewing begun since
+        it started (core/privacy) ends a run whose work is on the disk at
+        once - whatever the window was doing meanwhile; sent again, it is
+        converted in memory or not at all. A private run's work is kept
+        within its room (private_cap): past it, the converter stops - never
+        a byte more in memory, never one on the disk."""
+        from ..core import privacy
+        while True:
+            time.sleep(WATCH_EVERY)
+            with self._run_lock:
+                if self.generation != gen or self._server is None:
+                    return
+                if not self.private:
+                    if privacy.playing_private():
+                        log.info("cast bridge: private viewing began - the converter's work "
+                                 "on the disk stopped")
+                        self.private_stopped = True
+                        self.fatal = "private viewing began"
+                        self._stop()
+                        return
+                    continue
+                used = folder_bytes(self._tmp)
+                if used <= self._private_cap:
+                    continue
+                log.warning("cast bridge: a private cast's work reached its room in memory "
+                            "(%d MB) - the converter stopped", self._private_cap >> 20)
+                self.fatal = "no more room in memory for a private cast"
+                with self._lock:
+                    procs = list(self._procs)
+            for p in procs:
+                self.kill(p)
+            return
+
+    def _start(self, source: str, codecs: list[str] | None,
+               audio: int, subs: int | None, sub_codec: str, start_at: float,
+               quality: str, sub_lang: str,
+               feed: cast_feed.Feed | None, receiver: str) -> str:
         """Begin serving *source* re-muxed for the receiver; returns the URL.
 
         ffmpeg is not started here - it starts when the Chromecast actually
@@ -1149,9 +1335,31 @@ class CastBridge:
         *source* (which is then only what the logs name), and the receiver
         gets one HLS playlist. No subtitle rides along a feed. The bridge
         owns *feed* from now: it is closed when another stream replaces it
-        or the bridge stops.
+        or the bridge stops. *receiver*: the receiver's address (or name),
+        the only one then served (``receiver_addresses``).
         """
         self._stop(keep=feed)
+        # What plays privately: its work in memory out of a disk's reach, or
+        # not converted at all - the run before has gone already, so nothing
+        # more of it is written anywhere.
+        from ..core import privacy
+        self.private = bool(privacy.playing_private())
+        self._private_dir, self._private_cap = None, 0
+        self.private_stopped = False
+        if self.private:
+            folder = private_cast_dir()
+            room = private_cap(folder, self.cap) if folder else 0
+            if not room:
+                if feed is not None:
+                    feed.close()
+                log.info("cast bridge: a private cast is not converted - no memory out of a "
+                         "disk's reach for its work")
+                from ..i18n import LocalizedError
+                raise LocalizedError("cast_err_private_memory")
+            self._private_dir, self._private_cap = folder, room
+            log.info("cast bridge: a private cast's work in memory (%d MB)", room >> 20)
+        self.peers = receiver_addresses(receiver)
+        self._refused_told = False
         self.fatal = ""          # a new run gets to fail on its own terms
         self.generation += 1
         source = self._safe_source(source)
@@ -1186,7 +1394,7 @@ class CastBridge:
         self.feed = feed
         if feed is not None:
             self.subs, self.hls, self.start_at = None, True, 0.0
-        self.prefix = f"/{secrets.token_urlsafe(12)}/"
+        self.prefix = f"/{secrets.token_urlsafe(18)}/"
         if self.hls:
             self.hls_dir = os.path.join(self._tmpdir(), "hls")
             os.makedirs(self.hls_dir, exist_ok=True)
@@ -1253,8 +1461,21 @@ class CastBridge:
         all deleted the moment the cast ends.
         """
         if not self._tmp:
-            self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
+            if self.private:
+                # Named for this process, so a crash's leftovers are swept
+                # (private_cast_dir); never cast_cache_dir, a disk.
+                if not self._private_dir:
+                    raise OSError("no folder in memory for a private cast")
+                self._tmp = tempfile.mkdtemp(prefix=f"{os.getpid()}-cast-",
+                                             dir=self._private_dir)
+            else:
+                self._tmp = tempfile.mkdtemp(prefix="cast-", dir=cast_cache_dir())
         return self._tmp
+
+    def on_disk(self) -> bool:
+        """Whether a run is going whose work is on the disk - for private
+        viewing turned on meanwhile, which sends the cast again."""
+        return self._server is not None and not self.private
 
     # How long the receiver may be kept waiting for the first playlist.
     # ffmpeg has to open the provider, find the streams and write a segment
@@ -1270,6 +1491,26 @@ class CastBridge:
     #   receiver BUFFERING - converter is 1 segments written, 0 MB
     # Three segments is about twelve seconds of head start, paid once.
     HLS_LEAD = 3
+
+    def admits(self, who: str, path: str) -> bool:
+        """Whether *who* may be served *path*: the receiver's addresses when
+        they are known; when not, the first address that asks for this run's
+        own stream becomes the one (the receiver asks within seconds of being
+        told) - a request for anything else binds nothing."""
+        with self._lock:
+            if self.peers:
+                return who in self.peers
+            ours = _same(path, self.path) or (self.hls and _under(path, self.prefix))
+            if ours:
+                self.peers = frozenset({who})
+                log.info("cast bridge: the receiver's address not known - served to the first that asked")
+            return True
+
+    def refused_peer(self, address: str) -> None:
+        """Someone other than the receiver asked for the stream: said once a run."""
+        if not self._refused_told:
+            self._refused_told = True
+            log.warning("cast bridge: a request from another address than the receiver was refused")
 
     def hls_ready(self, name: str) -> bool:
         """Whether *name* can be served, starting ffmpeg if it has not been.
@@ -1459,7 +1700,7 @@ class CastBridge:
             began = time.monotonic()
             spool = _Spool(os.path.join(self._tmpdir(),
                                         f"spool{self.generation}"),
-                           self.cap)
+                           min(self.cap, self._private_cap) if self.private else self.cap)
             th = threading.Thread(target=self._spool_out, args=(proc, spool),
                                   daemon=True)
             with self._lock:

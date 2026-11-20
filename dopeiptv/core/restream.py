@@ -42,7 +42,8 @@ from .dvr_ingest import NotAStream
 from .dvr_pool import DvrPool
 from .dvr_session import DvrSession, IngestFactory
 from .dvr_store import Segment
-from .log import log, redact_url
+from .log import log
+from .num import digits
 
 #: The hold the restream puts on a session it reads.
 SERVER = "server"
@@ -99,9 +100,17 @@ def _private(stream: str) -> bool:
     (core/privacy.py): private viewing on, or a playback that began in it -
     the window keys it by the row's stream id, a number or its text."""
     keys: list[object] = [stream]
-    if stream.isdigit():
-        keys.append(int(stream))
+    n = digits(stream)
+    if n is not None:
+        keys.append(n)
     return any(privacy.playback_private("live", k) for k in keys)
+
+
+def _named(stream: str, name: str) -> str:
+    """A channel as a log line may name it (rule 4): "<private>" while the
+    person's own viewing of it is private, or anything plays privately
+    (privacy.for_log)."""
+    return "<private>" if _private(stream) else str(privacy.for_log(name or "a channel"))
 
 
 # -- an adaptive (HLS) channel: copied into MPEG-TS by ffmpeg -----------------------------
@@ -157,7 +166,7 @@ def ffmpeg_opener(ffmpeg: str, src: dict | None) -> Callable[..., Any]:
 
     from . import nerd
     from .dvr_ingest import USER_AGENT
-    from .player_exec import NO_WINDOW
+    from .player_exec import NO_WINDOW, ffmpeg_protocols
 
     def opener(url: str, **_kw: Any) -> _Piped:
         n = nerd.current()
@@ -170,7 +179,9 @@ def ffmpeg_opener(ffmpeg: str, src: dict | None) -> Callable[..., Any]:
             px = n.proxy(src, url) if n.flag("nerd_proxy_player", True) else ""
             if px:
                 cmd += ["-http_proxy", px]
-        cmd += ["-i", url, "-map", "0:v?", "-map", "0:a?", "-c", "copy", "-f", "mpegts", "pipe:1"]
+        # ffmpeg_protocols: the list's segments and keys stay a stream's.
+        cmd += [*ffmpeg_protocols(url), "-i", url, "-map", "0:v?", "-map", "0:a?", "-c", "copy",
+                "-f", "mpegts", "pipe:1"]
         proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
         return _Piped(proc)
@@ -294,8 +305,7 @@ class Restreamer:
             ch = Channel(key, source, stream, name, url, app, self._pool(), self._clock(),
                          joined_app=True)
             self._channels[key] = ch
-            log.info("restream: %s joins the app's own connection",
-                     "<private>" if _private(stream) else name or "a channel")
+            log.info("restream: %s joins the app's own connection", _named(stream, name))
         if ch is None:
             if not self._room_for(source, others):
                 return None
@@ -309,8 +319,8 @@ class Restreamer:
                 raise Busy(NO_DATA, f"the provider sent {e}, not a stream") from None
             ch = Channel(key, source, stream, name, url, session, pool, self._clock())
             self._channels[key] = ch
-            log.info("restream: %s opened (%s) - %d of %d tuner(s) in use", name or "a channel",
-                     redact_url(url), len(self._own()), self._total())
+            log.info("restream: %s opened (%s) - %d of %d tuner(s) in use", _named(stream, name),
+                     privacy.url_for_log(url), len(self._own()), self._total())
         v = Viewer(next(self._ids), client, ch, self._clock())
         ch.viewers.append(v)
         ch.idle_since = None
@@ -340,7 +350,7 @@ class Restreamer:
             if v in ch.viewers:
                 ch.viewers.remove(v)
                 log.info("restream: a viewer left %s after %.0f s, %.1f MB%s",
-                         ch.name or "a channel", self._clock() - v.since, v.sent / 1e6,
+                         _named(ch.stream, ch.name), self._clock() - v.since, v.sent / 1e6,
                          f" ({v.why})" if v.why else "")
             if not ch.viewers and ch.idle_since is None:
                 ch.idle_since = self._clock()
@@ -436,7 +446,7 @@ class Restreamer:
             ch.pool.let_go(ch.session, SERVER)
         except Exception as e:
             log.debug("restream: letting go failed: %s", e)
-        log.info("restream: %s let go (%s)", ch.name or "a channel", why)
+        log.info("restream: %s let go (%s)", _named(ch.stream, ch.name), why)
 
     def _tick(self) -> None:
         while not self._stop.wait(self.TICK):

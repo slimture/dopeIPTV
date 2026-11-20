@@ -24,6 +24,7 @@ from PyQt6.QtCore import QStandardPaths
 
 from ..core import channel_prefs
 from ..core.log import log
+from ..core.privacy import for_log
 from ..i18n import current_language, tr
 from .subtitle_text import fixed_bytes
 
@@ -75,6 +76,10 @@ def _subtitle_to_load(path: str) -> str:
         QStandardPaths.StandardLocation.CacheLocation)
     if fixed is None or not base:
         return path
+    from ..core.privacy import playing_private
+    if playing_private():
+        # A copy in the cache would say what was watched: the file as it is.
+        return path
     key = hashlib.sha1(os.path.abspath(path).encode(
         "utf-8", "surrogateescape")).hexdigest()[:12]
     folder = os.path.join(base, "subtitles", key)
@@ -84,10 +89,10 @@ def _subtitle_to_load(path: str) -> str:
         with open(copy, "wb") as fh:
             fh.write(fixed)
     except OSError as e:
-        log.info("subtitle: no fixed copy of %s: %s", path, e)
+        log.info("subtitle: no fixed copy of %s: %s", for_log(path), e)
         return path
     log.info("subtitle: right-to-left marks taken out of %s",
-             os.path.basename(path))
+             for_log(os.path.basename(path)))
     return copy
 
 
@@ -284,7 +289,7 @@ class TracksMixin:
             m.command("sub-add", _subtitle_to_load(str(path)), "select",
                       title or "", lang or "")
         except Exception as e:
-            log.warning("sub-add %s failed: %s", path, e)
+            log.warning("sub-add %s failed: %s", for_log(path), e)
             return False
         # Loaded: from here on it is only about showing it, which must not
         # turn a loaded subtitle into a failure.
@@ -306,11 +311,12 @@ class TracksMixin:
 
     def _remember_delay(self, value: float) -> None:
         """Nerd: the audio delay chosen, kept for the channel playing - not
-        while viewing privately, which keeps nothing of what is played (a
-        channel's own delay says it was watched): then it holds for this
-        stream only, and the next start sets the delay back."""
-        from ..core.privacy import private
-        if private():
+        for a private playback, which keeps nothing of what is played (a
+        channel's own delay says it was watched), though private viewing
+        ended before it did: then it holds for this stream only, and the
+        next start sets the delay back."""
+        from ..core.privacy import playing_private
+        if playing_private():
             self._delay_set = abs(value) >= 0.001
             return
         chan = getattr(self, "_delay_chan", None)
@@ -419,8 +425,10 @@ class TracksMixin:
 
     def _remember_sub_lang(self, m, tid) -> None:
         """The language of a subtitle turned on by hand: the next film opens
-        with a track in it chosen, hidden, so turning it on is instant."""
-        if m is None or not self._settings:
+        with a track in it chosen, hidden, so turning it on is instant. Not
+        from a private playback: it would say what language was watched."""
+        from ..core.privacy import playing_private
+        if m is None or not self._settings or playing_private():
             return
         try:
             track = next((t for t in (m.track_list or [])

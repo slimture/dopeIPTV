@@ -18,22 +18,29 @@ runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 command: dopeiptv
 
+# What the sandbox lets the app do - each line with what needs it, and
+# nothing that nothing needs.
 finish-args:
-  # Runtime network: the app streams IPTV.
+  # Runtime network: the app streams IPTV, and finds and casts to devices
+  # at home (its own sockets: mDNS, SSDP, the cast and remote servers).
   - --share=network
+  # X11's shared memory, for the fallback below.
   - --share=ipc
   - --socket=fallback-x11
   - --socket=wayland
   - --socket=pulseaudio
-  # GPU access for mpv's OpenGL render path.
+  # GPU access for mpv's OpenGL render path (no other device: not all).
   - --device=dri
-  # Recordings + playlists live under the user's home; the app writes files
-  # directly (not only via the portal), so it needs home access.
+  # Recordings, local files and their folders, playlists and backups live
+  # where the person keeps them under their home, and the app reads and
+  # writes them by path (not only through the portal), so it needs home
+  # access. The widest line here: narrowing it means opening every such
+  # folder through the portal instead.
   - --filesystem=home
-  # Inhibit the screensaver / suspend while a video plays.
+  # Inhibit the screensaver while a video plays (core/wakelock.py, on the
+  # session bus). The app never talks to logind: the two login1 lines that
+  # stood here let it ask the system to suspend or power off, for nothing.
   - --talk-name=org.freedesktop.ScreenSaver
-  - --talk-name=org.freedesktop.login1
-  - --system-talk-name=org.freedesktop.login1
   # The desktop's media controls (MPRIS; a second copy takes an .instance
   # name of its own) and the new-episode notifications.
   - --own-name=org.mpris.MediaPlayer2.dopeiptv
@@ -163,8 +170,8 @@ modules:
         url: https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl
         sha256: 5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e
       - type: file
-        url: https://files.pythonhosted.org/packages/5d/40/e1e72872c6354b306daef1703549e8e83b4d43cfea356311bf722a043752/setuptools-83.0.0-py3-none-any.whl
-        sha256: 29b23c360f22f414dc7336bb39178cc7bcbf6021ed2733cde173f09dba19abb3
+        url: https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl
+        sha256: ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
       - type: file
         url: https://files.pythonhosted.org/packages/87/1b/9e33c09813d65e248f7f773119148a612516a4bea93e9c6f545f78455b7c/wheel-0.47.0-py3-none-any.whl
         sha256: 212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced
@@ -172,8 +179,8 @@ modules:
         url: https://files.pythonhosted.org/packages/0a/d2/0f5006892e07ea342d57dbeda46027e99a097ffb6218bee1e37f9776ed95/casttube-0.2.1-py3-none-any.whl
         sha256: 36f118007f9eead3959cf30de03c1640b53a263569ff2a3971c0521826c835b2
       - type: file
-        url: https://files.pythonhosted.org/packages/ef/2f/c5464532e965badff2f4c4c1a3a83f5697f0d7c407ed0cda44aaa99bb451/certifi-2026.6.17-py3-none-any.whl
-        sha256: 2227dcbaafe0d2f59279d1762ddddc37783ed4354594f194ffc31d20f41fc3db
+        url: https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl
+        sha256: e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1
       - type: file
         url: https://files.pythonhosted.org/packages/ea/f8/72eb13dcabe7257035cea8aefd922caad2f110d252bf9f67c4c2ca763aee/charset_normalizer-3.4.9-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
         sha256: 84fd18bcc17526fc2b3c1af7d2b9217d32c9c04448c16ec693b9b4f1985c3d33
@@ -205,8 +212,8 @@ modules:
         url: https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
         sha256: 2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
       - type: file
-        url: https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl
-        sha256: 9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
+        url: https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl
+        sha256: 0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3
       - type: file
         url: https://files.pythonhosted.org/packages/43/2d/60a04c3cf7e243e47d60152394a5e29a4839ea8fd1c260868ff7af08240d/zeroconf-0.150.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
         sha256: 489a51320d20e7f07b2f447cd515f3645d17ceced0212f7249a83ce6d3b748e0

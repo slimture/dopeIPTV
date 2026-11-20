@@ -151,15 +151,18 @@ def test_guide_index_roundtrip(tmp_path):
 
 
 def test_guide_index_rejects_old_version(tmp_path):
-    """A v1 (pre-compact-storage) pickle must be rejected, not half-loaded."""
+    """An older app's index (a pickle, v1 to v3) is never read, where it
+    was kept or in the new index's place: the guide is parsed again."""
     import pickle
     cache = tmp_path / "epg_test.xml"
     cache.write_bytes(b"<tv/>")
     pkl = tmp_path / "epg_test.xml.pkl"
-    with pkl.open("wb") as f:
-        pickle.dump({"v": 1, "by_id": {"c1": [{"title": "old"}]},
-                     "by_name": {}}, f)
+    old = pickle.dumps({"v": 1, "by_id": {"c1": [{"title": "old"}]}, "by_name": {}})
+    pkl.write_bytes(old)
     g = XmltvGuide(client=None, cache_path=str(cache))
+    assert g._load_index() is False
+    assert g._by_id == {} and not pkl.exists()
+    g._index_path().write_bytes(old)
     assert g._load_index() is False
     assert g._by_id == {}
 

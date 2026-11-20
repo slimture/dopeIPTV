@@ -12,7 +12,7 @@ from typing import Any
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from ..core import nerd
+from ..core import nerd, privacy
 from ..core.commands import stream_url_ok
 from ..core.log import log
 from ..core.remote_api import DEFAULT_PORT, RemoteServer, new_token
@@ -276,4 +276,11 @@ class _RemoteMixin:
                        duration=round(float(snap.get("length") or 0), 1))
             if kind == "live":
                 out["programme"] = snap.get("artist") or ""
+            if privacy.playing_private():
+                # That something plays and how loud - not what, from where,
+                # how long, on which TV or for whom. The commands work as
+                # ever.
+                out.update(title="", private=True, position=0.0, duration=0.0)
+                for name in ("programme", "source", "cast", "profile"):
+                    out.pop(name, None)
         return out

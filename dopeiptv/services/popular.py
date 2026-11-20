@@ -35,7 +35,16 @@ _TECH = frozenset((
     "hdr", "hdr10", "hevc", "x264", "x265", "h264", "h265", "multi",
     "multisub", "vostfr"))
 _BRACKETED = re.compile(r"[\[({][^\])}]*[\])}]")
-_YEAR_IN_BRACKETS = re.compile(r"[\[(]\s*((?:19|20)\d{2})\s*[\])]")
+_YEAR_IN_BRACKETS = re.compile(r"[\[(]\s*+((?:19|20)\d{2})\s*[\])]")
+
+
+def without_brackets(text: str) -> str:
+    """_BRACKETED.sub(" ", text) in linear time, as providers/metadata.py
+    does it: nothing after the last closing bracket can be a part."""
+    last = max(text.rfind("]"), text.rfind(")"), text.rfind("}"))
+    if last < 0:
+        return text
+    return _BRACKETED.sub(" ", text[:last + 1]) + text[last + 1:]
 # A short tag in front of the title: "EN - ", "|SE| ", "NF: ", "4K-".
 _TAG = re.compile(r"^[^\w]*\w{1,8}[^\w\s]*\s*[-–|:]\s*")
 
@@ -63,7 +72,7 @@ _LAST_YEAR = time.localtime().tm_year + 1
 
 
 def _is_year(word: str) -> bool:
-    return len(word) == 4 and word.isdigit() and 1900 <= int(word) <= _LAST_YEAR
+    return len(word) == 4 and word.isdecimal() and 1900 <= int(word) <= _LAST_YEAR
 
 
 def name_keys(name: str) -> list[tuple[str, int, int | None]]:
@@ -74,7 +83,7 @@ def name_keys(name: str) -> list[tuple[str, int, int | None]]:
     1984" is from 2020), so the name is kept whole as well."""
     m = _YEAR_IN_BRACKETS.search(name)
     bracket_year = int(m.group(1)) if m else None
-    text = _BRACKETED.sub(" ", name)
+    text = without_brackets(name)
     words = _words(text)
     tail_year = None
     if len(words) > 1 and _is_year(words[-1]) and (

@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
+from .num import whole
+
 #: The app's own kinds of connection, in the order a sentence names them.
 KINDS = ("player", "buffer", "recording", "multiview", "cast")
 #: How long what the provider said of other devices stands (its count
@@ -60,11 +62,8 @@ class Verdict:
 
 
 def _int(value: Any) -> int | None:
-    try:
-        n = int(float(str(value).strip()))
-    except (TypeError, ValueError):
-        return None
-    return n if n >= 0 else None
+    n = whole(value)
+    return n if n is not None and n >= 0 else None
 
 
 def numbers(user_info: dict | None) -> tuple[int | None, int | None]:

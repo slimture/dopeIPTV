@@ -35,6 +35,11 @@ SOCKET_PATH_MAX = 100
 #: Windows: the file in the user's local app data holding the word in the
 #: pipe's name (``_pipe_key``).
 PIPE_KEY = "instance.key"
+#: A second start's message is one line of JSON, a command with an address
+#: at most (core/commands.MAX_OWN): a longer line, or more lines than a
+#: start ever sends, ends the connection.
+MAX_MESSAGE = 64 * 1024
+MAX_MESSAGES = 8
 
 
 def server_name() -> str:
@@ -45,7 +50,9 @@ def server_name() -> str:
     which only they can enter) - without one a folder of their own in
     their cache (0700, ``_make_folder``) - never the /tmp everyone shares,
     where another account could take the name first and hear this one's
-    commands. macOS keeps Qt's per-user temporary folder. Windows' named
+    commands. Elsewhere (macOS, a BSD), or with a cache path too long for
+    a socket, a folder of their own in the temporary folder
+    (dopeiptv-<uid>, 0700, theirs and no link). Windows' named
     pipes are the whole machine's: the name carries a random word only
     this user can read (``_pipe_key``), so no other account can make it
     first; the pipe itself is the user's alone (UserAccessOption)."""
@@ -62,6 +69,9 @@ def server_name() -> str:
         shared = os.path.join(runtime, "app", app_id)
         if os.path.isdir(shared):
             return os.path.join(shared, name)
+    if sys.platform == "win32":
+        key = _pipe_key()
+        return f"{name}-{key}" if key else name
     if sys.platform.startswith("linux"):
         if runtime and os.path.isabs(runtime) and os.path.isdir(runtime):
             return os.path.join(runtime, "dopeiptv", name)
@@ -69,11 +79,14 @@ def server_name() -> str:
         own = os.path.join(cache, "dopeiptv", "instance", name)
         if os.path.isabs(own) and len(own.encode("utf-8")) <= SOCKET_PATH_MAX:
             return own
-    if sys.platform == "win32":
-        key = _pipe_key()
-        if key:
-            return f"{name}-{key}"
-    return name
+    uid = getattr(os, "getuid", None)
+    if uid is None:
+        return name
+    # Off Linux, or a cache path too long for a socket: a folder of the
+    # user's own in the temporary folder (0700 and theirs, _make_folder) -
+    # never the temporary folder itself, which may be every account's.
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), f"dopeiptv-{uid()}", name)
 
 
 def _pipe_key() -> str:
@@ -118,8 +131,10 @@ def _make_folder(name: str) -> bool:
     try:
         os.makedirs(folder, mode=0o700, exist_ok=True)
         if os.name == "posix":
-            st = os.stat(folder)
-            if st.st_uid != os.getuid():
+            # lstat: a link another account left in a shared temporary
+            # folder would lead the socket - and the chmod - elsewhere.
+            st = os.lstat(folder)
+            if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
                 log.warning("commands: %s is another account's - not listening there", folder)
                 return False
             if stat.S_IMODE(st.st_mode) & 0o077:
@@ -191,18 +206,31 @@ class CommandServer(QObject):
                 break
             conn: QLocalSocket = pending
             buf = bytearray()
+            lines = [0]                 # how many this connection has sent
 
-            def read(sock: QLocalSocket = conn, buf: bytearray = buf) -> None:
+            def read(sock: QLocalSocket = conn, buf: bytearray = buf,
+                     taken: list[int] = lines) -> None:
                 buf.extend(sock.readAll().data())
+                over = False
                 while b"\n" in buf:
                     line, _, rest = bytes(buf).partition(b"\n")
                     buf[:] = rest
+                    taken[0] += 1
+                    if len(line) > MAX_MESSAGE or taken[0] > MAX_MESSAGES:
+                        over = True
+                        break
                     try:
                         cmd = json.loads(line.decode("utf-8"))
-                    except ValueError:
+                    except (ValueError, RecursionError):
                         continue
                     if isinstance(cmd, dict):
                         self._on(cmd)
+                if over or len(buf) > MAX_MESSAGE:
+                    # A second start sends one short line and goes: whatever
+                    # this is, it is not kept in memory or read on.
+                    log.info("commands: a connection that sends no command is closed")
+                    buf.clear()
+                    sock.abort()
             conn.readyRead.connect(read)
             conn.disconnected.connect(conn.deleteLater)
             read()

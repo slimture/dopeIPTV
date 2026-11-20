@@ -174,3 +174,36 @@ def test_a_deferred_link_falls_back_to_the_desktops_opener(monkeypatch):
         timers.pop(0)[1]()
     assert spawned == [["/usr/bin/xdg-open", "https://dopeiptv.org/"]]
 
+
+# ------------------------------------------- only an https address is opened ---
+
+def test_only_an_https_address_or_this_computers_page_is_a_link():
+    """A sign-in page or a release's download comes from a service's answer:
+    anything but https (or http to this computer, server mode's page) the
+    desktop would hand to whatever program claims it."""
+    for ok in ("https://trakt.tv/activate?code=AB12", "HTTPS://simkl.com/pin/",
+               "http://127.0.0.1:8090/?token=abc", "http://localhost:9/", "http://[::1]:5/"):
+        assert xdg.link_ok(ok), ok
+    for bad in ("file:///etc/passwd", "javascript:alert(1)", "smb://host/share",
+                "http://example.com/", "http://192.168.1.2/", "https:///nohost",
+                "-https://x", "https://a b/", "https://a/\nb", "data:text/html,x",
+                "", None, 7, b"https://x"):
+        assert not xdg.link_ok(bad), bad
+
+
+def test_open_url_opens_nothing_else(monkeypatch):
+    monkeypatch.setattr(xdg, "_open", lambda url: pytest.fail(f"opened {url}"))
+    for bad in ("file:///etc/passwd", "javascript:alert(1)", "vlc://x", "http://evil.example/"):
+        assert xdg.open_url(bad) is False
+
+
+def test_a_folder_opens_as_its_file_address(monkeypatch, tmp_path):
+    opened = []
+    monkeypatch.setattr(xdg, "_open", lambda url: opened.append(url) or True)
+    assert xdg.open_folder(tmp_path) is True
+    assert opened == [tmp_path.absolute().as_uri()]
+    f = tmp_path / "a.ts"
+    f.write_bytes(b"")
+    assert xdg.open_folder(f) is False and xdg.open_folder(tmp_path / "gone") is False
+    assert len(opened) == 1
+

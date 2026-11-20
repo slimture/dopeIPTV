@@ -46,12 +46,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
 from ..core.log import log
-from ..core.player_exec import NO_WINDOW
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from . import cast_feed
-from .cast_bridge import (_endless, _hls_file, _hls_name_ok, _timeshift,
-                          cast_cache_dir, ffmpeg_path, lan_address,
-                          video_encoder)
+from .cast_bridge import (PRIVATE_CAP, WATCH_EVERY, _endless, _hls_file, _hls_name_ok,
+                          _timeshift, cast_cache_dir, folder_bytes, ffmpeg_path, lan_address,
+                          private_cap, private_cast_dir, video_encoder)
 
 # What an Apple TV plays out of an HLS stream: these are copied untouched.
 COPY_VIDEO = frozenset({"h264", "hevc"})
@@ -279,7 +279,7 @@ def probe(source: str, net: list[str] | None = None, exe: str | None = None,
     try:
         res = subprocess.run(
             [exe, "-hide_banner", "-nostdin", *_probe_limits(source),
-             *(net or []), "-i", source],
+             *(net or []), *ffmpeg_protocols(source), "-i", source],
             capture_output=True, timeout=timeout, creationflags=NO_WINDOW)
         found = parse_probe(res.stderr.decode("utf-8", "replace"))
     except Exception as e:
@@ -307,7 +307,8 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
         src, opts = cast_feed.INPUT, list(cast_feed.INPUT_OPTIONS)
     else:
         src = p.url if "://" in p.url else os.path.abspath(p.url)
-        opts = [*_probe_limits(src), *(net or []),
+        # ffmpeg_protocols: what the address leads to stays a stream's.
+        opts = [*_probe_limits(src), *(net or []), *ffmpeg_protocols(src),
                 *(["-ss", f"{start:.3f}"] if start > 0 else [])]
     if p.video == "copy":
         video = ["-c:v", "copy", *(["-tag:v", "hvc1"] if p.hevc else [])]
@@ -419,7 +420,7 @@ _TYPES = {".m3u8": "application/vnd.apple.mpegurl", ".m4s": "video/iso.segment",
           ".mp4": "video/mp4"}
 
 
-class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
+class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     bridge: "AirPlayBridge"
 
@@ -459,7 +460,12 @@ class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
         if not _hls_name_ok(name):
             self.send_error(404)
             return
-        bridge.saw(str(self.client_address[0]))
+        who = str(self.client_address[0])
+        if not bridge.admits(who):
+            bridge.refused_peer()
+            self.send_error(403)
+            return
+        bridge.saw(who)
         file = _hls_file(bridge.folder, name)
         if file is None:
             self.send_error(404)
@@ -494,6 +500,8 @@ class AirPlayBridge:
         self.exe: str | None = None          # a stand-in, for tests
         self.prefix: str | None = None
         self.folder: str | None = None
+        #: What it converts is private: its segments in memory alone.
+        self.private = False
         self.url: str = ""
         self.plan: Plan | None = None
         self.error = ""
@@ -506,6 +514,16 @@ class AirPlayBridge:
         #: The pieces ffmpeg reads (the archive, the rewind buffer), if any.
         self.feed: cast_feed.Feed | None = None
         self._own: set[str] = set()
+        #: The one address besides this computer's own that is served: the
+        #: first that asked for this run's stream - the Apple TV (admits).
+        self._peer: str | None = None
+        self._refused_told = False
+        self._private_cap = 0
+        #: A run on the disk stopped because private viewing began.
+        self.private_stopped = False
+        self._run = 0
+        # One run at a time between start() and the watch that may end it.
+        self._run_lock = threading.RLock()
         self._server: _Server | None = None
         self._proc: subprocess.Popen[bytes] | None = None
         self._tail: collections.deque[str] = collections.deque(maxlen=8)
@@ -525,10 +543,27 @@ class AirPlayBridge:
         p = self._proc
         return p is not None and p.poll() is None
 
+    def on_disk(self) -> bool:
+        """Whether a run is going whose segments are on the disk - for
+        private viewing turned on meanwhile, which sends the cast again."""
+        return self._server is not None and not getattr(self, "private", False)
+
     def start(self, p: Plan, start: float = 0.0,
               net: list[str] | None = None,
               feed: cast_feed.Feed | None = None,
               net_for: cast_feed.NetFor | None = None) -> str:
+        """Begin converting *p* and serving it (_start); returns the
+        playlist's address on the LAN - and watch the run while it lasts
+        (_watch)."""
+        with self._run_lock:
+            url = self._start(p, start, net, feed, net_for)
+            run = self._run
+        threading.Thread(target=self._watch, args=(run,), name="airplay-watch",
+                         daemon=True).start()
+        return url
+
+    def _start(self, p: Plan, start: float, net: list[str] | None,
+               feed: cast_feed.Feed | None, net_for: cast_feed.NetFor | None) -> str:
         """Begin converting *p* and serving it; returns the playlist's
         address on the LAN. ffmpeg starts at once: by the time someone has
         picked their Apple TV, the first segments are there. With *feed*,
@@ -539,9 +574,28 @@ class AirPlayBridge:
         exe = self.exe or ffmpeg_path()
         if not exe:
             raise RuntimeError("no ffmpeg")
+        # What plays privately (core/privacy): its segments in memory out of
+        # a disk's reach (cast_bridge.private_cast_dir), or not converted at
+        # all - never on the disk. The run before has gone already.
+        from ..core import privacy
+        self.private = bool(privacy.playing_private())
+        private_dir = private_cast_dir() if self.private else None
+        if self.private and not (private_dir and private_cap(private_dir, PRIVATE_CAP)):
+            if feed is not None:
+                feed.close()
+            log.info("airplay bridge: a private cast is not converted - no memory out of a "
+                     "disk's reach for its work")
+            from ..i18n import LocalizedError
+            raise LocalizedError("cast_err_private_memory")
         self.plan, self.error, self.remote_seen = p, "", False
+        self._peer, self._refused_told, self.private_stopped = None, False, False
+        self._private_cap = private_cap(private_dir, PRIVATE_CAP) if private_dir else 0
+        self._run += 1
         self._tail.clear()
-        self.folder = tempfile.mkdtemp(prefix=folder_prefix(), dir=_cache_dir())
+        if private_dir:
+            self.folder = tempfile.mkdtemp(prefix=f"{os.getpid()}-airplay-", dir=private_dir)
+        else:
+            self.folder = tempfile.mkdtemp(prefix=folder_prefix(), dir=_cache_dir())
         self.prefix = f"/{secrets.token_urlsafe(18)}/"
         server = _Server(("0.0.0.0", 0), _Handler)
         server.bridge = self
@@ -647,6 +701,62 @@ class AirPlayBridge:
             time.sleep(0.1)
         self.error = self.error or "no stream after %d s" % timeout
         return False
+
+    def _watch(self, run: int) -> None:
+        """Once a second while run *run* lasts: private viewing begun since
+        it started (core/privacy) ends a run whose segments are on the disk
+        at once - sent again, it is converted in memory or not at all; a
+        private run's segments kept within their room (private_cap), past
+        which ffmpeg stops."""
+        from ..core import privacy
+        while True:
+            time.sleep(WATCH_EVERY)
+            with self._run_lock:
+                if self._run != run or self._server is None:
+                    return
+                if not self.private:
+                    if privacy.playing_private():
+                        log.info("airplay bridge: private viewing began - the segments on the "
+                                 "disk stopped")
+                        self.private_stopped = True
+                        self.error = "private viewing began"
+                        self._stop()
+                        return
+                    continue
+                if folder_bytes(self.folder) <= self._private_cap:
+                    continue
+                log.warning("airplay bridge: a private cast's segments reached their room in "
+                            "memory (%d MB) - ffmpeg stopped", self._private_cap >> 20)
+                self.error = "no more room in memory for a private cast"
+                proc = self._proc
+            if proc is not None and proc.poll() is None:
+                for step, grace in ((proc.terminate, 1.0), (proc.kill, 0.5)):
+                    try:
+                        step()
+                        proc.wait(timeout=grace)
+                        break
+                    except Exception:
+                        continue
+            return
+
+    def admits(self, addr: str) -> bool:
+        """Whether *addr* may be served this run: this computer's own player
+        always; of every other address only the first that asked for the
+        run's stream - the Apple TV, which asks within seconds of being
+        told. Another device that learnt the address is refused (403)."""
+        if addr in self._own:
+            return True
+        with self._lock:
+            if self._peer is None:
+                self._peer = addr
+                log.info("airplay bridge: served to the first receiver that asked, alone")
+            return addr == self._peer
+
+    def refused_peer(self) -> None:
+        """Another address than the receiver asked: said once a run."""
+        if not self._refused_told:
+            self._refused_told = True
+            log.warning("airplay bridge: a request from another address than the receiver was refused")
 
     def saw(self, addr: str) -> None:
         if addr not in self._own and not self.remote_seen:

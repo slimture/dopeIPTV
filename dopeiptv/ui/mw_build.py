@@ -698,6 +698,7 @@ class _BuildMixin(_BuildDetailMixin):
 
     def _build_status_row(self, lp: QVBoxLayout) -> None:
         self.count_lbl = QLabel("")
+        self.count_lbl.setTextFormat(Qt.TextFormat.PlainText)   # a channel's, a device's name
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
         status_row = QHBoxLayout()
         status_row.addWidget(self.count_lbl, 1)

@@ -1,7 +1,9 @@
 """What is dropped on the window, and the music it plays (MainWindow
 mixin). A drop (``dragEnterEvent``, ``dropEvent``): a video or a track
 played, an M3U file or a provider's link opening the Add source window
-filled in (``_add_dropped_playlist``). The play queue of local music
+filled in (``_add_dropped_playlist``) - nothing while "Who's watching?"
+waits for a PIN (``_drop_waits``), and for a kids profile a source only
+with a grown-up's PIN, as in Settings. The play queue of local music
 (``queue_add``, ``queue_clear``, ``_queue_step``, ``_play_queued``,
 ``_place_in_queue``, its window ``open_queue``), in charge only while a
 local file plays (``_local_is_playing``) and rolling on at a file's end
@@ -26,12 +28,25 @@ from .notices import hub_of
 from .widgets import confirm
 
 
+def _drop_waits(window) -> bool:
+    """"Who's watching?" waits for a profile's PIN at start: nothing
+    dropped on the window plays, or adds a source, before it is given."""
+    locked = getattr(window, "_profile_locked", None)
+    return bool(callable(locked) and locked())
+
+
 class _QueueMixin:
 
     def _add_dropped_playlist(self, found) -> None:
         """An M3U file or a provider link dropped on the window: the Add
         playlist dialog with it filled in, then on to the new playlist."""
         if not self.playlist_store:
+            return
+        # Adding a source is Settings' to do: a kids profile needs a
+        # grown-up's PIN for it there (mw_profiles), so here too - else a
+        # dropped playlist was the way round that.
+        unlock = getattr(self, "_kids_settings_unlock", None)
+        if callable(unlock) and not unlock():
             return
         kind, server, user, pw = found
         name = ""
@@ -63,6 +78,8 @@ class _QueueMixin:
         return out
 
     def dragEnterEvent(self, e) -> None:
+        if _drop_waits(self):
+            return
         mime = e.mimeData()
         if (any(u.isLocalFile()
                 and u.toLocalFile().lower().endswith(self.MEDIA_EXTS)
@@ -71,6 +88,8 @@ class _QueueMixin:
             e.acceptProposedAction()
 
     def dropEvent(self, e) -> None:
+        if _drop_waits(self):
+            return
         for u in e.mimeData().urls():
             p = u.toLocalFile()
             if p and p.lower().endswith(self.MEDIA_EXTS):
@@ -134,7 +153,7 @@ class _QueueMixin:
         i = getattr(self, "_track_index", -1)
         if not self._local_is_playing():
             log.info("queue: not stepping - no local file is playing "
-                     "(key=%r last=%r)", getattr(self, "_playing_key", None),
+                     "(key=%r last=%r)", for_log(getattr(self, "_playing_key", None)),
                      (getattr(self, "_last_playback", None) or {}).get("kind"))
             return False
         if not q or i < 0:

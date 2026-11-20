@@ -40,8 +40,12 @@ class Site:
         site = self
 
         class FakeRemote:
-            def __init__(self, slot, endpoint=None, timeout=20.0):
+            def __init__(self, slot, endpoint=None, timeout=20.0, auth=""):
                 self.slot = slot
+
+            @classmethod
+            def of(cls, raw, endpoint=None, timeout=20.0):
+                return cls(sync.derive(raw)[0], endpoint, timeout, auth=sync.auth_of(raw))
 
             def _ask(self):
                 site.calls += 1
@@ -346,6 +350,57 @@ def test_the_backup_path_stages_and_offers_quit(qapp, tmp_path, site, monkeypatc
     assert w.playlist_store.playlists() == []             # nothing changed until the start
     ov._b_quit.click()
     assert w.closed == 1 and w._resetting
+    assert site.calls == 0
+
+
+def test_an_encrypted_backup_asks_its_password_then_stages(qapp, tmp_path, site, monkeypatch):
+    """A backup with a password: asked for (a wrong one says so, asks
+    again), opened, then as any backup - shown, staged, Quit offered.
+    Cancelled at the question: nothing said, nothing staged."""
+    from PyQt6.QtWidgets import QFileDialog
+
+    from dopeiptv.ui import backup_dialogs, dialogs
+    src = QSettings(str(tmp_path / "src.ini"), QSettings.Format.IniFormat)
+    src.setValue("playlists", json.dumps([dict(PROVIDER, id="b1")]))
+    src.setValue("theme", "nord")
+    path = str(tmp_path / "locked.json")
+    backup.write(path, backup.lock(backup.collect({"main": src}, "1.6.9"), "hemligt",
+                                   backup.MIN_ROUNDS))
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(lambda *a, **k: (path, "")))
+    pending = tmp_path / "pending.json"
+    monkeypatch.setattr(backup, "pending_path", lambda folder=None: str(pending))
+    answers = {"pw": ["fel", "hemligt"]}
+
+    def unlock(dlg):
+        for pw in answers["pw"]:
+            if pw is None:
+                dlg.reject()
+                break
+            dlg.field.setText(pw)
+            dlg.go.click()
+            end = time.monotonic() + 20
+            while dlg.working() and time.monotonic() < end:
+                qapp.processEvents()
+            if dlg.result():
+                break
+            assert dlg.wrong.isVisibleTo(dlg)
+        return dlg.result()
+
+    shown = []
+    monkeypatch.setattr(backup_dialogs.UnlockBackupDialog, "exec", unlock)
+    monkeypatch.setattr(dialogs.RestoreBackupDialog, "exec",
+                        lambda dlg: shown.append(dlg) or dlg.replace.setChecked(True) or 1)
+    w, ov = _window(tmp_path)
+    ov._open_bring()
+    step = ov._stack.currentWidget()
+    answers["pw"] = [None]
+    ov._b_restore.click()
+    assert not shown and not pending.exists() and not ov._b_rerr.isVisibleTo(step)
+    answers["pw"] = ["fel", "hemligt"]
+    ov._b_restore.click()
+    assert shown and pending.exists()
+    assert backup.read(str(pending)).stores["main"]["theme"] == "nord"   # the plain copy waits
+    assert ov._b_quit.isVisibleTo(step) and w.playlist_store.playlists() == []
     assert site.calls == 0
 
 

@@ -34,6 +34,44 @@ and holds the rest. Never twice in a few seconds, never on a single
 reading. A live channel cannot be in step across providers (each has its
 own delay): only the channel is shared.
 
+Who said it. Everyone in the room holds the room's key, so the key says
+only "someone in the room". Each member therefore makes an Ed25519 key
+pair for the room (core/ed25519.py) and its id is the first 20 bytes of
+SHA-256 of a label and the public key (member_of) - 40 hex. Every
+message carries the public key ("pk") and, as the last field of its JSON,
+a signature ("sg") over the room id and the exact bytes before it; one
+whose key does not hash to its id or whose signature does not hold is
+dropped, and so is every unsigned one (an app up to 1.6.8, whose ids were
+16 random hex bound to nothing): no member can speak as another. Signing
+takes about 5 ms and checking about 3.5 ms of plain Python - every
+message is signed, on the link's threads, never the window's.
+
+What is not taken (Room.receive, and Link for the backlog). The relay, or
+anyone who learnt the room id, can hand an old sealed message again. A
+counter per sender ("n") refuses it while this computer remembers the
+sender - kept in memory per room for the app's run (``remembered``: the
+last ROOMS_REMEMBERED rooms), so leaving and joining again still knows
+every number taken; after a restart nothing is remembered, so: what the
+relay already held when this computer's first request was answered is not
+acted on (those in the room answer the hello with what plays now; the
+hello waits for that first answer, and where it could not, the backlog is
+read under the rules below instead); and, once the relay's clock is known
+here, a message is dropped when its moment "t" is more than JOIN_SLACK_MS
+before this computer joined, more than STALE_MS old, or more than AHEAD_MS
+in the future. A message is stamped as it is sent and normally arrives
+within a second - a slow network, three tries at sending and the long
+poll's 25 s stay far inside these minutes. Senders are forgotten only
+after STALE_MS + AHEAD_MS without a word, when nothing of theirs would be
+taken any more. After a longer loss of the relay the window says hello
+again, so what was missed comes back in the answers.
+
+Bounds on what another member can cause: at most MEMBERS_MAX people and
+SENDERS_MAX senders remembered, a hello answered once every few seconds
+per member, a state's version at most VER_JUMP above the room's, a "st"
+only for the sender's own choice, positions finite and never sought past
+a title's end, a frame exactly one of the padded sizes with nothing but
+zeros after its text, at most BATCH_MAX messages of one answer read.
+
 Plain data and the network only: nothing here touches a widget. The
 relay is spoken to on the link's own threads; the window (ui/mw_together.py)
 keeps the Room on its own thread and hands what it decides to the player.
@@ -41,21 +79,24 @@ keeps the Room on its own thread and hands what it decides to the player.
 from __future__ import annotations
 
 import base64
+import dataclasses
 import functools
 import hashlib
 import json
+import math
 import queue
 import secrets
 import struct
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from . import build_check
 from . import chacha20poly1305 as aead
-from .log import log
+from . import ed25519
+from .log import log, register_secrets
 from .sync import hkdf
 
 ENDPOINT = "https://dopeiptv.org/together/"
@@ -66,17 +107,16 @@ MAX_MEMBERS = 8
 WAIT = 25.0
 
 ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-#: A new room's code: 10 of the 31 characters, about 50 bits - read aloud in
-#: two groups of five. A code of 8 (from 1.6.7) still joins its room.
+#: A room's code: 10 of the 31 characters, about 50 bits - read aloud in
+#: two groups of five. 1.6.7's codes of 8 (about 40 bits, fewer rounds) join
+#: nothing: is_old_code says why one is refused.
 CODE_LEN = 10
 OLD_LEN = 8
 _SALT = b"dopeIPTV together v1"
 _AAD = b"dopeIPTV together v1"
 #: PBKDF2 rounds before HKDF: the code is short, and the relay knows the
-#: room id - each guess at a code costs it this much more. A code of the
-#: old length keeps its old rounds, so its room is the same room.
+#: room id - each guess at a code costs it this much more.
 STRETCH = 600_000
-OLD_STRETCH = 120_000
 FORMAT = 1
 #: A message's plain text is padded up to one of these, so the sizes the
 #: relay sees say little about what was sent.
@@ -92,6 +132,33 @@ MEDIA_KINDS = ("movie", "episode", "live")
 STATUSES = ("ok", "miss", "idle", "load")
 NAME_MAX = 24
 TEXT_MAX = 120
+
+#: A member's id: the hash of its public key (an app up to 1.6.8 had 16
+#: random hex, bound to nothing - never taken).
+ID_LEN = 40
+_ID_CTX = b"dopeIPTV together member v1"
+_SIGN_CTX = b"dopeIPTV together signed v1"
+_SIG_HEAD = b',"sg":"'
+_SIG_TAIL = len(_SIG_HEAD) + 88 + 2          # ,"sg":"<64 bytes as base64>"}
+
+#: Not taken: a message from more than this before this computer joined...
+JOIN_SLACK_MS = 30_000
+#: ...older than this against the relay's clock...
+STALE_MS = 300_000
+#: ...or from further in the future than this.
+AHEAD_MS = 300_000
+#: The most people a room shows (the relay seats MAX_MEMBERS; one who left
+#: without a word is still listed for a while) and senders it remembers.
+MEMBERS_MAX = 2 * MAX_MEMBERS
+SENDERS_MAX = 64
+#: A state whose version is further above the room's than this is not one
+#: anybody reached by choosing: nobody could ever choose past it.
+VER_JUMP = 10_000
+#: A member's hello is answered at most this often (seconds).
+HELLO_EVERY = 3.0
+#: As many messages as the relay keeps for a room: more in one answer are
+#: not read.
+BATCH_MAX = 300
 
 
 # -- the code, the room id and the key ------------------------------------------------
@@ -109,10 +176,21 @@ def format_code(raw: str) -> str:
 def parse_code(text: str) -> str | None:
     """A code as typed or pasted (any case, any separators) in its shown
     form, or None for anything that is not one."""
-    s = "".join(ch for ch in str(text or "").upper() if ch.isalnum())
-    if len(s) not in (CODE_LEN, OLD_LEN) or any(ch not in ALPHABET for ch in s):
+    s = _raw(text)
+    if len(s) != CODE_LEN or any(ch not in ALPHABET for ch in s):
         return None
     return format_code(s)
+
+
+def _raw(text: str) -> str:
+    return "".join(ch for ch in str(text or "").upper() if ch.isalnum())
+
+
+def is_old_code(text: str) -> bool:
+    """Whether *text* is one of the short codes 1.6.7 made (about 40 bits):
+    never joined - the window says why, so nobody takes it for a typo."""
+    s = _raw(text)
+    return len(s) == OLD_LEN and all(ch in ALPHABET for ch in s)
 
 
 @functools.lru_cache(maxsize=8)
@@ -124,22 +202,88 @@ def derive(code: str) -> tuple[str, bytes]:
     if shown is None:
         raise ValueError("not a room code")
     raw = shown.replace("-", "")
-    rounds = OLD_STRETCH if len(raw) == OLD_LEN else STRETCH
-    seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, rounds, 32)
+    # Whoever has the code is in the room: never in a log.
+    register_secrets(shown, raw, shown.lower())
+    seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, STRETCH, 32)
     return hkdf(seed, _SALT, b"room", 32).hex(), hkdf(seed, _SALT, b"key", 32)
 
 
-def new_member() -> str:
-    """This computer's id in a room, new for every room it joins."""
-    return secrets.token_hex(8)
+@dataclass(frozen=True)
+class Identity:
+    """This computer in one room: an Ed25519 key pair made for it, and the
+    id the others know it by - the hash of the public key, so only the
+    holder of *seed* can speak under it."""
+    seed: bytes
+    public: bytes
+    id: str
+
+    def __repr__(self) -> str:
+        return f"Identity({self.id})"
+
+
+def member_of(public: bytes) -> str:
+    """The id of the member whose public key is *public* (ID_LEN hex)."""
+    return hashlib.sha256(_ID_CTX + public).hexdigest()[:ID_LEN]
+
+
+def new_identity() -> Identity:
+    """This computer's key and id in a room, new for every room it joins."""
+    seed = secrets.token_bytes(32)
+    public = ed25519.public_key(seed)
+    return Identity(seed, public, member_of(public))
 
 
 # -- a message, sealed ----------------------------------------------------------------
 
-def seal(key: bytes, room: str, msg: dict[str, Any]) -> bytes:
+def _signed(room: str, body: bytes) -> bytes:
+    return _SIGN_CTX + bytes.fromhex(room) + body
+
+
+def encode(msg: dict[str, Any], room: str = "", identity: Identity | None = None) -> bytes:
+    """*msg* as JSON. With *identity* (whose id must be the message's
+    sender) the public key is added and, as the last field, the signature
+    over the room and every byte before it - checked on exactly those
+    bytes (_signature_holds), so nothing depends on two computers writing
+    JSON alike."""
+    if identity is None:
+        return json.dumps(msg, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    if msg.get("f") != identity.id:
+        raise ValueError("not this member's message")
+    signed = {k: v for k, v in msg.items() if k not in ("pk", "sg")}
+    signed["pk"] = base64.b64encode(identity.public).decode("ascii")
+    body = json.dumps(signed, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    sig = base64.b64encode(ed25519.sign(identity.seed, _signed(room, body)))
+    return body[:-1] + _SIG_HEAD + sig + b'"}'
+
+
+def _signature_holds(room: str, text: bytes, d: dict[str, Any], sender: str) -> bool:
+    """Whether *text* (the JSON *d* was read from) is signed by the key
+    its sender's id is the hash of."""
+    tail = text[-_SIG_TAIL:]
+    if len(text) <= _SIG_TAIL or not tail.startswith(_SIG_HEAD) or not tail.endswith(b'"}'):
+        return False
+    sig_text = tail[len(_SIG_HEAD):-2]
+    pk_text = d.get("pk")
+    if (not isinstance(pk_text, str) or len(pk_text) != 44
+            or d.get("sg") != sig_text.decode("ascii", "replace")):
+        return False
+    try:
+        public = base64.b64decode(pk_text, validate=True)
+        sig = base64.b64decode(sig_text, validate=True)
+    except ValueError:
+        return False
+    if len(public) != 32 or len(sig) != 64 or member_of(public) != sender:
+        return False
+    return ed25519.verify(public, _signed(room, text[:-_SIG_TAIL] + b"}"), sig)
+
+
+def seal(key: bytes, room: str, msg: dict[str, Any], identity: Identity | None = None) -> bytes:
     """*msg* as the relay passes it: a format byte, a random nonce, and the
-    padded JSON, encrypted and tied to the room."""
-    text = json.dumps(msg, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    padded JSON (signed, with *identity*), encrypted and tied to the room."""
+    return _seal_text(key, room, encode(msg, room, identity))
+
+
+def _seal_text(key: bytes, room: str, text: bytes) -> bytes:
     size = next((p for p in _PAD if p >= len(text) + 2), 0)
     if not size:
         raise ValueError("message too long")
@@ -149,9 +293,10 @@ def seal(key: bytes, room: str, msg: dict[str, Any]) -> bytes:
     return head + nonce + aead.encrypt(key, nonce, plain, _AAD + head + bytes.fromhex(room))
 
 
-def open_frame(key: bytes, room: str, blob: bytes) -> dict[str, Any] | None:
-    """The message in *blob*, or None for anything that is not one of this
-    room's (another key, damaged, a newer format)."""
+def _open_text(key: bytes, room: str, blob: Any) -> bytes | None:
+    """The JSON text sealed in *blob*, or None: another key, damaged, a
+    newer format - or not exactly as seal() makes one (a size that is none
+    of _PAD, anything but zeros after the text): nothing rides along."""
     if not isinstance(blob, (bytes, bytearray)) or not MIN_FRAME <= len(blob) <= MAX_FRAME:
         return None
     if blob[0] != FORMAT:
@@ -159,13 +304,54 @@ def open_frame(key: bytes, room: str, blob: bytes) -> dict[str, Any] | None:
     try:
         plain = aead.decrypt(key, bytes(blob[1:13]), bytes(blob[13:]),
                              _AAD + bytes(blob[:1]) + bytes.fromhex(room))
-        (length,) = struct.unpack(">H", plain[:2])
-        if length > len(plain) - 2:
-            return None
-        msg = json.loads(plain[2:2 + length].decode("utf-8"))
-    except (ValueError, struct.error, UnicodeDecodeError):
+    except ValueError:
+        return None
+    if len(plain) not in _PAD:
+        return None
+    (length,) = struct.unpack(">H", plain[:2])
+    if length > len(plain) - 2 or any(plain[2 + length:]):
+        return None
+    return plain[2:2 + length]
+
+
+def _loads(text: bytes | None) -> dict[str, Any] | None:
+    if text is None:
+        return None
+    try:
+        msg = json.loads(text.decode("utf-8"))
+    except (ValueError, RecursionError):
         return None
     return msg if isinstance(msg, dict) else None
+
+
+def open_frame(key: bytes, room: str, blob: bytes) -> dict[str, Any] | None:
+    """The message in *blob* as sent, unchecked (open_message checks who
+    sent it), or None for anything that is not one of this room's."""
+    return _loads(_open_text(key, room, blob))
+
+
+def older_frame(key: bytes, room: str, blob: bytes) -> bool:
+    """Whether *blob* is a message of this room with no signature at all -
+    what an app up to 1.6.8 sends (its 16-hex id is no member's either). It
+    is never taken (open_message says None); the window says once that such
+    a member is in the room and left out until they update."""
+    d = _loads(_open_text(key, room, blob))
+    return isinstance(d, dict) and d.get("k") in KINDS and "sg" not in d and "pk" not in d
+
+
+def open_message(key: bytes, room: str, blob: bytes) -> Message | None:
+    """The message in *blob*, well formed and from who it says: with the
+    signature of the key its sender's id is the hash of. None for anything
+    else - an older app's unsigned message among them."""
+    text = _open_text(key, room, blob)
+    d = _loads(text)
+    msg = parse(d)
+    if msg is None or text is None or d is None:
+        return None
+    if not _signature_holds(room, text, d, msg.sender):
+        log.debug("together: a message not signed by its sender was dropped")
+        return None
+    return dataclasses.replace(msg, signed=True)
 
 
 # -- what is said -------------------------------------------------------------------
@@ -193,9 +379,10 @@ def _int(value: Any, lo: int = 0, hi: int = 1 << 53) -> int | None:
 
 
 def _member_id(value: Any) -> str | None:
-    s = str(value or "")
-    if 8 <= len(s) <= 64 and all(ch in "0123456789abcdef" for ch in s):
-        return s
+    if not isinstance(value, str):
+        return None
+    if len(value) == ID_LEN and all(ch in "0123456789abcdef" for ch in value):
+        return value
     return None
 
 
@@ -274,7 +461,8 @@ class PlayState:
         t, ver, by = _int(d.get("t"), 1), _int(d.get("v"), 1), _member_id(d.get("b"))
         if (media is None or t is None or ver is None or by is None
                 or isinstance(pos, bool) or not isinstance(pos, (int, float))
-                or not 0 <= pos < 1e7 or not isinstance(d.get("p"), bool)):
+                or not math.isfinite(pos) or not 0 <= pos < 1e7
+                or not isinstance(d.get("p"), bool)):
             return None
         return cls(media, bool(d["p"]), float(pos), t, ver, by)
 
@@ -289,6 +477,8 @@ class Message:
     answer: bool = False
     status: str = ""
     state: PlayState | None = None
+    #: Proven to be its sender's (open_message); Room.receive takes no other.
+    signed: bool = False
 
 
 def parse(d: Any) -> Message | None:
@@ -350,6 +540,10 @@ class Clock:
                 return self._fallback
             return min(self._samples)[1]
 
+    def mono(self) -> float:
+        """This computer's monotonic seconds, as now_ms() takes them."""
+        return self._mono()
+
     def uncertainty(self) -> float:
         """Half the best round trip: how far off the clock may be (s)."""
         with self._lock:
@@ -368,6 +562,27 @@ class Member:
     name: str
     seen: float
     status: str = ""
+    greeted: float = float("-inf")
+
+
+#: Rooms whose senders' counters this run of the app keeps (memory only).
+ROOMS_REMEMBERED = 8
+_REMEMBERED: OrderedDict[str, dict[str, tuple[int, float]]] = OrderedDict()
+_REMEMBERED_LOCK = threading.Lock()
+
+
+def remembered(code: str) -> dict[str, tuple[int, float]]:
+    """The counters taken in room *code* this run (a Room's ``_last_n``):
+    the same dict each time it is joined, so a message taken before a
+    rejoin is not taken again. Never written anywhere."""
+    with _REMEMBERED_LOCK:
+        seen = _REMEMBERED.pop(code, None)
+        if seen is None:
+            seen = {}
+        _REMEMBERED[code] = seen
+        while len(_REMEMBERED) > ROOMS_REMEMBERED:
+            _REMEMBERED.popitem(last=False)
+        return seen
 
 
 class Room:
@@ -381,7 +596,8 @@ class Room:
     #: A state from further in the future than this is taken as now.
     FUTURE_MS = 5000
 
-    def __init__(self, code: str, me: str, name: str, clock: Clock) -> None:
+    def __init__(self, code: str, me: str, name: str, clock: Clock,
+                 seen: dict[str, tuple[int, float]] | None = None) -> None:
         self.code = code
         self.me = me
         self.name = clean_name(name) or "?"
@@ -390,7 +606,11 @@ class Room:
         self.state: PlayState | None = None
         self.status = "idle"
         self._sent = 0
-        self._last_n: dict[str, int] = {}
+        self._born = clock.mono()
+        #: Per sender: the highest "n" seen and when (this computer's
+        #: seconds) - *seen*, the room's own across rejoins (remembered).
+        self._last_n: dict[str, tuple[int, float]] = {} if seen is None else seen
+        self._told_unsigned = False
 
     # -- out
     def _make(self, kind: str, **fields: Any) -> dict[str, Any]:
@@ -418,12 +638,51 @@ class Room:
         return self._make("st", st=self.state.wire())
 
     # -- in
+    def _timely(self, msg: Message) -> bool:
+        """Whether *msg* is from this stay in the room and from about now
+        (the module's docstring says why each bound). Without the relay's
+        clock nothing can be said, and nothing is refused."""
+        if not self.clock.known:
+            return True
+        relay_now = self.clock.now_ms()
+        if not relay_now - STALE_MS <= msg.t <= relay_now + AHEAD_MS:
+            return False
+        return msg.t >= self.clock.now_ms(self._born) - JOIN_SLACK_MS
+
+    def _counted(self, msg: Message, now: float) -> bool:
+        """Whether *msg* is new from its sender - and its number kept."""
+        last = self._last_n.get(msg.sender)
+        if last is not None and msg.n <= last[0]:
+            return False
+        if last is None and len(self._last_n) >= SENDERS_MAX:
+            keep = (STALE_MS + AHEAD_MS) / 1000.0
+            for sender in [s for s, (_n, at) in self._last_n.items()
+                           if now - at > keep and s not in self.members]:
+                del self._last_n[sender]
+            if len(self._last_n) >= SENDERS_MAX:
+                return False
+        self._last_n[msg.sender] = (msg.n, now)
+        return True
+
     def receive(self, msg: Message, now: float) -> list[tuple[str, Any]]:
         """What *msg* changes, as events: ("joined" | "left" | "status" |
-        "hello", Member), ("state", (old, new))."""
-        if msg.sender == self.me or msg.n <= self._last_n.get(msg.sender, 0):
+        "hello", Member), ("state", (old, new)), ("unsigned", None) - once a
+        room, for the first message no key signs (an app up to 1.6.8, left
+        out until it is updated). Nothing for one of this computer's own,
+        an old one handed again or one out of its time."""
+        if msg.sender == self.me:
             return []
-        self._last_n[msg.sender] = msg.n
+        if not msg.signed:
+            log.debug("together: an unsigned message was dropped")
+            if not self._told_unsigned:
+                self._told_unsigned = True
+                return [("unsigned", None)]
+            return []
+        if not self._timely(msg):
+            log.debug("together: a message out of its time was ignored")
+            return []
+        if not self._counted(msg, now):
+            return []
         events: list[tuple[str, Any]] = []
         if msg.kind == "bye":
             gone = self.members.pop(msg.sender, None)
@@ -436,9 +695,10 @@ class Room:
             if member is None and msg.kind not in ("hi", "ka"):
                 pass            # known by name once they say hello (they answer ours)
             elif member is None:
-                member = Member(msg.sender, msg.name or "?", seen, msg.status)
-                self.members[msg.sender] = member
-                events.append(("joined", member))
+                if len(self.members) < MEMBERS_MAX:
+                    member = Member(msg.sender, msg.name or "?", seen, msg.status)
+                    self.members[msg.sender] = member
+                    events.append(("joined", member))
             else:
                 member.seen = max(member.seen, seen)
                 if msg.name:
@@ -447,13 +707,20 @@ class Room:
                     member.status = msg.status
                     events.append(("status", member))
         state = msg.state
+        if state is not None and msg.kind == "st" and state.by != msg.sender:
+            state = None        # a choice is told by whoever made it
+        if (state is not None and self.state is not None
+                and state.ver > self.state.ver + VER_JUMP):
+            state = None
         if state is not None and state.t > relay_now + self.FUTURE_MS:
             state = PlayState(state.media, state.playing, state.pos, relay_now,
                               state.ver, state.by)
         if state is not None and state.newer_than(self.state):
             old, self.state = self.state, state
             events.append(("state", (old, state)))
-        if msg.kind == "hi" and not msg.answer and member is not None:
+        if (msg.kind == "hi" and not msg.answer and member is not None
+                and now - member.greeted >= HELLO_EVERY):
+            member.greeted = now
             events.append(("hello", member))
         return events
 
@@ -526,6 +793,10 @@ class Corrector:
                 self.lead = min(self.LEAD_MAX, max(self.LEAD_MIN, 0.5 * self.lead + 0.5 * (used - drift)))
         if not want_playing:
             self._strikes = 0
+            if duration > 0:
+                # Never past the title's end, wherever the room says it is.
+                want = min(want, max(0.0, duration - self.PAUSED_TOLERANCE))
+                drift = pos - want
             if abs(drift) > self.PAUSED_TOLERANCE:
                 self._quiet_until = now + 2.0
                 return Fix("seek", max(0.0, want))
@@ -697,18 +968,37 @@ class Link:
     comes, one seals and sends. *on_message* gets each Message, *on_status*
     (kind, members) how the connection goes - "ok", "net", "busy", "full";
     both on the link's threads. *relay_for(room, member)* makes a relay
-    for a thread (tests hand in one of their own)."""
+    for a thread (tests hand in one of their own). With *identity* (whose
+    id is *me*) everything sent is signed - on the sending thread: a
+    signature takes a few milliseconds of plain Python.
+
+    What the relay held before this link's first request was answered is
+    not delivered (an old room's messages, or old ones handed again), and
+    nothing is sent before that answer, so every answer to this
+    computer's hello comes after it. Should that first answer not come
+    within FIRST_POLL_WAIT the sending goes ahead, and the backlog is then
+    delivered - the room's own rules of time judge it."""
 
     BACKOFF = (2.0, 5.0, 10.0, 20.0, 30.0)
     SEND_TRIES = 3
+    FIRST_POLL_WAIT = 8.0
 
     def __init__(self, room: str, key: bytes, me: str, clock: Clock,
                  on_message: Callable[[Message], None],
                  on_status: Callable[[str, int], None],
                  relay_for: Callable[[str, str], Any] | None = None,
-                 endpoint: str | None = None) -> None:
+                 endpoint: str | None = None, identity: Identity | None = None,
+                 on_older: Callable[[], None] | None = None) -> None:
+        if identity is not None and identity.id != me:
+            raise ValueError("the identity is another member's")
         self.room, self.key, self.me, self.clock = room, key, me, clock
+        self.identity = identity
+        self._polled = threading.Event()
+        self._posted = threading.Event()
         self._on_message, self._on_status = on_message, on_status
+        #: Told once a link: a member of an older app, unsigned (older_frame).
+        self._on_older = on_older
+        self._older_told = False
         self._relay_for = relay_for or functools.partial(Relay, endpoint=endpoint)
         self._stop = threading.Event()
         self._queue: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=64)
@@ -792,8 +1082,23 @@ class Link:
                 self.clock.sample(sent, got.now, received)
             if got.reset:
                 log.info("together: the relay started the room over")
-            for _seq, blob in got.msgs:
-                msg = parse(open_frame(self.key, self.room, blob))
+            msgs = got.msgs[-BATCH_MAX:]
+            if first and not self._posted.is_set():
+                if msgs:
+                    log.debug("together: %d messages from before joining left unread", len(msgs))
+                msgs = []
+            self._polled.set()
+            for _seq, blob in msgs:
+                if self._stop.is_set():
+                    break
+                msg = open_message(self.key, self.room, blob)
+                if msg is None and not self._older_told and self._on_older is not None \
+                        and older_frame(self.key, self.room, blob):
+                    self._older_told = True
+                    try:
+                        self._on_older()
+                    except Exception:
+                        log.debug("together: an older member not told", exc_info=True)
                 if msg is None or msg.sender == self.me:
                     continue
                 try:
@@ -805,8 +1110,15 @@ class Link:
             if not first and not got.msgs and received - sent < 1.0:
                 self._stop.wait(2.0)        # the relay did not wait: no busy loop
             first = False
+        self._polled.set()
         if hasattr(relay, "close"):
             relay.close()
+
+    def _await_first_poll(self) -> None:
+        end = time.monotonic() + self.FIRST_POLL_WAIT
+        while not (self._polled.is_set() or self._stop.is_set()) and time.monotonic() < end:
+            self._polled.wait(0.1)
+        self._posted.set()
 
     def _send_loop(self) -> None:
         relay = self._relay_for(self.room, self.me)
@@ -814,8 +1126,14 @@ class Link:
             msg = self._queue.get()
             if msg is None:
                 break
+            if not self._posted.is_set():
+                self._await_first_poll()
+            if self.clock.known and "t" in msg:
+                # The moment it leaves, on the relay's clock: what the
+                # others judge its age by (a state's own moment is its own).
+                msg = dict(msg, t=self.clock.now_ms())
             try:
-                blob = seal(self.key, self.room, msg)
+                blob = seal(self.key, self.room, msg, self.identity)
             except ValueError:
                 log.info("together: a message too long was not sent")
                 continue

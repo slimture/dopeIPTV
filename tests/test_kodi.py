@@ -445,3 +445,26 @@ def test_the_hub_puts_kodi_beside_the_others(monkeypatch):
     tv.active = None
     hub.shutdown()
     assert order[0] == "kodi" and sorted(order) == ["cc", "kodi", "tv"]
+
+
+def test_a_kodi_typed_as_https_is_asked_over_https_never_http():
+    """An address typed as https:// stays so - its login never goes out in
+    the clear over http instead; kept so in the settings too."""
+    assert kodi.parse_target("https://kodi.lan:8443/jsonrpc") == ("kodi.lan", 8443, True)
+    assert kodi.parse_target("kodi.lan:8080") == ("kodi.lan", 8080, False)
+    assert kodi.parse_address("https://kodi.lan:8443") == ("kodi.lan", 8443)
+    dev = kodi.KodiDevice("Den", "kodi.lan", 8443, "kodi", "pw", manual=True, secure=True)
+    assert dev.endpoint == "https://kodi.lan:8443/jsonrpc"
+    assert kodi.KodiDevice("Den", "kodi.lan", 8080).endpoint == "http://kodi.lan:8080/jsonrpc"
+
+    class S(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
+
+        def setValue(self, k, v):
+            self[k] = v
+    s = S()
+    kodi.save_devices(s, [dev, kodi.KodiDevice("Plain", "10.0.0.2", 8080)])
+    back = kodi.load_devices(s)
+    assert [d.secure for d in back] == [True, False]
+    assert back[0].endpoint.startswith("https://")

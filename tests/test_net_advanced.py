@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from dopeiptv.core import cert_pin, doh, live_latency, nerd, net_adapter, net_bridge, net_route
+from dopeiptv.core import cert_pin, dest_guard, doh, live_latency, nerd, net_adapter, net_bridge, net_route
 from dopeiptv.core.net_route import Route
 
 TS = (Path(__file__).parent / "data" / "tiny.ts").read_bytes()
@@ -37,11 +37,19 @@ def on(**kw) -> nerd.Nerd:
     return nerd.Nerd(S(nerd_enabled="true", **kw))
 
 
+_PEER_REFUSAL = dest_guard.peer_refusal
+
+
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
     # The test machine's own proxy would take the requests made here.
     for k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
         monkeypatch.delenv(k, raising=False)
+    # The servers here are on this computer under names own DNS gives them
+    # (provider.example -> 127.0.0.1): exactly what core/dest_guard.py
+    # refuses a real source, so it is set aside for these tests -
+    # test_own_dns_that_answers_this_computer_is_refused checks it here.
+    monkeypatch.setattr(dest_guard, "peer_refusal", lambda host, peer: "")
     doh.clear_cache()
     yield
     nerd.install(None)
@@ -388,6 +396,21 @@ def test_requests_connect_to_the_address_own_dns_gives_and_keep_the_name(servers
     assert any(a[0] == "wire" for a in dns.asked)
 
 
+def test_own_dns_that_answers_this_computer_is_refused(servers, monkeypatch):
+    """A name of the internet that own DNS answers with this computer's
+    address (DNS rebinding, by the provider's own DNS) is not connected to:
+    not a byte reaches the service there."""
+    import requests
+    monkeypatch.setattr(dest_guard, "peer_refusal", _PEER_REFUSAL)
+    dns = servers(FakeDoh, {"provider.example": ["127.0.0.1"]})
+    origin = servers(Origin)
+    s = requests.Session()
+    assert net_adapter.mount(s, Route(servers=(dns.url,)))
+    with pytest.raises(requests.exceptions.ConnectionError):
+        s.get(f"http://provider.example:{origin.port}/player_api.php", timeout=5)
+    assert origin.requests == []
+
+
 def test_a_pinned_certificate_and_only_that_one(servers, tmp_path):
     import requests
     cert = _make_cert(tmp_path, "nas.example", "a")
@@ -452,7 +475,8 @@ def test_make_client_mounts_the_route_and_hands_it_to_the_guide():
     nerd.install(S(nerd_enabled="false", nerd_dns="quad9"))
     c = make_client({"kind": "m3u", "server": "http://provider.example/list.m3u"})
     assert not c.net_route.active
-    assert type(c.session.get_adapter("https://provider.example/")).__name__ == "HTTPAdapter"
+    # The app's own adapter on requests' (core/_lazy_requests.py): no route.
+    assert type(c.session.get_adapter("https://provider.example/")).__name__ == "CappedAdapter"
 
 
 def test_a_settings_change_reaches_the_clients_session():
@@ -462,8 +486,8 @@ def test_a_settings_change_reaches_the_clients_session():
     assert type(s.get_adapter("https://x/")).__name__ == "HTTPAdapter"
     net_adapter.remount(s, Route(family="ipv4"))
     assert type(s.get_adapter("https://x/")).__name__ == "NetAdapter"
-    net_adapter.remount(s, Route())                     # off again: requests' own back
-    assert type(s.get_adapter("http://x/")).__name__ == "HTTPAdapter"
+    net_adapter.remount(s, Route())                     # off again: no route's adapter
+    assert type(s.get_adapter("http://x/")).__name__ == "CappedAdapter"
 
 
 def test_a_restore_shows_a_trusted_certificate_and_an_own_dns_server():
@@ -545,11 +569,20 @@ def test_a_proxys_request_goes_on_as_the_server_takes_it():
     assert net_bridge.split_target("[::1]:8443", 443) == ("::1", 8443)
 
 
+def _is_the_bridge(px: str) -> bool:
+    """A bridge's address as the player is handed it: on this computer,
+    with the bridge's key as the proxy's login."""
+    from urllib.parse import urlsplit
+    u = urlsplit(px)
+    return (u.scheme == "http" and u.hostname == "127.0.0.1" and bool(u.port)
+            and u.username == net_bridge.USER and len(u.password or "") >= 24)
+
+
 def test_the_player_is_pointed_at_the_bridge_only_where_the_route_changes_something():
     n = on(nerd_dns="cloudflare")
     nerd.install(n.s)
     px = n.stream_options({}, "http://provider.example/live/1.ts")["http-proxy"]
-    assert px.startswith("http://127.0.0.1:")
+    assert _is_the_bridge(px)
     assert n.stream_options({}, "http://127.0.0.1:5000/dvr/abc")["http-proxy"] == ""
     assert n.stream_options({}, "http://provider.example/1.ts", opened="http://127.0.0.1:9/x")["http-proxy"] == ""
     assert n.stream_options({}, "http://192.168.1.20:8001/1:0:1")["http-proxy"] == ""
@@ -659,10 +692,19 @@ def _pinned_and_others(servers, tmp_path, redirect_to: str | None = None):
     return ca, route, source, home, other, cdn
 
 
-def _connect(bridge, target: str) -> str:
-    """The bridge's answer to CONNECT *target*: its status line."""
+def _login(bridge) -> str:
+    """The bridge's key as a proxy's login, as a player sends it."""
+    import base64
+    word = base64.b64encode(f"{net_bridge.USER}:{bridge.secret}".encode()).decode()
+    return f"Proxy-Authorization: Basic {word}\r\n"
+
+
+def _connect(bridge, target: str, login: str | None = None) -> str:
+    """The bridge's answer to CONNECT *target*: its status line. With the
+    bridge's key, as the app's own player sends it (*login*: another)."""
+    login = _login(bridge) if login is None else login
     with socket.create_connection(("127.0.0.1", bridge.port), timeout=15) as s:
-        s.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode())
+        s.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n{login}\r\n".encode())
         return s.recv(4096).split(b"\r\n", 1)[0].decode()
 
 
@@ -735,7 +777,7 @@ def test_real_mpv_plays_through_the_bridge(servers, tmp_path):
     try:
         url = f"https://nas.example:{home.port}/live/3.ts"
         assert nerd.apply_stream(m, source, False, url=url)
-        assert m["http-proxy"].startswith("http://127.0.0.1:") and m["tls-verify"] is False
+        assert _is_the_bridge(m["http-proxy"]) and m["tls-verify"] is False
         m.command("loadfile", url)
         end = time.monotonic() + 20
         while time.monotonic() < end and not home.requests:
@@ -780,7 +822,7 @@ def test_a_recording_goes_through_the_bridge(monkeypatch, tmp_path):
     mgr._spawn(job)
     cmd = calls[-1]
     i = cmd.index("-http_proxy")
-    assert cmd[i + 1].startswith("http://127.0.0.1:") and cmd.index("-i") > i
+    assert _is_the_bridge(cmd[i + 1]) and cmd.index("-i") > i
     assert "-tls_verify" not in cmd                     # the stream's own check
     # A pinned home server: the bridge checks the pin, the recorder not the chain.
     nerd.set_source({"kind": "xtream", "options": cert_pin.pin_options("nas.example", 8443, "ab" * 32)})

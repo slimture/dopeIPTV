@@ -45,12 +45,15 @@ JOIN_SETTLE = 4.0
 FOLLOW_FOR = 25.0
 #: s after entering in which "X joined" is not toasted (the room's history).
 QUIET_JOINS = 4.0
+#: The relay not reached for this long (s): a hello on coming back.
+REJOIN_HELLO = 30.0
 
 
 class _TogetherSignals(QObject):
     """The link's threads emit these; the window hears them on its own."""
     message = pyqtSignal(int, object)       # link id, Message
     status = pyqtSignal(int, str, int)      # link id, kind, members
+    older = pyqtSignal(int)                 # link id: a member of an older app
 
 
 def _derive(lid: int, code: str) -> tuple[int, str, str, bytes]:
@@ -80,6 +83,8 @@ class _TogetherMixin:
         self._together_conn = ("idle", 0)
         self._together_joining = False
         self._together_entered_at = 0.0
+        self._together_down_at = 0.0
+        self._together_identity: together.Identity | None = None
         self._together_local: together.Media | None = None
         self._together_follow: together.Media | None = None
         self._together_follow_at = 0.0
@@ -99,6 +104,7 @@ class _TogetherMixin:
         q = Qt.ConnectionType.QueuedConnection
         self._together_signals.message.connect(self._together_on_message, q)
         self._together_signals.status.connect(self._together_on_status, q)
+        self._together_signals.older.connect(self._together_on_older, q)
         self._together_tick_timer = QTimer(self)
         self._together_tick_timer.setInterval(TICK_MS)
         self._together_tick_timer.timeout.connect(self._together_tick)
@@ -193,7 +199,7 @@ class _TogetherMixin:
     def together_join(self, code: str, name: str) -> str | None:
         shown = together.parse_code(code)
         if shown is None:
-            return tr("together_code_bad")
+            return tr("together_code_old" if together.is_old_code(code) else "together_code_bad")
         return self._together_enter(shown, name, joining=True)
 
     def _together_enter(self, code: str, name: str, joining: bool) -> str | None:
@@ -209,7 +215,12 @@ class _TogetherMixin:
         type(self)._together_name = clean
         self._together_lid += 1
         clock = together.Clock()
-        self._together_room = together.Room(code, together.new_member(), clean, clock)
+        # A key pair of its own for this room: nobody else in it can speak
+        # under this computer's id.
+        self._together_identity = together.new_identity()
+        self._together_room = together.Room(code, self._together_identity.id, clean, clock,
+                                            seen=together.remembered(code))
+        self._together_down_at = 0.0
         self._together_joining = joining
         self._together_conn = ("connecting", 0)
         self._together_note = ""
@@ -239,8 +250,10 @@ class _TogetherMixin:
         link = together.Link(room_id, key, room.me, room.clock,
                              on_message=partial(sig.message.emit, lid),
                              on_status=partial(sig.status.emit, lid),
+                             on_older=partial(sig.older.emit, lid),
                              relay_for=self._together_relay_for,
-                             endpoint=self._together_endpoint)
+                             endpoint=self._together_endpoint,
+                             identity=self._together_identity)
         self._together_link = link
         link.start()
         self._together_local = self._together_now_playing()
@@ -303,7 +316,19 @@ class _TogetherMixin:
     def _together_on_status(self, lid: int, kind: str, members: int) -> None:
         if lid != self._together_lid or self._together_room is None:
             return
+        was = self._together_conn[0]
         self._together_conn = (kind, members)
+        now = time.monotonic()
+        if kind in ("net", "busy"):
+            if was not in ("net", "busy"):
+                self._together_down_at = now
+        elif kind == "ok" and was in ("net", "busy"):
+            link = self._together_link
+            if link is not None and now - self._together_down_at >= REJOIN_HELLO:
+                # Back after a while without the relay: what was said
+                # meanwhile may be too old to be taken - the others'
+                # answers to a hello say what plays now.
+                link.send(self._together_room.hello())
         if kind == "full":
             self.together_leave(quiet=True)
             self._together_toast(tr("together_full", most=together.MAX_MEMBERS), 6000)
@@ -312,6 +337,11 @@ class _TogetherMixin:
                 dlg.show_error(tr("together_full", most=together.MAX_MEMBERS))
             return
         self._together_refresh()
+
+    def _together_on_older(self, lid: int) -> None:
+        """Someone in the room uses an app that cannot sign: said once."""
+        if lid == self._together_lid and self._together_room is not None:
+            self._together_toast(tr("together_older"), 8000)
 
     def _together_on_message(self, lid: int, msg: together.Message) -> None:
         room, link = self._together_room, self._together_link
@@ -329,6 +359,8 @@ class _TogetherMixin:
                 link.send(room.hello(answer=True))
             elif kind == "state":
                 self._together_on_state(what[1])
+            elif kind == "unsigned":
+                self._together_toast(tr("together_older"), 8000)
         self._together_refresh()
 
     def _together_on_state(self, state: together.PlayState) -> None:

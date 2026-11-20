@@ -126,6 +126,8 @@ class _PopularMixin:
     def _popular_chart_now(self) -> dict | None:
         """This week's chart, from memory or disk - fetched again in the
         background once it is a day old or in another language."""
+        if getattr(getattr(self, "cover", None), "off", False):
+            return None                     # TMDB turned off: no chart, not even the kept one
         if getattr(self, "_popular_chart", None) is None:
             self._popular_chart = popular.load(self._popular_chart_path()) or {}
         chart = self._popular_chart

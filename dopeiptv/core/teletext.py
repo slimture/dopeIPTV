@@ -129,7 +129,7 @@ def page_text(page: int) -> str:
 def page_from_text(text: str) -> int | None:
     """0x199 for "199"; None for anything but a page 100-899."""
     text = (text or "").strip()
-    if len(text) != 3 or not text.isdigit():
+    if len(text) != 3 or not text.isdecimal():
         return None
     page = int(text, 16)
     return page if is_decimal(page) else None

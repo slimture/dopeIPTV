@@ -78,7 +78,7 @@ def _text(v: Any, limit: int = 200) -> str:
 def _int(v: Any) -> int:
     try:
         return max(0, int(v or 0))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

@@ -296,7 +296,7 @@ def test_search_in_tv_mode_forgets_the_profile_before():
 
 class _Prof:
     def __init__(self, pid, name, pin=""):
-        self.id, self.name, self._pin = pid, name, pin
+        self.id, self.name, self._pin, self.kids = pid, name, pin, False
 
     @property
     def has_pin(self):
@@ -315,6 +315,12 @@ class _Store:
 
     def profiles(self):
         return list(self._ps)
+
+    def verify(self, pid, pin):
+        # As ProfileStore.verify: the switch asks the store, which also
+        # writes a PIN kept the old way anew (core/pins.py).
+        p = self.get(pid)
+        return p is not None and p.verify(pin)
 
 
 class _NoParental:

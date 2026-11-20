@@ -236,6 +236,7 @@ class _BuildDetailMixin:
             dl.insertWidget(dl.indexOf(self.player) + 1, self._player_resize)
 
         self.stream_error = QLabel("")
+        self.stream_error.setTextFormat(Qt.TextFormat.PlainText)    # the server's, mpv's words
         self.stream_error.setStyleSheet(
             f"color:{P['error']}; font-size:12px;")
         self.stream_error.setWordWrap(True)

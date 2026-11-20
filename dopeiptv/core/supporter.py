@@ -17,12 +17,14 @@ from __future__ import annotations
 import base64
 import binascii
 import datetime as dt
+import re
 import secrets
 import threading
 from collections import OrderedDict
 from typing import Any
 
 from .ed25519 import public_key, sign, verify
+from .log import register_secrets
 
 #: The public half of dopeiptv.org's supporter key (32 bytes, hex). Empty
 #: until the site has one: then no key checks out.
@@ -30,6 +32,8 @@ PUBLIC_KEY_HEX = "65c72e1f1ac5df41e6f268aad6dacbf690f78679f61fa8321488b62637b988
 PREFIX = "DS1-"
 _DOMAIN = b"dopeIPTV supporter key v1\x00"
 _PAYLOAD = 11                  # version (1) + day (4) + id (6)
+#: The key after its prefix: (11 + 64) bytes in base64url, unpadded.
+_BODY = re.compile(r"[A-Za-z0-9_-]{100}")
 
 
 def _pub(public: bytes | None) -> bytes | None:
@@ -58,6 +62,11 @@ def parse(key: str, public: bytes | None = None) -> dict[str, Any] | None:
     if pub is None or not text.upper().startswith(PREFIX):
         return None
     body = text[len(PREFIX):]
+    # Exactly what make() writes: 100 characters of the URL-safe alphabet,
+    # no padding. b64decode would skip any other character silently - a
+    # key with junk in it, or another's spelling of it, checked out.
+    if not _BODY.fullmatch(body):
+        return None
     try:
         raw = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
     except (binascii.Error, ValueError):
@@ -94,6 +103,7 @@ def stored(settings: Any) -> dict[str, Any] | None:
         return None
     if not key:
         return None
+    register_secrets(key, "".join(key.split()))
     seen = (PUBLIC_KEY_HEX, key)
     with _seen_lock:
         if seen in _seen:

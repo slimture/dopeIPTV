@@ -19,7 +19,7 @@ from typing import Any
 from PyQt6.QtCore import QMetaType, QObject, QTimer
 
 from ..core.log import log
-from .media_session import MediaHost, clean_snapshot
+from .media_session import MediaHost, art_for_bus, clean_snapshot
 
 BUS_NAME = "org.mpris.MediaPlayer2.dopeiptv"
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
@@ -47,6 +47,19 @@ def _strings(values: list[str]) -> Any:
     arg = QDBusArgument()
     arg.add(list(values), QMetaType.Type.QStringList.value)  # type: ignore[arg-type]
     return arg
+
+
+def art_url(art: str) -> str:
+    """*art* as the desktop is told it: a web address, or a file where the
+    app's own pictures are (its image cache, a picon folder) - never some
+    other path or protocol a source's row names; "" then."""
+    if art.lower().startswith(("http://", "https://")):
+        return art
+    from PyQt6.QtCore import QUrl
+
+    from ..core import picture_files
+    path = QUrl(art).toLocalFile() if art.lower().startswith("file:") else art
+    return art if path and picture_files.trusted(path) else ""
 
 
 def _build_adaptors(service: MprisService) -> None:
@@ -300,8 +313,12 @@ class MprisService(QObject):
             md["xesam:artist"] = _strings([s["artist"]])
         if s["album"]:
             md["xesam:album"] = s["album"]
-        if s["art"]:
-            md["mpris:artUrl"] = s["art"]
+        # Never an address with a login in it - the whole session bus reads
+        # this (media_session.art_for_bus) - nor a file outside the app's own
+        # pictures (art_url).
+        art = art_url(art_for_bus(s["art"])) if s["art"] else ""
+        if art:
+            md["mpris:artUrl"] = art
         if s["length"] > 0:
             md["mpris:length"] = _int64(int(s["length"] * 1e6))
         return md

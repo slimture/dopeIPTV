@@ -21,6 +21,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QAbstractItemView, QListWidgetItem
 
 from ..core.log import log
+from ..core.stores import catalogue_cats, kept_place, lock_hides
 from ..core.workers import run_async
 from ..i18n import tr
 
@@ -28,6 +29,10 @@ from ..i18n import tr
 # Sentinel for "no pending category to reselect" - distinct from None, which
 # is a real category id (the "All" row).
 _UNSET = object()
+
+#: The source's catalogue not read for the parental lock's held-back rows
+#: (_lock_learn): asked again no sooner than this.
+LOCK_RETRY_S = 60.0
 
 
 # The status row's "123 channels", per kind of list.
@@ -46,6 +51,10 @@ class _ListsMixin:
     # -- modes and categories ------------------------------------------------------
 
     def switch_mode(self, mode: str) -> None:
+        # Local files and Recordings are never a kids profile's, by any way
+        # in (a key, the palette, a menu): mw_profiles.KIDS_NEVER.
+        if mode in ("local", "rec") and getattr(self, "_profile_kids", lambda: False)():
+            mode = "live"
         # Any mode switch shows the three-column window (in TV mode: where
         # leaving it lands - TV mode holds the window).
         if getattr(self, "_center_stack", None) is not None and not self._tv_land_on(0):
@@ -392,7 +401,7 @@ class _ListsMixin:
                     continue
                 name = self.overrides.display_name(
                     self.mode, cid, c.get("category_name", "?"))
-                if kids and adult_category(name):
+                if kids and adult_category(name, c.get("category_name")):
                     continue
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):
@@ -617,7 +626,7 @@ class _ListsMixin:
             return
         if self.mode == "history":
             self._history_subcat = category_id  # None / live / movie / series
-            items = self.history.items()
+            items = self._lock_filter(self.history.items())
             if category_id is not None:
                 kinds = self._HISTORY_KINDS.get(category_id, set())
                 self.all_items = [it for it in items
@@ -1070,6 +1079,102 @@ class _ListsMixin:
                                and not hidden(it, mode) and kids(it))
         return lambda it: (str(it.get("category_id")) not in excluded
                            and not hidden(it, mode))
+
+    # -- the parental lock on what the stores kept ---------------------------------
+
+    def _lock_shut(self) -> dict[str, frozenset[str]]:
+        """Per mode, the source in use's categories that are locked while the
+        lock is shut (a kids profile's always); none while it is open."""
+        kids = getattr(self, "_profile_kids", lambda: False)()
+        if self.parental.session_unlocked and not kids:
+            return {}
+        out = {}
+        for mode in ("live", "vod", "series"):
+            ids = self.overrides.locked_ids(mode)
+            if ids:
+                out[mode] = ids
+        return out
+
+    def _lock_filter(self, rows) -> list:
+        """*rows* the stores kept of the source in use - History's, Continue
+        watching's - as the lists may show them: none of a category locked
+        while the lock is shut. A row that does not say its category (History
+        kept none for a channel or a film before) is held back until the
+        source's catalogue said it - read meanwhile on the pool, and shown
+        then (_lock_learn). With nothing locked, or the lock open, all."""
+        rows = list(rows or [])
+        shut = self._lock_shut()
+        if not shut:
+            return rows
+        found = self._lock_known()
+        out, wanted = [], {}
+        for r in rows:
+            hides = lock_hides(r, shut, found)
+            if hides is None:
+                place = kept_place(r)
+                if place is not None:
+                    wanted.setdefault(place[0], set()).add(place[2])
+                self._lock_held = True
+            elif not hides:
+                out.append(r)
+        if wanted:
+            self._lock_learn(wanted)
+        return out
+
+    def _lock_known(self) -> dict[str, dict[str, str]]:
+        """Per mode, what the source in use's catalogue said of the rows
+        _lock_filter held back: their id -> category ("" for none)."""
+        got = self.__dict__.get("_lock_cats")
+        if got is None or got[0] is not self.client:
+            got = (self.client, {})
+            self._lock_cats = got
+        return got[1]
+
+    def _lock_learn(self, wanted: dict[str, set[str]]) -> None:
+        """The categories of *wanted* (per mode, ids) read from the source's
+        catalogue on the pool - its lists as the client holds them, a
+        portal's only as loaded before - then whatever was held back for
+        want of them shown (_lock_cats_in)."""
+        import threading
+        if threading.current_thread() is not threading.main_thread():
+            return
+        client = self.client
+        failed_at = self.__dict__.get("_lock_failed")
+        if failed_at is not None and failed_at[0] is client \
+                and time.monotonic() - failed_at[1] < LOCK_RETRY_S:
+            return                      # held back meanwhile; asked again later
+        asking = self.__dict__.get("_lock_asking")
+        if asking is None or asking[0] is not client:
+            asking = (client, set())
+            self._lock_asking = asking
+        todo = {m: {i for i in ids if (m, i) not in asking[1]} for m, ids in wanted.items()}
+        todo = {m: ids for m, ids in todo.items() if ids}
+        if not todo:
+            return
+        asking[1].update((m, i) for m, ids in todo.items() for i in ids)
+
+        def work():
+            return client, {m: catalogue_cats(client, m, ids) for m, ids in todo.items()}
+
+        def failed(_msg=None) -> None:
+            if self.__dict__.get("_lock_asking", (None,))[0] is client:
+                asking[1].difference_update((m, i) for m, ids in todo.items() for i in ids)
+            self._lock_failed = (client, time.monotonic())
+
+        run_async(self.pool, work, self._lock_cats_in, failed)
+
+    def _lock_cats_in(self, got) -> None:
+        client, found = got
+        if client is not self.client:
+            return
+        known = self._lock_known()
+        for mode, cats in found.items():
+            known.setdefault(mode, {}).update(cats)
+        if not self.__dict__.pop("_lock_held", False):
+            return
+        held = getattr(self, "_held_rows_in", None)
+        if callable(held):
+            held("lock")
 
     def _channel_hidden(self, it, kind: str) -> bool:
         # A row carrying its own kind is judged by THAT, not by the view's.

@@ -69,7 +69,8 @@ from ..core.log import log
 from . import about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
-from .widgets import confirm, file_dialog_options
+from .widgets import confirm, file_dialog_options, plain_text
+from .notices import hub_of
 from ..core.workers import run_async
 
 
@@ -130,8 +131,9 @@ class SettingsContext:
     #: add_playlist(prefill=None): the quick form, then the new source's
     #: page.
     add_playlist: Callable[..., None]
-    #: General's backup: saved, and restored (Sources' list follows).
-    export_playlists: Callable[[], None]
+    #: General's backup: saved - export_playlists(password=""), whether it
+    #: was written - and restored (Sources' list follows).
+    export_playlists: Callable[..., bool]
     import_playlists: Callable[[], None]
     #: A change made: stored and applied a moment later (set once the
     #: window's change timer is made, before any page is built).
@@ -172,6 +174,60 @@ class _SettingsMixin:
             self.desktop_entry_btn.show()
         except Exception as e:      # never let a nicety break startup
             log.warning("desktop entry offer failed: %s", e)
+
+    def _tell_settings_not_private(self) -> None:
+        """Once a start, when a settings file could not be made readable by
+        this user alone (core/settings_files.py: a drive that keeps no
+        permissions): asked in a window that waits for an answer - it holds
+        every login - until the person says to go on for that file; after
+        that a calm message each start. Its button opens the folder."""
+        try:
+            from ..core import settings_files
+            found = settings_files.not_private()
+            if not found or getattr(self, "_settings_open_told", False):
+                return
+            self._settings_open_told = True
+            path = found[0]
+            folder = os.path.dirname(path)
+
+            def show() -> None:
+                from ..core import xdg
+                xdg.open_folder(folder)
+            accepted = str(self.settings.value(settings_files.ACCEPTED_KEY, "") or "")
+            if accepted != settings_files.accepted_mark(path):
+                answer = self._ask_settings_open(path)
+                if answer == "go":
+                    self.settings.setValue(settings_files.ACCEPTED_KEY,
+                                           settings_files.accepted_mark(path))
+                    log.warning("settings: kept on a drive other accounts may read, as the "
+                                "person said")
+                    return
+                if answer == "open":
+                    show()
+                log.warning("settings: the app closes - its settings file is not private")
+                self.close()
+                return
+            hub_of(self).post(tr("settings_open_body", path=path), title=tr("settings_open_title"),
+                              level="warning", action=show, action_label=tr("btn_open_folder"),
+                              key="settings_not_private")
+        except Exception as e:      # never in the way of starting
+            log.warning("settings: the note on their permissions was not shown: %s", e)
+
+    def _ask_settings_open(self, path: str) -> str:
+        """The question a settings file others may read asks: "go" (go on
+        with it, for this file), "open" (its folder, and close) or "quit" -
+        Close the default, and Escape."""
+        box = QMessageBox(QMessageBox.Icon.Warning, tr("settings_open_title"),
+                          plain_text(tr("settings_open_body", path=path)),
+                          QMessageBox.StandardButton.NoButton, self)
+        opened = box.addButton(tr("btn_open_folder"), QMessageBox.ButtonRole.ActionRole)
+        quit_btn = box.addButton(tr("settings_open_quit"), QMessageBox.ButtonRole.RejectRole)
+        go = box.addButton(tr("settings_open_go"), QMessageBox.ButtonRole.AcceptRole)
+        box.setDefaultButton(quit_btn)
+        box.setEscapeButton(quit_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        return "go" if clicked is go else "open" if clicked is opened else "quit"
 
     def _ask_desktop_entry(self) -> None:
         """The status-row link was clicked: ask, and remember the answer."""
@@ -417,32 +473,60 @@ class _SettingsMixin:
         return "\n".join(tr("backup_count", what=tr(f"backup_kind_{kind}"), n=n)
                          for kind, n in counts.items() if n)
 
-    def _backup_save(self, parent) -> None:
-        """Settings > General > Backup: everything to one file."""
+    def _backup_without_password_ok(self, parent) -> bool:
+        """The file holds every login, token and the sync code: kept
+        without a password only when the person says so, Cancel the
+        default."""
+        box = QMessageBox(QMessageBox.Icon.Warning, tr("backup_title"),
+                          tr("backup_no_pw_warn"), QMessageBox.StandardButton.Cancel, parent)
+        plain = box.addButton(tr("backup_no_pw_go"), QMessageBox.ButtonRole.AcceptRole)
+        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        return box.clickedButton() is plain
+
+    def _backup_save(self, parent, password: str = "") -> bool:
+        """Settings > General > Backup: everything to one file - with
+        *password*, encrypted with it (core/backup.lock) on a thread of its
+        own while a small window says so. Whether it was written."""
         from datetime import date
 
         from ..core import backup
+        if password and len(password) < backup.PASSWORD_MIN:
+            QMessageBox.warning(parent, tr("backup_title"),
+                                tr("backup_pw_short", n=backup.PASSWORD_MIN))
+            return False
+        if not password and not self._backup_without_password_ok(parent):
+            return False
+        # The same name with a password or without: the file says inside
+        # what it is, and the restore finds either kind the same way.
         path, _f = QFileDialog.getSaveFileName(
             parent, tr("backup_title"),
             f"dopeIPTV-backup-{date.today().isoformat()}.json",
             tr("file_filter_json"),
             options=file_dialog_options())
         if not path:
-            return
+            return False
         doc = backup.collect(self._backup_stores(), VERSION)
+        locked = bool(password)
         try:
-            backup.write(path, doc)
+            if locked:
+                from .backup_dialogs import run_working
+                run_working(parent, tr("backup_title"), tr("backup_locking"),
+                            lambda: backup.write(path, backup.for_file(doc, password)))
+            else:
+                backup.write(path, doc)
         except OSError as exc:
             log.warning("backup: not written: %s", exc)
             QMessageBox.warning(parent, tr("backup_title"),
                                 tr("pl_export_failed", error=exc))
-            return
+            return False
         counts = backup.summary(backup.parse(doc))
-        log.info("backup: written (%s)", ", ".join(
-            f"{k} {n}" for k, n in counts.items() if n))
-        QMessageBox.information(
-            parent, tr("backup_title"),
-            tr("backup_done", what=self._backup_counts(counts), path=path))
+        log.info("backup: written%s (%s)", " with a password" if locked else "",
+                 ", ".join(f"{k} {n}" for k, n in counts.items() if n))
+        done = tr("backup_done_locked" if locked else "backup_done",
+                  what=self._backup_counts(counts), path=path)
+        QMessageBox.information(parent, tr("backup_title"), done)
+        return True
 
     def _backup_restore(self, parent, playlists_added) -> None:
         """Settings > General > Backup: a backup back - over everything, as
@@ -451,8 +535,8 @@ class _SettingsMixin:
         from .dialogs import RestoreBackupDialog, pick_backup, stage_backup
         b, why = pick_backup(parent)
         if b is None:
-            if why:
-                QMessageBox.warning(parent, tr("restore_title"), why)
+            if why:     # the file's own words in it (its version)
+                QMessageBox.warning(parent, tr("restore_title"), plain_text(why))
             return
         store = getattr(self, "playlist_store", None)
         on = getattr(self, "_sync_on", None)
@@ -482,7 +566,7 @@ class _SettingsMixin:
             return
         why = stage_backup(b)
         if why:
-            QMessageBox.warning(parent, tr("restore_title"), why)
+            QMessageBox.warning(parent, tr("restore_title"), plain_text(why))
             return
         # As after Reset all: nothing written on the way out, and the app
         # closes - the backup is put in place as it next starts, where no
@@ -750,8 +834,14 @@ class _SettingsMixin:
             clear()
         self.refresh_playlist(force=False)
 
-    def _unlock_nerd(self) -> None:
-        """Nerd on, from About's seven taps: the page appears in Settings."""
+    def _unlock_nerd(self, in_settings: bool = False) -> None:
+        """Nerd on, from About's seven taps: the page appears in Settings.
+        A kids profile changes Settings only with a grown-up's PIN: the taps
+        do it there in About over Settings (*in_settings*), never in the one
+        the Help menu opens."""
+        kids = getattr(self, "_profile_kids", None)
+        if not in_settings and callable(kids) and kids():
+            return
         from ..core import nerd
         already = self.settings.value("nerd_enabled", "false") == "true"
         self.settings.setValue("nerd_enabled", "true")
@@ -1035,8 +1125,8 @@ class _SettingsMixin:
                 sources_changed(pl["id"])
                 edit_source(pl["id"], shell.current_key())
 
-        def export_playlists():
-            self._backup_save(d)
+        def export_playlists(password: str = "") -> bool:
+            return self._backup_save(d, password)
 
         def playlists_added() -> None:
             sources_changed(store.active_id)
@@ -1220,6 +1310,7 @@ class _SettingsMixin:
                 self._places_look_changed("settings")
             if changed & {"metadata_source", "tmdb_api_key"}:
                 self.cover.reload()
+                self._popular_changed()     # TMDB on or off: the tops ask again
             if changed & player_keys and self.player:
                 self.player.apply_default_options()
             if "show_stream_info" in changed and self.player:

@@ -24,7 +24,7 @@ import sys
 from typing import Any, Callable, Iterable
 
 from . import build_check
-from .log import URL_IN_TEXT, log, recent_lines
+from .log import URL_IN_TEXT, log, open_private, private_folder, recent_lines
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
 REPLIES = "https://dopeiptv.org/feedback/replies"
@@ -46,8 +46,9 @@ _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A login written name=value or name: value - a quoted name or value too, as
 # JSON and config files write them ("password": "x y"); the quotes stay.
-_KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|token|key|api_key|apikey|secret|"
-                     r"auth|sid|session|mac|play_token|login|host)([\"']?\s*[=:]\s*)"
+# (The log's filter masks the same, core/log.py, all but the login and host.)
+_KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|(?:access_|refresh_|play_)?token|key|"
+                     r"api[_-]?key|secret|auth|sid|session|mac|login|host)([\"']?\s*[=:]\s*)"
                      r"(\"[^\"\n]{0,200}\"|'[^'\n]{0,200}'|[^\s&'\",;]+)")
 # A header that carries a login, to the end of its line, and a bearer token
 # wherever it stands.
@@ -60,6 +61,29 @@ _HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\
                         r"(?::\d{1,5})?/[^\s'\"<>()\[\]]*", re.IGNORECASE)
 
 
+# A login told in words: "my password is hunter2", "lösenord: x",
+# "username kalle" - the word after the name, in the languages most reports
+# come in. ("login" and "pin" are left: "login failed", "the PIN was wrong".)
+_SAID = re.compile(r"(?i)\b(password|passwd|passcode|username|user name|"
+                   r"l\u00f6senord|anv\u00e4ndarnamn|passwort|benutzername|kennwort|"
+                   r"mot de passe|identifiant|contrase\u00f1a|usuario|senha|usu\u00e1rio|"
+                   r"wachtwoord|gebruikersnaam|has\u0142o|parola|salasana|adgangskode|passord)"
+                   r"(\s*[:=]\s*|\s+(?:is now|is|was|\u00e4r|var|ist|est|es|\u00e9)?\s*)"
+                   r"(?![\"']?<)([^\s,;.!?]{2,128})")
+# A token whatever it is called: a JSON web token, a GitHub or Slack token,
+# and any run of 32 or more letters and digits with both in it (a key, a
+# hash that would name a file).
+_JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
+_PREFIXED = re.compile(r"\b(?:gh[pousr]|xox[abprs]|sk|pk|rk)[-_][A-Za-z0-9_-]{16,}")
+_LONG = re.compile(r"(?<![A-Za-z0-9_/-])(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])"
+                   r"[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])")
+# Another account's home folder (Windows, macOS, Linux): its name.
+_HOME_DIR = re.compile(r"(?i)((?:[A-Z]:)?[\\/](?:Users|home|Documents and Settings)[\\/])"
+                       r"([^\\/\s:*?\"<>|]{1,64})")
+# A phone number written as one usually is: with a + or 00 first.
+_PHONE = re.compile(r"(?<![\w+])(?:\+|00)\d{1,3}(?:[ .-]?\d){6,13}(?!\d)")
+
+
 def _hide_value(m: re.Match[str]) -> str:
     value = m.group(3)
     quote = value[0] if value[:1] in ("'", '"') else ""
@@ -67,11 +91,11 @@ def _hide_value(m: re.Match[str]) -> str:
 
 
 def _not_an_address(text: str) -> bool:
-    """Loopback - or the app's own test build's version, which has four
-    numbers too ("1.6.0.123": the version and the build's run)."""
+    """Loopback - or exactly this build's own version where it has four
+    numbers ("1.6.8.259": a test build's run). Nothing else that only
+    begins as the version does: 1.6.8.10 can be someone's address."""
     from .. import __version__
-    base = ".".join(__version__.split(".")[:3])
-    return text.startswith("127.") or text.startswith(base + ".")
+    return text.startswith("127.") or (text == __version__ and text.count(".") == 3)
 
 
 def scrub(text: str, personal: Iterable[str] = ()) -> str:
@@ -90,9 +114,15 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
     out = _AUTH_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
     out = _BEARER.sub(lambda m: f"{m.group(1)} <hidden>", out)
     out = _KEYVAL.sub(_hide_value, out)
+    out = _SAID.sub(lambda m: f"{m.group(1)}{m.group(2)}<hidden>", out)
+    out = _JWT.sub("<token>", out)
+    out = _PREFIXED.sub("<token>", out)
+    out = _LONG.sub("<token>", out)
+    out = _PHONE.sub("<phone>", out)
     home = os.path.expanduser("~")
     if len(home) > 1:
         out = out.replace(home, "~")
+    out = _HOME_DIR.sub(lambda m: f"{m.group(1)}<user>", out)
     try:
         user = getpass.getuser()
     except Exception:
@@ -252,19 +282,21 @@ def _fit(text: str, room: int) -> str:
     return text if len(raw) <= room else raw[:max(0, room)].decode("utf-8", "ignore")
 
 
-def send(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
-         extra: dict | None = None) -> bool:
+def send(kind: str, text: str, *, personal: Iterable[str], timeout: float = 15.0,
+         endpoint: str | None = None, extra: dict | None = None) -> bool:
     """POST the report as the person left it - scrubbed once more on its way
     out (send_status). True when it arrived - never from a modified build
     (its reports go to whoever made it)."""
-    return 200 <= send_status(kind, text, timeout, endpoint, extra) < 300
+    return 200 <= send_status(kind, text, personal=personal, timeout=timeout,
+                              endpoint=endpoint, extra=extra) < 300
 
 
-def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | None = None,
-                extra: dict | None = None) -> int:
+def send_status(kind: str, text: str, *, personal: Iterable[str], timeout: float = 15.0,
+                endpoint: str | None = None, extra: dict | None = None) -> int:
     """send(), with the site's answer: its HTTP status - 409 for a reply to
     an answer whose thread is closed - or 0 when nothing reached it (never
-    from a modified build)."""
+    from a modified build). *personal*: what is the person's own
+    (personal_values()) - required, so no way out sends without it."""
     from .. import __version__
     if not build_check.allowed():
         log.info("report: not sent - not an official build")
@@ -272,10 +304,10 @@ def send_status(kind: str, text: str, timeout: float = 15.0, endpoint: str | Non
     extra = extra or {}
     fields = {"kind": kind if kind in ("error", "crash", "feedback") else "feedback",
               "version": __version__, "os": platform.system(),
-              # Scrubbed again here, whoever called: the window scrubs with
-              # what it knows is the person's own; this pass is the last,
-              # with the patterns alone, so no way out skips them.
-              "text": scrub(text or "")[:MAX_TEXT]}
+              # Scrubbed again here, whoever called, with the patterns and
+              # what is the person's own: the last pass, so no way out
+              # skips either.
+              "text": scrub(text or "", personal)[:MAX_TEXT]}
     # What feedback is about (a topic, an area, how often) and "supporter":
     # "yes" from a supporter (read first): single words from a short list.
     fields.update({k: v for k, v in extra.items()
@@ -610,6 +642,7 @@ def take_last_crash(folder: str) -> str:
 
 
 def open_crash_file(folder: str) -> Any:
-    """The file the native crash handler writes to this run (kept open)."""
-    os.makedirs(folder, exist_ok=True)
-    return open(crash_path(folder), "w", encoding="utf-8")  # noqa: SIM115 - held for the run
+    """The file the native crash handler writes to this run (kept open),
+    this user's alone (0600 in a 0700 folder): what was on the stack."""
+    private_folder(folder)
+    return open_private(crash_path(folder), "w", encoding="utf-8")

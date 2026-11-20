@@ -230,3 +230,118 @@ def test_showing_never_waits_for_discord():
 def test_no_discord_is_quiet():
     with pytest.raises(OSError):
         rpc.open_pipe(["/nonexistent-dir-dopeiptv/discord-ipc-0"])
+
+
+# -- whose socket it is: what plays is said to this user's Discord only -----------
+
+def test_the_user_s_own_folder_is_looked_through_before_tmp():
+    env = {"XDG_RUNTIME_DIR": "/run/user/1000"}
+    paths = rpc.socket_paths(env, "linux")
+    own = [i for i, p in enumerate(paths) if p.startswith("/run/user/1000/")]
+    shared = [i for i, p in enumerate(paths) if p.startswith("/tmp/")]
+    assert own and shared and max(own) < min(shared)
+
+
+@unix_only
+def test_a_socket_of_another_user_s_is_told_nothing(sock_path, monkeypatch):
+    """Discord falls back to /tmp, so /tmp is looked in - where any account
+    can make a socket called discord-ipc-0 and wait to be told what this
+    user watches."""
+    fake = FakeDiscord(sock_path)
+    try:
+        theirs = os.stat(sock_path).st_uid + 1
+        monkeypatch.setattr(rpc.os, "getuid", lambda: theirs)
+        assert not rpc.mine(sock_path)
+        with pytest.raises(PermissionError):
+            rpc.open_pipe([sock_path])
+        time.sleep(0.3)
+        assert fake.conns == [] and fake.handshakes == 0     # not even connected to
+        p = rpc.Presence("4242", connect=lambda: rpc.open_pipe([sock_path]), retry_s=0.05)
+        p.show({"type": 3, "details": "Watching News"})
+        time.sleep(0.4)
+        assert not p.connected and fake.activities == [] and fake.handshakes == 0
+        p.stop()
+    finally:
+        fake.quit()
+
+
+@unix_only
+def test_a_socket_swapped_for_another_user_s_is_told_nothing(sock_path, monkeypatch):
+    # The file is this user's when looked at; the one that answers is not.
+    fake = FakeDiscord(sock_path)
+    try:
+        monkeypatch.setattr(rpc, "peer_uid", lambda _sock: os.getuid() + 1)
+        with pytest.raises(PermissionError):
+            rpc.open_pipe([sock_path])
+        time.sleep(0.3)
+        assert fake.handshakes == 0 and fake.activities == []
+    finally:
+        fake.quit()
+
+
+@unix_only
+def test_this_user_s_own_discord_is_found_past_another_s_socket(sock_path, monkeypatch, tmp_path):
+    fake = FakeDiscord(sock_path)
+    no_socket = str(tmp_path / "discord-ipc-0")
+    open(no_socket, "w").close()
+    squatted = os.path.join(os.path.dirname(sock_path), "discord-ipc-1")
+    squat = FakeDiscord(squatted)
+    real_mine = rpc.mine
+    monkeypatch.setattr(rpc, "mine", lambda path: path != squatted and real_mine(path))
+    try:
+        assert not rpc.mine(no_socket)
+        pipe = rpc.open_pipe([no_socket, squatted, sock_path])
+        pipe.close()
+        time.sleep(0.2)
+        assert len(fake.conns) == 1 and squat.conns == []
+    finally:
+        fake.quit()
+        squat.quit()
+
+
+@unix_only
+def test_the_system_says_who_is_at_the_other_end():
+    a, b = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        uid = rpc.peer_uid(a)
+        assert uid is None or uid == os.getuid()
+        if sys.platform.startswith("linux") or sys.platform == "darwin":
+            assert uid == os.getuid()
+    finally:
+        a.close()
+        b.close()
+
+
+class _Fn:
+    """A function that takes attributes, as a ctypes one does (argtypes)."""
+
+    def __init__(self, fn):
+        self.fn = fn
+
+    def __call__(self, *args):
+        return self.fn(*args)
+
+
+def _kernel32(theirs, ours, ok=True):
+    def server(_handle, ref):
+        ref._obj.value = theirs
+        return 1 if ok else 0
+
+    def session(pid, ref):
+        assert pid == 4242
+        ref._obj.value = ours
+        return 1
+    k = type("Kernel32", (), {})()
+    k.GetNamedPipeServerSessionId = _Fn(server)
+    k.ProcessIdToSessionId = _Fn(session)
+    k.GetCurrentProcessId = _Fn(lambda: 4242)
+    return k
+
+
+def test_a_windows_pipe_served_from_another_session_is_left_alone():
+    """A pipe's name is the whole machine's: another account signed in
+    beside this one could make discord-ipc-0 first."""
+    assert rpc.pipe_is_ours(7, _kernel32(1, 1)) is True
+    assert rpc.pipe_is_ours(7, _kernel32(2, 1)) is False             # another login session
+    assert rpc.pipe_is_ours(7, _kernel32(1, 1, ok=False)) is None    # Windows does not say
+    assert rpc.pipe_is_ours(7, object()) is None                     # nor does this: as before

@@ -1,0 +1,9 @@
+# pip itself, for the packaged builds (release.yml): installed first, by the
+# pip the build's Python came with (--require-hashes -r, which every pip
+# understands), so every install after it is made by a pip that was checked
+# like the rest. Its exact version and hashes are in requirements-pip.txt,
+# made from this file - never edited by hand:
+#
+#   uv pip compile packaging/requirements-pip.in --universal --python-version 3.12 \
+#     --generate-hashes --no-annotate --emit-index-url -o packaging/requirements-pip.txt
+pip

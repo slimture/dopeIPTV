@@ -70,6 +70,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.9" date="2026-11-20">
+      <description>
+        <p>Private viewing keeps nothing on a disk, TMDB can be turned off, and the phone remote, server mode and kids profiles are harder to get round.</p>
+        <ul>
+          <li>Private viewing writes nothing of what plays to a disk: the rewind buffer, a converted cast and a fetched subtitle stay in memory or are not made</li>
+          <li>Provider artwork, TMDB off asks TMDB nothing at all</li>
+          <li>Kids profiles cannot reach local files, recordings, typed addresses or locked categories, and PINs are far harder to guess</li>
+          <li>The phone remote's key never crosses the network, and every request from the phone is signed</li>
+          <li>A backup can get a password that encrypts it</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.8" date="2026-11-19">
       <description>
         <p>More private: error reports, private viewing, sync and Watch together tightened.</p>

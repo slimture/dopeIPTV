@@ -21,6 +21,7 @@ import pytest
 
 from dopeiptv.core import phone_page, phone_remote
 from dopeiptv.core.phone_remote import PhoneServer
+from tests.phone_sign import signed_request
 
 TOKEN = "Ab3_-x9Ab3_-x9Ab3_-x9Ab3_-x9Qz12"
 
@@ -33,7 +34,8 @@ def _no_proxy(monkeypatch):
 
 def ask(port, path, headers=None):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    conn.request("GET", path, headers=headers or {})
+    path, _data, h = signed_request(TOKEN, "GET", path, None, headers)
+    conn.request("GET", path, headers=h)
     r = conn.getresponse()
     raw = r.read()
     conn.close()

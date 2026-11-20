@@ -54,6 +54,8 @@ KEPT_OUT = {
     "nerd_health_data": "{}", "hwdec_mode": "auto-safe", "force_x11": "true",
     "cast_devices": "TV", "subtitle_files": "{}", "tmdb_poster_cache_v3": "{}",
     "channel_stream_info": "{}",
+    # The PIN's wrong guesses and its lock (an older file would give them back).
+    "pin_tries": '{"tries": 4, "until": 1700000000}',
 }
 
 
@@ -281,6 +283,42 @@ def test_every_setting_that_sends_something_elsewhere_is_named(tmp_path):
     for secret in ("k3y-value", "h00k-t0ken", "mq-pass", "their-token", "t0ps3cret"):
         assert secret not in shown
     assert backup.new_token_here(b)
+
+
+def test_shaders_other_networks_a_log_file_and_sign_ins_are_named(tmp_path):
+    """Shaders run on the graphics card, the other networks let more of
+    the network reach server mode's tuner (no token), a log file names
+    what plays, and a Trakt or Simkl sign-in - another person's, in a file
+    of theirs - marks what plays here on their account. Each is named
+    before a restore; a token never is."""
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.dialogs import RestoreBackupDialog
+    src = _stores(tmp_path, "src")
+    m = src["main"]
+    for key, value in (("nerd_shaders", "/home/them/evil.glsl"),
+                       ("nerd_other_networks", "10.0.20.0/24\n10.0.30.0/24"),
+                       ("nerd_log_file", "true"),
+                       ("profiles/kid/trakt_access_token", "trakt-t0ken"),
+                       ("simkl_access_token", "simkl-t0ken")):
+        m.setValue(key, value)
+    b = backup.parse(backup.collect(src, "1.5.0"))
+    risky = backup.risky(b)
+    assert dict(risky) == {"nerd_shaders": "/home/them/evil.glsl",
+                           "nerd_other_networks": "10.0.20.0/24 10.0.30.0/24",
+                           "nerd_log_file": "", "trakt_access_token": "", "simkl_access_token": ""}
+    shown = json.dumps(risky) + json.dumps(RestoreBackupDialog.risky_lines(risky, []))
+    assert "t0ken" not in shown
+    lines = RestoreBackupDialog.risky_lines(risky, [])
+    assert tr("restore_signed_in", service="Trakt") in lines
+    assert tr("restore_signed_in", service="Simkl") in lines
+    assert tr("nerd_log_file") in lines
+    assert any(line.startswith(tr("nerd_card_lan")) for line in lines)
+    assert any("/home/them/evil.glsl" in line for line in lines)
+    # Nothing of these: nothing said.
+    plain = _stores(tmp_path, "plain")
+    plain["main"].setValue("nerd_log_file", "false")
+    plain["main"].setValue("trakt_access_token", "")
+    assert backup.risky(backup.parse(backup.collect(plain, "1.5.0"))) == []
 
 
 def test_the_remote_controls_token_is_never_taken_from_a_backup(tmp_path):
@@ -545,6 +583,9 @@ def restore_exec(dlg):
 
 dialogs.RestoreBackupDialog.exec = restore_exec
 mw_settings.confirm = lambda *a, **k: True
+# A backup without a password is asked about first; here it is wanted.
+asked_plain = []
+type(w)._backup_without_password_ok = lambda self, parent: asked_plain.append(1) or True
 closed = []
 w.close = lambda: closed.append(1) or True
 
@@ -558,6 +599,7 @@ def run(self):
     assert tr("backup_btn") not in [b.text() for b in plists.findChildren(QPushButton)]
     # Back up: one file, everything but what stays out.
     mine[tr("backup_btn")].click()
+    assert asked_plain == [1], "a backup without a password is asked about"
     doc = json.load(open(out, encoding="utf-8"))
     assert doc["dopeiptv_backup"] == 1 and "favorites_a" in doc["stores"]["main"]
     assert "window_geometry" not in doc["stores"]["main"]

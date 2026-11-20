@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .dvr_store import SegmentStore
 from .log import log
-from .exclusive_bind import ExclusiveBindMixin
+from .exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
 
 _PATH = re.compile(r"^/([A-Za-z0-9_-]+)/(?:s/(\d+)|(live))\.ts$")
 # Join live this far behind the newest byte, so mpv has something to start from.
@@ -31,7 +31,10 @@ _GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError,
          socket.timeout)
 
 
-class _Handler(BaseHTTPRequestHandler):
+class _Handler(IdleTimeoutMixin, BaseHTTPRequestHandler):
+    # IdleTimeoutMixin: a connection that asks nothing is let go after a
+    # while (the port is every program's on this computer); the answer has
+    # no limit - a paused player reads nothing for as long as it is paused.
     server: "_Server"
     protocol_version = "HTTP/1.0"
 

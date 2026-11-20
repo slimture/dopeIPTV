@@ -13,6 +13,13 @@ import pytest
 from dopeiptv.core import macupdate, selfupdate
 
 
+@pytest.fixture(autouse=True)
+def running_1_4_4(monkeypatch):
+    """These tests run as 1.4.4: an installer asks which version runs
+    before it takes a release (selfupdate.refuse_older)."""
+    monkeypatch.setattr(selfupdate, "VERSION", "1.4.4")
+
+
 def assets(version):
     names = [f"dopeIPTV-{version}-macOS-arm64.dmg", f"dopeIPTV-{version}-macOS-x86_64.dmg",
              f"dopeIPTV-{version}-windows-x64-setup.exe"]

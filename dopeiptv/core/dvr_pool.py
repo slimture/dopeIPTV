@@ -12,6 +12,19 @@ space cap - or with the disk running low - the channels left longest ago
 give way first, then the one watched. At most MAX_FROZEN channels are
 kept. Everything is wiped when the app ends (and swept at the next start
 after a crash): history is for this session only.
+
+A channel watched in private viewing (core/privacy.py; its session marked
+``private``) keeps its history only while it is the channel in the player
+or the one just left - so a reconnect and Stop, then Play find it again -
+and loses it when another channel is watched, when private viewing ends,
+and as the app closes, before the pool returns. One private from its start
+is kept in memory (``memory``: core/dvr_store.memory_base) where there is
+room and swap cannot carry it to a disk (core/memory_safe) - else it has no
+buffer at all (NoPrivateBuffer: the player opens the provider's address as
+it did before the buffer), never one on the disk. A buffer of the channel
+kept on the disk from before is dropped as it is watched privately - unless
+a recording or a cast reads it, whose connection the player then shares
+(one connection: what they write is written for them anyway).
 """
 from __future__ import annotations
 
@@ -23,8 +36,14 @@ from pathlib import Path
 
 from .dvr_ingest import NotAStream
 from .dvr_session import DvrSession, IngestFactory
-from .dvr_store import SegmentStore
-from .log import log, redact_url
+from .dvr_store import MEMORY_MIN_FREE, NotInMemory, SegmentStore, memory_budget
+from .log import log
+from .privacy import url_for_log
+
+
+class NoPrivateBuffer(RuntimeError):
+    """A channel watched privately gets no rewind buffer: none in memory
+    out of a disk's reach (core/memory_safe), and never one on a disk."""
 
 
 class DvrPool:
@@ -37,8 +56,10 @@ class DvrPool:
     def __init__(self, base: Path, keep_seconds: float, max_bytes: int,
                  ingest_factory: IngestFactory | None = None,
                  clock: Callable[[], float] = time.time,
-                 min_free: int | None = None) -> None:
+                 min_free: int | None = None, memory: Path | None = None) -> None:
         self.base = base
+        #: Where a private session's buffer goes in memory; None: none.
+        self.memory = memory
         self.keep_seconds = keep_seconds
         self.max_bytes = max_bytes
         self.min_free = SegmentStore.MIN_FREE_BYTES if min_free is None \
@@ -60,17 +81,24 @@ class DvrPool:
     # -- the channel on screen -----------------------------------------------
 
     def open(self, url: str, key: str | None = None,
-             source: str = "") -> DvrSession:
+             source: str = "", private: bool = False) -> DvrSession:
         """The session for a channel about to be watched: its own again if
         it was watched before (or is being recorded), else a new one - the
         connection of source *source* (its id) from now. NotAStream for one
         whose provider sent a page or a message instead of a stream: this
         session it plays as it did before the buffer (mpv opens the address
-        and says what it found)."""
+        and says what it found). *private*: watched privately from its
+        start - a new session's buffer in memory where there is room."""
         key = key or url
         with self._lock:
             s = self._sessions.get(key)
             if s is not None and s.closed:
+                s = None
+            if private and s is not None and not s.memory_cap \
+                    and not s.recording and not s.held:
+                # Its history of before is on the disk: what follows would
+                # be written there too. Let go - in memory anew, or none.
+                self._drop(s, "watched privately - not kept on the disk")
                 s = None
             said = self._refused.get(key)
             if said is not None and time.monotonic() - said[1] > self.REFUSED_FOR:
@@ -82,9 +110,7 @@ class DvrPool:
                 # channel left's, until time or space lets it go.
                 raise NotAStream(self._refused[key][0])
             if s is None:
-                s = DvrSession(url, self.base, self.keep_seconds,
-                               self.max_bytes, key=key,
-                               ingest_factory=self._factory)
+                s = self._new_session(url, key, private)
                 s.on_recording_done = self._recording_done
                 self._sessions[key] = s
             elif s.frozen:
@@ -94,11 +120,47 @@ class DvrPool:
             s.store.keep_seconds = self.keep_seconds
             s.last_used = self._clock()
             self.active = s
+            self._forget_private(s)
             self._enforce()
             self._start_ticking()
             log.info("DVR pool: watching %s (%d channel(s) kept)",
-                     redact_url(url), len(self._sessions))
+                     url_for_log(url), len(self._sessions))
             return s
+
+    def _new_session(self, url: str, key: str, private: bool) -> DvrSession:
+        if not private:
+            return DvrSession(url, self.base, self.keep_seconds, self.max_bytes, key=key,
+                              ingest_factory=self._factory)
+        memory = self.memory
+        budget = memory_budget(memory, self.max_bytes) if memory is not None else 0
+        if memory is None or not budget:
+            # No memory out of a disk's reach (or too little of it): no
+            # buffer - never one on the disk. No connection was opened.
+            raise NoPrivateBuffer("no memory out of a disk's reach for a private buffer")
+        try:
+            s = DvrSession(url, memory, self.keep_seconds, budget, key=key,
+                           ingest_factory=self._factory, min_free=MEMORY_MIN_FREE,
+                           memory=True)
+        except NotInMemory as e:
+            # Its own folder was not in memory after all (a link, a disk
+            # mounted there): checked before a connection opened - none.
+            log.warning("DVR pool: a private channel's buffer could not be kept in memory - "
+                        "it plays with no rewind buffer")
+            raise NoPrivateBuffer(str(e)) from e
+        s.memory_cap = budget
+        s.mark_private()
+        log.info("DVR pool: a private channel's buffer kept in memory (%d MB)", budget >> 20)
+        return s
+
+    def on_disk_private(self) -> bool:
+        """Whether the channel on screen is watched privately with a buffer
+        on the disk - private viewing turned on while it played - that the
+        player should leave for one in memory, or none (nothing else reads
+        it: a recording's or a cast's would be written for them anyway)."""
+        with self._lock:
+            s = self.active
+            return bool(s is not None and not s.closed and s.private and not s.memory_cap
+                        and not s.recording and not s.held)
 
     def release(self, s: DvrSession) -> None:
         """The player is done with *s*: frozen - unless a recording still
@@ -125,7 +187,7 @@ class DvrPool:
             return
         self._refused[s.key] = (why, time.monotonic())
         log.info("DVR pool: %s sent %s - played without the buffer for "
-                 "%.0f min", redact_url(s.url), why, self.REFUSED_FOR / 60)
+                 "%.0f min", url_for_log(s.url), why, self.REFUSED_FOR / 60)
 
     # -- read from elsewhere (server mode, core/restream.py) ------------------
 
@@ -173,6 +235,7 @@ class DvrPool:
             self.active = s
             if s.key not in self._sessions:
                 self._sessions[s.key] = s
+            self._forget_private(s)
             self._enforce()
             self._start_ticking()
             return s
@@ -183,6 +246,21 @@ class DvrPool:
             self._note_refused(s)
         s.let_go(who)
         self._recording_done(s)
+
+    # -- private viewing -------------------------------------------------------
+
+    def forget_private(self) -> None:
+        """Private viewing ended: the history of every channel watched in
+        it and left goes. The one still in the player keeps its buffer
+        until it is left."""
+        with self._lock:
+            self._forget_private(self.active)
+
+    def _forget_private(self, keep: DvrSession | None) -> None:
+        for s in list(self._sessions.values()):
+            if s.private and s is not keep and s is not self.active \
+                    and not s.recording and not s.held:
+                self._drop(s, "watched privately")
 
     def _recording_done(self, s: DvrSession) -> None:
         with self._lock:
@@ -239,7 +317,8 @@ class DvrPool:
         # trim. The frozen ones give way to them, oldest-watched first.
         live = [s for s in self._sessions.values() if s.streaming]
         for s in live:
-            s.store.max_bytes = self.max_bytes // max(1, len(live))
+            share = self.max_bytes // max(1, len(live))
+            s.store.max_bytes = min(share, s.memory_cap) if s.memory_cap else share
         total = sum(s.store.total_bytes() for s in self._sessions.values())
         for s in frozen:
             if total <= self.max_bytes:
@@ -290,7 +369,14 @@ class DvrPool:
         recorders = [r for s in sessions for r in list(s.recorders)]
         for s in sessions:
             s.close()
+        # What was watched privately is off the disk before this returns
+        # (the app may end before the closing threads get to it).
+        private = [s for s in sessions if s.private]
+        for s in private:
+            s.purge()
         if wait:
             deadline = time.monotonic() + wait
             for r in recorders:
                 r.join(max(0.0, deadline - time.monotonic()))
+            for s in private:
+                s.join(deadline - time.monotonic())

@@ -6,7 +6,6 @@ scoped per-playlist so each provider keeps its own data.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import threading
 import time
@@ -17,7 +16,8 @@ from typing import Any
 
 from PyQt6.QtCore import QSettings
 
-from . import privacy
+from . import pins, privacy
+from .log import register_secrets
 
 
 class _Kept:
@@ -64,6 +64,11 @@ def _kept_for(settings: Any, keys: tuple[str, ...]) -> _Kept:
         return kept
 
 
+def _register(values: Mapping[str, Any]) -> None:
+    """A sign-in's tokens (Trakt's, Simkl's) kept out of every log line."""
+    register_secrets(*(str(v) for k, v in values.items() if k.endswith("_token") and v))
+
+
 class KeptValues:
     """A few keys of a settings object held in memory, for a client whose
     workers read and renew them (Trakt's and Simkl's sign-in). Changed here
@@ -97,6 +102,7 @@ class KeptValues:
                 value = None
             if value is not None and value != "":
                 read[key] = value
+        _register(read)
         kept = self._kept
         with kept.lock:
             if kept.pending:
@@ -128,6 +134,7 @@ class KeptValues:
         """*values* in memory now, in the settings on the window's thread.
         With *since* (a snapshot's stamp) only if none of its keys changed
         meanwhile; False when it came too late and nothing was written."""
+        _register(values)
         kept = self._kept
         with kept.lock:
             if not self._still(since):
@@ -529,7 +536,8 @@ class HistoryStore:
 
 
 class ParentalControl:
-    """A salted+hashed PIN gating locked categories and favorite groups."""
+    """A PIN gating locked categories and favorite groups, kept as
+    core/pins.py keeps one: PBKDF2 with a salt of its own, never the PIN."""
 
     def __init__(self, settings: QSettings) -> None:
         self.settings = settings
@@ -538,14 +546,18 @@ class ParentalControl:
     def has_pin(self) -> bool:
         return bool(self.settings.value("parental_pin_hash", ""))
 
-    @staticmethod
-    def _hash(salt: str, pin: str) -> str:
-        return hashlib.sha256((salt + pin).encode()).hexdigest()
+    def _keep(self, pin: str) -> None:
+        salt, stored = pins.make(pin)
+        self.settings.setValue("parental_salt", salt)
+        self.settings.setValue("parental_pin_hash", stored)
+
+    #: The shortest PIN taken: fewer were tried in a moment (core/pins.py).
+    SHORTEST = 4
 
     def set_pin(self, pin: str) -> None:
-        salt = uuid.uuid4().hex
-        self.settings.setValue("parental_salt", salt)
-        self.settings.setValue("parental_pin_hash", self._hash(salt, pin))
+        if len(pin or "") < self.SHORTEST:
+            raise ValueError("a PIN of at least four characters")
+        self._keep(pin)
         self.session_unlocked = False
 
     def clear_pin(self) -> None:
@@ -554,9 +566,15 @@ class ParentalControl:
         self.session_unlocked = False
 
     def verify(self, pin: str) -> bool:
-        salt = self.settings.value("parental_salt", "")
+        """Whether *pin* is the parental PIN. One kept the way versions up
+        to 1.6.8 kept it (one SHA-256) is still taken, and written anew
+        now that it is known to be right."""
         stored = self.settings.value("parental_pin_hash", "")
-        return bool(stored) and self._hash(salt, pin) == stored
+        if not pins.check(stored, self.settings.value("parental_salt", ""), pin):
+            return False
+        if pins.outdated(stored):
+            self._keep(pin)
+        return True
 
     def lock_session(self) -> None:
         self.session_unlocked = False
@@ -607,6 +625,105 @@ class CategoryOverrides:
             if entry.get("hidden") or (include_locked and entry.get("locked")):
                 out.add(str(cid))
         return out
+
+    def locked_ids(self, mode: str) -> frozenset[str]:
+        """The ids of the categories of *mode* that are locked."""
+        given = self.data.get(mode)
+        return frozenset(str(cid) for cid, entry in (given or {}).items()
+                         if isinstance(entry, dict) and entry.get("locked"))
+
+
+#: A kept row's own kind (History's, Continue watching's) -> the catalogue
+#: its category is one of; an episode's is its series'.
+_KEPT_MODE = {"live": "live", "catchup": "live", "movie": "vod", "vod": "vod",
+              "series": "series", "episode": "series"}
+
+
+def kept_place(row: Any) -> tuple[str, str, str] | None:
+    """Where a kept row - History's, Continue watching's - is in its
+    source's catalogue: (mode, its category id, the id the catalogue lists
+    it by: a channel's or a film's stream id, an episode's series id). The
+    category is "" when the row does not say it (History kept none for a
+    channel or a film before). None for a row of no catalogue: a file, a
+    station, a recording, a web address."""
+    if not isinstance(row, dict):
+        return None
+    kind = str(row.get("_kind") or "")
+    mode = _KEPT_MODE.get(kind)
+    if mode is None:
+        return None
+    if kind == "episode":
+        ctx = row.get("_series_ctx")
+        ctx = ctx if isinstance(ctx, dict) else {}
+        cid, ident = ctx.get("category_id"), ctx.get("series_id")
+        if cid in (None, ""):
+            cid = row.get("category_id")
+        if ident is None:
+            ident = row.get("series_id")
+    elif mode == "series":
+        cid, ident = row.get("category_id"), row.get("series_id")
+    else:
+        cid, ident = row.get("category_id"), row.get("stream_id")
+        if ident is None:
+            ident = row.get("_key")
+    return (mode, "" if cid in (None, "") else str(cid),
+            "" if ident in (None, "") else str(ident))
+
+
+def lock_hides(row: Any, shut: Mapping[str, Any],
+               found: Mapping[str, Mapping[str, str]] | None = None) -> bool | None:
+    """Whether the parental lock leaves a kept row out now, as the lists
+    leave its category's rows out: True when its category is one of *shut*
+    (per mode, the categories locked while the lock is shut), False when
+    not. A row that does not say its category is looked up in *found*
+    (per mode, the catalogue's id -> its category, "" for one the catalogue
+    does not have); None when a category of its mode is shut and *found*
+    has not told it yet - held back until it has."""
+    place = kept_place(row)
+    if place is None:
+        return False
+    mode, cid, ident = place
+    ids = shut.get(mode)
+    if not ids:
+        return False
+    if not cid:
+        if not ident:
+            return False
+        known = (found or {}).get(mode)
+        if known is None or ident not in known:
+            return None
+        cid = known[ident]
+    return cid in ids
+
+
+#: A catalogue's lists and the id each lists its rows by, per mode.
+_CATALOGUE = {"live": ("live_streams", "stream_id"), "vod": ("vod_streams", "stream_id"),
+              "series": ("series_list", "series_id")}
+
+
+def catalogue_cats(client: Any, mode: str, ids: Iterable[str]) -> dict[str, str]:
+    """(a worker) The category of each of *ids* in *client*'s catalogue of
+    *mode* - its whole list as the client holds it, a portal's only as
+    loaded before (``paged_lists``: it is never paged through) - "" for one
+    it does not list. A list that cannot be read raises."""
+    want = {str(i) for i in ids}
+    name, key = _CATALOGUE[mode]
+    if getattr(client, "paged_lists", False):
+        loaded = getattr(client, "loaded", None)
+        rows = loaded(mode)[0] if callable(loaded) else []
+    else:
+        fn = getattr(client, name, None)
+        rows = fn(None) if callable(fn) else []
+    out = dict.fromkeys(want, "")
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        ident = r.get(key)
+        if ident is None or str(ident) not in want:
+            continue
+        cid = r.get("category_id")
+        out[str(ident)] = "" if cid in (None, "") else str(cid)
+    return out
 
 
 class ChannelOverrides:

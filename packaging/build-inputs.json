@@ -1,0 +1,92 @@
+{
+  "about": [
+    "Every binary release.yml downloads by address and then runs or ships, with the",
+    "SHA-256 it must have (tools/build_inputs.py fetch <name> <file> stops otherwise),",
+    "and the commit each source tree cloned by tag must be (verify-git).",
+    "sources are tried in order; a release of dopeIPTV's own that shipped the same",
+    "bytes is listed last, since it stays when upstream's file has moved on.",
+    "How to change one: docs/MAINTAINING.md, 'What the build downloads'."
+  ],
+  "inputs": {
+    "appimagetool-x86_64": {
+      "what": "appimagetool: packs the AppImage (a build tool, not shipped). AppImageKit's last build, unchanged since March 2023.",
+      "sha256": "b90f4a8b18967545fda78a445b27680a1642f1ef9488ced28b65398f2be7add2",
+      "sources": [
+        {"url": "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"}
+      ]
+    },
+    "appimagetool-aarch64": {
+      "what": "appimagetool for the aarch64 build.",
+      "sha256": "a48972e5ae91c944c5a7c80214e7e0a42dd6aa3ae979d8756203512a74ff574d",
+      "sources": [
+        {"url": "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"}
+      ]
+    },
+    "appimage-runtime-x86_64": {
+      "what": "The static type2 runtime every AppImage starts with (shipped: it is what runs first). AppImage/type2-runtime at fedfad5 (2026-10-19), the one in dopeIPTV 1.6.8.",
+      "sha256": "617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46",
+      "sources": [
+        {"url": "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64"},
+        {"url": "https://github.com/slimture/dopeIPTV/releases/download/v1.6.8/dopeIPTV-1.6.8-x86_64.AppImage",
+         "take": "appimage-runtime"}
+      ]
+    },
+    "appimage-runtime-aarch64": {
+      "what": "The type2 runtime of the aarch64 AppImage, the one in dopeIPTV 1.6.8.",
+      "sha256": "9a72a744d221576c9347ec074243acc5c3c7568896b12714e0e82e9f0bf47900",
+      "sources": [
+        {"url": "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-aarch64"},
+        {"url": "https://github.com/slimture/dopeIPTV/releases/download/v1.6.8/dopeIPTV-1.6.8-aarch64.AppImage",
+         "take": "appimage-runtime"}
+      ]
+    },
+    "libmpv-windows-x86_64": {
+      "what": "libmpv for Windows x64 with FFmpeg linked in (shipped as mpv-2.dll): zhongfly/mpv-winbuild 2026-11-19-b7339522cd, the one in dopeIPTV 1.6.8. Upstream keeps a build 30 days; the release that shipped it keeps it for good.",
+      "sha256": "09812b50e5a3a7197c2dc55b6a097fab00be5b9f4f8280b61d4f9a1f7c7bbcdb",
+      "sources": [
+        {"url": "https://github.com/zhongfly/mpv-winbuild/releases/download/2026-11-19-b7339522cd/mpv-dev-x86_64-20261119-git-b7339522cd.7z",
+         "sha256": "bbfd070048054d407ef1b5ea0cc9b4c1e744a9651c8bf7aa9e3420b5f4fc2a10",
+         "take": "7z:libmpv-2.dll"},
+        {"url": "https://github.com/slimture/dopeIPTV/releases/download/v1.6.8/dopeIPTV-1.6.8-windows-x64.zip",
+         "sha256": "f05a45920c5e488d6d7a96ed6b8c7529fce3b43f34a882131aba73c04de21001",
+         "take": "zip:dopeiptv/_internal/mpv-2.dll"}
+      ]
+    },
+    "libmpv-windows-aarch64": {
+      "what": "libmpv for Windows on ARM (shipped as mpv-2.dll): zhongfly/mpv-winbuild 2026-11-19-b7339522cd, the one in dopeIPTV 1.6.8.",
+      "sha256": "45ac86954e3ebcdd543e4c29a03ea11da5c0dc61018a6f9c891220570e652d23",
+      "sources": [
+        {"url": "https://github.com/zhongfly/mpv-winbuild/releases/download/2026-11-19-b7339522cd/mpv-dev-aarch64-20261119-git-b7339522cd.7z",
+         "sha256": "7c3b4e78b9982e26b539b7730559f6695d16307a81eebff1866e9742ec49fcc4",
+         "take": "7z:libmpv-2.dll"},
+        {"url": "https://github.com/slimture/dopeIPTV/releases/download/v1.6.8/dopeIPTV-1.6.8-windows-arm64.zip",
+         "sha256": "aa817de373fbca2f816da23f7ae8227194eca5881710db101093ef0809741396",
+         "take": "zip:dopeiptv/_internal/mpv-2.dll"}
+      ]
+    },
+    "micromamba-osx-64": {
+      "what": "micromamba 2.10.0 for the Intel Mac build: installs conda-forge's libraries there (a build tool, not shipped). conda-forge's own package, which micro.mamba.pm hands out as 'latest'.",
+      "sha256": "17b20c4271d65c030a5c86788f5ca86eb575187209f626edabdb8c6a875c6838",
+      "sources": [
+        {"url": "https://conda.anaconda.org/conda-forge/osx-64/micromamba-2.10.0-0.tar.bz2"}
+      ]
+    }
+  },
+  "git": {
+    "vulkan-loader": {
+      "what": "Khronos' Vulkan loader, built from source into vulkan-1.dll (shipped on Windows).",
+      "url": "https://github.com/KhronosGroup/Vulkan-Loader",
+      "tag": "v1.4.362",
+      "commit": "b8b96a2862bff1eed468e602d43f706beae89cf1"
+    },
+    "mpv": {
+      "what": "mpv's source, built into libmpv for the Intel Mac build at the version conda-forge's mpv package has.",
+      "url": "https://github.com/mpv-player/mpv.git",
+      "tags": {
+        "v0.40.0": "e48ac7ce08462f5e33af6ef9deeac6fa87eef01e",
+        "v0.41.0": "41f6a645068483470267271e1d09966ca3b9f413",
+        "v0.42.0": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3"
+      }
+    }
+  }
+}

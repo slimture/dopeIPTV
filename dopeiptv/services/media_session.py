@@ -128,11 +128,43 @@ def local_art(art: str) -> str | None:
         path = art
     else:
         return None
+    # A row's picture is its source's word too: only a file where the app's
+    # own pictures are (its cache, a picon folder: core/picture_files.py).
+    from ..core import picture_files
+    if not picture_files.trusted(path):
+        return None
     try:
         size = os.path.getsize(path)
     except (OSError, ValueError):
         return None
     return path if 0 < size <= ART_MAX_BYTES else None
+
+
+def carries_login(url: str) -> bool:
+    """Whether a web address holds a login or a token, as the log's own
+    masking finds them (core/log.redact_url: user:password@, an Xtream
+    path, token/api_key/X-Plex-Token... in the query, an account's own
+    values)."""
+    from ..core.log import redact_url
+    return redact_url(url) != url
+
+
+def art_for_bus(art: str) -> str:
+    """*art* as it may be said on the session bus (MPRIS), where every
+    program of the desktop reads it and KDE Connect passes it on to a
+    phone: a file on this computer, or a web address with no login in it.
+    A media server's pictures carry the account's token (Plex's
+    X-Plex-Token) - "" for such an address: the window fetches the picture
+    into the image cache, and the copy there is said instead."""
+    if not art:
+        return ""
+    if art.startswith("file:"):
+        return art
+    if os.path.isabs(art):
+        return QUrl.fromLocalFile(art).toString()
+    if art.startswith(("http://", "https://")) and not carries_login(art):
+        return art
+    return ""
 
 
 def supported() -> bool:

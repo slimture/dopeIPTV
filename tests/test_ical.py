@@ -217,7 +217,9 @@ assert [f.text() for f in d.fields] == [addrs[0][1]]
 d.close()
 # The phone remote too.
 assert w.phone_remote_start()
-assert any(u.endswith(f"/{w._phone.token}/calendar.ics") for _w, u in w._calendar_addresses())
+from dopeiptv.core.phone_remote import calendar_token
+assert any(u.endswith(f"/c/{calendar_token(w._phone.token)}/calendar.ics") for _w, u in w._calendar_addresses())
+assert not any(w._phone.token in u for _w, u in w._calendar_addresses()), "the remote's own key never"
 w.phone_remote_stop()
 w._remote_stop()
 

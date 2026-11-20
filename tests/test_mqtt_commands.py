@@ -183,6 +183,57 @@ def test_commands_are_heard_at_once_and_handed_on(broker):
         d.quit(0)
 
 
+def test_a_broker_that_never_stops_sending_holds_nothing():
+    """take() read for as long as anything was waiting: a broker sending
+    without a pause kept the events' thread there for good, and every
+    command it sent went to the window unpaced. One take() reads at most
+    TAKE_MAX packets now, and the commands handed on are paced (a token
+    bucket), the rest dropped."""
+    import socket
+    import threading
+
+    here, broker_end = socket.socketpair()
+    cl = mqtt.Client("127.0.0.1", 1883, timeout=5)
+    cl._sock = here
+    packet = mqtt.publish_packet(f"{P}/command/volume", b"40")
+    stop = threading.Event()
+
+    def flood():
+        while not stop.is_set():
+            try:
+                broker_end.sendall(packet * 64)
+            except OSError:
+                return
+    th = threading.Thread(target=flood, daemon=True)
+    th.start()
+    try:
+        t0 = time.monotonic()
+        got = cl.take(wait=1.0)
+        assert time.monotonic() - t0 < 2.0
+        assert 0 < len(got) <= 64 and got[0] == (f"{P}/command/volume", b"40", False)
+
+        heard: list[tuple[str, object]] = []
+        sink = events.MqttSink(_cfg(1), on_command=lambda name, value: heard.append((name, value)))
+        sink.client = cl
+        try:
+            t0 = time.monotonic()
+            while time.monotonic() - t0 < 1.0:
+                sink._hear()
+            spent = time.monotonic() - t0
+            assert heard and heard[0] == ("volume", 40)
+            most = sink.COMMANDS_BURST + sink.COMMANDS_PER_S * spent + 1
+            assert len(heard) <= most, (len(heard), most)
+            assert sink._dropped > 0
+        finally:
+            sink.client = None
+            sink.close(0)
+    finally:
+        stop.set()
+        broker_end.close()
+        here.close()
+        th.join(5)
+
+
 def test_the_state_has_the_volume_and_the_favourite_unless_private(broker):
     b = broker()
     d = events.Dispatcher()

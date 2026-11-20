@@ -20,13 +20,16 @@ from .box_finder import (
 )
 from .media_signin import MediaSignIn
 from .theme import P
+from .widgets import plain_text
 # Feedback and the backup's restore have modules of their own; their
 # windows stay importable from here.
 from .feedback_dialogs import (  # noqa: F401
     PRIVACY_URL, AnswersDialog, FeedbackDialog, ReportDialog, answer_text, answers_html,
     privacy_link,
 )
-from .backup_dialogs import RestoreBackupDialog, pick_backup, stage_backup  # noqa: F401
+from .backup_dialogs import (  # noqa: F401
+    RestoreBackupDialog, UnlockBackupDialog, pick_backup, stage_backup,
+)
 
 
 class KindOwnFields:
@@ -538,7 +541,7 @@ class PlaylistDialog(SourceFields, QDialog):
                 return
         bad = self.problem()
         if bad is not None:
-            QMessageBox.warning(self, bad[0], bad[1])
+            QMessageBox.warning(self, bad[0], plain_text(bad[1]))     # a typed or restored line
             return
         self.accept()
 

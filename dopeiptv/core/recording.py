@@ -17,11 +17,16 @@ from PyQt6.QtCore import QObject, QSettings, Qt, QTimer, pyqtSignal
 
 from . import rec_mp4
 from .log import log
-from .player_exec import NO_WINDOW, find_player_executable
+from .player_exec import (NO_WINDOW, address_scheme, fetchable, ffmpeg_protocols,
+                          find_player_executable, find_program)
 from .privacy import for_log
+from .rec_extras import not_a_device
 
 #: What the player sends, so a panel that plays a channel also records it.
 RECORD_UA = "dopeIPTV/1.0"
+#: Why a recording was not started for an address that is no stream's
+#: (player_exec.fetchable): the recorder is never handed one.
+NOT_A_STREAM = "its address is not a stream's"
 
 
 def _bundled_ffmpeg() -> str | None:
@@ -62,10 +67,14 @@ def safe_filename(name: str | None) -> str:
     characters and 200 bytes, so the date, a " (2)" and the extension added
     to it stay under a file system's 255 bytes a name (120 characters of
     Japanese alone were 360)."""
+    # Control characters and half a surrogate pair too: a title is a
+    # provider's, and a NUL in one raised out of every later look at the
+    # path (the recorder's tick, every five seconds).
     cleaned = "".join(c for c in (name or "recording")
-                      if c not in '/\\:*?"<>|').strip()[:120]
-    cleaned = cleaned.encode("utf-8")[:200].decode("utf-8", "ignore").strip()
-    return cleaned or "recording"
+                      if c not in '/\\:*?"<>|' and ord(c) >= 32 and ord(c) != 127
+                      and not 0xD800 <= ord(c) <= 0xDFFF).strip()[:120]
+    cleaned = cleaned.encode("utf-8", "ignore")[:200].decode("utf-8", "ignore").strip()
+    return not_a_device(cleaned) if cleaned else "recording"
 
 
 def format_size(nbytes: float) -> str:
@@ -292,7 +301,7 @@ class RecordingManager(QObject):
     def ffmpeg() -> str | None:
         """The app's ffmpeg: the one a packaged build bundles, else the
         system's."""
-        return _bundled_ffmpeg() or shutil.which("ffmpeg")
+        return _bundled_ffmpeg() or find_program("ffmpeg")
 
     @staticmethod
     def recorder() -> tuple[str | None, str | None]:
@@ -532,6 +541,67 @@ class RecordingManager(QObject):
     def active_count(self) -> int:
         return sum(1 for j in self.jobs if j["status"] == "recording")
 
+    def subfolder(self, folder: str | None) -> str:
+        """The recordings folder's own subfolder *folder* - or the
+        recordings folder itself for a name that leads out of it ("..",
+        another drive, a path from the root): a job kept in the settings,
+        or brought by a backup, never writes anywhere else."""
+        root = self.directory()
+        if not folder:
+            return root
+        target = os.path.normpath(os.path.join(root, folder))
+        try:
+            top = os.path.abspath(root)
+            inside = os.path.commonpath([top, os.path.abspath(target)]) == top
+        except ValueError:                  # another drive (Windows), a NUL
+            inside = False
+        if not inside:
+            log.warning("record: the folder %r is not in the recordings folder - "
+                        "recorded there instead", folder)
+            return root
+        return target
+
+    @staticmethod
+    def _stays_inside(root: str, folder: str) -> bool:
+        """Whether *folder* (made already) is the recordings folder *root*
+        or one inside it on disk too: no link on the way from *root* down
+        that leads elsewhere, and where it resolves to still inside *root* -
+        a folder another account can change cannot send a recording out."""
+        try:
+            top = os.path.realpath(root)
+            rel = os.path.relpath(os.path.abspath(folder), os.path.abspath(root))
+        except ValueError:
+            return False
+        if rel == os.curdir:
+            return True
+        if rel.startswith(os.pardir):
+            return False
+        here = os.path.abspath(root)
+        for part in rel.split(os.sep):
+            here = os.path.join(here, part)
+            try:
+                if os.path.islink(here):
+                    return False
+            except OSError:
+                return False
+        try:
+            return os.path.commonpath([top, os.path.realpath(folder)]) == top
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _shared_folder(folder: str) -> bool:
+        """POSIX: *folder* is another account's, or others may write in it
+        without the sticky bit - a link put there could redirect a file."""
+        if os.name != "posix":
+            return False
+        try:
+            st = os.stat(folder)
+        except OSError:
+            return False
+        others_write = bool(st.st_mode & 0o002) and not (st.st_mode & 0o1000)
+        return others_write or (st.st_uid != os.getuid() and bool(st.st_mode & 0o022))
+
     def build_path(self, title: str, folder: str = "", channel: str = "") -> str:
         """A unique target file for a new recording: "Title 2026-11-14
         21.00.ts", or as the Nerd page's template names it (folders
@@ -540,17 +610,26 @@ class RecordingManager(QObject):
         from .rec_extras import render_name
         n_ = nerd.current()
         template = n_.get("nerd_rec_template").strip() if n_.on else ""
+        base = self.subfolder(folder)
         if template:
-            stem = os.path.join(self.directory(), folder or "",
-                                render_name(template, title, channel))
+            stem = os.path.join(base, render_name(template, title, channel))
         else:
             stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
-            stem = os.path.join(self.directory(), folder or "",
-                                f"{safe_filename(title)} {stamp}")
+            stem = os.path.join(base, f"{safe_filename(title)} {stamp}")
         os.makedirs(os.path.dirname(stem), exist_ok=True)
+        root = self.directory()
+        if not self._stays_inside(root, os.path.dirname(stem)):
+            log.warning("record: a folder on the way to the recording leads out of the "
+                        "recordings folder (a link) - recorded in the recordings folder instead")
+            stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H.%M")
+            stem = os.path.join(root, f"{safe_filename(title)} {stamp}")
+        if self._shared_folder(os.path.dirname(stem)):
+            log.warning("record: other accounts on this computer can change the recordings "
+                        "folder - a recording there is only as safe as they are")
         path = stem + ".ts"
         n = 1
-        while os.path.exists(path):
+        # lexists: a link left where the file goes is a name taken too.
+        while os.path.lexists(path):
             path = f"{stem} ({n}).ts"
             n += 1
         return path
@@ -752,6 +831,15 @@ class RecordingManager(QObject):
             j["error"] = "no VPN up (Nerd's VPN guard)"
             log.info("record: %s not started - no VPN up", for_log(j.get("title")))
             return
+        if not fetchable(str(j.get("url") or "")):
+            # A playlist's "address" that is no stream's (concat:, subfile:,
+            # gopher:...): the recorder would read this computer's files with
+            # it, or send what it says to a port. Never handed to one.
+            j["status"] = "failed"
+            j["error"] = NOT_A_STREAM
+            log.warning("record: %s not started - %s (%s:)", for_log(j.get("title")),
+                        NOT_A_STREAM, address_scheme(str(j.get("url") or ""))[:20])
+            return
         kind, exe = self.recorder()
         if not exe:
             j["status"] = "failed"
@@ -763,8 +851,11 @@ class RecordingManager(QObject):
             except Exception as e:
                 log.debug("record: before the connection: %s", e)
         try:
-            path = self.build_path(j["title"], j.get("folder") or "", j.get("channel") or "")
-        except OSError as e:
+            path = self.build_path(str(j.get("title") or ""), str(j.get("folder") or ""),
+                                   str(j.get("channel") or ""))
+        except (OSError, ValueError) as e:
+            # ValueError: a name no file system takes (a NUL in the folder a
+            # damaged job names) - failed here, not raised out of the tick.
             j["status"] = "failed"
             j["error"] = str(e)
             return
@@ -774,19 +865,26 @@ class RecordingManager(QObject):
         through = recorder_options(kind, *self._bridge(j))
         through = [*self._rtsp_options(j, kind), *through]
         if kind == "ffmpeg":
+            # ffmpeg_protocols: what the address leads to (a redirect, a
+            # playlist's segments) stays a stream's too.
             cmd = [exe, "-y", "-loglevel", "error",
                    *self._input_options(j["url"]),
+                   *ffmpeg_protocols(j["url"]),
                    *through, "-i", j["url"],
                    "-c", "copy"]
             if secs:
                 cmd += ["-t", str(secs)]
             cmd.append(path)
         else:
-            cmd = [exe, j["url"], f"--stream-record={path}", "--vo=null",
+            cmd = [exe, f"--stream-record={path}", "--vo=null",
                    "--ao=null", "--no-terminal", f"--user-agent={RECORD_UA}"]
             cmd += through
             if secs:
                 cmd.append(f"--length={secs}")
+            # The address last, after "--": a playlist's line that starts
+            # with a dash is a file that does not open, never an option of
+            # mpv's (media/players.player_command).
+            cmd += ["--", j["url"]]
         try:
             j["proc"] = subprocess.Popen(
                 cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

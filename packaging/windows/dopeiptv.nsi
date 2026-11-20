@@ -149,7 +149,7 @@ Section "dopeIPTV"
   ; new files. It is closed first, as the uninstaller does.
   ${If} $Updating == 1
   ${OrIf} ${Silent}
-    nsExec::Exec `powershell.exe -NoProfile -NonInteractive -Command "$$p = Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' }; if ($$p) { $$p | Stop-Process -Force; $$p | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue }"`
+    nsExec::Exec `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$$p = Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' }; if ($$p) { $$p | Stop-Process -Force; $$p | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue }"`
     Pop $0
   ${EndIf}
   ; The last version's program files go first, so nothing it had and this
@@ -214,7 +214,7 @@ FunctionEnd
 
 Section "Uninstall"
   ; A copy still running from this folder is closed first, or its files stay.
-  nsExec::Exec `powershell.exe -NoProfile -NonInteractive -Command "Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
+  nsExec::Exec `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "Get-Process dopeiptv -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
   Pop $0
   Sleep 1000
   Delete "$SMPROGRAMS\${APP}.lnk"

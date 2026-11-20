@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote, urlsplit
 
-from ..core import mirrors
+from ..core import mirrors, stream_address
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..core.privacy import for_log
@@ -67,8 +67,29 @@ _SERIES_INFO_KEYS = ("name", "cover", "plot", "cast", "director", "genre",
 # Where a channel row says it has an archive: Ministra's lists have
 # "archive" and "enable_tv_archive", other portals "tv_archive".
 _ARCHIVE_FLAGS = ("tv_archive", "archive", "enable_tv_archive")
-# A MAG player's options after the address in a cmd ("position:0").
-_MAG_OPTIONS = re.compile(r"(?:\s+[a-z_]+:(?!//)\S*)+\s*$", re.I)
+class _TrailingOptions:
+    """A MAG player's options after the address in a cmd ("position:0"):
+    ``sub("", cmd)`` takes them off its end as
+    re.sub(r"(?:\\s+[a-z_]+:(?!//)\\S*)+\\s*$", "", cmd, flags=re.I) did -
+    a word at a time from the end, in linear time (that pattern took
+    quadratic time on a portal's answer with a long run of spaces)."""
+
+    _OPTION = re.compile(r"[a-z_]+:(?!//)\S*", re.I)
+    _SPACES = re.compile(r"(\s+)")
+
+    def sub(self, repl: str, s: str) -> str:
+        parts = self._SPACES.split(s)       # word, spaces, word, ..., word
+        end = len(parts) - 1
+        if end >= 2 and parts[end] == "":
+            end -= 2                        # the spaces it ends with
+        cut = None
+        while end >= 2 and self._OPTION.fullmatch(parts[end]):
+            cut = end - 1                   # the spaces before an option go with it
+            end -= 2
+        return s if cut is None else "".join(parts[:cut]) + repl
+
+
+_MAG_OPTIONS = _TrailingOptions()
 
 
 def portal_endpoints(url: str) -> list[str]:
@@ -187,7 +208,14 @@ def _id(value: Any) -> int | str | None:
     s = "" if value is None else str(value).strip()
     if not s:
         return None
-    return int(s) if s.isdigit() else s
+    return int(s) if _digits(s) else s
+
+
+def _digits(s: str) -> bool:
+    """Whether *s* is a whole number int() reads: decimal digits only (a
+    superscript is a digit to isdigit() and no number to int()), 18 at
+    most (more is no portal's id or time, and int() refuses thousands)."""
+    return s.isdecimal() and len(s) <= 18
 
 
 def _numbers(value: Any) -> list[int]:
@@ -206,7 +234,7 @@ def _utc_stamp(value: Any) -> int | None:
     """A portal time as unix time. The cookie asks for UTC, so a plain
     "YYYY-MM-DD HH:MM:SS" is read as UTC."""
     s = str(value or "").strip()
-    if s.isdigit():
+    if _digits(s):
         return int(s) or None
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
@@ -219,7 +247,7 @@ def _utc_stamp(value: Any) -> int | None:
 def _expiry(value: Any) -> int | None:
     """An account's end date as unix time, or None for none/unlimited."""
     s = str(value or "").strip()
-    if s.isdigit():
+    if _digits(s):
         n = int(s)
         return n if n > 10 ** 8 else None
     for fmt in _EXPIRY_FORMATS:
@@ -263,7 +291,7 @@ def _episode_key(series: str, season: int, num: int) -> str:
     """An id for an episode the portal only numbers. The window keeps
     watched episodes by int(id), so it must be a number, and one no other
     series' episode has."""
-    base = (int(series) if series.isdigit()
+    base = (int(series) if _digits(series)
             else zlib.crc32(series.encode("utf-8")) & 0x7FFFFFFF)
     return str(base * 10 ** 7 + min(season, 999) * 10 ** 4 + min(num, 9999))
 
@@ -300,7 +328,16 @@ def archive_address(answer: Any) -> str:
     got = answer.get("cmd") if isinstance(answer, dict) else answer
     s = strip_cmd(got if isinstance(got, str) else "")
     s = _MAG_OPTIONS.sub("", s).strip().replace(" ", "%20")
-    return s if _URL.match(s) else ""
+    return s if _is_address(s) else ""
+
+
+def _is_address(s: str) -> bool:
+    """Whether a portal's answer is an address to play: one with a
+    protocol, and not one of those that are no stream whoever gives them
+    (core/stream_address.py: an edit list or a filter graph in the address
+    itself). Which protocols a portal's stream may come over is looked at
+    where the address is handed out (providers/client.py make_client)."""
+    return bool(_URL.match(s)) and not stream_address.refusal(s, remote=False)
 
 
 def archive_cmds(row: dict) -> list[str]:
@@ -956,7 +993,7 @@ class StalkerClient(Mirrored, ListCache):
                 "epg_channel_id": str(ch.get("xmltv_id") or ""),
                 "added": "0", "is_adult": int(_flag(ch.get("censored"))),
                 "category_id": cat,
-                "category_ids": [int(cat)] if cat.isdigit() else [],
+                "category_ids": [int(cat)] if _digits(cat) else [],
                 "custom_sid": "", "direct_source": "",
                 # Played by programme (archive_link), in whole days as
                 # Xtream counts.
@@ -1057,7 +1094,7 @@ class StalkerClient(Mirrored, ListCache):
                 "rating": rating,
                 "rating_5based": round(_float(rating) / 2, 1),
                 "category_id": cat,
-                "category_ids": [int(cat)] if cat.isdigit() else []}
+                "category_ids": [int(cat)] if _digits(cat) else []}
             details: dict[str, Any] = {
                 "plot": str(v.get("description") or "").strip(),
                 "cast": str(v.get("actors") or "").strip(),
@@ -1179,7 +1216,7 @@ class StalkerClient(Mirrored, ListCache):
             n = (_int(erow.get("series_number"))
                  or _int(erow.get("episode_number")) or j)
             raw_id = str(erow.get("id") or "")
-            eid = raw_id if raw_id.isdigit() else _episode_key(sid, snum, n)
+            eid = raw_id if _digits(raw_id) else _episode_key(sid, snum, n)
             cmd = str(erow.get("cmd") or "")
             rec = {"cmd": cmd} if cmd else {
                 "module": module, "movie_id": sid, "season_id": season_id,
@@ -1286,7 +1323,7 @@ class StalkerClient(Mirrored, ListCache):
                             read=self.LINK_BUDGET_SECS, deadline=deadline)
             got = js.get("cmd") if isinstance(js, dict) else js
             url = strip_cmd(got if isinstance(got, str) else "")
-            if not _URL.match(url):
+            if not _is_address(url):
                 err = js.get("error") if isinstance(js, dict) else ""
                 log.warning("stalker create_link %s @ %s: no address%s", key,
                             self.server, f" ({err})" if err else "")

@@ -35,6 +35,7 @@ from ..core.workers import run_async
 from ..i18n import tr
 from ..providers import bouquets as bq
 from .theme import P
+from .widgets import plain_text
 
 #: The item data role a row keeps its index in.
 ROW_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -615,6 +616,7 @@ def _button(text: str, tip: str = "") -> QPushButton:
 
 def _head(text: str) -> QLabel:
     lbl = QLabel(text)
+    lbl.setTextFormat(Qt.TextFormat.PlainText)     # a bouquet's name, the box's words
     lbl.setStyleSheet("font-weight:700;")
     return lbl
 
@@ -985,7 +987,7 @@ class BouquetEditorDialog(QDialog):
             self.session.move_bouquet(row, row - 1 if step < 0 else row + 2)
 
     def _ask_text(self, title: str, label: str, text: str = "") -> str:
-        got, ok = QInputDialog.getText(self, title, label, text=text)
+        got, ok = QInputDialog.getText(self, title, plain_text(label), text=text)
         return " ".join((got or "").split()) if ok else ""
 
     def new_bouquet(self) -> None:

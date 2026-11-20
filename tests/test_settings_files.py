@@ -149,3 +149,133 @@ def test_the_window_s_start_narrows_them_before_the_restore_writes_them():
     body = src[src.index("def main() -> int:"):]
     assert body.index("settings_files.protect()") < body.index("_put_restore_in_place()")
     assert body.index("settings_files.protect()") < body.index("profiles.ProfileSettings(ORG, ORG)")
+
+
+# -- a drive that keeps no permissions: the app starts, and says so once ------------
+
+@pytest.fixture
+def nothing_noted():
+    settings_files._not_private.clear()
+    yield
+    settings_files._not_private.clear()
+
+
+@pytest.fixture
+def warnings():
+    import logging
+
+    from dopeiptv.core.log import log
+    seen: list[str] = []
+
+    class Catch(logging.Handler):
+        def emit(self, record):
+            if record.levelno >= logging.WARNING:
+                seen.append(record.getMessage())
+    h = Catch()
+    log.addHandler(h)
+    yield seen
+    log.removeHandler(h)
+
+
+def _shared_file(tmp_path) -> Path:
+    folder = tmp_path / "dopeiptv"
+    folder.mkdir(mode=0o755)
+    os.chmod(folder, 0o755)
+    f = folder / "dopeiptv.conf"
+    f.write_text("[General]\npassword=hunter2\n")
+    os.chmod(f, 0o644)
+    return f
+
+
+def test_a_drive_that_refuses_the_mode_is_logged_by_name_and_noted(tmp_path, monkeypatch,
+                                                                    nothing_noted, warnings):
+    f = _shared_file(tmp_path)
+
+    def refused(path, mode):
+        raise PermissionError(1, "Operation not permitted", str(path))
+    monkeypatch.setattr(settings_files.os, "chmod", refused)
+    assert settings_files.keep_private(str(f)) is False         # never raises
+    assert settings_files.not_private() == [str(f)]
+    assert any(str(f) in w and "not permitted" in w for w in warnings), warnings
+    assert not any("hunter2" in w for w in warnings)
+    # Asked again (protect runs once, a second store may name it): one entry.
+    settings_files.keep_private(str(f))
+    assert settings_files.not_private() == [str(f)]
+    assert f.read_text() == "[General]\npassword=hunter2\n"
+
+
+def test_a_drive_that_takes_the_mode_and_keeps_its_own_is_noted_too(tmp_path, monkeypatch,
+                                                                     nothing_noted, warnings):
+    f = _shared_file(tmp_path)
+    monkeypatch.setattr(settings_files.os, "chmod", lambda path, mode: None)
+    assert settings_files.keep_private(str(f)) is False
+    assert settings_files.not_private() == [str(f)]
+    assert any(str(f) in w for w in warnings)
+
+
+def test_a_file_kept_private_is_noted_nowhere(tmp_path, nothing_noted):
+    f = _shared_file(tmp_path)
+    assert settings_files.keep_private(str(f)) is True
+    assert settings_files.not_private() == []
+
+
+def test_the_window_asks_first_then_says_it_calmly_with_where_it_is(tmp_path, monkeypatch,
+                                                                       nothing_noted):
+    """A settings file others may read holds every login: the window asks -
+    close (the default), or go on with that file - and only once the person
+    said to go on does it say so calmly each start after."""
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+    from dopeiptv.ui.notices import NoticeHub
+
+    class Settings(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
+
+        def setValue(self, k, v):
+            self[k] = v
+
+    class Window(_SettingsMixin):
+        def __init__(self, answer):
+            self.notices = NoticeHub()
+            self.settings = Settings()
+            self.asked: list[str] = []
+            self.closed = False
+            self.answer = answer
+
+        def _ask_settings_open(self, path):
+            self.asked.append(path)
+            return self.answer
+
+        def close(self):
+            self.closed = True
+
+    w = Window("quit")
+    w._tell_settings_not_private()
+    assert w.notices.messages() == [] and not w.asked              # nothing to say
+    f = _shared_file(tmp_path)
+    monkeypatch.setattr(settings_files.os, "chmod", lambda path, mode: None)
+    settings_files.keep_private(str(f))
+    w._tell_settings_not_private()
+    assert w.asked == [str(f)] and w.closed, "Close: the app closes"
+    assert settings_files.ACCEPTED_KEY not in w.settings
+    go = Window("go")
+    go._tell_settings_not_private()
+    assert go.asked == [str(f)] and not go.closed
+    assert go.settings[settings_files.ACCEPTED_KEY] == settings_files.accepted_mark(str(f))
+    assert str(f) not in str(go.settings), "the path itself is not kept"
+    later = Window("quit")
+    later.settings = go.settings
+    later._tell_settings_not_private()
+    later._tell_settings_not_private()
+    assert later.asked == [] and not later.closed, "asked once, for that file"
+    [msg] = later.notices.messages()
+    assert msg.level == "warning" and not msg.decide
+    assert msg.title == tr("settings_open_title") and str(f) in msg.body
+    assert msg.action_label == tr("btn_open_folder")
+    opened = []
+    monkeypatch.setattr("dopeiptv.core.xdg.open_folder", opened.append)
+    msg.action()
+    assert opened == [str(f.parent)]

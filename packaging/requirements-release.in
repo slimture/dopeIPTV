@@ -1,0 +1,44 @@
+# What the packaged builds install with pip (release.yml): the app's own
+# requirements and the tools that make the packages. The exact versions and
+# the SHA-256 of every file pip may take for them are in
+# requirements-release.txt, made from this file - never edited by hand:
+#
+#   MACOSX_DEPLOYMENT_TARGET=15.0 uv pip compile packaging/requirements-release.in \
+#     --universal --python-version 3.12 --generate-hashes --no-header \
+#     --no-annotate --emit-index-url -o packaging/requirements-release.txt
+#
+# (docs/MAINTAINING.md, "What the build downloads".) The Flatpak has its own
+# pinned wheels in its manifest.
+-r ../requirements.txt
+
+# (pip itself is pinned in requirements-pip.txt: the builds install that
+# first, with the pip their Python came with, and everything here after it.)
+# PyInstaller makes the frozen bundles; on Windows its bootloader is built
+# from this source (release.yml, "Python build deps").
+pyinstaller
+# Installed by name on the Mac builds, ahead of the frameworks.
+pyobjc-core ; sys_platform == "darwin"
+# The Intel Mac build stays on PyObjC 12.2.2: 13.0's CoreMedia binds a
+# function of macOS 26's Swift runtime and does not load on macOS 15
+# (release.yml, "Python build deps"). Apple Silicon takes the newest; its
+# own line makes the two builds two answers.
+pyobjc-core>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-Cocoa>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-MediaPlayer>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-AVFoundation>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-AVKit>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-CoreMedia>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-CoreAudio>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-framework-Quartz>12.2.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+pyobjc-core==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-Cocoa==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-MediaPlayer==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-AVFoundation==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-AVKit==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-CoreMedia==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-CoreAudio==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+pyobjc-framework-Quartz==12.2.2 ; sys_platform == "darwin" and platform_machine == "x86_64"
+# The Windows build draws the .ico with it.
+pillow ; sys_platform == "win32"
+# The sdist and the wheel (python -m build).
+build

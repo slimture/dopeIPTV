@@ -16,12 +16,21 @@ Linux and macOS only. On Windows the main settings are a registry key and
 the files sit in the user's own profile; nothing is done there. A macOS
 plist (the main settings there) is never made here and its folder, the
 system's ~/Library/Preferences, is left alone.
+
+A file system that keeps no permissions (a FAT or exFAT drive, some network
+shares) refuses the change or takes it and keeps the old mode. The app
+starts all the same: the file is logged by its name (never what it holds)
+and kept in ``not_private``; the window asks in a window that waits for an
+answer - close, or go on with that file (ACCEPTED_KEY) - and says so each
+start after (ui/mw_settings.py); server mode without a window does not start
+(headless.py) until the person says so.
 """
 from __future__ import annotations
 
 import os
 import stat
 import sys
+import threading
 from typing import Any, Mapping
 
 from .log import log
@@ -29,34 +38,71 @@ from .log import log
 FILE_MODE = 0o600
 FOLDER_MODE = 0o700
 
+#: The settings files this start could not keep to this user, in order.
+_not_private: list[str] = []
+#: The file the person said to go on with, readable by others all the same
+#: (accepted_mark): asked again for any other file, or a moved one.
+ACCEPTED_KEY = "settings_open_accepted"
+_lock = threading.Lock()
 
-def _narrow(path: str, mode: int) -> None:
+
+def _narrow(path: str, mode: int) -> bool:
+    """*path*'s mode narrowed to within *mode*; whether it is now - a file
+    system without permissions takes the change and keeps the old mode."""
     now = stat.S_IMODE(os.stat(path).st_mode)
     if now & ~mode:
         os.chmod(path, now & mode)
+        now = stat.S_IMODE(os.stat(path).st_mode)
+    return not now & ~mode
+
+
+def _note(path: str, why: str) -> None:
+    log.warning("settings: %s could not be kept to this user (%s) - it holds logins; "
+                "another account on this computer may be able to read it", path, why)
+    with _lock:
+        if path not in _not_private:
+            _not_private.append(path)
+
+
+def accepted_mark(path: str) -> str:
+    """What ACCEPTED_KEY holds for *path*: its hash, not the path itself (a
+    backup or a report of the settings names no folder)."""
+    import hashlib
+    return hashlib.sha256(os.path.abspath(path).encode("utf-8", "replace")).hexdigest()[:32]
+
+
+def not_private() -> list[str]:
+    """The settings files this start could not make readable by this user
+    alone (their paths; empty when every one is)."""
+    with _lock:
+        return list(_not_private)
 
 
 def keep_private(path: str, *, folder: bool = True, create: bool = True) -> bool:
     """*path* readable by this user alone, and with *folder* the folder it is
     in too (made at 0700 when missing). *create*: a missing file made empty
-    at 0600 first. Never raises; False when it could not be done (logged)."""
+    at 0600 first. Never raises; False when it could not be done - logged
+    with the file's name and kept in not_private()."""
     if os.name != "posix" or not path:
         return True
     try:
+        kept = True
         if folder:
             parent = os.path.dirname(path)
             os.makedirs(parent, mode=FOLDER_MODE, exist_ok=True)
-            _narrow(parent, FOLDER_MODE)
+            kept = _narrow(parent, FOLDER_MODE)
         if create and not os.path.lexists(path):
             try:
                 os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, FILE_MODE))
             except FileExistsError:
                 pass
         if os.path.exists(path):
-            _narrow(path, FILE_MODE)
-        return True
+            kept = _narrow(path, FILE_MODE) and kept
+        if not kept:
+            _note(path, "its drive keeps no permissions")
+        return kept
     except OSError as e:
-        log.warning("settings: %s not kept to this user (%s)", path, e)
+        _note(path, e.strerror or type(e).__name__)
         return False
 
 

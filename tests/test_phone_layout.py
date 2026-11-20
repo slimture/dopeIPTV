@@ -286,7 +286,7 @@ def test_the_page_fits_each_phone_upright_and_on_its_side_in_a_browser():
     servers = {lang: _serve(lang) for lang in ("en", "ru", "ar")}
     try:
         def url(lang):
-            return f"http://127.0.0.1:{servers[lang].port}/{TOKEN}/"
+            return f"http://127.0.0.1:{servers[lang].port}/r/#{TOKEN}"
         runs = []
         for w, h in SIZES:
             for size in ((w, h), (h, w)):

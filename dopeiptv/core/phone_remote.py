@@ -12,10 +12,20 @@ query string only the few keys they take (``query_params``).
 
 Off until the person turns it on ("Phone remote…"). Only a phone at a
 private address gets an answer - any part of a home network split in
-VLANs, never the internet (core/home_net.py). Every address starts
-with a long random token, /<token>/, which is what the code on the screen
-holds: a request without it gets 403 and nothing else, and an address that
-keeps guessing is shut out for a while. Each address may ask only so often
+VLANs, never the internet (core/home_net.py). The code on the screen holds
+the address /r/ and, after its #, a long random key (``page_url``): a
+browser never sends what follows the #, so the key never crosses the
+network. The page keeps it on the phone and signs every request with it
+(HMAC-SHA256 over the method, the address, the time and a nonce,
+``signed``) - one seen on the way can be neither changed nor sent again,
+and no request carries anything that would let another be made. A
+picture's address is signed the same way, for a quarter of an hour
+(``picture_ok``). The page itself, its manifest and icons hold nothing of
+the person's and need no key. An address of before, with the key in its
+path (/<key>/), gets a page that says to scan the code again - and, the
+key having crossed the network, a new key at once (``on_leaked``). A
+request whose signature does not hold gets 401, and an address that keeps
+trying is shut out for a while. Each address may ask only so often
 (a token bucket; a list's pictures, many at once as it scrolls, in a more
 generous bucket of their own). Nothing else is served - not the remote API, whose own
 server stays on this computer unless the person chose otherwise.
@@ -32,9 +42,11 @@ behind live and how far back, which the page reckons on by the clock
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import threading
 import time
@@ -94,9 +106,54 @@ def new_token() -> str:
     return secrets.token_urlsafe(TOKEN_BYTES)
 
 
+#: The page's address on the server; its key is after the # (page_url).
+PREFIX = "r"
+#: How far a request's time may be from this computer's: phones keep the
+#: network's time, so a minute either way.
+SIGN_WINDOW_MS = 60_000
+#: How long a picture's signed address holds (the page signs a new one).
+PICTURE_TTL_MS = 15 * 60_000
+#: Nonces remembered against a request sent again: a minute's at most.
+NONCES_MAX = 20_000
+_STAMP = re.compile(r"\d{1,15}")
+_NONCE = re.compile(r"[A-Za-z0-9_-]{16,64}")
+_SIGN = re.compile(r"[0-9a-f]{64}")
+
+
+def _host(ip: str) -> str:
+    return f"[{ip}]" if ":" in ip else ip
+
+
 def page_url(ip: str, port: int, token: str) -> str:
-    host = f"[{ip}]" if ":" in ip else ip
-    return f"http://{host}:{int(port)}/{token}/"
+    """The address the code holds: the page, and its key after the # -
+    which the phone's browser never sends."""
+    return f"http://{_host(ip)}:{int(port)}/{PREFIX}/#{token}"
+
+
+def calendar_token(token: str) -> str:
+    """The calendar's own address part: a calendar app cannot sign, so it
+    gets a key that opens the calendar alone - read only, never the remote."""
+    raw = hmac.new(token.encode("utf-8"), b"calendar", hashlib.sha256).digest()[:24]
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def calendar_url(ip: str, port: int, token: str) -> str:
+    return f"http://{_host(ip)}:{int(port)}/c/{calendar_token(token)}/calendar.ics"
+
+
+def signature(token: str, method: str, target: str, stamp: str, nonce: str, body: bytes = b"") -> str:
+    """What the page signs a request with: HMAC-SHA256 of the method, the
+    address asked for (its path and query), the time, a nonce and the body,
+    each on a line - with the key the code holds."""
+    msg = f"{method}\n{target}\n{stamp}\n{nonce}\n".encode("utf-8") + body
+    return hmac.new(token.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+
+#: What an address of before is answered: the code is to be scanned again.
+OLD_ADDRESS = ("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
+               "<title>dopeIPTV Remote</title><body style='font:16px system-ui;margin:2em'>"
+               "<p>This address of the remote is out of date. Open <b>Phone remote</b> in dopeIPTV and "
+               "scan its code again.</p>").encode("utf-8")
 
 
 def image_type(data: bytes) -> str | None:
@@ -122,6 +179,15 @@ def query_params(query: str) -> dict[str, str]:
         if key in QUERY_KEYS and values and len(values[0]) <= QUERY_MAX:
             out[key] = values[0]
     return out
+
+
+def picture_query(query: str) -> dict[str, str]:
+    """A picture's signed address: its "x" (until when) and "s" alone."""
+    try:
+        got = parse_qs(query or "", keep_blank_values=False, max_num_fields=4)
+    except ValueError:
+        return {}
+    return {k: v[0][:80] for k, v in got.items() if k in ("x", "s") and v}
 
 
 def state_tag(state: dict[str, Any]) -> str:
@@ -296,8 +362,14 @@ class PhoneServer:
                  limiter: RateLimiter | None = None,
                  asset: Callable[[str], tuple[bytes, str] | None] | None = None,
                  pictures: RateLimiter | None = None,
-                 on_client: Callable[[str], Any] | None = None) -> None:
+                 on_client: Callable[[str], Any] | None = None,
+                 on_leaked: Callable[[str], Any] | None = None) -> None:
         self.host, self.port, self.token = host, int(port), token
+        #: Told (on the server's thread) of the new key made when an address
+        #: of before brought the old one across the network.
+        self.on_leaked = on_leaked
+        self._nonces: OrderedDict[str, int] = OrderedDict()
+        self._nonce_lock = threading.Lock()
         self.call, self.page = call, page
         self.asset = asset
         #: Told (on the server's thread) of the first request with the token
@@ -333,8 +405,66 @@ class PhoneServer:
         log.info("phone remote: stopped")
 
     def authorized(self, given: str) -> bool:
+        """Whether *given* is the key itself - only an address of before
+        carries it, in its path (leaked)."""
         return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
                                                         self.token.encode("utf-8"))
+
+    def signed(self, method: str, target: str, headers: Any, body: bytes = b"",
+               now_ms: int | None = None) -> str:
+        """"" for a request the page signed with the key - in its time, its
+        nonce new - else why not: "missing", "stale", "bad" or "again"."""
+        now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+        stamp = str(headers.get("X-Remote-Time") or "")
+        nonce = str(headers.get("X-Remote-Nonce") or "")
+        sign = str(headers.get("X-Remote-Sign") or "")
+        if not (_STAMP.fullmatch(stamp) and _NONCE.fullmatch(nonce) and _SIGN.fullmatch(sign)):
+            return "missing"
+        if abs(now_ms - int(stamp)) > SIGN_WINDOW_MS:
+            return "stale"
+        if not self.token or not hmac.compare_digest(
+                signature(self.token, method, target, stamp, nonce, body), sign):
+            return "bad"
+        with self._nonce_lock:
+            while self._nonces and (len(self._nonces) >= NONCES_MAX
+                                    or next(iter(self._nonces.values())) < now_ms):
+                self._nonces.popitem(last=False)
+            if nonce in self._nonces:
+                return "again"
+            self._nonces[nonce] = now_ms + 2 * SIGN_WINDOW_MS
+        return ""
+
+    def picture_ok(self, path: str, query: dict[str, str], now_ms: int | None = None) -> bool:
+        """A picture's address the page signed: *path* until its "x" (ms),
+        at most PICTURE_TTL_MS ahead. A picture asked again from it is the
+        browser's own, so no nonce."""
+        now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+        until, sign = query.get("x", ""), query.get("s", "")
+        if not (_STAMP.fullmatch(until) and _SIGN.fullmatch(sign)):
+            return False
+        if not now_ms <= int(until) <= now_ms + PICTURE_TTL_MS + SIGN_WINDOW_MS:
+            return False
+        return bool(self.token) and hmac.compare_digest(
+            signature(self.token, "GET", path, until, "picture"), sign)
+
+    def calendar_ok(self, given: str) -> bool:
+        return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
+                                                        calendar_token(self.token).encode("utf-8"))
+
+    def leaked(self) -> str:
+        """The key crossed the network (an address of before): a new one at
+        once, told to the window; every phone scans the code again."""
+        self.token = new_token()
+        with self._nonce_lock:
+            self._nonces.clear()
+        log.warning("phone remote: a phone used the address of before, which carries the key - "
+                    "a new key was made; scan the code again")
+        if self.on_leaked is not None:
+            try:
+                self.on_leaked(self.token)
+            except Exception:
+                log.debug("phone remote: on_leaked failed", exc_info=True)
+        return self.token
 
     #: Addresses remembered as connected, at most.
     CLIENTS_MAX = 256
@@ -388,14 +518,18 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
         def _text(self, code: int, text: str) -> None:
             self._send(code, text.encode("utf-8"), "text/plain; charset=utf-8")
 
-        def _body(self) -> dict[str, Any] | None:
+        def _raw(self) -> bytes | None:
+            """The request's body as sent, MAX_BODY at most; None past it."""
             try:
                 length = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 return None
             if length < 0 or length > MAX_BODY:
                 return None
-            raw = self.rfile.read(length) if length else b""
+            return self.rfile.read(length) if length else b""
+
+        @staticmethod
+        def _json_of(raw: bytes) -> dict[str, Any] | None:
             if not raw.strip():
                 return {}
             try:
@@ -404,10 +538,29 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 return None
             return body if isinstance(body, dict) else None
 
+        def _refused(self, who: str, why: str) -> None:
+            """401 for a request the page did not sign, with this computer's
+            time so the page can set its clock right once; a wrong signature
+            counts towards the shut-out, never a web page's."""
+            lim = server.limiter
+            if why == "bad" and not cross_site(self.headers, self.headers.get("Host")) \
+                    and lim.failed(who):
+                log.warning("phone remote: an address on the network kept sending wrong "
+                            "signatures; it is shut out for %d minutes", int(lim.lockout // 60))
+            self._send(401, b'{"error": "not signed"}', "application/json; charset=utf-8",
+                       {"X-Remote-Now": str(int(time.time() * 1000))})
+
         def _handle(self, method: str) -> None:
             who = self.client_address[0]
             if not server.client_ok(str(who), _own(self)):
                 self._text(403, "forbidden")
+                return
+            # A Host that is no name of the home (a web page's own name a
+            # DNS rebinding pointed here): refused before anything is
+            # counted - its tries never shut the phone out of its remote.
+            host = self.headers.get("Host")
+            if host is not None and not home_net.home_host(host):
+                self._text(421, "misdirected")
                 return
             lim = server.limiter
             parts = urlsplit(self.path)
@@ -418,34 +571,44 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
             if lim.blocked(who) or not bucket.allow(who):
                 self._send(429, b"too many requests", "text/plain; charset=utf-8", {"Retry-After": "10"})
                 return
-            given = unquote(segs[1]) if len(segs) > 1 else ""
-            if not server.authorized(given):
-                # Only what looks like a try at the token counts: a phone's
+            first = unquote(segs[1]) if len(segs) > 1 else ""
+            if first == "c" and len(segs) == 4 and segs[3] == "calendar.ics" and method in ("GET", "HEAD"):
+                if not server.calendar_ok(unquote(segs[2])):
+                    self._text(403, "forbidden")
+                    return
+                text = server.call("calendar", {})
+                self._send(200, str(text).encode("utf-8"), "text/calendar; charset=utf-8",
+                           {"Content-Disposition": 'inline; filename="dopeIPTV.ics"'})
+                return
+            if first != PREFIX:
+                if first and server.authorized(first):
+                    # An address of before: the key in its path, seen by
+                    # whatever carried the request. Never again.
+                    server.leaked()
+                    self._send(410, OLD_ADDRESS, "text/html; charset=utf-8",
+                               {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'"})
+                    return
+                # Only what looks like a try at the key counts: a phone's
                 # browser asks for /favicon.ico by itself. Never a web
                 # page's: one the phone visits would shut it out of its remote.
-                if len(given) >= 16 and not cross_site(self.headers, self.headers.get("Host")) \
+                if len(first) >= 16 and not cross_site(self.headers, self.headers.get("Host")) \
                         and lim.failed(who):
                     log.warning("phone remote: an address on the network kept guessing; "
                                 "it is shut out for %d minutes", int(lim.lockout // 60))
                 self._text(403, "forbidden")
                 return
             if len(segs) == 2:
-                self._send(301, b"", "text/plain", {"Location": f"/{given}/"})
+                self._send(301, b"", "text/plain", {"Location": f"/{PREFIX}/"})
                 return
-            server.note_client(str(who))
             rest = "/".join(segs[2:])
             reading = method in ("GET", "HEAD")
             try:
                 if rest == "" and reading:
+                    # The page holds nothing of the person's: its key is the
+                    # phone's own (after the # of the code's address).
                     html, csp = server.page()
                     self._send(200, html, "text/html; charset=utf-8",
                                {"Content-Security-Policy": csp})
-                elif rest.startswith("api/"):
-                    self._api(rest[4:], method, parts.query)
-                elif rest.startswith("logo/") and reading:
-                    self._logo(unquote(rest[5:]))
-                elif rest.startswith("thumb/") and reading:
-                    self._thumb(unquote(rest[6:]))
                 elif rest in ASSETS and reading:
                     got = server.asset(rest) if server.asset is not None else None
                     if not got:
@@ -453,10 +616,25 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                     else:
                         self._send(200, got[0], got[1],
                                    {"Cache-Control": "private, max-age=86400"})
-                elif rest == "calendar.ics" and reading:
-                    text = server.call("calendar", {})
-                    self._send(200, str(text).encode("utf-8"), "text/calendar; charset=utf-8",
-                               {"Content-Disposition": 'inline; filename="dopeIPTV.ics"'})
+                elif (rest.startswith("logo/") or rest.startswith("thumb/")) and reading:
+                    if not server.picture_ok(path, picture_query(parts.query)):
+                        self._refused(str(who), "picture")
+                    elif rest.startswith("logo/"):
+                        self._logo(unquote(rest[5:]))
+                    else:
+                        self._thumb(unquote(rest[6:]))
+                elif rest.startswith("api/"):
+                    raw = self._raw() if method == "POST" else b""
+                    if raw is None:
+                        self._json(400, {"error": "the body is too large"})
+                        return
+                    target = path + ("?" + parts.query if parts.query else "")
+                    why = server.signed(method, target, self.headers, raw)
+                    if why:
+                        self._refused(str(who), why)
+                        return
+                    server.note_client(str(who))
+                    self._api(rest[4:], method, parts.query, raw)
                 else:
                     self._json(404, {"error": "not found"})
             except TimeoutError:
@@ -469,7 +647,7 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 log.warning("phone remote: %s failed: %s", rest.split("/")[0] or "page", e)
                 self._json(500, {"error": type(e).__name__})
 
-        def _api(self, action: str, method: str, query: str = "") -> None:
+        def _api(self, action: str, method: str, query: str = "", raw: bytes = b"") -> None:
             if action in READ:
                 if method not in ("GET", "HEAD"):
                     self._json(405, {"error": "use GET"})
@@ -499,7 +677,7 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
                 # web page's form or fetch (a text/plain body can be JSON).
                 self._json(403, {"error": "not from another site"})
                 return
-            params = self._body()
+            params = self._json_of(raw)
             if params is None:
                 self._json(400, {"error": "the body is not a JSON object"})
                 return

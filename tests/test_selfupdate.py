@@ -29,6 +29,13 @@ TEST_SEED = bytes(range(32))
 TEST_KEY = base64.b64encode(ed25519.public_key(TEST_SEED)).decode()
 
 
+@pytest.fixture(autouse=True)
+def running_1_2_14(monkeypatch):
+    """These tests run as 1.2.14: an installer asks which version runs
+    before it takes a release (selfupdate.refuse_older)."""
+    monkeypatch.setattr(selfupdate, "VERSION", "1.2.14")
+
+
 def signed(release: dict) -> dict:
     """*release* with a checksum list of its assets, signed with TEST_SEED."""
     sums = "".join(f"{a['digest'].split(':', 1)[1]}  {a['name']}\n"
@@ -386,8 +393,18 @@ class _Got:
     def __init__(self, body: bytes):
         self.content = body
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
     def raise_for_status(self):
         pass
+
+    def iter_content(self, chunk_size: int):
+        for i in range(0, len(self.content), chunk_size):
+            yield self.content[i:i + chunk_size]
 
 
 def _github_has(monkeypatch, rel: dict | None) -> list:
@@ -484,3 +501,151 @@ def test_a_build_without_a_key_takes_no_update(monkeypatch):
     with pytest.raises(selfupdate.UpdateError) as e:
         selfupdate.signed_asset({"tag": "v1.4.6"}, _asset())
     assert e.value.key == "upd_err_unsigned"
+
+
+class _Hop:
+    """A redirect to *where*."""
+    is_redirect = True
+
+    def __init__(self, where: str):
+        self.headers = {"Location": where}
+
+    def close(self):
+        pass
+
+
+def test_a_download_follows_redirects_only_over_https(monkeypatch, tmp_path):
+    body = b"new version"
+    asset = _asset(digest="sha256:" + hashlib.sha256(body).hexdigest())
+    asset["size"] = len(body)
+    asked: list = []
+    hops = {asset["url"]: _Hop("https://github.com/x/releases/download/v1/f"),
+            "https://github.com/x/releases/download/v1/f": _Hop("/storage/f")}
+
+    def get(url, **kw):
+        asked.append((url, kw.get("allow_redirects"), kw["headers"].get("X-dopeIPTV-Build")))
+        return hops.get(url) or _Resp(body)
+
+    monkeypatch.setattr(selfupdate.requests, "get", get)
+    selfupdate.download(asset, tmp_path / "f")
+    assert (tmp_path / "f").read_bytes() == body
+    assert [u for u, _r, _b in asked] == [asset["url"], "https://github.com/x/releases/download/v1/f",
+                                          "https://github.com/storage/f"]
+    assert all(r is False for _u, r, _b in asked), "requests follows no redirect by itself"
+    assert asked[0][2] and not asked[1][2], "the build's kind goes to dopeiptv.org alone"
+
+    # A redirect to plain http is not followed, and nothing is left behind.
+    hops["https://github.com/x/releases/download/v1/f"] = _Hop("http://github.com/storage/f")
+    asked.clear()
+    with pytest.raises(UpdateError, match="https"):
+        selfupdate.download(asset, tmp_path / "g")
+    assert len(asked) == 2 and not (tmp_path / "g").exists()
+
+    # Nor round and round.
+    hops[asset["url"]] = _Hop(asset["url"])
+    with pytest.raises(UpdateError, match="redirects"):
+        selfupdate.download(asset, tmp_path / "h")
+
+
+def test_a_download_stops_once_it_is_larger_than_the_file(monkeypatch, tmp_path):
+    body = b"x" * (3 << 16)
+    asset = _asset(digest="sha256:" + hashlib.sha256(body[:10]).hexdigest())
+    asset["size"] = 10
+    read: list = []
+
+    class _Endless(_Resp):
+        def iter_content(self, chunk_size):
+            for chunk in super().iter_content(chunk_size):
+                read.append(len(chunk))
+                yield chunk
+
+    monkeypatch.setattr(selfupdate.requests, "get", lambda url, **kw: _Endless(body))
+    with pytest.raises(UpdateError, match="damaged"):
+        selfupdate.download(asset, tmp_path / "f")
+    assert len(read) == 1, "it stopped at the first chunk past the size"
+    assert not (tmp_path / "f").exists()
+    # With no size given, the cap is DOWNLOAD_MAX.
+    monkeypatch.setattr(selfupdate, "DOWNLOAD_MAX", 1 << 16)
+    read.clear()
+    with pytest.raises(UpdateError, match="damaged"):
+        selfupdate.download(dict(asset, size=0), tmp_path / "f")
+    assert len(read) == 2
+
+
+def test_githubs_checksum_list_is_read_no_further_than_a_megabyte(monkeypatch):
+    monkeypatch.setattr(selfupdate.requests, "get", lambda url, **kw: _Got(b"0" * (2 << 20)))
+    with pytest.raises(ValueError, match="too large"):
+        selfupdate._github_file("v1.6.8", "SHA256SUMS")
+
+# -- hardening: no step back, a file of our own, a download that ends -----------------
+
+@pytest.mark.parametrize("version", ["1.2.14", "1.2.13", "1.0.0", "1.2.14.7"])
+def test_a_release_that_is_not_newer_is_never_installed(env, version):
+    """Whatever offered it: a release signed long ago stays signed, so the
+    installer itself asks which version runs. 1.2.14.7 is a test build of
+    the running release's number - newer, so taken; the rest are not."""
+    current, served = env
+    rel = _release(served, GOOD, version=version)
+    if version == "1.2.14.7":
+        assert selfupdate.install(rel, "1.2.14").read_bytes() == GOOD
+        return
+    with pytest.raises(UpdateError) as e:
+        selfupdate.install(rel, "1.2.14")
+    assert e.value.key == "upd_err_mac_check" and e.value.kwargs == {"step": "version"}
+    assert tr(e.value.key, **e.value.kwargs) != e.value.key        # said in words, in every language
+    assert _leftovers(current.parent) == [current.name], "nothing was fetched"
+
+
+def test_back_on_releases_a_test_build_takes_the_release_it_carries_the_number_of(env, monkeypatch):
+    # The one step "down" there is today (updates.offered): 1.2.15 over the
+    # test build 1.2.15.40, and any later release - never an earlier one.
+    monkeypatch.setattr(selfupdate, "VERSION", "1.2.15.40")
+    selfupdate.refuse_older("v1.2.15")
+    selfupdate.refuse_older("v1.2.16")
+    selfupdate.refuse_older("v1.2.15.41")
+    for old in ("v1.2.14", "v1.2.15.39", "v1.2.15.40", "", "v"):
+        with pytest.raises(UpdateError):
+            selfupdate.refuse_older(old)
+
+
+def test_the_check_is_against_the_version_running_not_the_one_passed_in(env, monkeypatch):
+    current, served = env
+    monkeypatch.setattr(selfupdate, "VERSION", "1.2.15")
+    with pytest.raises(UpdateError):
+        selfupdate.install(_release(served, GOOD), "1.0.0")          # a caller that says it is older
+
+
+def test_the_download_is_a_file_of_our_own_never_one_lying_there(env, tmp_path):
+    """In a folder others may write to, a file - or a link - put under the
+    download's name beforehand would be theirs to change after the checksum."""
+    current, served = env
+    rel = _release(served, GOOD)
+    asset = selfupdate.signed_asset(rel, rel["assets"][1])
+    victim = tmp_path / "victim.txt"
+    victim.write_text("mine", encoding="utf-8")
+    part = current.with_name(".dopeIPTV-1.2.15-x86_64.AppImage.part")
+    part.symlink_to(victim)
+    selfupdate.download(asset, part)
+    assert not part.is_symlink() and part.read_bytes() == GOOD
+    assert victim.read_text(encoding="utf-8") == "mine", "written through the link"
+    # And a plain leftover of an earlier try is replaced, not appended to.
+    part.write_bytes(b"old" * 100)
+    selfupdate.download(asset, part)
+    assert part.read_bytes() == GOOD
+
+
+def test_a_download_that_runs_past_its_size_is_cut_off(env, monkeypatch):
+    current, served = env
+    rel = _release(served, GOOD)
+    asset = dict(selfupdate.signed_asset(rel, rel["assets"][1]))
+    part = current.with_name(".x.part")
+    served[asset["url"]] = GOOD + b"\0" * (1 << 20)                # the server sends more than it said
+    with pytest.raises(UpdateError) as e:
+        selfupdate.download(asset, part)
+    assert e.value.key == "upd_err_checksum" and not part.exists()
+    # No size named (GitHub and the site both name one): a ceiling still holds.
+    monkeypatch.setattr(selfupdate, "DOWNLOAD_MAX", 1 << 16)
+    asset["size"] = 0
+    with pytest.raises(UpdateError) as e:
+        selfupdate.download(asset, part)
+    assert e.value.key == "upd_err_checksum" and not part.exists()

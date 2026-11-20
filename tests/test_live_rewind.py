@@ -56,7 +56,9 @@ def test_off_and_damaged_values(tmp_path):
 def test_play_puts_the_buffer_on_disk_only_when_asked():
     import inspect
     src = inspect.getsource(EmbeddedPlayer.play)
-    assert "self._live_rewind_disk()" in src.split('m["cache-on-disk"]', 1)[1][:120]
+    # As Settings say - and never for a private playback (core/privacy).
+    before = src.split('m["cache-on-disk"]', 1)[0][-300:]
+    assert "self._live_rewind_disk()" in before and "not self._dvr_playing_private()" in before
     assert "_live_rewind_minutes() > 0" in src
 
 

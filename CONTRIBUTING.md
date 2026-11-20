@@ -86,3 +86,7 @@ DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log python3 dopeiptv.py
 ```
 
 Credentials are redacted from logs automatically, but skim before posting.
+
+A security problem is never an issue: report it privately as
+[`SECURITY.md`](SECURITY.md) says. What the app protects, and from whom,
+is [`docs/SECURITY.md`](docs/SECURITY.md).

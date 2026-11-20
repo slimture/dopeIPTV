@@ -41,14 +41,47 @@ _configured = False
 # taught and the ones added after it was written.
 
 _secrets: set[str] = set()
+#: Credentials of three characters or fewer: masked as words of their own.
+_short: set[str] = set()
 
 # Query parameters that carry an account, whatever the provider calls it.
 # A Stalker portal's links name the box (mac) and a play token, Plex's
-# carry X-Plex-Token.
+# carry X-Plex-Token, Jellyfin's and Emby's X-Emby-Token or api_key, an
+# OAuth answer access_token and refresh_token.
 _CRED_PARAMS = frozenset((
     "username", "user", "password", "pass", "pwd", "token", "auth",
-    "api_key", "apikey", "key", "secret", "sig", "signature",
-    "mac", "play_token", "x-plex-token"))
+    "api_key", "apikey", "api-key", "x-api-key", "key", "secret", "sig",
+    "signature", "mac", "play_token", "x-plex-token", "x-emby-token",
+    "x-mediabrowser-token", "access_token", "refresh_token"))
+
+# -- logins in free text, not inside an address: the error report's own
+# patterns (core/report.py, which imports this module - so they are written
+# out here; tests/test_log_redaction.py holds the two to the same). A login
+# written name=value or name: value - a quoted name or value too, as JSON
+# and config files write them ("password": "x y"); the quotes stay. The
+# report's has "login" and "host" too; a log keeps them, or nothing in it
+# would say which server a line is about. And "name = ..." is left alone:
+# a line of Python in a traceback, a space before the "=" its style.
+KEYVAL = re.compile(r"(?i)\b(user(?:name)?|pass(?:word)?|pwd|(?:access_|refresh_|play_)?token|key|"
+                    r"api[_-]?key|secret|auth|sid|session|mac)([\"']?(?:\s*:|=)\s*)"
+                    r"(\"[^\"\n]{0,200}\"|'[^'\n]{0,200}'|[^\s&'\",;]+)")
+#: A header that carries a login, to the end of its line, and a bearer
+#: token wherever it stands.
+AUTH_LINE = re.compile(r"(?i)\b((?:proxy-)?authorization|(?:set-)?cookie)([\"']?\s*[:=]\s*)[^\r\n]*")
+BEARER = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
+#: A box's MAC (a Stalker portal's login).
+MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
+#: A supporter key: the one thing that could tie a log to a donation.
+SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
+# A query without its address ("Max retries exceeded with url:
+# /get.php?username=...&password=..."), and an Xtream account in a path
+# without its address ("url: /live/<user>/<pass>/1234.ts").
+_QUERY_IN_TEXT = re.compile(r"(?<=[\w/.%~-])\?(?=[\w.~%+-]+=)[^\s'\"<>()\[\]#]+")
+_PATH_IN_TEXT = re.compile(r"(?<![\w/.:%@-])/(live|movie|series|timeshift)/"
+                           r"[^/\s'\"<>?#]+/[^/\s'\"<>?#]+/")
+# What a terminal or a log viewer would act on (a colour, a cursor move, a
+# line rewritten): every C0 and C1 control but tab and newline.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 
 # Xtream path layouts: /<kind>/<username>/<password>/<id>.<ext>. The bare
 # /<username>/<password>/<id> form is deliberately NOT guessed at - it is
@@ -79,10 +112,13 @@ def register_secrets(*values: str | None) -> None:
     exception message quoting the full URL - without a parser that has to
     keep up with each new one."""
     for v in values:
-        # A very short "secret" would blank out ordinary words all over the
-        # log, and a credential that short protects nothing to begin with.
+        # One of three characters or fewer is masked only where it stands
+        # as a word of its own (_short): as a substring it would blank out
+        # ordinary words all over the log.
         if v and len(v) > 3:
             _secrets.add(v)
+        elif v and v.strip():
+            _short.add(v)
 
 
 def redact(text: str) -> str:
@@ -94,6 +130,9 @@ def redact(text: str) -> str:
     that grows under you raises RuntimeError."""
     for s in tuple(_secrets):
         text = text.replace(s, "***")
+    for s in tuple(_short):
+        if s in text:
+            text = re.sub(r"(?<![0-9A-Za-z])" + re.escape(s) + r"(?![0-9A-Za-z])", "***", text)
     return text
 
 
@@ -174,16 +213,47 @@ def _address_masked(url: str) -> str:
     return urlunsplit((parts.scheme, netloc, "/".join(segs), query, frag)) + tail
 
 
+def _query_masked(m: re.Match[str]) -> str:
+    query = m.group(0)
+    end = len(query)
+    while end > 1 and query[end - 1] in ".,;:!?":
+        end -= 1
+    query, tail = query[1:end], query[end:]
+    return "?" + "&".join(_masked_pair(p) for p in query.split("&")) + tail
+
+
+def _value_masked(m: re.Match[str]) -> str:
+    value = m.group(3)
+    quote = value[0] if value[:1] in ("'", '"') else ""
+    return f"{m.group(1)}{m.group(2)}{quote}***{quote}"
+
+
 def redact_text(text: str) -> str:
     """*text* the app did not write - a line ffmpeg or mpv printed, an
     exception's message - safe to log: every address in it masked
-    (_address_masked), then every registered value. Never raises."""
+    (_address_masked), a query or an Xtream account without its address,
+    a login header, a bearer token, a login written name=value, a box's
+    MAC and a supporter key, then every registered value. Never raises."""
     try:
         if "://" in text:
             text = URL_IN_TEXT.sub(lambda m: _address_masked(m.group(0)), text)
+        if "?" in text:
+            text = _QUERY_IN_TEXT.sub(_query_masked, text)
+        if "/" in text:
+            text = _PATH_IN_TEXT.sub(lambda m: f"/{m.group(1)}/***/***/", text)
+        text = AUTH_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)}***", text)
+        text = BEARER.sub(lambda m: f"{m.group(1)} ***", text)
+        text = SUPPORTER.sub("***", text)
+        text = MAC.sub("***", text)
+        text = KEYVAL.sub(_value_masked, text)
     except Exception:
         pass
     return redact(text)
+
+
+def _escaped(text: str) -> str:
+    """*text* with its control characters shown as \\x1b, not acted on."""
+    return _CONTROL.sub(lambda m: f"\\x{ord(m.group(0)):02x}", text)
 
 
 def _redact_arg(value: object) -> object:
@@ -218,9 +288,13 @@ class _RedactFilter(logging.Filter):
                 # split between the message and an argument, and masking
                 # the message alone could eat a %s an argument needs.
                 text = record.getMessage()
-                record.msg, record.args = redact_text(text), ()
+                record.msg, record.args = _escaped(redact_text(text)), ()
             else:
-                record.msg = _redact_arg(record.msg)
+                msg = _redact_arg(record.msg)
+                if not isinstance(msg, str):
+                    text = str(msg)
+                    msg = msg if _escaped(text) == text else text
+                record.msg = _escaped(msg) if isinstance(msg, str) else msg
         except Exception:
             pass
         try:
@@ -229,15 +303,87 @@ class _RedactFilter(logging.Filter):
             if record.exc_info and not record.exc_text:
                 record.exc_text = logging.Formatter().formatException(record.exc_info)
             if record.exc_text:
-                record.exc_text = redact_text(record.exc_text)
+                record.exc_text = _escaped(redact_text(record.exc_text))
             if record.stack_info:
-                record.stack_info = redact_text(record.stack_info)
+                record.stack_info = _escaped(redact_text(record.stack_info))
         except Exception:
             pass
         return True
 
 
 _file_handler: logging.Handler | None = None
+
+
+def private_folder(path: str) -> None:
+    """*path* made, or narrowed, to this user alone (0700) - a folder of
+    the app's own: its logs, a rewind buffer's. Never raises."""
+    try:
+        os.makedirs(path, mode=0o700, exist_ok=True)
+        if os.name == "posix":
+            now = os.stat(path).st_mode & 0o777
+            if now & ~0o700:
+                os.chmod(path, now & 0o700)
+    except OSError:
+        pass
+
+
+def _narrowed(fd: int) -> None:
+    if os.name == "posix":
+        now = os.fstat(fd).st_mode & 0o777
+        if now & ~0o600:
+            os.fchmod(fd, now & 0o600)
+
+
+def private_fd(path: str, append: bool = False) -> int:
+    """A file opened for writing that this user alone reads (0600): made
+    so, or narrowed when it was there before - a log is pasted into a bug
+    report, not read by every account on the computer."""
+    flags = (os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_TRUNC)
+             | getattr(os, "O_BINARY", 0))
+    fd = os.open(path, flags, 0o600)
+    try:
+        _narrowed(fd)
+    except OSError:
+        pass
+    return fd
+
+
+def open_private(path: str, mode: str = "w", encoding: str | None = "utf-8",
+                 errors: str | None = None) -> Any:
+    """open() of a file this user alone reads (private_fd)."""
+    fd = private_fd(path, append="a" in mode)
+    try:
+        return open(fd, mode, encoding=None if "b" in mode else encoding,  # noqa: SIM115
+                    errors=errors)
+    except Exception:
+        os.close(fd)
+        raise
+
+
+def _private_handler(path: str) -> logging.Handler:
+    """A rotating log file (2 MB, three files at most) that this user alone
+    reads, its rolled-over copies too."""
+    from logging.handlers import RotatingFileHandler
+
+    class PrivateFileHandler(RotatingFileHandler):
+        def _open(self) -> Any:
+            return open_private(self.baseFilename, self.mode,
+                                encoding=self.encoding, errors=self.errors)
+
+        def doRollover(self) -> None:
+            super().doRollover()
+            if os.name != "posix":
+                return
+            for n in range(1, self.backupCount + 1):
+                try:
+                    name = f"{self.baseFilename}.{n}"
+                    now = os.stat(name).st_mode & 0o777
+                    if now & ~0o600:
+                        os.chmod(name, now & 0o600)
+                except OSError:
+                    pass
+
+    return PrivateFileHandler(path, maxBytes=2_000_000, backupCount=2, encoding="utf-8")
 
 
 def log_dir() -> str:
@@ -272,9 +418,8 @@ def set_file_logging(on: bool) -> str | None:
     if _file_handler is not None:
         return log_file()
     try:
-        from logging.handlers import RotatingFileHandler
-        os.makedirs(log_dir(), exist_ok=True)
-        fh = RotatingFileHandler(log_file(), maxBytes=2_000_000, backupCount=2, encoding="utf-8")
+        private_folder(log_dir())
+        fh = _private_handler(log_file())
         fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     except Exception as e:
         log.warning("log file not kept: %s", e)
@@ -335,9 +480,7 @@ def configure_logging() -> None:
     path = os.environ.get("DOPEIPTV_LOG_FILE")
     if path:
         try:
-            from logging.handlers import RotatingFileHandler
-            fh = RotatingFileHandler(
-                path, maxBytes=2_000_000, backupCount=2, encoding="utf-8")
+            fh = _private_handler(path)
             fh.setFormatter(logging.Formatter(
                 "%(asctime)s %(levelname)s %(message)s"))
             log.addHandler(fh)

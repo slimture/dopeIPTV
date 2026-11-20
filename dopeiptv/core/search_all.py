@@ -71,14 +71,15 @@ def row_key(row: Mapping[str, Any]) -> str | None:
 
 def adult_ids(categories: Iterable[Any], names: Mapping[str, str] | None = None) -> frozenset[str]:
     """The ids of *categories* named for adults, by the name the lists show
-    them under (*names*: the user's, else the provider's)."""
+    them under (*names*: the user's) or the provider's own - a new name
+    never takes one out."""
     given = names or {}
     out: set[str] = set()
     for c in categories or []:
         if not isinstance(c, Mapping) or c.get("category_id") is None:
             continue
         cid = str(c.get("category_id"))
-        if adult_category(given.get(cid) or str(c.get("category_name") or "")):
+        if adult_category(given.get(cid), c.get("category_name")):
             out.add(cid)
     return frozenset(out)
 

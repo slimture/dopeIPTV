@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import QApplication, QMenu
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
-from .widgets import confirm
+from .widgets import confirm, plain_text
 
 BOX_SIGNAL_MS = 2000
 # How much of a recorded file is read to tell whether it is encrypted.
@@ -92,7 +92,8 @@ class _BoxMixin:
         items = [auto, *ids]
         at = items.index(current) if current in items else 0
         choice, ok = QInputDialog.getItem(
-            self, tr("nerd_epg_map"), tr("nerd_epg_map_hint", name=it.get("name") or ""),
+            self, tr("nerd_epg_map"),
+            plain_text(tr("nerd_epg_map_hint", name=it.get("name") or "")),
             items, at, True)
         if not ok:
             return
@@ -314,8 +315,9 @@ class _BoxMixin:
     def _box_rec_rename(self, it: dict) -> None:
         from PyQt6.QtWidgets import QInputDialog
         title = str(it.get("name") or "")
-        name, ok = QInputDialog.getText(self, tr("ctx_rename"),
-                                        tr("box_rec_rename_q", title=title), text=title)
+        name, ok = QInputDialog.getText(
+            self, tr("ctx_rename"), plain_text(tr("box_rec_rename_q", title=title)),
+            text=title)
         name = (name or "").strip()
         if not ok or not name or name == title:
             return
@@ -336,8 +338,9 @@ class _BoxMixin:
                 return
             title = str(it.get("name") or "")
             items = [f for f in (folders or []) if isinstance(f, str)] or ["/media/hdd/movie/"]
-            folder, ok = QInputDialog.getItem(self, tr("box_rec_move"),
-                                              tr("box_rec_move_q", title=title), items, 0, True)
+            folder, ok = QInputDialog.getItem(
+                self, tr("box_rec_move"), plain_text(tr("box_rec_move_q", title=title)),
+                items, 0, True)
             folder = (folder or "").strip()
             if not ok or not folder.startswith("/"):
                 return

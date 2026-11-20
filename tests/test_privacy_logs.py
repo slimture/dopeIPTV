@@ -63,6 +63,28 @@ def test_a_recording_not_started_is_not_named(app, lines, tmp_path):
     assert not [m for m in lines if "Secret Show" in m], lines
 
 
+def test_server_mode_and_a_finished_recording_name_nothing_while_private(lines, tmp_path):
+    """Rule 4: the restream's channel names, a recording's file and the
+    errors that quote its path go through privacy.for_log."""
+    import sys
+
+    from dopeiptv.core import rec_extras, rec_mp4, restream
+    assert restream._named("7", "Secret TV") == "<private>"
+    folder = tmp_path / "Secret Show 2026-11-19.ts"
+    folder.mkdir()
+    (folder / "x").write_text("x")
+    rec_mp4._drop(str(folder))                       # a folder: os.remove refuses it
+    proc = rec_extras.run_post(f'"{sys.executable}" -c pass', str(tmp_path / "Secret Show.ts"),
+                               "Secret Show")
+    if proc is not None:
+        proc.wait(10)
+    rec_extras.run_post("/no/such/program-Secret", str(tmp_path / "Secret Show.ts"), "Secret Show")
+    assert [m for m in lines if m.startswith("recording:")], lines
+    assert not [m for m in lines if "Secret" in m], lines
+    privacy.set_private(False)
+    assert restream._named("7", "Secret TV") == "Secret TV"
+
+
 def test_a_series_channel_without_an_address_is_not_named(lines):
     from dopeiptv.core import series_rules as sr
     from dopeiptv.ui import mw_series

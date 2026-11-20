@@ -18,6 +18,7 @@ from ..core.profiles import adult_category
 from ..core.workers import run_async
 from ..i18n import tr
 from .mw_radio import SEARCH
+from .widgets import plain_text
 
 
 class _SearchMixin:
@@ -136,7 +137,9 @@ class _SearchMixin:
     def _render_cat_search(self, q: str, idx: dict) -> None:
         results = []
         # A kids profile: no category named for adults, and no locked one
-        # (as the category list leaves them out, main_window).
+        # (as the category list leaves them out, main_window). Anyone else:
+        # a locked one while the lock is shut by its name alone, marked as
+        # the list marks it - nothing of what is in it.
         kids = getattr(self, "_profile_kids", lambda: False)()
         for c in getattr(self, "_raw_categories", []):
             cid = c.get("category_id")
@@ -144,11 +147,15 @@ class _SearchMixin:
                 continue
             cname = self.overrides.display_name(
                 self.mode, cid, c.get("category_name", "?"))
-            if kids and (adult_category(cname) or (
-                    self.overrides.is_locked(self.mode, cid)
-                    and not self.parental.session_unlocked)):
+            locked = (self.overrides.is_locked(self.mode, cid)
+                      and not self.parental.session_unlocked)
+            if kids and (adult_category(cname, c.get("category_name")) or locked):
                 continue
             name_match = q in cname.lower()
+            if locked:
+                if name_match:
+                    results.append((1_000_000, cname + "  " + tr("cat_locked_suffix"), cid, []))
+                continue
             chans = idx.get(cid, [])
             matches = [n for n, low in chans if q in low]
             if not name_match and not matches:
@@ -169,7 +176,7 @@ class _SearchMixin:
                 label += "  ·  " + ", ".join(sample)
             it = QListWidgetItem(label)
             it.setData(Qt.ItemDataRole.UserRole, cid)
-            it.setToolTip(cname)
+            it.setToolTip(plain_text(cname))     # the provider's category name
             self.cat_list.addItem(it)
         if not results:
             none_it = QListWidgetItem(tr("cat_search_none"))

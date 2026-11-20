@@ -5,7 +5,8 @@ from __future__ import annotations
 import threading
 import time
 
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from .cast_bridge import (
     QUALITY, SAFE_AUDIO, SAFE_VIDEO, CastBridge,
@@ -119,6 +120,7 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
     no worse than before.
     """
     try:
+        from ..core import dest_guard
         from ..core._lazy_requests import requests
         # Ask for the redirect only - never open the stream itself. Fetching
         # it (allow_redirects=True) made the panel reset the connection: it
@@ -144,7 +146,16 @@ def _resolve_redirects(url: str) -> tuple[str, str | None]:
                 r.close()
                 break
             r.close()
-            final = requests.compat.urljoin(final, loc)
+            nxt = requests.compat.urljoin(final, loc)
+            # Each hop as the app's own requests take one (core/dest_guard):
+            # a provider's redirect never sends this request to this
+            # computer, a link-local host or - from the internet - the home
+            # network. Refused, the receiver is handed what was asked for.
+            why = dest_guard.redirect_refusal(final, nxt)
+            if why:
+                log.warning("cast: a redirect to %s was not followed", why)
+                return url, None
+            final = nxt
         if final != url:
             log.info("cast: resolved redirect -> %s", final)
         # text/html is the panel's error page, never a media type - ignore it.
@@ -471,9 +482,42 @@ class ChromecastManager:
                 pass
             self._browser = None
 
+    def labels(self) -> dict:
+        """Each device under the name the list shows it by: its own - or,
+        when two devices answer to one name, the name with the address, so
+        that neither stands in for the other (anything on the network can
+        announce itself as "Living room TV")."""
+        by_name: dict[str, list] = {}
+        for c in list(self.devices):
+            by_name.setdefault(c.name, []).append(c)
+        out: dict = {}
+        for name, group in by_name.items():
+            if len(group) == 1:
+                out[name] = group[0]
+                continue
+            for c in group:
+                label, n = f"{name} ({_host_of(c) or '?'})", 2
+                while label in out:
+                    label, n = f"{name} ({_host_of(c) or '?'}) #{n}", n + 1
+                out[label] = c
+        return out
+
+    def label_of(self, cc) -> str:
+        """The name *cc* has in the list now ("" when it is not in it)."""
+        return next((label for label, c in self.labels().items() if c is cc), "")
+
+    def find(self, name: str) -> bool:
+        """Whether *name* is a device here - looked for first when this run
+        has not met it yet (as cast() does)."""
+        with self._lock:
+            if self._device(name) is None:
+                self.scan()
+            return self._device(name) is not None
+
     def scan(self) -> list[str]:
         with self._lock:
             was_active = getattr(self.active, "name", None)
+            was_at = _host_of(self.active) if self.active is not None else ""
             self._tear_down()
             devices, browser = _pc().get_chromecasts(timeout=6)
             self._browser = browser
@@ -483,11 +527,13 @@ class ChromecastManager:
             # A running cast survives all this: the receiver plays the stream
             # by itself, so dropping the sender socket does not stop the TV.
             # Re-point 'active' at the freshly discovered object with the same
-            # name, or the stop button would have nothing left to talk to.
+            # name, or the stop button would have nothing left to talk to -
+            # the one at the same address, when two answer to that name.
             if was_active:
-                self.active = next(
-                    (c for c in self.devices if c.name == was_active), None)
-            return sorted(cc.name for cc in self.devices)
+                same = [c for c in self.devices if c.name == was_active]
+                self.active = next((c for c in same if _host_of(c) == was_at),
+                                   same[0] if same else None)
+            return sorted(self.labels())
 
     def set_hosts(self, hosts: list[dict], attach: bool = True) -> list[str]:
         """Chromecasts by their address, listed from now on beside those
@@ -510,7 +556,7 @@ class ChromecastManager:
         pc = _pc()
         if pc is None or not self.by_host:
             return []
-        names: list[str] = []
+        names: list = []
         for h in self.by_host:
             host = str(h["host"])
             cc = next((c for c in self.devices if _host_of(c) == host), None)
@@ -527,11 +573,11 @@ class ChromecastManager:
                     continue
                 self.devices.append(cc)
                 self._hosted.append(cc)
-            names.append(cc.name)
-        return names
+            names.append(cc)
+        return [self.label_of(cc) or cc.name for cc in names]
 
     def _device(self, name: str):
-        return next((c for c in self.devices if c.name == name), None)
+        return self.labels().get(name)
 
     def stale(self, status) -> bool:
         """Whether *status* is still talking about the stream we replaced."""
@@ -698,7 +744,7 @@ class ChromecastManager:
                                  title, start=start):
                 return device_name
             raise LocalizedError("cast_err_container", type=ctype)
-        log.info("cast -> %s: %s (%s)", device_name, resolved,
+        log.info("cast -> %s: %s (%s)", device_name, url_for_log(resolved),
                  ctype if served else f"{ctype}, guessed")
         verdict = self._play_and_verify(mc, resolved, ctype, title,
                                         start=start)
@@ -749,7 +795,7 @@ class ChromecastManager:
         fallback = cast_content_type(url)
         if fallback not in _UNPLAYABLE:
             log.info("cast -> %s: %s (%s, guessed)", device_name,
-                     redact_url(url), fallback)
+                     url_for_log(url), fallback)
             if self._play_and_verify(mc, url, fallback, title,
                                      start=start) is not False:
                 return device_name
@@ -850,7 +896,7 @@ class ChromecastManager:
             log.info("cast: %s cannot decode %s - converting it here",
                      device_name, " + ".join(bad) or "this stream")
         bridged = self.bridge.start(
-            url, codecs,
+            url, codecs, receiver=_host_of(self.active) if self.active is not None else "",
             audio=(audio or {}).get("index", 0),
             subs=None if subs is None else subs.get("index"),
             sub_codec=(subs or {}).get("codec", ""), start_at=start,

@@ -153,6 +153,74 @@ def test_screenshot_modes_and_a_box_that_sends_no_picture(fake):
         c.screenshot()
 
 
+def test_a_screenshot_larger_than_any_is_not_read(fake, monkeypatch):
+    from dopeiptv.providers import enigma2
+    box = fake(routes())
+    c = client(box)
+    monkeypatch.setattr(enigma2, "GRAB_MAX", len(JPEG) + 10)
+    assert c.screenshot() == JPEG
+    box.routes["/grab"] = lambda q: JPEG + b"\x00" * 100        # its length says so
+    with pytest.raises(LocalizedError):
+        c.screenshot()
+
+    class Endless:                  # no length said: it keeps coming
+        headers: dict = {}
+
+        def iter_content(self, _n):
+            while True:
+                yield b"\x00" * 64
+
+    assert enigma2._read_most(Endless(), 1000) is None
+
+
+def _picture(fmt: str, w: int = 64, h: int = 36) -> bytes:
+    from PyQt6.QtCore import QBuffer, QIODevice
+    from PyQt6.QtGui import QColor, QImage
+    img = QImage(w, h, QImage.Format.Format_RGB32)
+    img.fill(QColor(10, 120, 200))
+    buf = QBuffer()
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    assert img.save(buf, fmt)
+    return bytes(buf.data())
+
+
+def test_the_screenshot_is_decoded_as_what_it_says_and_bounded(app, monkeypatch):
+    from dopeiptv.ui import box_tools
+    for fmt in ("JPEG", "PNG", "BMP"):
+        img = box_tools.decode_grab(_picture(fmt))
+        assert img is not None and (img.width(), img.height()) == (64, 36), fmt
+    png = _picture("PNG")
+    # A PNG that says it is 30000 x 30000: never decoded.
+    huge = png[:16] + (30000).to_bytes(4, "big") * 2 + png[24:]
+    assert box_tools.decode_grab(huge) is None
+    # Only as what its first bytes say: a PNG behind a BMP's "BM" is no BMP.
+    assert box_tools.decode_grab(b"BM" + png) is None
+    assert box_tools.decode_grab(b'<svg xmlns="http://www.w3.org/2000/svg"/>') is None
+    assert box_tools.decode_grab(b"GIF89a" + png) is None
+    assert box_tools.decode_grab("not bytes") is None
+    monkeypatch.setattr(box_tools, "GRAB_MAX", len(png) - 1)
+    assert box_tools.decode_grab(png) is None
+
+
+def test_the_screenshot_window_shows_the_box_s_picture(app, monkeypatch):
+    from dopeiptv.ui import box_tools
+    monkeypatch.setattr(box_tools, "run_async", _sync)
+    sent = [_picture("JPEG", 320, 180)]
+
+    class Grabs:
+        def screenshot(self, _mode):
+            return sent[0]
+    from PyQt6 import sip
+    w = box_tools.BoxScreenshotDialog(None, Grabs(), None)
+    app.processEvents()             # its first take, as it opens - while run_async is _sync
+    assert w._pixmap is not None and (w._pixmap.width(), w._pixmap.height()) == (320, 180)
+    assert w._data == sent[0] and w.save_btn.isEnabled()
+    sent[0] = b"\xff\xd8\xff" + b"\x00" * 200            # no picture in it
+    w.take()
+    assert w.status.text() == tr("err_box_no_grab")
+    sip.delete(w)                   # nothing of it left for a later test's event loop
+
+
 def test_remote_keys_are_the_codes_openwebif_sends(fake):
     box = fake(routes())
     c = client(box)

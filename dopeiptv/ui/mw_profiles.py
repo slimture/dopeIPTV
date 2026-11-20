@@ -1,13 +1,17 @@
 """Profiles in the window (core/profiles.py keeps them, ui/profiles_ui.py
 draws them): the stores of the profile in use, switching to another - the
 playback stopped first, everything of the profile's read again, no restart -
-the "Who's watching?" picker at start, the PIN of a profile that has one, a
-kids profile's limits (no locked category or folder, never a PIN question
-for one, Settings only with a grown-up's PIN), and the profile as the phone
-remote, the remote API and Home Assistant see and switch it."""
+the "Who's watching?" picker at start, the PIN of a profile that has one
+(wrong ones counted, each making the next try wait a little longer -
+``_pin_must_wait``, ``_pin_was_wrong``, core/pins.Tries: in the window and
+in TV mode, which ask through here), a kids profile's limits (no locked
+category or folder, never a PIN question for one, Settings only with a
+grown-up's PIN), and the profile as the phone remote, the remote API and
+Home Assistant see and switch it."""
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from typing import Any
@@ -16,7 +20,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QMessageBox
 
-from ..core import profiles
+from ..core import pins, profiles
 from ..core.log import log
 from ..core.profiles import Profile, ProfileSettings, adult_category, adult_item
 from ..core.stores import (
@@ -50,22 +54,51 @@ def _gone(obj: Any) -> bool:
         return False
 
 
-def adult_ids(cats: Any, overrides: Any, mode: str) -> frozenset[str]:
+class AdultIds(frozenset):
+    """The ids of a source's categories named for adults; ``known`` every
+    id the source lists - a row of any other is of no category a kids
+    profile may see (a provider lists a category for adults or not; what it
+    keeps out of its list is not taken to be for children)."""
+    known: frozenset[str] = frozenset()
+
+
+def adult_ids(cats: Any, overrides: Any, mode: str) -> AdultIds:
     """The ids of *cats* (a source's categories of *mode*) named for adults,
-    by the name the lists show them under."""
+    by the name the lists show them under or the provider's own: a category
+    renamed in the app is still one."""
     out: set[str] = set()
+    every: set[str] = set()
     for c in cats or []:
         if not isinstance(c, dict) or c.get("category_id") is None:
             continue
-        cid, name = c.get("category_id"), str(c.get("category_name") or "")
+        cid, own = c.get("category_id"), str(c.get("category_name") or "")
+        every.add(str(cid))
+        name = own
         try:
             if overrides is not None:
-                name = overrides.display_name(mode, cid, name)
+                name = overrides.display_name(mode, cid, own)
         except Exception:
             pass
-        if adult_category(name):
+        if adult_category(name, own):        # renamed or not
             out.add(str(cid))
-    return frozenset(out)
+    ids = AdultIds(out)
+    ids.known = frozenset(every)
+    return ids
+
+
+#: What a kids profile never sees or plays: files on this computer and the
+#: recordings - nothing says what they are - and addresses opened by hand.
+KIDS_NEVER = frozenset(("local", "recording", "rec", "web"))
+#: A radio station's tags that keep it from a kids profile.
+_ADULT_TAGS = frozenset(("adult", "erotic", "erotica", "sex", "sexy", "xxx", "porn", "18+"))
+
+
+def adult_station(it: dict) -> bool:
+    """Whether a radio station's own tags or name say it is for adults."""
+    tags = str(it.get("tags") or "").lower().replace(";", ",").split(",")
+    if any(t.strip() in _ADULT_TAGS for t in tags):
+        return True
+    return adult_item(it)
 
 
 class KidsFilter:
@@ -114,17 +147,26 @@ class KidsFilter:
         ctx = ctx if isinstance(ctx, dict) else {}
         if adult_item(it) or adult_item(ctx):
             return False
-        mode = _KIDS_KIND.get(str(it.get("_kind") or it.get("_ekind") or self.mode))
+        kind = str(it.get("_kind") or it.get("_ekind") or self.mode)
+        if kind in KIDS_NEVER:
+            return False
+        if kind == "radio":
+            return not adult_station(it)
+        mode = _KIDS_KIND.get(kind)
         if mode is None:
             return True
         cid = it.get("category_id")
         if cid in (None, ""):
             cid = ctx.get("category_id")
         if cid in (None, ""):
-            return True
+            # Of no category the app knows: not for a kids profile - what a
+            # provider leaves unlabelled is not taken to be for children.
+            return False
         ids = self._ids(mode)
         if ids is None:
             self.window._kids_held = True
+            return False
+        if isinstance(ids, AdultIds) and str(cid) not in ids.known:
             return False
         return str(cid) not in ids
 
@@ -170,6 +212,28 @@ class _ProfilesMixin:
         keep = self._kids_keep(mode)
         return rows if keep is None else [r for r in rows if keep(r)]
 
+    def _kids_may_play(self, kind: str, item: Any) -> bool:
+        """The one door every playback goes through for a kids profile
+        (_start_playback): what its lists may show, and nothing else -
+        whichever way it was asked (a list, the phone, the remote API, Home
+        Assistant, a link, a drop). A row the app cannot tell about (no
+        item, no category) is not played. Said once in a note."""
+        if not self._profile_kids():
+            return True
+        ok = False
+        if kind not in KIDS_NEVER and isinstance(item, dict):
+            row = dict(item)
+            if kind == "episode" and isinstance(self.series_ctx, dict):
+                row.setdefault("_series_ctx", self.series_ctx)
+            row.setdefault("_kind", {"live": "live", "movie": "vod", "episode": "episode",
+                                     "radio": "radio"}.get(kind, kind))
+            keep = self._kids_keep("live")
+            ok = keep is None or keep(row)
+        if not ok:
+            log.info("profiles: a kids profile does not play this (%s)", kind)
+            self._show_toast(tr("profile_kids_not_here"), 4000)
+        return ok
+
     def _kids_allows(self, it: Any, mode: str = "live") -> bool:
         keep = self._kids_keep(mode)
         return keep is None or keep(it)
@@ -208,7 +272,7 @@ class _ProfilesMixin:
         overrides = getattr(self, "overrides", None)
 
         def work():
-            out: dict[str, frozenset[str]] = {}
+            out: dict[str, AdultIds] = {}
             for mode, name in _CATS.items():
                 fn = getattr(client, name, None)
                 try:
@@ -234,9 +298,18 @@ class _ProfilesMixin:
             return
         # Held back while they were not known: shown now.
         self._kids_ver = int(self.__dict__.get("_kids_ver", 0)) + 1
+        self._held_rows_in("kids")
+
+    def _held_rows_in(self, reason: str) -> None:
+        """Rows held back for want of their categories (a kids profile's
+        test, the parental lock's on what the stores kept): shown now in
+        every place, list and TV mode's Home."""
         try:
-            self._refresh_places("kids")
-            if getattr(self, "all_items", None) and not self._guide_page_showing():
+            self._refresh_places(reason)
+            if reason == "lock" and getattr(self, "mode", "") == "history" \
+                    and not self._guide_page_showing():
+                self._load_items(getattr(self, "_current_cat", None))   # History read again
+            elif getattr(self, "all_items", None) and not self._guide_page_showing():
                 self._apply_filter()
             tv = getattr(self, "_tv_page", None)
             if tv is not None and not _gone(tv) and getattr(self, "_tv_on", False) \
@@ -427,18 +500,75 @@ class _ProfilesMixin:
 
     # -- the PIN -------------------------------------------------------------------------
 
+    def _pin_tries(self) -> pins.Tries:
+        """The wrong PINs counted (core/pins.py), kept in the household's
+        settings so closing the app does not start the count over."""
+        tries = self.__dict__.get("_pin_tries_kept")
+        if tries is None:
+            tries = self._pin_tries_kept = pins.Tries(profiles.raw(self.settings))
+        return tries
+
+    def _pin_names(self, *found: Profile) -> list[str]:
+        """The PINs a question takes, by their names in the count: those
+        profiles', and the parental PIN where there is one (it opens what
+        theirs open) - a wrong try is one at each of them."""
+        names = [f"profile/{p.id}" for p in found if p.has_pin]
+        if self.parental.has_pin():
+            names.append("parental")
+        return names
+
+    def _pin_must_wait(self, names: list[str], title: str, parent=None) -> bool:
+        """Whether a PIN may not be tried yet, after wrong ones - said, with
+        how long (a minute at the very most: a slow-down, never a lock)."""
+        wait = self._pin_tries().wait(*names)
+        if wait <= 0:
+            return False
+        QMessageBox.information(parent or self, title, tr("pin_wait", n=max(1, math.ceil(wait))))
+        return True
+
+    def _pin_was_wrong(self, names: list[str], title: str, parent=None) -> None:
+        """A wrong PIN: counted for each PIN the question takes, and said -
+        with the wait that follows, from the third on."""
+        wait = self._pin_tries().wrong(*names)
+        text = tr("msg_wrong_pin")
+        if wait > 0:
+            text += "\n\n" + tr("pin_wait", n=max(1, math.ceil(wait)))
+            log.info("profiles: wrong PINs - the next try waits %d s", math.ceil(wait))
+        QMessageBox.warning(parent or self, title, text)
+
+    def _pin_given(self, pin: str, *found: Profile) -> str:
+        """Which PIN *pin* is - one of those profiles' ("profile/<id>"), the
+        parental one ("parental") - or "" for none of them. Its own wrong
+        tries are forgotten, and only its own: knowing one PIN is no way to
+        more tries at another."""
+        if not pin:
+            return ""
+        name = next((f"profile/{p.id}" for p in found
+                     if p.has_pin and self.profiles.verify(p.id, pin)), "")
+        if not name and self.parental.has_pin() and self.parental.verify(pin):
+            name = "parental"
+        if name:
+            self._pin_tries().right(name)
+        return name
+
     def _profile_unlock(self, p: Profile, parent=None) -> bool:
         """Profile *p*'s PIN asked, if it has one (or the parental PIN):
         True when it may be opened."""
         if not p.has_pin:
             return True
+        names = self._pin_names(p)
+        if self._pin_must_wait(names, p.name, parent):
+            return False
         from .profiles_ui import ask_pin
         pin = ask_pin(parent or self, p.name, tr("profile_enter_pin", name=p.name))
         if pin is None:
             return False
-        if p.verify(pin) or (self.parental.has_pin() and self.parental.verify(pin)):
+        if self._pin_given(pin, p):
             return True
-        QMessageBox.warning(parent or self, p.name, tr("msg_wrong_pin"))
+        if pin:
+            self._pin_was_wrong(names, p.name, parent)
+        else:                           # nothing typed: no guess
+            QMessageBox.warning(parent or self, p.name, tr("msg_wrong_pin"))
         return False
 
     def _profile_pick(self, pid: str, tv: bool = False) -> bool:
@@ -449,6 +579,8 @@ class _ProfilesMixin:
             return False
         at_start = self._profile_picker is not None or tv
         if (pid != profiles.active_id() or at_start) and not self._profile_unlock(p):
+            return False
+        if pid != profiles.active_id() and not self._kids_leave_unlock(p):
             return False
         ok = self.switch_profile(pid)
         if ok:
@@ -463,24 +595,57 @@ class _ProfilesMixin:
                     page.show_screen("home")
         return ok
 
+    def _grown_up_pin_exists(self) -> bool:
+        return bool(self.profiles.grown_up_pins() or self.parental.has_pin())
+
+    def _kids_leave_unlock(self, target: Profile) -> bool:
+        """Leaving a kids profile for a grown-up's that has no PIN of its
+        own takes a grown-up's PIN - else a kids profile is left as easily
+        as it is picked. A kids profile to another, or to one with a PIN
+        (asked already, _profile_unlock), goes as before."""
+        if not self._profile_kids() or target.kids or target.has_pin:
+            return True
+        if not self._grown_up_pin_exists():
+            # A kids profile made before one was needed (1.6.8): with no
+            # grown-up's PIN anywhere there is no boundary to keep, and the
+            # household must not be locked in it.
+            log.info("profiles: a kids profile left with no grown-up's PIN set")
+            return True
+        return self._grown_up_unlock(target.name, tr("profile_kids_leave"))
+
     def _kids_settings_unlock(self) -> bool:
         """A kids profile opens Settings with a grown-up's PIN: one of a
         profile that is not a kids one, or the parental PIN. With none set
-        there is nothing to keep them out with."""
+        Settings stays closed to it, and it says how a grown-up sets one -
+        from a grown-up's profile, or a kids profile would be no boundary."""
         if self._profile_must_pick:
             return False        # who is watching is not said yet
         if not self._profile_kids():
             return True
+        return self._grown_up_unlock(tr("settings_title"), tr("profile_kids_settings"))
+
+    def _grown_up_unlock(self, title: str, text: str) -> bool:
+        """A grown-up's PIN asked (a grown-up profile's or the parental
+        one): True when it was given. With none set nothing is opened, and
+        the person is told how a grown-up sets one."""
         store = self.profiles
-        if not store.grown_up_pins() and not self.parental.has_pin():
-            return True
+        if not self._grown_up_pin_exists():
+            QMessageBox.information(self, title, tr("profile_kids_no_pin"))
+            return False
+        grown_ups = [p for p in store.profiles() if not p.kids]
+        names = self._pin_names(*grown_ups)
+        if self._pin_must_wait(names, title):
+            return False
         from .profiles_ui import ask_pin
-        pin = ask_pin(self, tr("settings_title"), tr("profile_kids_settings"))
+        pin = ask_pin(self, title, text, longest=64)
         if pin is None:
             return False
-        if store.grown_up_pin(pin) or (self.parental.has_pin() and self.parental.verify(pin)):
+        if self._pin_given(pin, *grown_ups):
             return True
-        QMessageBox.warning(self, tr("settings_title"), tr("msg_wrong_pin"))
+        if pin:
+            self._pin_was_wrong(names, title)
+        else:
+            QMessageBox.warning(self, title, tr("msg_wrong_pin"))
         return False
 
     # -- the picker -----------------------------------------------------------------------
@@ -619,7 +784,13 @@ class _ProfilesMixin:
         # "Who's watching?" waiting for the PIN at start: the profile in use
         # is not open yet either - its PIN is asked as the picker asks it.
         at_start = bool(self._profile_must_pick)
-        if (p.id != profiles.active_id() or at_start) and p.has_pin:
+        # From a kids profile to a grown-up's without a PIN of its own: a
+        # grown-up's PIN, as the window asks one (_kids_leave_unlock).
+        leaving = (p.id != profiles.active_id() and self._profile_kids()
+                   and not p.kids and not p.has_pin)
+        if leaving and not self._grown_up_pin_exists():
+            raise ValueError("a grown-up's PIN is needed to leave this profile")
+        if ((p.id != profiles.active_id() or at_start) and p.has_pin) or leaving:
             now = time.monotonic()
             fails = [t for t in (getattr(self, "_remote_pin_fails", None) or [])
                      if now - t < REMOTE_PIN_SECS]
@@ -627,7 +798,11 @@ class _ProfilesMixin:
             if len(fails) >= REMOTE_PIN_TRIES:
                 raise ValueError("too many wrong PINs - try again in a few minutes")
             pin = str(params.get("pin") or "")
-            if not (pin and (p.verify(pin) or (self.parental.has_pin() and self.parental.verify(pin)))):
+            # Through the store: a PIN kept the old way is written anew on
+            # a right entry here too (core/pins.py).
+            grown = [x for x in store.profiles() if not x.kids and x.has_pin] if leaving else [p]
+            if not (pin and (any(store.verify(x.id, pin) for x in grown)
+                             or (self.parental.has_pin() and self.parental.verify(pin)))):
                 if pin:
                     fails.append(now)
                     if len(fails) >= REMOTE_PIN_TRIES:

@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.workers import run_async
 from ..i18n import tr
-from ..providers.kodi import DEFAULT_PORT, parse_address
+from ..providers.kodi import DEFAULT_PORT, parse_target
 from .theme import P
 
 
@@ -41,9 +41,11 @@ class _KodiAddDialog(QDialog):
         intro.setObjectName("DetailMeta")
         lay.addWidget(intro)
         form = QFormLayout()
-        self.address = QLineEdit(
-            "" if dev is None else (dev.address if dev.port != DEFAULT_PORT
-                                    else dev.host))
+        shown = "" if dev is None else (dev.address if dev.port != DEFAULT_PORT
+                                        else dev.host)
+        if dev is not None and dev.secure:
+            shown = "https://" + shown
+        self.address = QLineEdit(shown)
         self.address.setPlaceholderText(tr("kodi_address_ph"))
         self.user = QLineEdit("" if dev is None else dev.user)
         self.user.setPlaceholderText("kodi")
@@ -89,17 +91,17 @@ class _KodiAddDialog(QDialog):
     def _check(self) -> None:
         if self._checking:
             return
-        where = parse_address(self.address.text())
+        where = parse_target(self.address.text())
         if where is None:
             self._say(tr("kodi_bad_address"), error=True)
             return
-        host, port = where
+        host, port, secure = where
         user, password = self.user.text().strip(), self.password.text()
         self._checking = True
         self.ok_btn.setEnabled(False)
         self._say(tr("kodi_checking", address=f"{host}:{port}"))
         run_async(self.pool, self.kodi.add, self._added, self._failed,
-                  host, port, user, password)
+                  host, port, user, password, "", secure)
 
     def _alive(self) -> bool:
         return not sip.isdeleted(self) and self.isVisible()

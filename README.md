@@ -373,6 +373,7 @@ Reporting bugs and fixing a translation in your language help just as much.
 - [`docs/MAINTAINING.md`](docs/MAINTAINING.md) — everything needed to take the project over: branches, CI, releases, the website, keys and accounts, open work.
 - [`AGENTS.md`](AGENTS.md) — the guide for AI coding assistants (any of them), and a quick map for humans too.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DEVELOPER_NOTES.md`](docs/DEVELOPER_NOTES.md) — how the code is laid out and why.
+- [`SECURITY.md`](SECURITY.md) — how to report a security problem privately; [`docs/SECURITY.md`](docs/SECURITY.md) — the threat model: what is protected, from whom, and what is honestly left; [`docs/SECURITY_REVIEWS.md`](docs/SECURITY_REVIEWS.md) — every review round and what was done.
 
 ## License
 

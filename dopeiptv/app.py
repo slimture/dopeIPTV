@@ -109,6 +109,31 @@ from .ui.app_icon import (  # noqa: F401
 )
 
 
+def _close_on_interrupt(window) -> bool:
+    """Ctrl+C in the terminal the app was started from closes the window
+    as its close button does - the player, recordings and settings let go
+    in order - instead of a KeyboardInterrupt raised inside whatever Qt
+    callback ran then, which read as a crash. A second Ctrl+C ends the
+    process at once. Python only sees a signal while it runs, so a light
+    tick keeps it looking."""
+    import signal
+
+    def ask(_sig, _frame) -> None:
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        log.info("Ctrl+C: closing the window")
+        QTimer.singleShot(0, window.close)
+
+    try:
+        signal.signal(signal.SIGINT, ask)
+    except (ValueError, OSError):       # not the main thread, or no SIGINT
+        return False
+    tick = QTimer(window)
+    tick.timeout.connect(lambda: None)
+    tick.start(500)
+    window._interrupt_tick = tick
+    return True
+
+
 def _install_crash_hooks() -> None:
     """Print genuinely-uncaught Python exceptions to stderr with an
     explicit flush. Newer PyQt6 turns unhandled slot exceptions into
@@ -146,6 +171,11 @@ def _install_crash_hooks() -> None:
 
     def _hook(exc_type, exc_value, exc_tb):
         if _is_quiet(exc_type):
+            return
+        if isinstance(exc_type, type) and issubclass(exc_type, KeyboardInterrupt):
+            # Ctrl+C in the terminal, raised in whatever Qt callback ran
+            # then: the person's wish to stop, never a crash to report.
+            log.info("interrupted (Ctrl+C)")
             return
         buf = io.StringIO()
         traceback.print_exception(exc_type, exc_value, exc_tb, file=buf)
@@ -297,6 +327,11 @@ def main() -> int:
         sys.stdout = open(os.devnull, "w")
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")
+    # A start by a dopeiptv:// link takes the link and nothing after it:
+    # what follows is the link's own text (core/commands.own_arguments), and
+    # neither the options below nor Qt's own ever read it.
+    from .core.commands import is_link, own_arguments
+    sys.argv[1:] = own_arguments(sys.argv[1:])
     configure_logging()
     # One unconditional startup line so packaging smoke tests can prove
     # Python + our package imported cleanly before any GL/Qt init runs.
@@ -459,6 +494,10 @@ def main() -> int:
     # the restore in place once it knows no copy took the command.
     from .core.commands import parse_command
     command = parse_command(sys.argv[1:])
+    if command is None and any(is_link(a) for a in sys.argv[1:]):
+        # A link that asks nothing the app knows: the window comes forward -
+        # never a second copy of the app for every such link a page opens.
+        command = {"open": True}
     restored = _put_restore_in_place() if command is None else None
 
     # Opt-in X11/XWayland backend (Settings > "Run via X11"). Must be set
@@ -488,7 +527,12 @@ def main() -> int:
         except Exception:
             pass
 
-    app = QApplication(sys.argv)
+    # Qt reads options of its own from what it is handed (-platform,
+    # -platformpluginpath, -style, -stylesheet...). A start by a link hands
+    # it the program's name and nothing else: whatever stands beside a link
+    # is never Qt's to act on. The person's own command line is as before.
+    linked = any(is_link(a) for a in sys.argv[1:])
+    app = QApplication(sys.argv[:1] if linked else sys.argv)
     # A command (--play, --channel, a dopeiptv:// link) goes to the copy
     # already running, if there is one; this start then ends here.
     if command is not None:
@@ -619,6 +663,7 @@ def main() -> int:
 
     w = MainWindow(client, settings, store)
     w.show()
+    _close_on_interrupt(w)
     if restored is not None:
         from .i18n import tr
         w._show_toast(tr("restore_done_start") if restored

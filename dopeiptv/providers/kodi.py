@@ -25,11 +25,12 @@ from urllib.parse import quote, urlsplit
 
 from .. import APP_NAME, VERSION
 from ..core._lazy_requests import requests
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from . import mdns
 from .cast_bridge import lan_address
-from .dlna import FileShare, _NoBridge
+from .dlna import FileShare, _NoBridge, _read_body
 
 # A Kodi's name in the device list says what it is, and keeps it apart from
 # a Chromecast or a TV of the same name.
@@ -49,6 +50,8 @@ GONE_AFTER = 2
 # Polls without any answer at all before Kodi counts as gone (switched off).
 UNREACHABLE_AFTER = 10
 _INVALID_PARAMS = -32602
+#: The longest JSON-RPC answer read: the ones asked for here are short.
+MAX_ANSWER = 256 * 1024
 
 
 class KodiError(Exception):
@@ -74,6 +77,7 @@ class KodiDevice:
     user: str = ""
     password: str = ""
     manual: bool = False
+    secure: bool = False      # typed as https://: asked over https, never http
 
     def __repr__(self) -> str:          # never the login
         return f"KodiDevice({self.name!r}, {self.address})"
@@ -85,7 +89,8 @@ class KodiDevice:
 
     @property
     def endpoint(self) -> str:
-        return f"http://{self.address}/jsonrpc"
+        scheme = "https" if self.secure else "http"
+        return f"{scheme}://{self.address}/jsonrpc"
 
     @property
     def login(self) -> tuple[str, str] | None:
@@ -98,8 +103,11 @@ class KodiDevice:
         return self.name + SUFFIX
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "host": self.host, "port": self.port,
-                "user": self.user, "password": self.password}
+        out: dict[str, Any] = {"name": self.name, "host": self.host, "port": self.port,
+                               "user": self.user, "password": self.password}
+        if self.secure:
+            out["secure"] = True
+        return out
 
 
 # -- what goes over the wire -----------------------------------------------------
@@ -108,6 +116,14 @@ def parse_address(text: str) -> tuple[str, int] | None:
     """(host, port) from what a person types: "192.168.1.20",
     "192.168.1.20:8080", "kodi.local:8080", "http://host:8080/jsonrpc",
     "[fe80::1]:8080". None for anything that is not an address."""
+    where = parse_target(text)
+    return None if where is None else (where[0], where[1])
+
+
+def parse_target(text: str) -> tuple[str, int, bool] | None:
+    """(host, port, secure) from what a person types: as parse_address,
+    and whether it was typed as https:// - a Kodi asked over https is never
+    asked over http instead, with its login in the clear."""
     text = (text or "").strip()
     if not text:
         return None
@@ -123,7 +139,7 @@ def parse_address(text: str) -> tuple[str, int] | None:
         return None
     if not all(c.isalnum() or c in ".-:_%" for c in host):
         return None
-    return host, port
+    return host, port, parts.scheme == "https"
 
 
 def rpc_request(method: str, params: dict[str, Any] | None = None,
@@ -204,7 +220,7 @@ def load_devices(settings: Any) -> list[KodiDevice]:
                               host=str(d["host"]), port=port,
                               user=str(d.get("user") or ""),
                               password=str(d.get("password") or ""),
-                              manual=True))
+                              manual=True, secure=d.get("secure") is True))
     return out
 
 
@@ -224,17 +240,26 @@ class KodiRpc:
              timeout: float = 6.0) -> Any:
         self._ident += 1
         http = self.session or requests
+        # To this Kodi and nowhere it points on to: a redirect would carry
+        # the request - the stream's address in it - to another address.
+        # And an answer is some kilobytes: no more is read (MAX_ANSWER).
         r = http.post(self.device.endpoint,
                       data=json.dumps(rpc_request(method, params, self._ident)),
                       headers={"Content-Type": "application/json",
                                "User-Agent": UA},
-                      auth=self.device.login, timeout=timeout)
+                      auth=self.device.login, timeout=timeout,
+                      allow_redirects=False, stream=True)
         if r.status_code == 401:
+            r.close()
             raise KodiAuthError()
         if r.status_code != 200:
+            r.close()
             raise KodiError(r.status_code, f"HTTP {r.status_code}")
         try:
-            body = r.json()
+            raw = _read_body(r, MAX_ANSWER)
+            if len(raw) > MAX_ANSWER:
+                raise ValueError("too long for an answer")
+            body = json.loads(raw.decode("utf-8", "replace"))
         except ValueError as e:
             raise KodiError(-32700, "not a JSON-RPC answer") from e
         if not isinstance(body, dict):
@@ -361,12 +386,12 @@ class KodiManager:
         return sorted(devices)
 
     def add(self, host: str, port: int, user: str = "", password: str = "",
-            name: str = "") -> str:
+            name: str = "", secure: bool = False) -> str:
         """Remember a Kodi (or its new login) and return its name in the
         device list. Checks that it answers first: LocalizedError when it
         wants a login or does not answer."""
         dev = KodiDevice(name="", host=host, port=port, user=user,
-                         password=password, manual=True)
+                         password=password, manual=True, secure=secure)
         try:
             dev.name = _clean_name(name or describe(dev, self.session))
         except KodiAuthError as e:
@@ -406,6 +431,14 @@ class KodiManager:
         if dev is None:
             dev = self._merge([]).get(label)
         return dev
+
+    def find(self, label: str) -> bool:
+        """Whether *label* is a Kodi here - looked for first when this run
+        has not met it yet (as cast() does)."""
+        with self._lock:
+            if self.device(label) is None:
+                self.scan()
+            return self.device(label) is not None
 
     # -- talking to the one casting ----------------------------------------------
 
@@ -482,7 +515,7 @@ class KodiManager:
         self._dvr = bool(dvr)
         self.last_position = self.position_offset = self.position_at = 0.0
         self.duration = 0.0 if dvr else float(duration or 0.0)
-        log.info("kodi -> %s (%s): %s", dev.name, dev.address, redact_url(shown))
+        log.info("kodi -> %s (%s): %s", dev.name, dev.address, url_for_log(shown))
         try:
             self._call("Player.Open", {"item": {"file": target}}, timeout=15)
         except KodiAuthError as e:

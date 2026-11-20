@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
 from .log import log
+from .privacy import for_log
 
 #: The setting: "true" saves recordings as MP4.
 SETTING = "rec_save_mp4"
@@ -236,7 +237,8 @@ def _drop(path: str) -> None:
     except FileNotFoundError:
         pass
     except OSError as e:
-        log.warning("recording: could not remove %s: %s", os.path.basename(path), e)
+        log.warning("recording: could not remove %s: %s", for_log(os.path.basename(path)),
+                    for_log(e))
 
 
 def _tail(text: str, n: int = 300) -> str:
@@ -293,12 +295,12 @@ def remux(src: str, ffmpeg: str, run: Runner = _run,
         try:
             os.replace(src + INFO, final + INFO)
         except OSError as e:
-            log.warning("recording: its info stays with the .ts: %s", e)
+            log.warning("recording: its info stays with the .ts: %s", for_log(e))
     try:
         os.remove(src)
     except OSError as e:
         # Open elsewhere (Windows): both are kept rather than the MP4 lost.
-        log.warning("recording: saved as MP4, the .ts could not be removed: %s", e)
+        log.warning("recording: saved as MP4, the .ts could not be removed: %s", for_log(e))
     return Result(True, final)
 
 

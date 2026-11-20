@@ -17,7 +17,7 @@ import unicodedata
 from typing import Any
 from urllib.parse import urlsplit
 
-from . import channel_numbers, nerd
+from . import channel_numbers, nerd, picture_files
 from .log import log
 
 PICON_EXTS = (".png", ".svg", ".webp", ".jpg")
@@ -73,6 +73,8 @@ def picon_index(folder: str) -> dict[str, str]:
             log.info("nerd: picon folder %s unreadable: %s", folder, e)
         _index.update(dir=folder, mtime=mtime, by_name=by_name)
         log.info("nerd: %d picon(s) in %s", len(by_name), folder)
+        # Its files are pictures the loader may read (core/picture_files.py).
+        picture_files.trust("picons", [folder])
         return by_name
 
 

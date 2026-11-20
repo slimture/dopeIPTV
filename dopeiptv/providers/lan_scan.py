@@ -39,6 +39,7 @@ from __future__ import annotations
 import errno
 import functools
 import ipaddress
+import json
 import selectors
 import socket
 import sys
@@ -247,13 +248,14 @@ def probe(host: str, ports: dict[str, int] | None = None,
         if p in up:
             base = f"http://{h}" + ("" if p == 80 else f":{p}")
             try:
-                r = sess.get(base + "/web/about", timeout=(CONNECT * 3, READ))
+                r = sess.get(base + "/web/about", timeout=(CONNECT * 3, READ), **_AS_IT_STANDS)
+                about_xml = _short_body(r) or b""
                 if r.status_code == 401 and "enigma" in (r.headers.get("WWW-Authenticate", "")
                                                           + r.headers.get("Server", "")).lower():
                     found.append({"kind": "enigma2", "server": base, "name": f"Enigma2 ({host})",
                                   "login": True})
-                elif r.ok and b"<e2about" in r.content[:4096]:
-                    root = parse_xml(r.content)
+                elif b"<e2about" in about_xml[:4096]:
+                    root = parse_xml(about_xml)
                     about = root.find("e2about")
                     model = child_text(about, "e2model") if about is not None else ""
                     image = " ".join(x for x in (
@@ -273,13 +275,14 @@ def probe(host: str, ports: dict[str, int] | None = None,
         if p in up:
             base = f"http://{h}:{p}"
             try:
-                r = sess.get(base + "/api/serverinfo", timeout=(CONNECT * 3, READ))
+                r = sess.get(base + "/api/serverinfo", timeout=(CONNECT * 3, READ), **_AS_IT_STANDS)
                 realm = r.headers.get("WWW-Authenticate", "").lower()
                 if r.status_code == 401 and "tvheadend" in realm:
+                    r.close()
                     found.append({"kind": "tvheadend", "server": base, "name": f"Tvheadend - {host}",
                                   "login": True})
-                elif r.ok:
-                    js = r.json()
+                else:
+                    js = _short_json(r)
                     if isinstance(js, dict) and "sw_version" in js:
                         found.append({"kind": "tvheadend", "server": base,
                                       "name": f"Tvheadend {js.get('sw_version', '')} - {host}".replace("  ", " ")})
@@ -303,7 +306,8 @@ def _home_servers(sess: Any, h: str, host: str, ports: dict[str, int], up: set[i
         if ports[kind] not in up:
             return None
         try:
-            return sess.get(f"http://{h}:{ports[kind]}{path}", timeout=(CONNECT * 3, READ), **kw)
+            return sess.get(f"http://{h}:{ports[kind]}{path}", timeout=(CONNECT * 3, READ),
+                            **_AS_IT_STANDS, **kw)
         except Exception:
             return None
 
@@ -315,10 +319,7 @@ def _home_servers(sess: Any, h: str, host: str, ports: dict[str, int], up: set[i
         return r.status_code == 401 and any(w in said for w in words)
 
     def js(r: Any) -> Any:
-        try:
-            return r.json() if r is not None and r.ok else None
-        except ValueError:
-            return None
+        return _short_json(r) if r is not None else None
 
     info = js(ask("vdr", "/info.json"))
     if isinstance(info, dict) and ("vdr" in info or "diskusage" in info):
@@ -327,25 +328,30 @@ def _home_servers(sess: Any, h: str, host: str, ports: dict[str, int], up: set[i
                       "name": " ".join(f"VDR {vdr.get('version') or ''}".split()) + f" - {host}"})
     else:
         r = ask("streamdev", "/channels.m3u")
-        if r is not None and r.ok and r.content.lstrip()[:7] == b"#EXTM3U":
+        head = _short_body(r, 4096, whole=False) if r is not None else None
+        if head is not None and head.lstrip()[:7] == b"#EXTM3U":
             found.append({"kind": "vdr", "server": base("streamdev"), "name": f"VDR (streamdev) - {host}"})
     r = ask("dvbviewer", "/api/version.html")
     if r is not None and wants_login(r, "dvbviewer", "recording service", "media server"):
+        r.close()
         found.append({"kind": "dvbviewer", "server": base("dvbviewer"), "name": f"DVBViewer - {host}",
                       "login": True})
-    elif r is not None and r.ok and b"<version" in r.content[:2048]:
+    elif r is not None:
+        body = _short_body(r) or b""
         try:
-            name = " ".join((parse_xml(r.content).text or "").split())
+            name = " ".join((parse_xml(body).text or "").split()) if b"<version" in body[:2048] else ""
         except Exception:
             name = ""
         if "dvbviewer" in name.lower() or "recording service" in name.lower():
             found.append({"kind": "dvbviewer", "server": base("dvbviewer"), "name": f"{name} - {host}"})
     r = ask("nextpvr", "/service", params={"method": "session.initiate", "ver": "1.0", "device": "dopeIPTV"})
-    if r is not None and r.ok and b"<rsp" in r.content[:2048] and b"<salt>" in r.content:
+    body = (_short_body(r) or b"") if r is not None else b""
+    if b"<rsp" in body[:2048] and b"<salt>" in body:
         found.append({"kind": "nextpvr", "server": base("nextpvr"), "name": f"NextPVR - {host}",
                       "login": True})
     r = ask("mythtv", "/Myth/GetHostName", headers={"Accept": "application/json"})
     if r is not None and wants_login(r, "mythtv"):
+        r.close()
         found.append({"kind": "mythtv", "server": base("mythtv"), "name": f"MythTV - {host}", "login": True})
     else:
         got = js(r)
@@ -358,17 +364,18 @@ def _jellyfin(sess: Any, base: str, host: str, found: list[dict]) -> None:
     """Jellyfin and Emby answer the same question; Jellyfin names itself,
     Emby answers under /emby as well."""
     try:
-        r = sess.get(base + "/System/Info/Public", timeout=(CONNECT * 3, READ))
-        js = r.json() if r.ok else None
+        r = sess.get(base + "/System/Info/Public", timeout=(CONNECT * 3, READ), **_AS_IT_STANDS)
     except Exception:
         return
+    js = _short_json(r)
     if not isinstance(js, dict) or not (js.get("Id") or js.get("ServerName")):
         return
     kind = "jellyfin" if "jellyfin" in str(js.get("ProductName") or "").lower() else ""
     if not kind:
         try:
-            r = sess.get(base + "/emby/System/Info/Public", timeout=(CONNECT * 3, READ))
-            kind = "emby" if r.ok and isinstance(r.json(), dict) else "jellyfin"
+            r = sess.get(base + "/emby/System/Info/Public", timeout=(CONNECT * 3, READ),
+                         **_AS_IT_STANDS)
+            kind = "emby" if isinstance(_short_json(r), dict) else "jellyfin"
         except Exception:
             kind = "jellyfin"
     name = str(js.get("ServerName") or jellyfin.NAMES[kind])
@@ -378,10 +385,10 @@ def _jellyfin(sess: Any, base: str, host: str, found: list[dict]) -> None:
 def _plex(sess: Any, base: str, host: str, found: list[dict]) -> None:
     try:
         r = sess.get(base + "/identity", headers={"Accept": "application/json"},
-                     timeout=(CONNECT * 3, READ))
-        js = r.json() if r.ok else None
+                     timeout=(CONNECT * 3, READ), **_AS_IT_STANDS)
     except Exception:
         return
+    js = _short_json(r)
     mc = js.get("MediaContainer") if isinstance(js, dict) else None
     ident = str(mc.get("machineIdentifier") or "") if isinstance(mc, dict) else ""
     if ident:
@@ -390,10 +397,10 @@ def _plex(sess: Any, base: str, host: str, found: list[dict]) -> None:
 
 def _hdhr(sess, base: str, host: str, found: list[dict]) -> None:
     try:
-        r = sess.get(base + "/discover.json", timeout=(CONNECT * 3, READ))
-        js = r.json() if r.ok else None
+        r = sess.get(base + "/discover.json", timeout=(CONNECT * 3, READ), **_AS_IT_STANDS)
     except Exception:
         return
+    js = _short_json(r)
     if isinstance(js, dict) and (js.get("DeviceID") or js.get("LineupURL")):
         name = str(js.get("FriendlyName") or "HDHomeRun")
         model = str(js.get("ModelNumber") or "")
@@ -483,33 +490,73 @@ def scan(progress: Callable[[int], None] | None = None, hosts: list[str] | None 
 
 # -- what can be cast to --------------------------------------------------------------
 
+#: What a device's answer about itself is read to, at most: these are a few
+#: hundred bytes, and whatever answers on the port is free to send more.
+SHORT_ANSWER = 256 * 1024
+
+
+def _short_json(r: Any) -> Any:
+    """A short JSON answer of an address that was asked what it is - read
+    to SHORT_ANSWER and no further, from that address and nowhere it points
+    on to (the request followed no redirect). None for anything else."""
+    try:
+        if r.status_code != 200:
+            r.close()
+            return None
+        raw = dlna._read_body(r, SHORT_ANSWER)
+        if len(raw) > SHORT_ANSWER:
+            return None
+        return json.loads(raw.decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+
+#: How every question of a search is asked: of the address asked and
+#: nowhere it points on to, its answer read only as far as it is wanted.
+_AS_IT_STANDS: dict[str, Any] = {"allow_redirects": False, "stream": True}
+
+
+def _short_body(r: Any, limit: int = SHORT_ANSWER, whole: bool = True) -> bytes | None:
+    """An answer's body as _short_json reads it, for one that is no JSON:
+    None unless the address said 200; read to *limit*, and - *whole* - none
+    at all when there is more (with *whole* off, its first *limit* bytes)."""
+    try:
+        if r.status_code != 200:
+            r.close()
+            return None
+        raw = dlna._read_body(r, limit)
+    except Exception:
+        return None
+    if len(raw) > limit and whole:
+        return None
+    return raw[:limit]
+
+
 def _kodi(sess: Any, host: str, port: int) -> dict | None:
     """A Kodi's JSON-RPC: "pong" to a ping; a 401 from Kodi's own web
     server (its realm names it) is a Kodi that wants its login."""
     url = f"http://{_http_host(host)}:{port}/jsonrpc"
     try:
         r = sess.post(url, json={"jsonrpc": "2.0", "method": "JSONRPC.Ping", "id": 1},
-                      timeout=(CONNECT * 3, READ))
+                      timeout=(CONNECT * 3, READ), allow_redirects=False, stream=True)
     except Exception:
         return None
     if r.status_code == 401:
         realm = (r.headers.get("WWW-Authenticate", "") + r.headers.get("Server", "")).lower()
+        r.close()
         if "xbmc" in realm or "kodi" in realm:
             return {"kind": "kodi", "host": host, "port": port, "name": f"Kodi ({host})",
                     "login": True}
         return None
-    try:
-        js = r.json() if r.ok else None
-    except ValueError:
-        return None
+    js = _short_json(r)
     if not isinstance(js, dict) or js.get("result") != "pong":
         return None
     name = ""
     try:
         r = sess.post(url, json={"jsonrpc": "2.0", "method": "XBMC.GetInfoLabels", "id": 2,
                                  "params": {"labels": ["System.FriendlyName"]}},
-                      timeout=(CONNECT * 3, READ))
-        got = (r.json() or {}).get("result") if r.ok else None
+                      timeout=(CONNECT * 3, READ), allow_redirects=False, stream=True)
+        got = (_short_json(r) or {}).get("result")
         if isinstance(got, dict):
             name = str(got.get("System.FriendlyName") or "").strip()
     except Exception:
@@ -523,10 +570,11 @@ def _chromecast(sess: Any, host: str, port: int = 8008) -> dict | None:
     its name, model and id."""
     try:
         r = sess.get(f"http://{_http_host(host)}:{port}/setup/eureka_info",
-                     params={"params": "name,device_info"}, timeout=(CONNECT * 3, READ))
-        js = r.json() if r.ok else None
+                     params={"params": "name,device_info"}, timeout=(CONNECT * 3, READ),
+                     allow_redirects=False, stream=True)
     except Exception:
         return None
+    js = _short_json(r)
     if not isinstance(js, dict) or not (js.get("name") or js.get("device_info")):
         return None
     raw = js.get("device_info")

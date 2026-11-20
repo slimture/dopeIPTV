@@ -7,6 +7,428 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.9]
+
+### Fixed
+
+- The window could stop for good while pictures loaded - a macOS hang
+  report after an update, and the same on Linux. A poster or logo decoded
+  on a worker held Qt's lock for its image plugins and waited for Python's,
+  while the window's thread (an icon for a search field's clear button, any
+  picture it loaded) held Python's and waited for Qt's. Each reader now
+  finds its handler before it decodes, with Python's lock held
+  (`core/workers.ready`); a test runs workers and the window's thread
+  decoding at once.
+- An episode playing shows its series' poster under the video, with the
+  episode's name - the column followed only the list's pick, so it kept the
+  last TV channel's logo, and its button would have started that channel.
+  Every way an episode starts goes through it (the series' page, Continue,
+  the next episode, TV mode, the phone, watch together).
+- A series shows its poster under the video when it is clicked, as a
+  channel or a film does: opening its page (from the Series place, a list,
+  Mine, Search or Now playing) shows the series at once, and the episode
+  picked on the page - one click, the arrows - follows there with the
+  series' poster, plot and cast. The poster's button plays that episode
+  (or the series' next one), never the list's row behind the page. The
+  page's series_info answer is shared, so nothing is asked twice.
+- Ctrl+C in the terminal the app was started from closes the window as its
+  close button does (the player, recordings and settings let go in order);
+  it was raised inside whatever Qt callback ran then and offered as a crash
+  report. A second Ctrl+C ends the process at once.
+
+### Security
+
+- Private viewing writes nothing of what plays to a disk. A channel's
+  rewind buffer, a cast's converted stream and a fetched subtitle go only
+  to a folder in memory that swap cannot carry to a disk - no swap,
+  encrypted swap or zram, or a tmpfs never swapped - or are not made at
+  all: the channel plays with no rewind buffer, a cast that needs
+  converting is refused with the reason, a subtitle reaches the player with
+  no file. mpv's own rewind stays in memory too. Private viewing turned on
+  while a channel plays from a disk buffer opens it again, and a cast
+  converted on the disk is sent again under the same rule. A recording
+  while watching privately is asked first.
+- A cast's converter no longer waits for the window: each run - a cast, a
+  seek, a recast, a reconnect - stops by itself within a second of private
+  viewing beginning when its work is on the disk, and the cast is sent
+  again in memory or not at all, also when it was on its way meanwhile. A
+  private cast's work in memory is measured while it runs and the
+  converter stops at its room, so a long film cannot fill the memory.
+- The Apple TV's bridge serves this computer and the Apple TV alone: the
+  first other address that asks for a run's stream, anyone else refused.
+- A login of three characters or fewer is masked in the log as a word of
+  its own.
+- zram whose backing cannot be read no longer counts as swap that keeps
+  nothing: private viewing then keeps no buffer in memory there.
+- Trakt's browser sign-in takes an error only with the state it asked
+  for, so another program cannot end a sign-in.
+- TMDB can be turned off altogether: **Provider artwork, TMDB off** under
+  Settings → Posters & info asks it nothing - no titles, no searches, no
+  ids for Trakt or Simkl, no chart of the week, no picture moved onto
+  TMDB's server. Provider artwork alone still asks TMDB for Trakt's ids,
+  as before.
+- The audit of the packages a release ships fails when it could not check
+  them all, and a release is not signed until it passed.
+- A channel watched privately from its start keeps its rewind buffer in
+  memory only when the very folder it writes into is: no link, this user's
+  own, 0700, on a file system in memory by the mount table - otherwise it
+  has none, and no second connection is opened for the try.
+- The phone remote refuses a Host that is no name of the home before it
+  counts anything, so a web page pointing its own name at this computer
+  cannot shut a phone out of its remote.
+
+- The phone remote's key no longer crosses the network: the code's address
+  carries it after its `#`, which a browser never sends, and the phone keeps
+  it. Every request is signed with it (HMAC-SHA256 over the method, the
+  address, the time, a nonce and the body; a minute's window, each nonce
+  once), so someone reading the home network's traffic can neither use nor
+  replay a request. A picture's address is signed for a quarter of an hour;
+  an address of before, with the key in it, makes a new key at once (scan
+  the code again); the calendar has a read-only key of its own. Phones that
+  had the remote need the code scanned once more.
+- A converted cast serves only the receiver it was started for.
+- A channel watched privately from its start keeps its rewind buffer in
+  memory on Linux (`$XDG_RUNTIME_DIR`, the user's own tmpfs, with a budget
+  of its own), never on the disk; elsewhere as before, deleted as it is left.
+- Watch together remembers, for the app's run, every message number taken in
+  a room, so leaving and joining again takes no message twice; a member of
+  an older app that cannot sign is said once.
+- A profile's PIN is 4 to 8 digits, the parental PIN at least 4 characters.
+- An answer read whole may be 32 MiB (was 256), a source's lists 512 MiB
+  (was 1 GiB).
+- core/dest_guard.py: the app's own requests - guides, pictures, the
+  providers' and services' APIs, the rewind buffer, a cast's address - are
+  checked where they land. A name that is not this computer's never reaches
+  this computer, and one that is neither link-local nor a home name never
+  a link-local host (a router's address, a cloud's metadata service):
+  checked on the socket after it connects, before a byte is sent, so a DNS
+  answer that changes (rebinding) is caught. A redirect goes on only over
+  http(s), never from the internet into the home network, this computer or
+  a link-local host - by its target as written and as it resolves - for
+  requests' own redirects and the cast's by hand.
+- core/ytdlp.py, core/ytdlp_pin.py, tools/ytdlp_pin.py: the yt-dlp the app
+  may download is the release the build names. release.yml checks that
+  release's `SHA2-256SUMS` with gpgv against yt-dlp's own signing key and
+  writes its files' SHA-256s into the app; the app installs only those
+  bytes and runs only a copy it marked itself. A checksum list downloaded
+  beside the file is no longer trusted. A new yt-dlp comes with the app's
+  next release or test build.
+- tools/build_manifest.py, release.yml: the build jobs sign their file
+  list with the build key alone (`DOPEIPTV_BUILD_KEY`, `BUILD_KEYS`) -
+  never the update key, which now only the checksum step has. Without a
+  build key a build calls itself modified and a tag's build stops.
+- ui/mw_profiles.py: a kids profile is a boundary. Every playback goes
+  through one check, whoever asks (a list, the phone, the remote API, Home
+  Assistant, a link): never a file on this computer, a recording or an
+  address opened by hand, never a row without a category or of one the
+  source does not list. The phone remote lists no local files or
+  recordings for it. A kids profile is made only once a grown-up's PIN
+  exists, and is left for a grown-up's profile only with one; one made
+  before, in a household with no grown-up's PIN, is never locked in.
+- services/home_server.py: server mode's tuner needs its token, in the
+  tuner's own address (`/t/<token>/`, every stream of its lineup under it) -
+  Jellyfin, Emby and Channels take it. Devices are let in without the token
+  only as the person says (Settings > Nerd > Remote and automation): the
+  addresses listed, or every device on this computer's networks, which a
+  server set up before keeps. The UDP search answers only those let in.
+- providers/kodi.py: a Kodi typed as `https://` is asked over https, never
+  over http with its login in the clear.
+- core/stream_address.py, providers/client.py: a source on the internet
+  never sends the app to a device of the home network - its streams, its
+  pictures, its guide - unless the person lets that source in (its option
+  "Addresses on my home network"); a multicast relay at home (udpxy) still
+  plays.
+- core/remote_api.py: a request under a Host that is not a home name, or
+  from a page of another site, is refused whatever its token.
+- core/net_bridge.py: at most 64 connections at once, and a request's head
+  in ten seconds in all, before any work for it.
+- core/recording.py: no link on the way into the recordings folder sends a
+  recording elsewhere; a link where the file goes is a name taken.
+- core/settings_files.py, ui/mw_settings.py, headless.py: a settings file
+  that could not be made private is asked about before the app goes on
+  (close is the default); server mode without a window does not start
+  until `--settings-not-private` says so.
+- core/events.py: turning private viewing on takes back the events still
+  waiting that name what plays.
+- core/report.py: a login told in words, a token without a name, another
+  account's home folder and a phone number are cleaned out of a report too.
+- ui/mw_sync.py: a new sync code from Settings > Sync - the old one's copy
+  is deleted, the other computers join again with the new one.
+- release.yml, nightly.yml: signing runs in the environments
+  `release-signing` and `nightly-signing`, so the owner can require an
+  approval and keep the update key there alone.
+- services/home_server.py: server mode's page and `api/` take a token of
+  their own (`nerd_server_admin_token`, never in a backup); the playlist's
+  token, which every TV and player holds, opens the playlist, the guide and
+  the streams and nothing else.
+- Private viewing: the remote API's status and the events no longer carry
+  the profile, the cast's device or a private playback's position and
+  length; a private stream's address in the log is `<private>`.
+- core/picture_files.py: a link inside a trusted picture folder is followed
+  only while it stays inside (or leads to the person's own file); a file is
+  looked at before it is opened, so a pipe or a device is never read, and
+  opened without following a link swapped in since.
+- Settings > General > Backup: a password has at least 10 characters, and a
+  backup without one - it holds every login - is made only after a warning,
+  Cancel the default.
+- core/together.py: Watch together takes only signed members and only
+  10-character codes. 1.6.7's codes of 8 and 1.6.8's unsigned members are
+  refused; an old code is said to be one. Everyone in a room needs this
+  version or later.
+- core/report.py: an address that only begins as the version does
+  (1.6.8.10) is scrubbed from a report; only exactly this build's own
+  four-part version is kept.
+- core/backup.py: a full backup may get a password (Settings > General >
+  Backup, a field and its repeat). With one the file is encrypted -
+  ChaCha20-Poly1305 under a key PBKDF2-HMAC-SHA256 makes of the password
+  in 600 000 rounds, a new salt and nonce each time, the header covered by
+  the tag - and a restore, from Settings or the welcome, asks for it: a
+  wrong password or a changed file is one error, said and asked again.
+  Key and file are worked on a thread of their own. Without a password the
+  file is exactly as before, and old backups restore as they did. The
+  design is in docs/SECURITY.md, "A backup's password".
+- core/build_check.py: `secure` lets a service's address through only over
+  https to dopeiptv.org itself (`SERVICE_HOST`; loopback for the tests) -
+  an address on another host, or a name that only ends in it, is refused.
+- core/report.py: `send` and `send_status` take the person's own values
+  (`personal`) as a required argument, so the last scrub before anything
+  leaves knows the source's names, logins and addresses as well as the
+  patterns, whichever way a report was put together.
+- core/selfupdate.py: an update's download follows its redirects by hand
+  (`_get_https`): each address https, the build's kind sent to
+  dopeiptv.org alone, five hops at most; it stops reading once more has
+  come than the file is (`DOWNLOAD_MAX` when no size is given), and
+  GitHub's checksum list stops at 1 MiB while it is read.
+- core/sync.py: every sync request carries a credential from the code
+  (`auth_of`, `X-Sync-Auth`, `Remote.of`) that the site keeps only a
+  SHA-256 of; the first write with it binds the slot, and from then on a
+  request without it - to read, write or delete - is turned down. A slot
+  alone no longer lets anyone delete or replace a household's copy. An
+  older app goes on syncing a slot until a computer with this version
+  writes to it, then says the site turned it down until it is updated.
+  The first round with this version puts the copy back even unchanged
+  (`round_trip`'s *bind*, `State.bound`), so a household's slot is bound
+  as soon as one of its computers has updated.
+- core/together.py: each member of a room has an Ed25519 key of its own,
+  its id the hash of the public key, and signs every message over the room
+  and its exact bytes - nobody in a room can speak as another (1.6.8
+  members' messages are taken as before, and protected once they update).
+  A frame opens only at one of the padded sizes with zeros after its text;
+  the relay's backlog at joining is not read and messages out of their time
+  are ignored, so an old frame handed over again after a rejoin cannot move
+  playback; what one member can cause is bounded (members listed, hellos
+  answered, version jumps, seeks past a title's end). A room with an old
+  8-character code says that it is easier to guess (`together_old_code`).
+- core/together.py: members on 1.6.8, whose messages are not signed, are
+  taken in this release only - 1.7.0 refuses them (`UNSIGNED_UNTIL`; a
+  test fails once the version reaches it). An unsigned message never
+  speaks for a member with a key, neither as its sender nor as who chose
+  the state it passes on, and the log says once per room that an unsigned
+  member is in it.
+- Private viewing: for a playback that began private, nothing is kept or
+  sent to its end even if private viewing is turned off meanwhile - stream
+  health, stream details, the track and subtitle chosen for a title, a
+  channel's audio delay and teletext page, the subtitle language, a
+  series' season, the folder of a file opened by hand, radio-browser.info's
+  click, Trakt's start after its lookup, a title cast again to a TV.
+- Private viewing: a film, episode or recording watched privately is no
+  longer marked watched (and sent to a media server, Trakt or Simkl) once
+  it was stopped after private viewing had been turned off.
+- Private viewing: TMDB is not asked about the title playing privately
+  (`privacy.title_private`); the lists around it load their posters as
+  before.
+- Private viewing: a private channel's rewind buffer is deleted when
+  another channel is watched, when private viewing ends and before the app
+  has closed, and one left by a crash at the next start.
+- Private viewing: the log no longer carries a subtitle file's name, a
+  file's path or a stream's address for a private playback (the server's
+  name only, `privacy.url_for_log`; a Chromecast's resolved address was
+  logged unredacted), and the system is no longer told the title as the
+  reason the screen stays awake.
+
+- core/sync.py, ui/sync_review.py: sync can no longer reroute a playlist
+  behind the person's back. Whoever held a household's sync code could
+  change an existing playlist's proxy, extra headers, address rewrite,
+  udpxy, catch-up address, backup addresses, own DNS server or trusted
+  certificate in the synced copy, and the next round wrote it in without a
+  word. These settings now never arrive by themselves: this computer keeps
+  its own (a playlist new from sync comes without them), a card says which
+  playlist and which settings wait, and Review shows each beside this
+  computer's, with Apply and Keep mine. Nothing changes for anyone who
+  never uses these settings. Found in a red-team review.
+- media/players.py, core/recording.py: a playlist line that starts with a
+  dash (`--log-file=`, `--include=`) is no longer read as an option by an
+  external mpv or VLC or by the mpv recorder - it overwrote a file or
+  loaded a configuration from another server; what is no stream's address
+  or file's path is not handed to a player or the recorder at all.
+- core/player_exec.py: ffmpeg and ffprobe, wherever the app starts them for
+  a stream (recorder, casts, AirPlay, server mode), read only a stream's
+  protocols - no `concat:`, `subfile:`, `unix:` or local files behind an
+  address.
+- core/net_bridge.py: the loopback proxy for a source's own DNS or pinned
+  certificate asks for a key made for each run; another program on the
+  computer cannot use it.
+- core/rec_extras.py: the command after a recording, when it is a batch
+  file on Windows, gets a programme's title as text only (`&`, `%VAR%`).
+- core/recording.py: a recording's name leaves out control characters and
+  Windows device names; a job's folder stays inside the recordings folder.
+- core/backup.py: restoring a backup names server mode, adult channels
+  through it and a sync code before anything is put back, and shows a
+  command in full.
+- The app's servers: a playlist's addresses are never written under a Host
+  of the asker's choosing; at most 256 connections at once, 64 per
+  address; server mode's answers time out when nobody reads them; the
+  tuner's token-free endpoints are held to 10 requests a second per
+  address; cast addresses carry 144-bit tokens compared in constant time.
+- media/embedded.py, ui/cert_trust.py: the text over the picture (a
+  station's title, a programme's or channel's name) and the "certificate
+  changed" question show outside text as plain words, never rich text.
+- core/selfupdate.py, core/winupdate.py: an installer takes no release that
+  is not newer than the copy running; the download is a file of the
+  updater's own; on Windows the installer waits in the user's local app
+  data, not the shared temp folder.
+- Builds: every binary the release downloads (libmpv for Windows, the
+  AppImage runtime and tool, micromamba) is pinned by SHA-256
+  (`packaging/build-inputs.json`, `tools/build_inputs.py`); Python packages
+  come from a hashed lock; actions are pinned by commit and workflows are
+  read-only by default; the update key is handed to one signing step in a
+  job that builds nothing; CI fails on a known vulnerability in a shipped
+  package (`tools/audit_deps.py`). The Flatpak ships urllib3 2.8.0 and
+  certifi 2026.10.23 and no longer has logind access.
+- core/stream_address.py: a channel's address from a provider or playlist
+  is checked before it is played - only network media protocols from a
+  network source, never an address that carries a filter graph, an edit
+  list or an option. An `av://lavfi` address could make the player write a
+  file of the provider's choosing (proven).
+- providers/epg.py: the guide's index on disk is read by a restricted
+  unpickler; a file planted in the cache can no longer run code.
+- core/picture_files.py, core/svg_safe.py: a row's picture is read from
+  disk only where the app's own pictures are - a logo naming `/dev/zero` or
+  a network share (a Windows login hash) is never read; an SVG logo can no
+  longer make Qt open files it names.
+- core/_lazy_requests.py, core/workers.py: pictures, playlists, lists and
+  API answers have a size ceiling far above any real one; an answer that
+  never ends fails as a request does.
+- services/notify.py: a notification shows a series' name as words.
+- Private viewing: the system's media controls (MPRIS, macOS Now Playing,
+  Windows) show "dopeIPTV" for a private playback - no title, programme,
+  series or artwork, here or of a cast - and work as before; the remote
+  API's status says `private: true` with no title or programme; a
+  recording begun privately is not named in its events once private
+  viewing is off.
+- core/commands.py, app.py: a `dopeiptv://` link is read alone - nothing
+  after it on the command line reaches the app or Qt, so a link cannot
+  start server mode, play a file or load a Qt plugin; a link that asks to
+  play an address is asked about first, with the server and the whole
+  address shown (saved addresses, `--play`, `--channel` and channel links
+  as before); what a second start hands over is size-limited and checked.
+- ui/mw_queue.py: nothing dropped on the window plays while "Who's
+  watching?" waits for a PIN; a kids profile adds a source by a drop only
+  with a grown-up's PIN.
+- core/pins.py: PINs are kept by PBKDF2 (600 000 rounds, a salt each); an
+  old one still works and is written anew when next entered. After two
+  wrong tries each further one waits, 5 s growing to 60 s, never a lock.
+  An app up to 1.6.8 cannot read a PIN kept the new way.
+- core/discord_rpc.py, core/tv_input.py: Discord status goes only to a
+  Discord of the same user; lircd's socket is listened to only where
+  another user could not have put it.
+- services/media_session.py: an artwork address with a media server's
+  token in it is no longer put on the session bus.
+- Casting: what a device says about itself is bounded (SSDP, DLNA, mDNS,
+  Kodi and Chromecast probes - no redirect, same host, capped sizes); a TV
+  is remembered by its own id, so one that answers to a known name as
+  another device is not cast to until picked, and each device's address is
+  shown.
+- Parental lock: a locked category's channel or film is no longer shown
+  or played from History, Continue watching, Recently watched, the
+  phone's Recent or Mine while the lock is shut; History keeps a title's
+  category now, older rows are checked against the source's catalogue.
+- Kids profile: a category for adults can no longer be reached by
+  renaming it (the provider's own name counts too); Manage categories…
+  lists only what the kids profile sees; About's seven taps turn Nerd on
+  only from Settings, which already asks a grown-up's PIN.
+- The sidebar search names a locked category without its channels.
+- The phone remote forgets its play ids on a profile or source switch and
+  checks Continue and History rows again when they play.
+- Sidebar entry colours from sync or a backup are used only as `#rrggbb`:
+  a crafted value can no longer inject style rules or stop the app from
+  starting.
+- core/xdg.py: only https addresses, or server mode's page on this
+  computer, are opened in the browser - a service's answer cannot open
+  `file:` or another program's scheme.
+- providers/satip.py: a SAT>IP server can no longer make the app read a
+  file of this computer, or a share on another host, as its channel list.
+- core/safe_xml.py: no XML from a box, device or guide can declare
+  entities, however it is encoded (UTF-16, UTF-7, a `]` inside a
+  declaration).
+- A provider's or device's text can no longer freeze the app with
+  patterns that take quadratic time (M3U lines, titles, channel names,
+  portal answers, guide fields).
+- core/source_files.py: a source id from a backup or sync can no longer
+  name files outside the cache folder.
+- Find on my network follows no redirects and reads only short answers; a
+  crafted HDHomeRun reply no longer ends the search, and discovery reads
+  end on time.
+- services/share.py: the shared guide no longer breaks on a guide that
+  names a non-text encoding, and unpacks a cached guide a slice at a time.
+- A number no real source sends no longer drops a whole source; a bouquet
+  backup and `--port` are bounded.
+- Words from a provider, guide, box, cast device or backup are shown as
+  words everywhere - labels, tooltips, questions and messages; an
+  `<img src="file:///...">` there could load a local file (on Windows a
+  network path could leak the login hash).
+- providers/enigma2.py, ui/box_tools.py: an Enigma2 box's screenshot is
+  read up to 64 MB and decoded off the window's thread, only as the JPEG,
+  PNG or BMP it says it is, refused before decoding when it claims a huge
+  size.
+- core/stream_address.py: yt-dlp never runs on a `ytdl://` address from a
+  provider, box or web playlist; web streams opened by the person work as
+  before.
+- docs/SECURITY.md: the threat model - what is protected, who could attack
+  and what stops each, the honest limits with their reasons, and how it is
+  kept; SECURITY.md says how to report and what follows a report.
+- core/log.py: logins outside an address are masked too - a query or an
+  Xtream path without its address, a login header, a bearer token, a login
+  written name=value, a box's MAC, a supporter key; control characters are
+  shown, not acted on; log, crash and rewind-buffer files belong to this
+  user alone.
+- core/updates.py, core/ytdlp.py: dopeiptv.org is asked with no redirect
+  followed; GitHub and the yt-dlp download follow redirects only over https.
+- core/nerd.py: the VPN guard judges every spelling of an IPv4 address by
+  where it goes; a file on a network share is not one's own file.
+- core/num.py: numbers from outside are finite and range-checked and never
+  raise.
+- core/m3u_ids.py: many channels of one name no longer cost quadratic time.
+- core/restream.py, core/rec_extras.py, core/rec_mp4.py: names in their log
+  lines go through `for_log`.
+- core/url_rewrite.py: rules nested past Python's limit are no rules.
+- providers/oauth_loopback.py: Trakt's browser sign-in checks its state;
+  stray and silent requests are ignored, Cancel and the time limit always
+  work.
+- services/share.py: no login reaches another device through a logo, a
+  source's name or the guide's icons and links.
+- core/mqtt.py, core/events.py: a broker that never stops sending holds
+  nothing, and Home Assistant's commands are paced.
+- core/instance.py: the command socket is never in a shared temporary
+  folder.
+- core/supporter.py: only a key exactly as it is written checks out.
+- core/backup.py: the PIN's wrong tries stay on this computer; shaders,
+  other networks, a log file and watch-history sign-ins are named before a
+  restore.
+- core/player_exec.py, core/platform_windows.py, the installer: Windows'
+  own tools are started by their full path, and ffmpeg and mpv never come
+  from the current folder or a batch file.
+- core/stream_address.py, providers/client.py: a source on the internet
+  hands out media streams only (http(s), rtsp, rtmp and its kin, rtp,
+  srtp, udp, srt, rist, mms) and never a host on this computer or a
+  link-local one, in any spelling - its pictures and its playlist's own
+  guide address neither. Home sources, playlist files, the person's own
+  rewrite rules and udpxy, and AceStream lists through the engine on this
+  computer play as before.
+- providers/epg.py: the guide's index is plain data with no code in it;
+  an older app's pickled index is never read and is rebuilt from the guide.
+- core/settings_files.py: a settings file that cannot be kept private (a
+  drive without permissions) is logged by name and said once in the window.
 ## [1.6.8]
 
 ### Security

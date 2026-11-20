@@ -204,6 +204,7 @@ class RewindBarMixin:
         self.ts_slider.setMouseTracking(True)   # hover tooltips w/o a pressed button
         self.ts_slider.seek_requested.connect(self._on_ts_seek)
         self.ts_label = QLabel("● " + tr("mv_live"))
+        self.ts_label.setTextFormat(Qt.TextFormat.PlainText)    # a guide's programme title
         self.ts_label.setStyleSheet(
             "background: transparent; color: #FFFFFF;"
             "font-size: 11px; font-weight: 700;")

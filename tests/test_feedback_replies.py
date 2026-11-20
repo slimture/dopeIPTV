@@ -93,19 +93,19 @@ def test_a_reply_goes_with_its_thread_and_a_closed_one_is_told(monkeypatch):
     inbox, closed = Inbox(), Inbox(status=409)
     h = report.code_hash("abc")
     try:
-        assert report.send_status("feedback", "More words", endpoint=inbox.url,
+        assert report.send_status("feedback", "More words", personal=(), endpoint=inbox.url,
                                   extra={"reply": h, "thread": h, "supporter": "yes"}) == 200
         body = inbox.got[-1][2]
         assert body["thread"] == h and body["reply"] == h and body["text"] == "More words"
         assert set(body) == {"kind", "version", "os", "text", "reply", "thread", "supporter"}
-        report.send_status("feedback", "x", endpoint=inbox.url, extra={"thread": "not-a-hash"})
+        report.send_status("feedback", "x", personal=(), endpoint=inbox.url, extra={"thread": "not-a-hash"})
         assert "thread" not in inbox.got[-1][2]
-        assert report.send_status("feedback", "x", endpoint=closed.url, extra={"reply": h, "thread": h}) == 409
-        assert not report.send("feedback", "x", endpoint=closed.url)
+        assert report.send_status("feedback", "x", personal=(), endpoint=closed.url, extra={"reply": h, "thread": h}) == 409
+        assert not report.send("feedback", "x", personal=(), endpoint=closed.url)
     finally:
         inbox.close()
         closed.close()
-    assert report.send_status("feedback", "x", endpoint="http://127.0.0.1:9/none", timeout=3) == 0
+    assert report.send_status("feedback", "x", personal=(), endpoint="http://127.0.0.1:9/none", timeout=3) == 0
 
 
 # -- the window -----------------------------------------------------------------------------

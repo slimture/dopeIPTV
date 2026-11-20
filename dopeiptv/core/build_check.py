@@ -41,10 +41,13 @@ from typing import Any, Iterable, Mapping
 
 from . import ed25519
 from .log import log
-from .update_keys import UPDATE_KEYS
+from .update_keys import BUILD_KEYS, UPDATE_KEYS
 
 MANIFEST = "_build_manifest.json"
 SIGNATURE = MANIFEST + ".sig"
+#: The keys a build's file list may be signed with: a build key (which signs
+#: nothing else) or the update key (core/update_keys.py).
+MANIFEST_KEYS: tuple[str, ...] = tuple(dict.fromkeys((*BUILD_KEYS, *UPDATE_KEYS)))
 FORMAT = 1
 #: Sent with every request to dopeiptv.org: official, modified or source.
 HEADER = "X-dopeIPTV-Build"
@@ -293,7 +296,7 @@ def git_head(root: str) -> str:
 
 
 def check(pkg_dir: str, frozen: bool, version: str, archive: Any = None,
-          keys: Iterable[str] = UPDATE_KEYS, root: str | None = None) -> Verdict:
+          keys: Iterable[str] = MANIFEST_KEYS, root: str | None = None) -> Verdict:
     """What the package in *pkg_dir* is (see the module's words)."""
     root = os.path.dirname(os.path.realpath(pkg_dir)) if root is None else root
     data = _read(os.path.join(pkg_dir, MANIFEST))
@@ -422,18 +425,26 @@ def headers() -> dict[str, str]:
     return {HEADER: kind()}
 
 
+#: Where dopeiptv.org's services are - and the only place secure() lets a
+#: report, a synced copy or a room's message go.
+SERVICE_HOST = "dopeiptv.org"
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
 def secure(url: str) -> bool:
     """Whether a request to one of dopeiptv.org's services may go to *url*:
-    https - or this computer, for the tests' own servers. Anything else is
-    refused before a connection is made (a changed endpoint, a typo)."""
+    https to dopeiptv.org itself - or this computer, for the tests' own
+    servers. Anything else is refused before a connection is made (a
+    changed endpoint, a typo, another host)."""
     from urllib.parse import urlsplit
     try:
         parts = urlsplit(str(url))
-        host = parts.hostname
+        host = (parts.hostname or "").lower()
     except ValueError:
         return False
-    return parts.scheme == "https" or (
-        parts.scheme == "http" and host in ("127.0.0.1", "localhost", "::1"))
+    if host in _LOOPBACK:
+        return parts.scheme in ("http", "https")
+    return parts.scheme == "https" and host == SERVICE_HOST
 
 
 class NotOfficial(RuntimeError):

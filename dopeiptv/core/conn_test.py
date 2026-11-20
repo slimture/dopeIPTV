@@ -37,6 +37,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 from . import mirrors, nerd, rtsp
 from .log import log
+from .num import whole
 
 STEPS = ("dns", "tcp", "tls", "login", "stream", "speed")
 #: What a stream needs, about (Mbit/s): the comparison the speed step makes.
@@ -498,7 +499,9 @@ class ConnTest:
         return client.live_url(row["stream_id"], fmt) or "", str(row.get("name") or "")
 
     def _stream_session(self, url: str) -> Any:
-        import requests
+        # The app's own session: what it reads whole (a playlist of an
+        # adaptive stream) has a ceiling (core/_lazy_requests.py).
+        from ._lazy_requests import requests
         n = self._nerd
         session = requests.Session()
         session.headers["User-Agent"] = n.user_agent(self.opts)
@@ -693,12 +696,14 @@ def account_lines(ui: dict) -> list[tuple[str, dict[str, Any]]]:
         out.append(("ct_acct_open", {}))
     else:
         try:
-            ts = int(float(str(exp)))
+            ts = whole(exp)
+            if ts is None:
+                raise ValueError(exp)
             date = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
             days = int((ts - time.time()) // 86400)
             out.append(("ct_acct_ends", {"date": date, "days": days}) if days >= 0
                        else ("ct_acct_ended", {"date": date}))
-        except (TypeError, ValueError, OSError):
+        except (TypeError, ValueError, OSError, OverflowError):
             pass
     limit, active = numbers(ui)
     if limit is not None and active is not None:

@@ -52,8 +52,9 @@ GUIDE_BACK = 6 * 3600
 PAGE = 1000
 LOGIN_KEYS = ("err_wrong_login", "err_box_login_needed")
 
-_EXTINF = re.compile(r'#EXTINF:\s*-?[\d.]*(?P<attrs>(?:[^,"]|"[^"]*")*),(?P<name>.*)')
-_ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+# As providers/client.py reads an M3U line: linear on any line.
+_EXTINF = re.compile(r'#EXTINF:\s*+-?[\d.]*+(?P<attrs>(?:[^,"]|"[^"]*")*+),(?P<name>.*)')
+_ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
 _NUMBERED = re.compile(r"^(\d+)\s+(.+)$")
 
 
@@ -271,7 +272,7 @@ class VdrClient(BoxClient):
             m = _NUMBERED.match(name)
             if m and m.group(1) == seg:
                 num, name = int(m.group(1)), m.group(2).strip()
-            elif seg.isdigit():
+            elif seg.isdecimal() and len(seg) <= 9:
                 num = int(seg)
             # A channel id (S19.2E-1-1019-10301) names it for good; a number
             # changes when the list is sorted, its name does not.

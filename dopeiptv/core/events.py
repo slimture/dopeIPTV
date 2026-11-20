@@ -87,7 +87,7 @@ HA_PREFIX = "homeassistant"
 
 #: What an event may say about what plays: none of it while viewing privately.
 WHAT = frozenset({"title", "channel", "programme", "series", "source", "previous", "file", "error",
-                  "favorite"})
+                  "favorite", "profile", "cast", "device", "duration"})
 
 
 # -- the settings ----------------------------------------------------------------
@@ -274,6 +274,17 @@ class _Sink:
                          self.name, self.dropped)
             self._q.append((kind, message))
             self._cv.notify()
+
+    def withdraw_titled(self) -> int:
+        """Private viewing turned on: the events still waiting here that say
+        what plays are taken back unsent - those already sent cannot be.
+        How many."""
+        with self._cv:
+            kept = deque(it for it in self._q
+                         if it[0] != "event" or it[1].get("private") or not (WHAT & it[1].keys()))
+            gone = len(self._q) - len(kept)
+            self._q = kept
+        return gone
 
     def close(self, drain_s: float = 1.0) -> None:
         """Send what is queued for at most *drain_s*, then end."""
@@ -470,6 +481,8 @@ class MqttSink(_Sink):
     """The broker: one connection kept open, a last will, keepalive."""
 
     name = "mqtt"
+    COMMANDS_PER_S = 10.0
+    COMMANDS_BURST = 30
 
     def __init__(self, cfg: Config, limit: int = QUEUE_MAX, after: Iterable[_Sink] = (),
                  on_command: Callable[[str, Any], None] | None = None,
@@ -491,6 +504,12 @@ class MqttSink(_Sink):
         self.options: tuple[str, ...] = tuple(options)
         self._forget = forget and not cfg.commands
         self.commands_heard = 0
+        #: Commands handed on: a token bucket (COMMANDS_PER_S, at most
+        #: COMMANDS_BURST at once) - a flood from the broker is dropped,
+        #: never queued onto the window's thread.
+        self._tokens = float(self.COMMANDS_BURST)
+        self._filled = time.monotonic()
+        self._dropped = 0
         self._readable = False
         self._wake_r, self._wake_w = socket.socketpair()
         for s in (self._wake_r, self._wake_w):
@@ -555,11 +574,29 @@ class MqttSink(_Sink):
             cmd = mqtt_control.parse(self.prefix, topic, payload, retained)
             if cmd is None or self.on_command is None:
                 continue
+            if not self._paced():
+                self._dropped += 1
+                if self._dropped == 1:
+                    log.info("events: commands come faster than %d a second - the rest dropped",
+                             int(self.COMMANDS_PER_S))
+                continue
+            self._dropped = 0
             self.commands_heard += 1
             try:
                 self.on_command(*cmd)
             except Exception as e:
                 log.info("events: a command was not taken: %s", e)
+
+    def _paced(self) -> bool:
+        """One more command may go to the window now (the token bucket)."""
+        now = time.monotonic()
+        self._tokens = min(float(self.COMMANDS_BURST),
+                           self._tokens + (now - self._filled) * self.COMMANDS_PER_S)
+        self._filled = now
+        if self._tokens < 1.0:
+            return False
+        self._tokens -= 1.0
+        return True
 
     def _controls(self, cl: mqtt.Client) -> None:
         """Home Assistant's controls for the commands, or none."""
@@ -829,6 +866,14 @@ class Dispatcher:
             self.set_state(*state, private=private, now=now)
         return message
 
+    def withdraw_titled(self) -> int:
+        """Every receiver's waiting events that say what plays, taken back
+        (private viewing turned on); how many."""
+        gone = sum(s.withdraw_titled() for s in self.sinks)
+        if gone:
+            log.info("events: %d waiting event(s) that named what plays taken back", gone)
+        return gone
+
     def set_state(self, state: str, fields: dict[str, Any] | None = None, private: bool = False,
                   now: float | None = None) -> None:
         self._last = (state, fields, private)
@@ -837,7 +882,8 @@ class Dispatcher:
             self.state["volume"] = self.volume
         if self.tv_mode is not None and state != "off":
             self.state["tv_mode"] = self.tv_mode
-        if self.profile and state != "off":
+        if self.profile and state != "off" and not private:
+            # Never while viewing privately: who is watching is part of what.
             self.state["profile"] = self.profile
         for s in self.sinks:
             if isinstance(s, MqttSink):
@@ -912,6 +958,9 @@ class RecordingWatch:
         self._seen: dict[str, str] = {str(j.get("id")): str(j.get("status")) for j in jobs}
         self._ending: dict[str, float] = {}
         self._reasons: dict[str, str] = {}
+        # The recordings that began while what played was private: every
+        # event of theirs says so, to their end (fields' "private").
+        self._private: set[str] = set()
 
     def stopped(self, title: str, reason: str) -> None:
         """RecordingManager.recording_stopped: why it ended."""
@@ -921,11 +970,18 @@ class RecordingWatch:
     def pending(self) -> bool:
         return bool(self._ending)
 
-    @staticmethod
-    def _fields(j: dict) -> dict[str, Any]:
-        return {"title": j.get("title") or "", "channel": j.get("channel") or ""}
+    def _fields(self, j: dict) -> dict[str, Any]:
+        out: dict[str, Any] = {"title": j.get("title") or "", "channel": j.get("channel") or ""}
+        if str(j.get("id")) in self._private:
+            out["private"] = True
+        return out
 
-    def update(self, jobs: Iterable[dict], now: float | None = None) -> list[tuple[str, dict[str, Any]]]:
+    def update(self, jobs: Iterable[dict], now: float | None = None,
+               private: bool = False) -> list[tuple[str, dict[str, Any]]]:
+        """*private*: what plays now is private (core/privacy.py) - a
+        recording that starts now is private to its end, and its events
+        carry ``"private": True`` in their fields for the sender to say
+        what happened, not what."""
         t = time.monotonic() if now is None else now
         out: list[tuple[str, dict[str, Any]]] = []
         by_id: dict[str, dict] = {}
@@ -937,6 +993,8 @@ class RecordingWatch:
             if status == before:
                 continue
             if status == "recording":
+                if private:
+                    self._private.add(jid)
                 out.append(("recording_started", self._fields(j)))
             elif status == "done" and before == "recording":
                 self._ending[jid] = t
@@ -957,6 +1015,7 @@ class RecordingWatch:
                         reason=self._reasons.pop(title, "") or "finished")))
         for jid in [k for k in self._seen if k not in by_id]:
             del self._seen[jid]
+            self._private.discard(jid)
         return out
 
 

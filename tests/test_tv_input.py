@@ -66,6 +66,73 @@ def test_lirc_socket_found_by_env(tmp_path):
         srv.close()
 
 
+def test_a_socket_that_could_be_anyone_s_is_not_taken_for_lircd(tmp_path, monkeypatch):
+    """Whatever sends lines on lircd's socket presses TV mode's keys. With
+    $LIRC_SOCKET_PATH in a folder everyone can write to, another account
+    could put its own socket there while lircd is not running."""
+    import stat as st_mod
+    import types
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    path = str(shared / "lircd")
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(path)
+    real = os.stat
+    owner = {"uid": os.getuid() + 4242, "folder": 0o1777}
+
+    def fake(p, *a, **k):
+        got = real(p, *a, **k)
+        if str(p) == path:
+            return types.SimpleNamespace(st_mode=got.st_mode, st_uid=owner["uid"])
+        if str(p) == str(shared):
+            return types.SimpleNamespace(st_mode=st_mod.S_IFDIR | owner["folder"], st_uid=0)
+        return got
+    monkeypatch.setattr(ti.os, "stat", fake)
+    try:
+        # Another account's, in a folder like /tmp: no.
+        assert not ti.lirc_socket_ok(path)
+        assert ti.lirc_socket({"LIRC_SOCKET_PATH": path}) in (None, *ti.LIRC_SOCKETS)
+        got: list[str] = []
+        reader = ti.LircReader(got.append, path)
+        reader.RETRY_S = 0.05
+        reader.start()
+        time.sleep(0.3)
+        reader.halt()
+        srv.settimeout(0.2)
+        srv.listen(1)
+        try:
+            srv.accept()
+            connected = True
+        except OSError:
+            connected = False
+        assert not connected                                 # not even connected to
+        # lircd's own account, in a folder only its owner writes to (/run/lirc): yes.
+        owner["folder"] = 0o755
+        assert ti.lirc_socket_ok(path) and ti.lirc_socket({"LIRC_SOCKET_PATH": path}) == path
+        # Root's, or this user's own, wherever it is: yes.
+        owner["folder"] = 0o1777
+        for uid in (0, os.getuid()):
+            owner["uid"] = uid
+            assert ti.lirc_socket_ok(path)
+        assert not ti.lirc_socket_ok(str(tmp_path / "nope"))
+        assert not ti.lirc_socket_ok(str(shared))            # no socket
+    finally:
+        srv.close()
+
+
+def test_a_line_that_never_ends_is_not_kept():
+    lines, rest = ti.lirc_lines(b"", b"00f4 00 KEY_OK dev\n00f4 00 KEY_")
+    assert lines == ["00f4 00 KEY_OK dev"] and rest == b"00f4 00 KEY_"
+    lines, rest = ti.lirc_lines(rest, b"RED dev\n")
+    assert lines == ["00f4 00 KEY_RED dev"] and rest == b""
+    rest = b""
+    for _ in range(64):                                      # 256 KiB and no line break
+        lines, rest = ti.lirc_lines(rest, b"x" * 4096)
+        assert lines == [] and len(rest) <= ti.LIRC_LINE_MAX
+    lines, rest = ti.lirc_lines(rest, b"\n00f4 00 KEY_UP dev\n")
+    assert [ti.lirc_event(ln) for ln in lines][-1] == "up"
+
+
 def test_lirc_reader_reads_a_fake_lircd():
     d = tempfile.mkdtemp()
     path = os.path.join(d, "lircd")
@@ -171,6 +238,17 @@ def test_gamepads_found_in_proc():
     assert ti.parse_input_devices(_PROC) == [("Microsoft X-Box 360 pad", "/dev/input/event7")]
     assert ti.parse_input_devices(_PROC, "/tmp/x") == [("Microsoft X-Box 360 pad", "/tmp/x/event7")]
     assert ti.parse_input_devices("") == []
+
+
+def test_only_the_kernel_s_own_handler_names_are_a_pad():
+    """A device names itself in /proc/bus/input/devices: nothing it writes
+    there is taken for a handler, or leads out of /dev/input."""
+    for handlers in ("js0 event/../../../tmp/x", "js0 event7/../../x", "js0 eventx",
+                     "jsfoo event7", "js../x event7", "event7", "js0"):
+        text = f'N: Name="Pad"\nH: Handlers={handlers}\n\n'
+        assert ti.parse_input_devices(text) == [], handlers
+    odd = 'N: Name="Pad"\nH: Handlers=js12 event/../x event31\n\n'
+    assert ti.parse_input_devices(odd) == [("Pad", "/dev/input/event31")]
 
 
 def test_evdev_reader_reads_a_fake_pad(tmp_path):

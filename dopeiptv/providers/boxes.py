@@ -21,6 +21,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape, quoteattr
 
+from ..core import safe_xml
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
@@ -35,7 +36,6 @@ USER_AGENT = "dopeIPTV/1.0"
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 _C1 = re.compile(r"[\x80-\x9f]")
 _DECL = re.compile(r"^\s*<\?xml[^>]*\?>", re.S)
-_DOCTYPE = re.compile(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?\s*>", re.S | re.I)
 _ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding=[\"']([A-Za-z0-9._-]+)")
 
 
@@ -56,7 +56,9 @@ def clean_text(value: Any, lines: bool = False) -> str:
 def parse_xml(content: bytes) -> ET.Element:
     """A box's XML answer, whatever it got wrong: a declared charset that is
     not what was sent, bytes that are not UTF-8, control characters XML does
-    not allow. A DOCTYPE (entities) is dropped before the parse."""
+    not allow. A DOCTYPE (entities) is dropped before the parse, and what is
+    parsed is proven to declare none (core/safe_xml.py): a DTD left in is a
+    parse error, as a broken answer is."""
     m = _ENCODING.match(content or b"")
     declared = m.group(1).decode("ascii", "replace") if m else "utf-8"
     text = None
@@ -68,7 +70,11 @@ def parse_xml(content: bytes) -> ET.Element:
             continue
     if text is None:
         text = content.decode("utf-8", errors="replace")
-    text = _BAD_XML.sub("", _DOCTYPE.sub("", _DECL.sub("", text.lstrip("﻿"), count=1)))
+    text = safe_xml.drop_dtd(_BAD_XML.sub("", _DECL.sub("", text.lstrip("﻿"), count=1)))
+    try:
+        safe_xml.refuse_dtd(text, "A box's answer")
+    except ValueError as e:
+        raise ET.ParseError(str(e)) from None
     return ET.fromstring(text)
 
 
@@ -133,7 +139,11 @@ def build_xmltv(channels: list[tuple[str, str]], events: list[dict]) -> bytes:
         if key in seen or ev["stop"] <= ev["start"] or not ev.get("title"):
             continue
         seen.add(key)
-        parts = [f'<programme start="{xmltv_time(ev["start"])}" stop="{xmltv_time(ev["stop"])}" '
+        try:
+            start, stop = xmltv_time(ev["start"]), xmltv_time(ev["stop"])
+        except (OverflowError, OSError, ValueError):
+            continue                    # a time no calendar has: that one left out
+        parts = [f'<programme start="{start}" stop="{stop}" '
                  f'channel={quoteattr(ev["channel"])}><title>{escape(ev["title"])}</title>']
         if ev.get("subtitle"):
             parts.append(f"<sub-title>{escape(ev['subtitle'])}</sub-title>")
@@ -241,14 +251,18 @@ class BoxClient(OfflineClient):
 
     def get(self, path: str, params: dict | None = None,
             timeout: tuple[float, float] | None = None,
-            absolute: bool = False) -> Any:
+            absolute: bool = False, stream: bool = False) -> Any:
         """GET from the box, logging in the way it asks (basic or digest)
         the first time it says 401. Raises LocalizedError for a login the
-        box wants and does not get."""
+        box wants and does not get. *stream*: the body left for the caller
+        to read (and close) with a ceiling of its own."""
         url = path if absolute else self.url(path)
+        more = {"stream": True} if stream else {}
         r = self.session.get(url, params=params, auth=self._auth,
-                             timeout=timeout or self.TIMEOUT)
+                             timeout=timeout or self.TIMEOUT, **more)
         if r.status_code == 401:
+            if stream:
+                r.close()
             if not self.username:
                 raise LocalizedError("err_box_login_needed")
             if self._auth is None:
@@ -258,10 +272,12 @@ class BoxClient(OfflineClient):
                               if "digest" in challenge
                               else auth_mod.HTTPBasicAuth(self.username, self.password))
                 r = self.session.get(url, params=params, auth=self._auth,
-                                     timeout=timeout or self.TIMEOUT)
+                                     timeout=timeout or self.TIMEOUT, **more)
             if r.status_code == 401:
                 self._auth = None
                 raise LocalizedError("err_wrong_login")
+        if stream and not r.ok:
+            r.close()
         r.raise_for_status()
         return r
 

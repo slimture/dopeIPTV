@@ -47,7 +47,7 @@ from typing import Any
 
 from PyQt6.QtWidgets import QDialog, QMenu, QPushButton
 
-from ..core import privacy
+from ..core import privacy, stream_address
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
@@ -55,6 +55,7 @@ from ..i18n import LocalizedError, tr
 from ..providers import cast_feed
 from .cast_dialog import CastDialog
 from .mw_cast_moment import _CastMomentMixin
+from .mw_privacy import note_titles
 from .cast_add_dialogs import _AddressDialog, _KodiAddDialog
 from .theme import P
 
@@ -116,6 +117,14 @@ class _CastMixin(_CastMomentMixin):
         url, title = self._stream_for(it)
         if not url:
             url = it.get("_url")
+            if url and it.get("stream_id") is not None:
+                # A source's row (one kept in History too): its address is
+                # the source's word, judged as the client judges it - never
+                # the raw line once the client has refused it.
+                judge = getattr(self.client, "played_from_source", None)
+                same = not source_id or str(source_id) == self._cast_source_of()
+                url = judge(url) if (judge is not None and same) \
+                    else stream_address.played(url, True, "cast")
             title = it.get("name") or it.get("title") or "dopeIPTV"
         # A live channel has to go as HLS: the receiver cannot decode a raw
         # MPEG transport stream at all, whatever we label it. Every section
@@ -739,8 +748,9 @@ class _CastMixin(_CastMomentMixin):
                             if e is item or self._item_key(e) == key), -1)
             self._last_playback["ep_queue"] = queue or []
             self._last_playback["ep_index"] = idx
-        self._trakt_start_for_item(kind, item)
-        self._simkl_start_for_item(kind, item)
+        # Asked of this playback, as a start here is: a title that began
+        # in private viewing is not told when it is sent again after it.
+        self._watch_accounts_start(kind, key, item)
         self._ms_started(url, key, kind, item, float(start or 0.0))
         log.info("cast: %s to %s, from %d s", for_log(title), device,
                  int(start or 0))
@@ -869,6 +879,7 @@ class _CastMixin(_CastMomentMixin):
         if key is None or not kind:
             return
         privacy.playback_started(kind, key)
+        note_titles(ctx)
         self._cast_hooked = True
         title, item = ctx.get("title") or "", ctx.get("item")
         for name in ("_events_started", "_discord_started"):
@@ -1018,7 +1029,9 @@ class _CastMixin(_CastMomentMixin):
         """What a History row needs beyond its address, for this kind.
 
         For a live channel, its stream_id and archive depth, so a later replay
-        from History still has timeshift and catch-up available.
+        from History still has timeshift and catch-up available - and, as
+        for a film, its category: the parental lock leaves a locked one's
+        row out wherever History is shown (the lists' rule, _lock_filter).
 
         For an episode, its series - so a replay from History (or Home's
         Recently viewed) resumes as an EPISODE, lands in the series' episode
@@ -1030,8 +1043,11 @@ class _CastMixin(_CastMomentMixin):
         if kind == "live" and item is not None:
             return {"stream_id": item.get("stream_id"),
                     "num": item.get("num"),
+                    "category_id": item.get("category_id"),
                     "tv_archive": item.get("tv_archive"),
                     "tv_archive_duration": item.get("tv_archive_duration")}
+        if kind == "movie" and item is not None:
+            return {"category_id": item.get("category_id")}
         if kind == "local" and item is not None:
             return {k: item.get(k)
                     for k in ("_year", "_filename", "_clean_title", "_path")
@@ -1291,6 +1307,13 @@ class _CastMixin(_CastMomentMixin):
             if ok and isinstance(ctx, dict):
                 ctx.pop("_recovering", None)      # it went: the watchdog judges it
             fn(*a)
+            # Private viewing began while it was on its way: what it started
+            # is looked at now (_cast_private_on).
+            if isinstance(ctx, dict) and ctx.pop("_private_check", False) \
+                    and not getattr(self, "_cast_inflight", 0):
+                again = getattr(self, "_cast_private_on", None)
+                if callable(again):
+                    again()
         run_async(self.pool, work, partial(over, done, True), partial(over, failed, False))
 
     def _cast_send_failed(self, msg: str) -> None:
@@ -1613,6 +1636,38 @@ class _CastMixin(_CastMomentMixin):
         bits = [b for b in (t.get("lang"), t.get("title")) if b]
         bits.append(t.get("codec") or "?")
         return " · ".join(bits)
+
+    def _cast_private_on(self) -> None:
+        """Private viewing turned on during a cast whose converter works on
+        the disk (providers/cast_bridge, airplay_bridge): sent again the way
+        a stuck cast is - the converter's run before goes first, and the new
+        one keeps its work in memory out of a disk's reach, or refuses and
+        the send says why (cast_err_private_memory). A cast the TV fetches
+        itself writes nothing here and goes on as it is."""
+        if not getattr(self, "_cast_device", None):
+            return
+        ctx = getattr(self, "_cast_ctx", None)
+        if not isinstance(ctx, dict):
+            return
+        if self._cast_busy():
+            # A send on its way may start a run on the disk: the converter's
+            # own watch ends it within a second (cast_bridge._watch), and
+            # this is asked again as soon as the send is done (_cast_send).
+            ctx["_private_check"] = True
+            return
+        bridge = getattr(getattr(self, "cast", None), "bridge", None)
+        on_disk = getattr(bridge, "on_disk", None)
+        try:
+            disk = bool(callable(on_disk) and on_disk()) or bool(getattr(bridge, "private_stopped", False))
+        except Exception:
+            log.debug("cast: the converter's folder not known", exc_info=True)
+            return
+        if not disk:
+            return
+        log.info("private viewing: the cast's converter worked on the disk - sent again")
+        self._cast_restart(ctx)
+        # A refusal is said, never tried again by the watchdog.
+        ctx.pop("_recovering", None)
 
     def _recast_with(self, audio, subs, start: float | None = None,
                      settle: bool = False) -> None:

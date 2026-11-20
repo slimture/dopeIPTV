@@ -25,7 +25,9 @@ class _StreamInfoMixin:
 
     def _remember_stream_info(self, key: str, info: dict) -> None:
         from ..core import privacy, stream_info
-        if privacy.private() or not stream_info.enabled(self.settings):
+        # What the player observed is of what it plays: asked of that
+        # playback, private to its end.
+        if privacy.playing_private() or not stream_info.enabled(self.settings):
             return
         if self._stream_info_store().put(key, info):
             self.listw.viewport().update()

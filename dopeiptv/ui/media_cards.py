@@ -59,6 +59,7 @@ from ..i18n import tr
 from .qt_i18n import format_when
 from .series_cards import ImageSource
 from .theme import P, corner_radius, ink_on, tinted
+from .widgets import plain_text
 
 __all__ = [
     "Card", "CardModel", "CardRow", "CardStrip", "CardView", "ChannelRow", "ChannelView",
@@ -836,7 +837,7 @@ class CardModel(QAbstractListModel):
         if role == Qt.ItemDataRole.ToolTipRole:
             title = getattr(it, "title", None) or getattr(it, "name", "")
             line = getattr(it, "line", "")
-            return f"{title}\n{line}" if line else title
+            return plain_text(f"{title}\n{line}" if line else title)     # a provider's words
         return None
 
     def set_items(self, items: Iterable) -> None:
@@ -2458,7 +2459,7 @@ class PageHeader(QWidget):
         tip = self.line_text() if cut else ""
         for lab in (self.title, self.count):
             if lab.toolTip() != tip:
-                lab.setToolTip(tip)
+                lab.setToolTip(plain_text(tip))
 
     def _give_room(self, need: int) -> None:
         """A filter beside the line gives up its room first - down to its

@@ -7,6 +7,7 @@ or both. The stores' "Trakt" layer holds what those accounts say together.
 
 from __future__ import annotations
 
+import hmac
 import html
 import secrets
 import threading
@@ -21,6 +22,7 @@ from ..providers.trakt import (
 )
 from .notices import hub_of
 from .theme import P
+from .widgets import plain_text
 from ..core.workers import run_async
 from ..core.xdg import open_url
 from PyQt6 import sip
@@ -104,18 +106,32 @@ class _TraktMixin:
         from ..core import privacy
         if privacy.playback_private(kind, key):
             return
-        if kind in ("movie", "episode"):
-            self._trakt_start_for_item(kind, item)
-            self._simkl_start_for_item(kind, item)
-        elif kind == "local" and item is not None and not item.get("_no_scrobble"):
-            # A local file scrobbles as a movie when Trakt can match the
-            # cleaned title; an unmatched file just scrobbles nothing.
-            local_movie = {"name": item.get("_clean_title") or item.get("name") or ""}
-            self._trakt_start_for_item("movie", local_movie)
-            self._simkl_start_for_item("movie", local_movie)
+        # The playback it is, for Trakt's start: its answer to the lookup
+        # comes later, and private viewing turned on meanwhile made this
+        # playback private.
+        self._watch_ident = (kind, key)
+        try:
+            if kind in ("movie", "episode"):
+                self._trakt_start_for_item(kind, item)
+                self._simkl_start_for_item(kind, item)
+            elif kind == "local" and item is not None and not item.get("_no_scrobble"):
+                # A local file scrobbles as a movie when Trakt can match the
+                # cleaned title; an unmatched file just scrobbles nothing.
+                local_movie = {"name": item.get("_clean_title") or item.get("name") or ""}
+                self._trakt_start_for_item("movie", local_movie)
+                self._simkl_start_for_item("movie", local_movie)
+        finally:
+            self._watch_ident = None
 
     def _trakt_start_for_item(self, kind: str, item) -> None:
         from ..core import privacy
+        ident = getattr(self, "_watch_ident", None)
+
+        def still_public() -> bool:
+            # Asked again once Trakt has answered the lookup.
+            return not (privacy.playback_private(*ident) if ident is not None
+                        else privacy.private())
+
         # The account of the profile watching, whatever profile is in use by
         # the time the answer comes (core/profiles.py).
         trakt = self.trakt
@@ -128,7 +144,7 @@ class _TraktMixin:
 
             def job(title=title):
                 movie = trakt.find_movie(title)
-                if not movie:
+                if not movie or not still_public():
                     return None
                 payload = {"movie": movie}
                 trakt.scrobble_start(payload, 0.0)
@@ -147,7 +163,7 @@ class _TraktMixin:
 
             def job(show_title=show_title, season=season, episode=episode):
                 ep = trakt.find_episode(show_title, season, episode)
-                if not ep:
+                if not ep or not still_public():
                     return None
                 payload = {"episode": ep}
                 trakt.scrobble_start(payload, 0.0)
@@ -156,7 +172,7 @@ class _TraktMixin:
             return
 
         def done(payload):
-            if payload and trakt is self.trakt:
+            if payload and trakt is self.trakt and still_public():
                 self._trakt_active = {"payload": payload, "client": trakt}
 
         run_async(self.pool, job, done, lambda _e: None)
@@ -1056,7 +1072,8 @@ class _TraktMixin:
             if params.get("error"):
                 info.setText(tr("trakt_denied"))
                 return
-            if params.get("state") != state["token"]:
+            if not hmac.compare_digest(str(params.get("state") or "").encode("utf-8"),
+                                       state["token"].encode("utf-8")):
                 # Mismatched state: never trust the code (CSRF guard).
                 info.setText(tr("trakt_login_failed", msg="state mismatch"))
                 return
@@ -1083,7 +1100,7 @@ class _TraktMixin:
 
         def exchange_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(tr("trakt_login_failed", msg=msg))
+                info.setText(plain_text(tr("trakt_login_failed", msg=msg)))
 
         # However the dialog goes away - Cancel, Escape or the window's close
         # button - the listener must stop. Only Cancel used to say so, and
@@ -1096,7 +1113,7 @@ class _TraktMixin:
             self.pool,
             lambda: capture_oauth_redirect(
                 OAUTH_PORT, timeout=180.0,
-                should_cancel=lambda: state["cancelled"]),
+                should_cancel=lambda: state["cancelled"], state=state["token"]),
             captured, capture_failed)
         open_url(trakt.authorize_url(state["token"], challenge))
         d.exec()
@@ -1141,7 +1158,7 @@ class _TraktMixin:
 
         def poll_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(tr("trakt_login_failed", msg=msg))
+                info.setText(plain_text(tr("trakt_login_failed", msg=msg)))
 
         def started(data) -> None:
             if state["cancelled"]:
@@ -1158,7 +1175,7 @@ class _TraktMixin:
 
         def start_failed(msg) -> None:
             if not state["cancelled"]:
-                info.setText(tr("trakt_could_not_start", msg=msg))
+                info.setText(plain_text(tr("trakt_could_not_start", msg=msg)))
 
         # Closed any way at all: stop polling (see the browser dialog).
         d.finished.connect(lambda _r: state.__setitem__("cancelled", True))
@@ -1182,6 +1199,7 @@ class _TraktMixin:
         tw.addTab(wl_list, tr("trakt_tab_watchlist"))
         tw.addTab(hist_list, tr("nav_history"))
         status = QLabel(tr("common_loading"))
+        status.setTextFormat(Qt.TextFormat.PlainText)      # the service's words
         status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         lay.addWidget(status)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

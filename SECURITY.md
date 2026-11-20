@@ -1,30 +1,122 @@
-# Security Policy
+# Security policy
+
+dopeIPTV is meant to be open, private and hard to attack. What it protects,
+who could attack it, what stops them and what is honestly left is its
+threat model, [`docs/SECURITY.md`](docs/SECURITY.md); every review round
+and what came of it is in
+[`docs/SECURITY_REVIEWS.md`](docs/SECURITY_REVIEWS.md). The code behind
+what the app sends out is shown at <https://dopeiptv.org/transparency/>.
+
+## Reporting a vulnerability
+
+Please **do not open a public issue** for a security problem.
+
+Report it privately through GitHub:
+**<https://github.com/slimture/dopeIPTV/security/advisories/new>** (the
+repository's Security tab → "Report a vulnerability"). The same address is
+in <https://dopeiptv.org/.well-known/security.txt>. If the form is not
+available to you, contact the maintainer
+[@slimture](https://github.com/slimture) through GitHub and say only that
+you have something to report privately.
+
+What helps most:
+
+- the version (Help → About; on a Mac the dopeIPTV menu) and the
+  package - AppImage, .deb, Flatpak, the Windows installer or zip, the Mac
+  app, or a checkout at a commit;
+- the system it ran on;
+- the steps, and what an attacker gains: what they must control first
+  (a provider, a device at home, a web page, a program on the computer...)
+  and what they get;
+- a log if it shows the problem (`DOPEIPTV_LOG=debug
+  DOPEIPTV_LOG_FILE=/path`): logins and tokens are taken out of it, but
+  read it before you send it.
+
+English or Swedish, either is fine.
+
+## What happens then
+
+dopeIPTV is maintained by one person, so these are goals, not promises of
+a team:
+
+- **an acknowledgement within a week;**
+- **for a high or critical problem**, as
+  [`docs/SECURITY_REVIEWS.md`](docs/SECURITY_REVIEWS.md) defines them,
+  **a fix or a plan within 30 days**, and a release as soon as the fix is
+  ready;
+- for the rest, a fix in a coming release, or an answer saying why it
+  stays as it is - a limit then goes into the threat model.
+
+You are kept informed while it is worked on. Please keep the problem
+private until a release with the fix is out, or until we agree otherwise.
+Then it is published as a GitHub security advisory, named in the release
+notes, and recorded in `docs/SECURITY_REVIEWS.md` - with credit to you,
+unless you prefer otherwise.
 
 ## Supported versions
 
-Only the **latest release** receives security fixes — the app has a built-in
-update check, and upgrading is a download away.
+Only the **latest release** receives security fixes: the app checks for
+updates itself, and the AppImage, the installed Windows app and the Mac app
+update in place. A fix reaches the test builds (Settings → General →
+Update channel → Test builds) first, as it is made.
 
 | Version | Supported |
 | ------- | --------- |
 | latest release | ✅ |
+| test builds of the next release | ✅ (fixes land here first) |
 | older releases | ❌ |
 
-## Reporting a vulnerability
+## Scope
 
-Please **do not open a public issue** for security problems.
+**In scope:**
 
-Report privately via GitHub's built-in flow: the repository's
-**Security tab → "Report a vulnerability"**. You'll get an acknowledgement
-as soon as the report is seen (normally within a few days), and credit in
-the release notes of the fix unless you prefer otherwise.
+- the app, in every package the project releases (AppImage, .deb, Flatpak,
+  the Mac .dmg, the Windows installer and zip, the Python package) and from
+  a checkout of this repository;
+- the way it is built and updated: the workflows, the pinned build inputs,
+  the signed checksum list and build manifest, the update itself;
+- dopeiptv.org's services: the update feed and downloads, feedback and its
+  answers (`/feedback/`), settings sync (`/sync/`), the Watch together
+  relay (`/together/`), the Trakt sign-in's redirect (`/trakt/callback`),
+  supporter keys (`/donate/`), and the site itself.
 
-If the Security tab is unavailable to you, contact the maintainer
-[@slimture](https://github.com/slimture) through GitHub.
+**Out of scope:**
 
-## Scope notes
+- providers' own servers and streams, and the boxes and media servers
+  people add - report those to whoever runs them;
+- third-party services: TMDB, Trakt, Simkl, OpenSubtitles, Plex.tv,
+  radio-browser.info, GitHub, Stripe, Google's Chromecast, Apple's AirPlay
+  and the rest listed below;
+- bugs in libmpv, FFmpeg, Qt or Python themselves: report them upstream -
+  we gladly ship the bundled libraries' updates that fix them;
+- the limits the threat model already names ("Honest limits"), unless you
+  show one is worse than it says;
+- what needs the person's own account on the computer, an administrator,
+  or the unlocked computer;
+- reports from an automated scanner without a shown way to use them.
 
-Useful context for researchers:
+## Safe harbour
+
+Research done in good faith within these lines is welcome, and we will not
+take or support legal action against it:
+
+- use your own installs, accounts, sources and devices;
+- never touch data that is not yours: no one else's sync copy, room,
+  feedback or account - if you reach one by accident, stop, keep nothing,
+  and tell us;
+- never disrupt a service: no load or denial-of-service tests against
+  dopeiptv.org, no spam through its feedback, no guessing at others' sync
+  slots or rooms;
+- no social engineering of people, and nothing against Stripe, GitHub or
+  any other company's systems;
+- give us the time above before anything is made public.
+
+If you are not sure whether something is within these lines, ask first
+through the private report.
+
+## What the app connects to
+
+Useful context for researchers; the threat model says what protects each.
 
 - **Servers the user configures**: their IPTV provider (Xtream Codes, an
   M3U playlist or a Stalker / Ministra portal) and its logos, XMLTV guide
@@ -43,8 +135,10 @@ Useful context for researchers:
     update checks from its log;
   - feedback and error reports, only when the person presses Send, and the
     answers to them (`/feedback/report`, `/feedback/replies`);
-  - settings sync when turned on (`/sync/`: ciphertext only, under a random
-    slot, end-to-end encrypted with a key made from the sync code);
+  - settings sync when turned on (`/sync/`: ciphertext only, under a slot
+    made from the sync code, end-to-end encrypted with a key made from the
+    same code; once bound, a slot is read, written or deleted only with a
+    credential from the code too);
   - Watch together when a room is used (`/together/`: a relay of sealed
     messages);
   - the Trakt sign-in's redirect (`/trakt/callback`), handed on to the
@@ -77,8 +171,9 @@ Useful context for researchers:
   - on 127.0.0.1 only: the app's own rewind buffer for the embedded player
     (random token, `core/dvr_server.py`); a loopback proxy that carries the
     player's and recorder's connections over a source's own DNS or pinned
-    certificate (Nerd, `core/net_bridge.py`); the Trakt sign-in's redirect
-    listener, briefly, on port 41794 (`providers/oauth_loopback.py`);
+    certificate (Nerd, a key made for each run, `core/net_bridge.py`); the
+    Trakt sign-in's redirect listener, briefly, on port 41794
+    (`providers/oauth_loopback.py`);
   - on the LAN while a cast needs it, each under a random path and stopped
     with the cast: a local file served to a DLNA TV (`providers/dlna.py`),
     the converter that makes a stream - or a channel's archive or rewind
@@ -96,10 +191,11 @@ Useful context for researchers:
     `services/home_server.py`, `core/hdhr.py`);
   - a local socket of the user's own for a second start's command
     (`core/instance.py`).
-- Credentials (provider logins, the sync code, tokens) are stored
-  **locally** in Qt's QSettings store, unencrypted — the standard threat
-  model of a desktop app — and masked in logs; error reports are scrubbed
-  of addresses, logins and names before the person sees them
+- **Credentials** (provider logins, the sync code, tokens) are stored
+  **locally** in Qt's settings, unencrypted, in files only the user can
+  read (0600 in a 0700 folder on Linux and macOS,
+  `core/settings_files.py`), and kept out of logs; error reports are
+  scrubbed of addresses, logins and names before the person sees them
   (`core/report.py`). There is no telemetry: what plays goes only to what
   the person turns on (Trakt, Simkl, their own media server, Discord, a
   Watch together room's sealed messages), and dopeiptv.org gets nothing

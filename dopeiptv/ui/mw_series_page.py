@@ -55,6 +55,9 @@ CACHE_SECS = 10 * 60
 CACHE_MAX = 24
 #: How often the card of what plays is brought up to date.
 TICK_MS = 10_000
+#: The column under the video follows the card picked this long after
+#: the arrows rest.
+DETAIL_MS = 250
 
 
 class _SeriesPageMixin:
@@ -74,6 +77,7 @@ class _SeriesPageMixin:
     _sp_art_loader: LogoLoader | None = None
     _sp_timer: QTimer | None = None
     _sp_head: dict | None = None
+    _sp_detail_timer: QTimer | None = None
 
     # -- where it is ------------------------------------------------------------------
 
@@ -116,6 +120,14 @@ class _SeriesPageMixin:
             t.setInterval(TICK_MS)
             t.timeout.connect(self._sp_tick)
             self._sp_timer = t
+            # The column under the video follows the card picked, once the
+            # arrows rest (as it follows a list's row).
+            d = QTimer(self)
+            d.setSingleShot(True)
+            d.setInterval(DETAIL_MS)
+            d.timeout.connect(self._sp_detail)
+            self._sp_detail_timer = d
+            page.picked.connect(self._sp_picked)
         return page
 
     def _sp_art(self) -> LogoLoader:
@@ -162,6 +174,7 @@ class _SeriesPageMixin:
         if same and self._sp_seasons:
             if focus is not None:
                 page.focus_episode(str(focus))
+            self._sp_detail()
             return
         self._sp_gen += 1
         self._sp_ctx = dict(series)
@@ -171,6 +184,7 @@ class _SeriesPageMixin:
         self._sp_head = None
         page.reset()
         self._sp_fill_header()
+        self._sp_detail()               # the series' poster at once
         self._sp_fetch()
         page.view.setFocus()
 
@@ -263,6 +277,11 @@ class _SeriesPageMixin:
         extra = info.get("info") if isinstance(info.get("info"), dict) else {}
         if series.get("category_id") is None and extra.get("category_id") is not None:
             series["category_id"] = extra["category_id"]
+        # The column under the video reads the same answer (its plot, cast,
+        # genre): never asked of the provider a second time.
+        info_cache = getattr(self, "_info_cache", None)
+        if isinstance(info_cache, dict) and sid is not None and client is self.client:
+            info_cache.setdefault(("series", sid), extra)
         episodes = self._episode_rows(info, series)
         # The same rows come back from the cache: what was new when the page
         # opened last has been seen since (_follow_entered marks it anew).
@@ -341,6 +360,7 @@ class _SeriesPageMixin:
         self._sp_head = None
         page.reset()
         self._sp_fill_header()
+        self._sp_detail()
         rows: list[dict] = []
         for s_no, e_no, p, stem in sorted(eps):
             r = self._local_file_row(p, stem, stat=False)
@@ -419,7 +439,8 @@ class _SeriesPageMixin:
         raw = ctx.get("cover") or ctx.get("stream_icon") or info.get("cover")
         try:
             poster = (self.cover.cover_url(ctx, "series") if not local
-                      else None) or tmdb_url_from_provider(raw) or raw
+                      else None) or (None if self.cover.off
+                                     else tmdb_url_from_provider(raw)) or raw
         except Exception:
             poster = raw
         poster = str(td.get("poster_url") or poster or "")
@@ -636,12 +657,114 @@ class _SeriesPageMixin:
         except Exception:
             log.exception("series page: what plays was not marked")
 
+    # -- the column under the video ------------------------------------------------
+
+    def _sp_picked(self, _ep=None) -> None:
+        """A card picked (a click, the arrows, the page going to one): the
+        column follows once they rest."""
+        t = self._sp_detail_timer
+        if t is not None and self._series_page_showing():
+            t.start()
+
+    def _sp_detail(self) -> None:
+        """The column under the video shows what the page has picked: the
+        episode with its series' poster, plot and cast, or the series
+        itself while no card is picked - so a click on a series, an episode
+        or Now playing shows the series' poster, as a click on a channel or
+        a film shows its own."""
+        page = self._series_page
+        if page is None or sip.isdeleted(page) or not self._series_page_showing():
+            return
+        if self._sp_detail_timer is not None:
+            self._sp_detail_timer.stop()
+        ctx = dict(self._sp_ctx or {})
+        local = self._sp_local
+        sid = ctx.get("series_id")
+        cached = ("series", sid) in (getattr(self, "_info_cache", None) or {})
+        ep = page.view.current_item()
+        try:
+            if ep is None:
+                self._current_key = self._item_key(ctx)
+                self._show_detail({"name": self._sp_title(), "_kind": "episode",
+                                   "_series_ctx": ctx, "_info_later": not cached})
+                self._detail_episode = (None, ctx, local, None)
+            else:
+                key = self._item_key(ep)
+                self._current_key = key
+                self._show_detail({**ep, "_kind": "episode", "_series_ctx": ctx,
+                                   "_info_later": not cached})
+                self._detail_episode = (ep, ctx, local, key)
+            self._apply_play_icon()
+        except Exception:
+            log.exception("series page: the column under the video was not drawn")
+
+    def _sp_holds(self, series: dict, local: str | None) -> bool:
+        """The page (shown or kept hidden) still holds *series*' episodes."""
+        if not self._sp_seasons:
+            return False
+        if local is not None or self._sp_local is not None:
+            return local == self._sp_local
+        return str((self._sp_ctx or {}).get("series_id")) == str(series.get("series_id"))
+
+    def _sp_detail_playing(self) -> bool | None:
+        """Whether what the column shows from a series' page plays (the
+        poster's button then pauses it); None when it shows nothing of one."""
+        shown = self._detail_episode
+        if shown is None:
+            return None
+        ep, series, local, key = shown
+        p = getattr(self, "player", None)
+        playing = getattr(self, "_playing_key", None)
+        if p is None or getattr(p, "current_url", None) is None or playing is None:
+            return False
+        if getattr(self, "_playing_group", None) != ("local" if local is not None else "episode"):
+            return False
+        if ep is not None:
+            return str(key) == str(playing)
+        if local is not None:
+            return self._sp_holds(series, local) and any(
+                str(self._item_key(e)) == str(playing)
+                for s in self._sp_seasons for e in s.episodes)
+        ctx = (getattr(self, "_last_playback", None) or {}).get("series_ctx") or {}
+        return str(ctx.get("series_id")) == str(series.get("series_id"))
+
+    def _detail_play(self) -> bool:
+        """The poster's button on "play": what the column shows from a
+        series' page plays as the page plays it - the episode, or the
+        series' next one (the page's own button). False: nothing of a
+        page shown, the list's row plays as ever."""
+        shown = self._detail_episode
+        if shown is None:
+            return False
+        ep, series, local, _key = shown
+        if not self._sp_holds(series, local):
+            return False
+        if ep is None:
+            self._sp_primary()
+        else:
+            self._sp_play(ep)
+        return True
+
     # -- the seasons ------------------------------------------------------------------
+
+    def _sp_private(self) -> bool:
+        """Private viewing, or this series' episode the private playback
+        still going on after it: the page follows what plays, and the
+        season it lands on would say what was watched."""
+        if privacy.private():
+            return True
+        lp = getattr(self, "_last_playback", None) or {}
+        if lp.get("kind") != "episode" \
+                or not privacy.playback_private("episode", lp.get("key")):
+            return False
+        mine = (lp.get("series_ctx") or {}).get("series_id")
+        here = (self._sp_ctx or {}).get("series_id")
+        return mine is None or here is None or str(mine) == str(here)
 
     def _sp_season_picked(self, i: int) -> None:
         """A season the person picked: kept for the next time (never while
         viewing privately), with the episode that is next now."""
-        if privacy.private() or not 0 <= i < len(self._sp_seasons):
+        if self._sp_private() or not 0 <= i < len(self._sp_seasons):
             return
         nxt = self._sp_next
         next_key = sv.episode_key(nxt.episode) if nxt and nxt.episode is not None else ""
@@ -658,8 +781,8 @@ class _SeriesPageMixin:
         if season.number is None or not any(not sv.still_of(e) for e in season.episodes):
             return
         tid = self.tmdb.tmdb_id_for(self._sp_title(), "series")
-        if not isinstance(tid, int):
-            return
+        if not isinstance(tid, int) or privacy.title_private(self._sp_title()):
+            return      # no id, or the series played privately: not asked
         known = self._sp_tmdb if self._sp_tmdb is not None else {}
         self._sp_tmdb = known
         key = (tid, season.number)
@@ -988,6 +1111,8 @@ class _SeriesPageMixin:
         self._sp_return_search = False
         if self._sp_timer is not None:
             self._sp_timer.stop()
+        if self._sp_detail_timer is not None:
+            self._sp_detail_timer.stop()
         if self._series_page_showing():
             self._mid_stack.setCurrentIndex(0)
 

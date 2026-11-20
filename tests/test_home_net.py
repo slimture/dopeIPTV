@@ -14,6 +14,7 @@ from dopeiptv.core import home_net, nerd
 from dopeiptv.core.nerd_check import FAIL, INFO, OK
 from dopeiptv.core.phone_remote import PhoneServer
 from dopeiptv.core.remote_api import RemoteServer
+from tests.phone_sign import signed_request
 
 TOKEN = "Ab3_-x9Ab3_-x9Ab3_-x9Ab3_-x9Qz12"
 
@@ -143,7 +144,8 @@ def test_this_computer_at_any_address_of_its_own_is_at_home():
 
 def _ask(port: int, path: str, headers: dict | None = None) -> tuple[int, bytes]:
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    conn.request("GET", path, headers=headers or {})
+    path, _data, h = signed_request(TOKEN, "GET", path, None, headers)
+    conn.request("GET", path, headers=h)
     r = conn.getresponse()
     body = r.read()
     conn.close()

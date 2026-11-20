@@ -21,7 +21,7 @@ from typing import Any
 from PyQt6.QtCore import QLocale, QTimer
 from PyQt6.QtWidgets import QInputDialog
 
-from ..core import channel_prefs
+from ..core import channel_prefs, privacy
 from ..core import teletext as ttx
 from ..core import teletext_subs as tsubs
 from ..core.log import log
@@ -295,7 +295,10 @@ class TeletextSubsMixin:
         self._set_mpv("sub-visibility", True)
         self._ttx_current = choice
         self._ttx_auto = choice if auto and choice.page is None else None
-        if remember and self._chan_key and choice.kind == tsubs.TELETEXT:
+        if remember and self._chan_key and choice.kind == tsubs.TELETEXT \
+                and not privacy.playing_private():
+            # A channel's page says it was watched: not kept for a private
+            # playback (it shows for this one all the same).
             self._ttx_page_store().put(self._chan_key, choice)
         if choice.kind == tsubs.TELETEXT:
             self._ttx_check_tid = choice.track
@@ -327,7 +330,8 @@ class TeletextSubsMixin:
     def _ttx_forget(self) -> None:
         """Subtitles off or another track picked by hand: the channel's
         teletext page goes."""
-        if self._ttx_current is not None and self._chan_key:
+        if self._ttx_current is not None and self._chan_key \
+                and not privacy.playing_private():
             self._ttx_page_store().forget(self._chan_key)
         self._ttx_current = None
         self._ttx_auto = None

@@ -38,7 +38,8 @@ def github(monkeypatch):
 
     class Fake:
         @staticmethod
-        def get(url, params=None, headers=None, timeout=None):
+        def get(url, params=None, headers=None, timeout=None, allow_redirects=True):
+            assert allow_redirects is False, "every redirect followed by hand, or none"
             assert headers["User-Agent"].startswith("dopeIPTV/")
             state["asked"].append(url)
             if url == "https://dopeiptv.org/releases.json":
@@ -214,3 +215,57 @@ def test_a_test_builds_download_is_this_computers_file_through_the_site(monkeypa
     assert mw_updates._own_file(rel) == ""
     monkeypatch.setattr(sys, "platform", "darwin")
     assert mw_updates._own_file({"tag": "v1.4.5.80", "assets": []}) == ""
+
+
+class Moved(Resp):
+    """A 302 with its Location (requests' is_redirect)."""
+
+    is_redirect = True
+
+    def __init__(self, location) -> None:
+        super().__init__({})
+        self.headers = {"Location": location}
+
+    def close(self) -> None:
+        pass
+
+
+def test_the_site_s_answer_is_never_followed_elsewhere(github, monkeypatch):
+    """Rule 2: dopeiptv.org's services go through build_check.secure and
+    follow no redirect. One sent elsewhere is not taken - GitHub is asked,
+    as when the site does not answer."""
+    fake = updates.requests.get
+
+    def get(url, **kw):
+        if url == "https://dopeiptv.org/releases.json":
+            github["asked"].append(url)
+            return Moved("http://mirror.example/releases.json")
+        return fake(url, **kw)
+    monkeypatch.setattr(updates.requests, "get", get)
+    assert fetch_update(channel="stable")["tag"] == "v1.4.0"
+    assert "http://mirror.example/releases.json" not in github["asked"]
+    monkeypatch.setattr(updates.requests, "get", fake)
+    # An address that is not https to the site itself is not asked at all.
+    github["asked"].clear()
+    monkeypatch.setattr(updates, "SITE", "http://dopeiptv.org")
+    assert fetch_update(channel="stable")["tag"] == "v1.4.0"
+    assert not [u for u in github["asked"] if "dopeiptv.org" in u], github["asked"]
+
+
+def test_github_s_redirects_are_followed_only_over_https(github, monkeypatch):
+    """A moved repository's answer is followed, each hop https; plain http
+    is refused before it is asked."""
+    fake = updates.requests.get
+    hops = {"https://api.github.com/repos/slimture/dopeIPTV/releases/latest":
+            Moved("https://api.github.com/repositories/1/releases/latest"),
+            "https://api.github.com/repositories/1/releases/latest": Resp(rel("v1.4.2"))}
+
+    def get(url, **kw):
+        github["asked"].append(url)
+        return hops[url] if url in hops else fake(url, **kw)
+    monkeypatch.setattr(updates.requests, "get", get)
+    assert fetch_update(channel="stable")["tag"] == "v1.4.2"
+    hops["https://api.github.com/repositories/1/releases/latest"] = Moved("http://evil.example/latest")
+    with pytest.raises(selfupdate.UpdateError):
+        fetch_update(channel="stable")
+    assert "http://evil.example/latest" not in github["asked"]

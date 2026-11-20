@@ -28,6 +28,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from .num import digits, number
+
 #: The season number providers give their specials.
 SPECIALS = 0
 #: Seasons remembered at most (the oldest go first).
@@ -49,7 +51,7 @@ def _int(value: Any) -> int | None:
     if isinstance(value, int):
         return value
     m = _DIGITS.search(str(value or ""))
-    return int(m.group(0)) if m else None
+    return digits(m.group(0)) if m else None
 
 
 def season_of(value: Any) -> int | None:
@@ -276,8 +278,7 @@ def episode_title(ep: dict, series_name: str = "") -> str:
         title = title[len(name):]
     title = _SXXEYY.sub(" ", title)
     title = _SEP.sub("", " ".join(title.split()))
-    if episode_number(ep) is not None and title.isdigit() \
-            and int(title) == episode_number(ep):
+    if episode_number(ep) is not None and digits(title) == episode_number(ep):
         return ""
     return title
 
@@ -296,12 +297,9 @@ def minutes_of(ep: dict) -> int:
     """An episode's length in minutes from what its source says (0: not
     known): seconds, "01:02:03", "45:10", "45 min", "2700"."""
     info = _info(ep)
-    secs = info.get("duration_secs")
-    try:
-        if secs is not None and secs != "" and float(secs) > 0:
-            return max(1, round(float(secs) / 60))
-    except (TypeError, ValueError):
-        pass
+    secs = number(info.get("duration_secs"), lo=0)
+    if secs:
+        return max(1, round(secs / 60))
     text = str(info.get("duration") or ep.get("_sp_runtime") or "").strip()
     if not text:
         return 0
@@ -331,11 +329,8 @@ def year_of(*values: Any) -> str:
 def rating_of(*values: Any) -> float | None:
     """A rating out of ten from the first value that is one."""
     for v in values:
-        try:
-            r = float(str(v).replace(",", "."))
-        except (TypeError, ValueError):
-            continue
-        if 0 < r <= 10:
+        r = number(str(v).replace(",", "."), lo=0, hi=10)
+        if r:
             return round(r, 1)
     return None
 

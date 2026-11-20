@@ -17,8 +17,9 @@ on:
     branches: [testing]
   workflow_dispatch:
 
+# Read-only unless a job says otherwise (docs/MAINTAINING.md, "The workflows").
 permissions:
-  contents: write
+  contents: read
 
 # A newer push makes the build in progress pointless.
 concurrency:
@@ -31,7 +32,9 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
       - id: v
         run: |
           BASE=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' dopeiptv/__init__.py)
@@ -40,6 +43,13 @@ jobs:
 
   build:
     needs: version
+    # The most any job of release.yml asks for; each of its jobs names its
+    # own, and none that builds gets more than contents: write (which it
+    # uses on a tag only - nothing is attached for a test build).
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     uses: ./.github/workflows/release.yml
     with:
       nightly_version: ${{ needs.version.outputs.version }}
@@ -51,8 +61,12 @@ jobs:
     # Changes only what is not so yet; never holds up a build.
     runs-on: ubuntu-24.04
     continue-on-error: true
+    permissions:
+      contents: write      # edits the notes of the releases
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
       - name: Tidy the release notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,14 +78,21 @@ jobs:
     # without the Linux AppImage there is no nightly at all.
     if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: ubuntu-24.04
+    # The update key lives in this environment, for the testing branch alone
+    # (docs/MAINTAINING.md, "The release key").
+    environment: nightly-signing
+    permissions:
+      contents: write      # publishes the pre-release, removes the oldest
+    outputs:
+      published: ${{ steps.gather.outputs.publish }}
     env:
       V: ${{ needs.version.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
         with:
           path: artifacts
       - name: Gather the packages
@@ -125,6 +146,10 @@ jobs:
           fi
           echo "publish=${PUB}" >> "$GITHUB_OUTPUT"
       - name: Sign the checksums
+        # The one step that is handed the update key: it lists the files,
+        # and runs the signing tool - the repository's own code on Python's
+        # own library (-I -S). No token here; this job builds nothing and
+        # installs nothing.
         if: steps.gather.outputs.publish == 'true'
         env:
           DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
@@ -137,7 +162,7 @@ jobs:
           if [ -z "$DOPEIPTV_UPDATE_KEY" ]; then
             echo "::warning::DOPEIPTV_UPDATE_KEY is not set: this test build is not signed, and the app will not install it"
           else
-            python3 tools/sign_sums.py out/SHA256SUMS
+            python3 -I -S tools/sign_sums.py out/SHA256SUMS
           fi
       - name: Notes
         if: steps.gather.outputs.publish == 'true'
@@ -170,12 +195,16 @@ jobs:
           cat notes.md
       - name: Publish the pre-release
         if: steps.gather.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "nightly-${V}" out/* --prerelease --latest=false \
             --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
             --notes-file notes.md
       - name: Keep the newest seven
         if: steps.gather.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             --jq '[.[] | select(.isPrerelease and (.tagName | startswith("nightly-")))]
@@ -184,3 +213,27 @@ jobs:
             echo "removing ${tag}"
             gh release delete "${tag}" --yes --cleanup-tag
           done
+
+  attest:
+    # Where each file of the test build was made, as a signed statement of
+    # GitHub's own (Sigstore): this repository, this workflow, this commit -
+    # gh attestation verify <file> --repo slimture/dopeIPTV. Made from the
+    # signed checksum list once the build is published, and never in a
+    # build's way.
+    needs: [version, publish]
+    if: ${{ !cancelled() && needs.publish.outputs.published == 'true' }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write        # the workflow's identity, for the signature
+      attestations: write    # stores the statement with the repository
+    steps:
+      - name: The test build's checksum list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.version.outputs.version }}
+        run: gh release download "nightly-${V}" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --dir .
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8   # v4.2.2
+        with:
+          subject-checksums: SHA256SUMS

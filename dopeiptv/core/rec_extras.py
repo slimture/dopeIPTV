@@ -9,6 +9,15 @@ nothing can lead outside the recording folder (".." and absolute parts are
 dropped). The command is split like a shell would split it but never run
 through one: placeholders are filled in per argument, so a title with
 quotes or ; in it is only ever text.
+
+One program does read its arguments as a shell: Windows' cmd.exe, which
+Windows itself puts in front of a batch file (.bat, .cmd). For such a
+command (``through_cmd``) a title or a channel's name - a provider's words
+- goes without the quote that would end its argument, and without a % that
+would put a variable's value in its place; every argument that holds a
+character cmd.exe reads (& | < > ^ ( ) % !) is put in quotes, as one with a
+space always was; and a recording whose own file name would be expanded is
+not handed to the command at all (``post_command``).
 """
 
 from __future__ import annotations
@@ -23,13 +32,15 @@ import time
 from datetime import datetime
 
 from .log import log
+from .privacy import for_log
 from .nerd_check import FAIL, INFO, OK, WARN, Check
 
 DEFAULT_TEMPLATE = "{title} {date} {time}"
 FIELDS = ("title", "channel", "date", "time", "year", "month", "day", "hour",
           "minute", "weekday", "path", "folder", "file")
 _NAME_FIELDS = FIELDS[:10]
-_UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+# Half a surrogate pair too (JSON can carry one): no file system takes it.
+_UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f\x7f\ud800-\udfff]')
 # A title or a channel's name is cut at this many characters, as
 # safe_filename cuts a title; and no part of the path comes near a file
 # system's 255 bytes a name - room is left for the " (12)" and the extension
@@ -39,16 +50,31 @@ NAME_CHARS = 120
 PART_BYTES = 255 - 16
 
 
+#: The names Windows keeps for its devices, whatever comes after a dot.
+_WINDOWS_DEVICES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"] + [f"{d}{n}" for d in ("COM", "LPT") for n in "123456789"])
+
+
+def not_a_device(name: str) -> str:
+    """*name*, or "_name" when Windows would open one of its devices for it
+    (CON, NUL, COM1... - "NUL.ts" too): a recording of a channel called so
+    went nowhere, and its folder could not be made."""
+    if name.split(".", 1)[0].strip().upper() in _WINDOWS_DEVICES:
+        return "_" + name
+    return name
+
+
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", _UNSAFE.sub("", text)).strip()
 
 
 def _safe_part(text: str) -> str:
     part = _clean(text)
-    raw = part.encode("utf-8")
+    raw = part.encode("utf-8", "ignore")
     if len(raw) > PART_BYTES:
         part = raw[:PART_BYTES].decode("utf-8", "ignore")
-    return part.strip().strip(".").strip()
+    part = part.strip().strip(".").strip()
+    return not_a_device(part) if part else part
 
 
 def _pieces(template: str, values: dict[str, str]) -> list[str]:
@@ -110,21 +136,132 @@ def _split(command: str, windows: bool) -> list[str]:
     return list(lex)
 
 
+#: What cmd.exe reads as more than text in an argument that is not in quotes.
+_CMD_READS = frozenset("&|<>^()%!")
+#: The variables cmd.exe makes up itself, beside the environment's.
+_CMD_OWN = frozenset({"CD", "DATE", "TIME", "RANDOM", "ERRORLEVEL", "CMDEXTVERSION",
+                      "CMDCMDLINE", "HIGHESTNUMANODENUMBER", "__CD__", "__APPDIR__",
+                      "FIRMWARE_TYPE"})
+
+
+def through_cmd(program: str) -> bool:
+    """Whether Windows runs *program* through cmd.exe: a batch file (.bat,
+    .cmd - Windows starts cmd.exe for one by itself) or cmd.exe as named."""
+    name = re.split(r"[\\/]", (program or "").strip().strip('"'))[-1].lower()
+    return name.endswith((".bat", ".cmd")) or name in ("cmd", "cmd.exe")
+
+
+def _expansions(value: str, env: dict[str, str] | None = None) -> list[str]:
+    """The variables cmd.exe would put the value of in place of a part of
+    *value*: each %NAME% (or !NAME!) of a variable there is. One there is
+    not stays as written on a command line."""
+    known = os.environ if env is None else env
+    names = {k.upper() for k in known} | _CMD_OWN
+    found = []
+    for mark in "%!":
+        # Between each two marks next to each other, as cmd.exe looks.
+        for name in value.split(mark)[1:-1]:
+            if name.split(":", 1)[0].upper() in names:
+                found.append(mark + name.split(":", 1)[0].upper())
+    return found
+
+
+def _expanded_by_cmd(value: str, env: dict[str, str] | None = None) -> bool:
+    return bool(_expansions(value, env))
+
+
+def _words_for_cmd(text: str, env: dict[str, str] | None = None) -> str:
+    """A provider's words as an argument cmd.exe reads: without the quote
+    that would end the argument, without control characters (a new line is
+    a new command), and - when cmd.exe would expand them - without their
+    % and !."""
+    out = "".join(c for c in (text or "") if c != '"' and ord(c) >= 32 and ord(c) != 127)
+    if _expanded_by_cmd(out, env):
+        out = out.replace("%", "").replace("!", "")
+    return out
+
+
+def _quoted(arg: str) -> str:
+    """*arg* in quotes, as subprocess.list2cmdline quotes one with a space."""
+    out, slashes = ['"'], 0
+    for c in arg:
+        if c == "\\":
+            slashes += 1
+            continue
+        if c == '"':
+            out.append("\\" * (slashes * 2) + '\\"')
+        else:
+            out.append("\\" * slashes + c)
+        slashes = 0
+    out.append("\\" * (slashes * 2) + '"')
+    return "".join(out)
+
+
+def cmd_line(argv: list[str]) -> str:
+    """*argv* as the one line Windows hands a program, for one cmd.exe
+    reads: what subprocess makes of the list, but with every argument that
+    holds a character cmd.exe reads in quotes too. Unquoted, "A&B.ts" was
+    the argument A and the command B.ts."""
+    return " ".join(_quoted(a) if (not a or any(c in _CMD_READS or c in " \t" for c in a))
+                    else subprocess.list2cmdline([a]) for a in argv)
+
+
 def post_argv(command: str, path: str, title: str, channel: str = "",
-              windows: bool | None = None) -> list[str]:
-    """The command as arguments, placeholders filled in each one."""
-    values = fields(title, channel)
-    values.update(path=path, folder=os.path.dirname(path), file=os.path.basename(path))
+              windows: bool | None = None, env: dict[str, str] | None = None) -> list[str]:
+    """The command as arguments, placeholders filled in each one. For a
+    command Windows runs through cmd.exe, the title and the channel's name
+    as cmd.exe can only read as text (``_words_for_cmd``)."""
+    win = os.name == "nt" if windows is None else windows
     try:
-        argv = _split(command or "", os.name == "nt" if windows is None else windows)
+        argv = _split(command or "", win)
     except ValueError as e:
         raise ValueError(f"cannot read the command: {e}") from e
+    if win and argv and through_cmd(argv[0]):
+        title, channel = _words_for_cmd(title, env), _words_for_cmd(channel, env)
+    values = fields(title, channel)
+    values.update(path=path, folder=os.path.dirname(path), file=os.path.basename(path))
     return [re.sub(r"\{(\w*)\}", lambda m: values.get(m.group(1), m.group(0)), a) for a in argv]
 
 
-def _env(path: str, title: str, channel: str) -> dict[str, str]:
+def post_command(command: str, path: str, title: str, channel: str = "",
+                 windows: bool | None = None,
+                 env: dict[str, str] | None = None) -> list[str] | str:
+    """What is started for a finished recording: the arguments - or, for a
+    command Windows runs through cmd.exe, the one line it is given
+    (``cmd_line``). ValueError for a command that cannot be read, and for a
+    recording whose file name cmd.exe would expand (%NAME% of a variable
+    there is): the command is not started for that one."""
+    win = os.name == "nt" if windows is None else windows
+    argv = post_argv(command, path, title, channel, win, env)
+    if not (win and argv and through_cmd(argv[0])):
+        return argv
+    # What the person wrote may name a variable (%USERPROFILE%); what was
+    # filled in - the file's name, a title next to a channel's name - may
+    # not add one, nor a quote or a new line.
+    for written, arg in zip(_split(command or "", win), argv, strict=True):
+        if arg == written:
+            continue
+        added = list(_expansions(arg, env))
+        for name in _expansions(written, env):
+            if name in added:
+                added.remove(name)
+        if added or arg.count('"') != written.count('"') \
+                or any(ord(c) < 32 and c not in written for c in arg):
+            raise ValueError("the recording's file name holds what cmd.exe would expand "
+                             "(%NAME%) - the command is not run for it")
+    return cmd_line(argv)
+
+
+def _env(path: str, title: str, channel: str, command: str = "") -> dict[str, str]:
     from .xdg import system_env
     env = system_env()
+    try:
+        first = _split(command, True)[:1] if command and os.name == "nt" else []
+    except ValueError:
+        first = []
+    if first and through_cmd(first[0]):
+        # A batch file reads these with %NAME%, which cmd.exe then reads on.
+        title, channel = _words_for_cmd(title, env), _words_for_cmd(channel, env)
     env.update(DOPEIPTV_REC_PATH=path, DOPEIPTV_REC_TITLE=title or "",
                DOPEIPTV_REC_CHANNEL=channel or "")
     return env
@@ -139,14 +276,17 @@ def run_post(command: str, path: str, title: str, channel: str = "") -> subproce
         argv = post_argv(command, path, title, channel)
         if not argv:
             return None
-        proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, env=_env(path, title, channel),
+        proc = subprocess.Popen(post_command(command, path, title, channel),
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                env=_env(path, title, channel, command),
                                 start_new_session=True,
                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, ValueError) as e:
-        log.warning("recording: the command after it did not start: %s", e)
+        log.warning("recording: the command after it did not start: %s", for_log(e))
         return None
-    log.info("recording: started %s for %s", os.path.basename(argv[0]), os.path.basename(path))
+    log.info("recording: started %s for %s", os.path.basename(argv[0]),
+             for_log(os.path.basename(path)))
     return proc
 
 
@@ -197,13 +337,14 @@ def check_post(command: str, timeout: float = 20.0) -> Check:
         fh.write(b"\x47" + b"\xff" * 187)
     try:
         argv = post_argv(command, sample, "dopeIPTV test", "Test")
+        started = post_command(command, sample, "dopeIPTV test", "Test")
     except ValueError as e:
         return Check(FAIL, "nerd_ck_post_bad", {}, str(e))
     lines = ["Ran: " + " ".join(shlex.quote(a) for a in argv)]
     t0 = time.monotonic()
     try:
-        out = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
-                             env=_env(sample, "dopeIPTV test", "Test"),
+        out = subprocess.run(started, capture_output=True, text=True, timeout=timeout,
+                             env=_env(sample, "dopeIPTV test", "Test", command),
                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except FileNotFoundError as e:
         lines.append(f"Error: {e}")

@@ -1,3 +1,33 @@
+## dopeIPTV 1.6.9
+
+**Private viewing keeps nothing on a disk, TMDB can be turned off altogether, and the phone remote, server mode and kids profiles are much harder to get round.**
+
+### Privacy
+
+- **Private viewing writes nothing of what plays to a disk.** A channel's rewind buffer, a cast's converted stream and a subtitle you fetch go only to memory that cannot reach a disk - on Linux, with no swap or encrypted swap - or are not made at all: the channel then plays without the rewind buffer, and a cast that needs converting says why it cannot. Turning private viewing on while something plays opens it again the private way, and a cast is sent again within a second. A recording while you watch privately is asked about first.
+- **TMDB can be turned off altogether:** choose **Provider artwork, TMDB off** under Settings → Posters & info and the app asks it nothing - no titles, no searches. Pictures then come from your provider alone, and Popular right now, cast photos and series backdrops are off.
+- **Kids profiles hold:** a kids profile can only be made once a grown-up's profile has a PIN, cannot play local files, recordings or an address typed in, and cannot reach a locked or adult category through History, Search, the phone or anything else. PINs are kept far harder to guess, and wrong tries slow down.
+- **A backup can get a password**, which encrypts the whole file.
+
+### Security
+
+- **The phone remote's key never crosses the network:** the code you scan carries it where a browser never sends it, and every request from the phone is signed with it.
+- **Server mode:** a new server's tuner needs its token, its page and settings a token of their own, and neither answers a web page or a name that is not your home's.
+- **A cast the app converts is served to the TV it was started for alone**, Chromecast and Apple TV.
+- **A provider can no longer make the app reach this computer or your home network:** the app's own requests never land there, nor follow a redirect inward, and a channel's address cannot name them.
+- **yt-dlp**, for YouTube and the like, is downloaded only as the release the build checked against yt-dlp's own signature.
+- **A release is signed only once the audit of everything it ships has passed.**
+
+### Fixed
+
+- The window could stop for good while pictures loaded (a macOS hang report, and the same on Linux).
+- An episode playing shows its series' poster under the video, and a series shows its poster as soon as it is clicked.
+- Ctrl+C in the terminal the app was started from closes the window as its close button does.
+
+### dopeiptv.org
+
+- **The website's statistics:** a visit is kept 14 days at the most, whatever is set; everything that should be gone is looked for after every run and deleted again; the server's swap is encrypted with a key a restart forgets, and the admin page says so if it is not.
+
 ## dopeIPTV 1.6.8
 
 **More private: error reports, private viewing, sync and Watch together tightened, and dopeiptv.org shows the code for each.**
@@ -13,8 +43,8 @@
 
 ### dopeiptv.org
 
-- **Privacy, behind the scenes** shows the new code: the sync counter, the room code, the reports' last cleaning, and how long the website's statistics keep each part. It also says more plainly where each protection stops.
-- The website's statistics never note a tip on a visit - a tip counts only in the day's total - and the service forgets an address within minutes once its request limit no longer needs it.
+- **The website's statistics** keep much less. A visitor's ID is made with a key that changes every month and is deleted once the month after has ended - from then on nobody can tie it to an address, us included. A visit is kept in detail for 30 days instead of 400, then only as anonymous figures. The logs that hold addresses are kept two days instead of a week, and the front server keeps no log of requests at all. A tip is never noted on a visit, only in the day's total, and the service forgets an address within minutes once its request limit no longer needs it.
+- **Privacy, behind the scenes** shows the new code - the sync counter, the room code, the reports' last cleaning, the statistics' monthly key - and says more plainly where each protection stops, including that the list of where the app connects is what its own code names, not a guarantee that nothing else does.
 
 ## dopeIPTV 1.6.7
 

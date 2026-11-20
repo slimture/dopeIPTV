@@ -10,7 +10,7 @@ import re
 from ..providers.client import b64, epg_times
 from ..i18n import tr
 from .theme import ACCENT, P
-from .widgets import _ClickableWidget
+from .widgets import _ClickableWidget, plain_text
 from ..core import film_view as fv
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
@@ -40,8 +40,13 @@ class _DetailMixin:
 
     POSTER_SIZE_LIVE = (112, 112)
     POSTER_SIZE_MEDIA = (170, 255)
+    #: A series' page's pick the column shows - (episode or None for the
+    #: series itself, series, local title or None, episode key) - so the
+    #: poster's button plays what the column shows (mw_series_page).
+    _detail_episode: tuple | None = None
 
     def _show_detail(self, it) -> None:
+        self._detail_episode = None
         self._detail_film_continue(None)
         self.now_card.hide()
         self.media_info.hide()
@@ -286,10 +291,26 @@ class _DetailMixin:
         pos, _dur = self._film_progress(it)
         self._film_play(it, pos if pos > 0 else None)
 
+    def _detail_follow_episode(self, ep, key) -> None:
+        """An episode started - from its series' page, Continue, the phone
+        or the next one by itself: its series' poster and words under the
+        video, the episode's name over them. The column follows the list's
+        pick, and an episode is never that pick, so the poster stayed on
+        the row picked before - the last TV channel - and its button would
+        have started that channel. A row picked afterwards shows as ever."""
+        series = self.series_ctx
+        if not isinstance(ep, dict) or not series:
+            return
+        self._current_key = key
+        self._show_detail({**ep, "_kind": "episode", "_series_ctx": series})
+        self._detail_episode = (ep, dict(series), None, key)
+        self._apply_play_icon()
+
     def _show_continue_episode_detail(self, it) -> None:
         """Continue-watching episode row: show the series' poster + info (plot,
         cast, genre) with the episode's name, since the row itself carries no
-        series_id to resolve."""
+        series_id to resolve. ``_info_later``: the series' page asks its
+        series_info itself, so nothing is asked twice."""
         ctx = it.get("_series_ctx") or {}
         self.d_logo.show()
         self.play_mpv.show()
@@ -303,7 +324,7 @@ class _DetailMixin:
             (ctx.get("name") or self._detail_name).strip()[:1].upper())
         self._load_detail_poster(ctx, True, "series")
         sid = ctx.get("series_id")
-        if sid is not None:
+        if sid is not None and not it.get("_info_later"):
             self._request_media_info("series", sid, self._current_key)
 
     @property
@@ -350,7 +371,8 @@ class _DetailMixin:
         # If the provider icon embeds a TMDB path, prefer the direct
         # image.tmdb.org URL - the panel's own proxy is often the one
         # that's 404ing/down. Same rewrite the list delegate uses.
-        fallback_url = tmdb_url_from_provider(raw_cover) or raw_cover
+        fallback_url = (None if getattr(getattr(self, "cover", None), "off", False)
+                        else tmdb_url_from_provider(raw_cover)) or raw_cover
         key = self._current_key
 
         def logo(pm) -> None:
@@ -433,7 +455,7 @@ class _DetailMixin:
         chip = _ClickableWidget()
         if self.tmdb and name:
             chip.setCursor(Qt.CursorShape.PointingHandCursor)
-            chip.setToolTip(tr("detail_cast_find", name=name))
+            chip.setToolTip(plain_text(tr("detail_cast_find", name=name)))
             chip.clicked.connect(
                 lambda: self._on_cast_clicked(name, person_id))
         v = QVBoxLayout(chip)
@@ -1122,6 +1144,8 @@ class _DetailMixin:
             self._record_now(ch, minutes, title_override=title)
             return
         if ch.get("stream_id") is None:
+            return
+        if not self._rec_private_ok():
             return
         # A portal's link would be long dead by then: such a recording asks
         # for its address when it starts.

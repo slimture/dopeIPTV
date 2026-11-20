@@ -7,6 +7,16 @@ stop where their run ends, so a reconnect gap is never played across. Old
 segments go by time, by a byte cap, and when the disk runs low; a segment
 a reader still has open is only forgotten then, and deleted once it is let
 go (Windows cannot delete an open file).
+
+A channel watched privately from its start keeps its segments in memory
+where the system has a folder there for this user alone (``memory_base``:
+Linux's ``$XDG_RUNTIME_DIR``, a tmpfs gone at logout and at a restart) whose
+contents swap cannot carry to a disk (core/memory_safe: no swap, encrypted
+swap or zram, or a tmpfs never swapped), with a budget of its own
+(``memory_budget``) - so nothing of it ever reaches the disk. Elsewhere a
+private channel has no buffer at all (core/dvr_pool). A buffer that was on
+disk when private viewing began is marked (``PRIVATE_MARK``), deleted as it
+is left, and at the next start after a crash.
 """
 from __future__ import annotations
 
@@ -18,6 +28,9 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
+
+from . import memory_safe
+from .log import log, open_private, private_folder
 
 TS_PACKET = 188
 
@@ -39,9 +52,16 @@ class SegmentStore:
 
     def __init__(self, root: Path, keep_seconds: float, max_bytes: int,
                  clock: Callable[[], float] = time.time,
-                 min_free: int | None = None) -> None:
+                 min_free: int | None = None, memory: bool = False) -> None:
         self.root = root
-        self.root.mkdir(parents=True, exist_ok=True)
+        # What was watched, this user's alone: the folder 0700 (narrowed
+        # when it was there before), each segment 0600 (open_private).
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        private_folder(str(self.root))
+        # A buffer meant for memory: its own folder checked where it really
+        # is before a byte is written - else nothing is (NotInMemory).
+        if memory and not memory_folder(self.root):
+            raise NotInMemory(f"not in memory: {self.root.name}")
         self.keep_seconds = keep_seconds
         self.max_bytes = max_bytes
         self.min_free = self.MIN_FREE_BYTES if min_free is None else min_free
@@ -101,7 +121,7 @@ class SegmentStore:
         seq = self._next_seq
         self._next_seq += 1
         path = self.root / f"{seq:08d}.ts"
-        self._fh = open(path, "wb")
+        self._fh = open_private(str(path), "wb")
         seg = Segment(seq, self._run, now, now, 0, path)
         self._segs.append(seg)
         self._by_seq[seq] = seg
@@ -414,10 +434,46 @@ class SegmentStore:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+#: In a session folder whose channel was watched privately (core/privacy.py).
+PRIVATE_MARK = ".private"
+
+
+def mark_private(root: Path) -> None:
+    """Say on disk that *root* holds a channel watched privately: should
+    the app be killed before it deletes it, the next start does at once."""
+    try:
+        (root / PRIVATE_MARK).touch()
+    except OSError:
+        pass
+
+
+def _pid_of(entry: Path) -> int:
+    try:
+        return int(entry.name.split("-", 1)[0])
+    except ValueError:
+        return 0
+
+
+def _gone(pid: int) -> bool:
+    """Whether the process that made a folder has ended - known for sure
+    only where asking is harmless (not Windows, where os.kill ends it)."""
+    if pid <= 0 or os.name == "nt":
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 def sweep_abandoned(base: Path, older_than: float = 600.0) -> int:
     """Remove session folders nobody writes to any more - left by a crash
     or a killed app. A running session writes a segment every two seconds,
-    so a folder untouched for ten minutes is no one's."""
+    so a folder untouched for ten minutes is no one's. One watched
+    privately (PRIVATE_MARK) whose process has ended goes whatever its
+    age: a private channel's buffer is never for a later session."""
     removed = 0
     try:
         entries = list(base.iterdir())
@@ -426,7 +482,12 @@ def sweep_abandoned(base: Path, older_than: float = 600.0) -> int:
     now = time.time()
     for entry in entries:
         try:
-            if entry.is_dir() and now - entry.stat().st_mtime > older_than:
+            if not entry.is_dir():
+                continue
+            left_private = ((entry / PRIVATE_MARK).exists()
+                            and _pid_of(entry) != os.getpid()
+                            and _gone(_pid_of(entry)))
+            if left_private or now - entry.stat().st_mtime > older_than:
                 shutil.rmtree(entry, ignore_errors=True)
                 removed += 1
         except OSError:
@@ -436,3 +497,68 @@ def sweep_abandoned(base: Path, older_than: float = 600.0) -> int:
 
 def session_dir(base: Path, token: str) -> Path:
     return base / f"{os.getpid()}-{token[:12]}"
+
+
+# -- a private session's buffer in memory ---------------------------------------
+
+#: The most a private session keeps in memory, and of what that memory has
+#: free at most a half (the rest of the system lives there too).
+MEMORY_MAX = 1 << 30
+#: What must stay free in that memory before older segments go.
+MEMORY_MIN_FREE = 64 << 20
+#: Below this a buffer in memory is not worth it: the disk, as before.
+MEMORY_LEAST = 64 << 20
+def in_memory(path: Path, mounts: str | None = None) -> bool:
+    """Whether *path* is on a file system in memory, by the mount table
+    (Linux's /proc/self/mounts): the longest mount point it is under."""
+    return memory_safe.in_memory(path, mounts)
+
+
+def memory_base(env: dict | None = None, mounts: str | None = None,
+                platform: str | None = None) -> Path | None:
+    """Where a private session's buffer goes in memory: a folder under
+    ``$XDG_RUNTIME_DIR`` - only on Linux, only when it is this user's own
+    (0700, theirs) and on tmpfs; None anywhere else (core/memory_safe)."""
+    return memory_safe.private_base("dvr", env, mounts, platform)
+
+
+class NotInMemory(OSError):
+    """A folder meant to be in memory is not, is not this user's own, or
+    what is written there could reach a disk through swap."""
+
+
+def memory_folder(path: Path, mounts: str | None = None, swaps: str | None = None) -> bool:
+    """Whether *path* - made already - is where a buffer in memory may be
+    written: a folder itself (never a link to one), this user's own, 0700
+    (narrowed when it is not), on a file system in memory where it really
+    is (the mount table: a link above it, or a disk mounted on or under it,
+    is found so), and out of a disk's reach - swap none, encrypted or in
+    memory, or the file system never swapped (memory_safe.stays_in_memory)."""
+    if not memory_safe.own_folder(path):
+        return False
+    return memory_safe.stays_in_memory(path, mounts, swaps)[0]
+
+
+def memory_budget(base: Path, max_bytes: int, mounts: str | None = None,
+                  swaps: str | None = None) -> int:
+    """What a private session may keep in memory at *base*: the rewind
+    buffer's own cap, MEMORY_MAX, half of what is free there - 0 when that
+    is too little to be worth it, or when the folder made is not in memory,
+    not this user's own or within a disk's reach (memory_folder): then a
+    private channel plays with no buffer at all - never one on a disk."""
+    try:
+        base.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if not memory_safe.own_folder(base):
+            log.warning("DVR: the folder for a private buffer in memory is not this user's own "
+                        "- a private channel plays with no rewind buffer")
+            return 0
+        ok, why = memory_safe.stays_in_memory(base, mounts, swaps)
+        if not ok:
+            log.warning("DVR: a private buffer could reach a disk here (%s) - a private channel "
+                        "plays with no rewind buffer", why)
+            return 0
+        free = shutil.disk_usage(base).free
+    except OSError:
+        return 0
+    budget = min(int(max_bytes), MEMORY_MAX, max(0, free - MEMORY_MIN_FREE) // 2)
+    return budget if budget >= MEMORY_LEAST else 0

@@ -11,7 +11,7 @@ from .dialogs import ContentManagerDialog
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
-from .widgets import confirm
+from .widgets import confirm, plain_text
 from PyQt6.QtCore import QItemSelectionModel, Qt
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
@@ -585,29 +585,52 @@ class _ContextMenuMixin:
             return True
         if not self.parental.has_pin():
             return True
+        # Wrong PINs are counted, and each makes the next try wait a little
+        # longer (mw_profiles, core/pins.Tries): four digits are soon tried.
+        must_wait = getattr(self, "_pin_must_wait", None)
+        if callable(must_wait) and must_wait(["parental"], tr("parental_control")):
+            return False
         pin, ok = QInputDialog.getText(
             self, tr("parental_control"), tr("parental_enter_pin"),
             QLineEdit.EchoMode.Password)
         if not ok:
             return False
-        if self.parental.verify(pin.strip()):
+        pin = pin.strip()
+        if pin and self.parental.verify(pin):
             self.parental.session_unlocked = True
+            tries = getattr(self, "_pin_tries", None)
+            if callable(tries):
+                tries().right("parental")
             return True
-        QMessageBox.warning(self, tr("msg_parental_title"),
-                            tr("msg_wrong_pin"))
+        was_wrong = getattr(self, "_pin_was_wrong", None)
+        if pin and callable(was_wrong):
+            was_wrong(["parental"], tr("msg_parental_title"))
+        else:
+            QMessageBox.warning(self, tr("msg_parental_title"),
+                                tr("msg_wrong_pin"))
         return False
 
     def _ensure_pin_configured(self) -> bool:
         if self.parental.has_pin():
             return True
-        pin, ok = QInputDialog.getText(
-            self, tr("parental_control"), tr("pin_choose_prompt"),
-            QLineEdit.EchoMode.Password)
-        pin = (pin or "").strip()
-        if ok and pin:
+        pin = self._ask_new_parental_pin(self, tr("pin_choose_prompt"))
+        if pin:
             self.parental.set_pin(pin)
             return True
         return False
+
+    def _ask_new_parental_pin(self, parent, prompt: str) -> str:
+        """A new parental PIN asked for until it is long enough (or the
+        person cancels: "")."""
+        while True:
+            pin, ok = QInputDialog.getText(parent, tr("parental_control"), plain_text(prompt),
+                                           QLineEdit.EchoMode.Password)
+            pin = (pin or "").strip()
+            if not ok or not pin:
+                return ""
+            if len(pin) >= self.parental.SHORTEST:
+                return pin
+            QMessageBox.warning(parent, tr("parental_control"), plain_text(tr("pin_too_short")))
 
     # -- category context menu -----------------------------------------------------
 
@@ -834,5 +857,24 @@ class _ContextMenuMixin:
         self._pending_cat_select = (cur.data(Qt.ItemDataRole.UserRole)
                                     if cur else self._pending_cat_select)
         ContentManagerDialog(
-            self, self.mode, self._raw_categories, self.overrides).exec()
+            self, self.mode, self._managed_categories(), self.overrides).exec()
         self._load_categories()
+
+    def _managed_categories(self) -> list:
+        """The categories Manage categories… lists: all of them - for a kids
+        profile only those its lists show (none named for adults, none
+        locked), as its category column has them."""
+        cats = list(self._raw_categories or [])
+        kids = getattr(self, "_profile_kids", None)
+        if kids is None or not kids():
+            return cats
+        from ..core.profiles import adult_category
+        out = []
+        for c in cats:
+            cid = c.get("category_id")
+            own = c.get("category_name")
+            name = self.overrides.display_name(self.mode, cid, str(own or ""))
+            if adult_category(name, own) or self.overrides.is_locked(self.mode, cid):
+                continue
+            out.append(c)
+        return out

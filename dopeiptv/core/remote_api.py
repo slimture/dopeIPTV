@@ -35,7 +35,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 from . import home_net
 from .log import log
 from .nerd_check import FAIL, OK, WARN, Check
-from .exclusive_bind import ExclusiveBindMixin
+from .exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin
 
 DEFAULT_PORT = 3673            # D-O-P-E on a phone's keypad
 PORT_KEY = "nerd_remote_port"
@@ -78,14 +78,22 @@ def lan_addresses() -> list[str]:
     return out
 
 
-def _host_ok(host: str) -> bool:
-    """The Host a client asked for, used to write its playlist's addresses:
-    a name, an IPv4 or a bracketed IPv6 address and a port, nothing else."""
-    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:[]")
-    return 0 < len(host) <= 255 and all(c in allowed for c in host)
+#: What every answer says: never sniffed for another type, and no address of
+#: ours (the token may be in it) handed on as a referrer.
+SAFE_HEADERS = {"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"}
 
 
-class _Server(ExclusiveBindMixin, ThreadingHTTPServer):
+def header_safe(url: str) -> str:
+    """*url* as a header's value: what is no printable ASCII written as
+    %XX. A source's address goes out as a redirect's Location, and a line
+    break in one would have been the end of that header and the start of
+    another of the address's own choosing."""
+    if all(33 <= ord(c) < 127 for c in url):
+        return url
+    return quote(url, safe="%/:=&?~#+!$,;'@()*[]")
+
+
+class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
@@ -141,6 +149,20 @@ class RemoteServer:
         return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
                                                         self.token.encode("utf-8"))
 
+    def base(self, host_header: str | None, own: str = "") -> str:
+        """This server's address as a playlist writes it: under the Host
+        the client asked by when that is a home network's name or an
+        address (home_net.host_for_addresses), else at the address the
+        client reached this computer at (*own*). Never under whatever Host
+        a request carries: every stream address in the playlist holds the
+        token, and would send it - and the player - wherever that Host
+        points."""
+        named = home_net.host_for_addresses(host_header)
+        if named:
+            return f"http://{named}"
+        ip = own if home_net._ip(own) is not None and own not in ("0.0.0.0", "::") else "127.0.0.1"
+        return f"http://[{ip}]:{self.port}" if ":" in ip else f"http://{ip}:{self.port}"
+
     @staticmethod
     def client_ok(address: str, own: str = "") -> bool:
         """This computer or the home network, whichever part of it (*own*:
@@ -172,7 +194,7 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
-            for k, v in (extra or {}).items():
+            for k, v in {**SAFE_HEADERS, **(extra or {})}.items():
                 self.send_header(k, v)
             self.end_headers()
             if self.command != "HEAD":
@@ -187,6 +209,8 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", ctype)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
+            for k, v in SAFE_HEADERS.items():
+                self.send_header(k, v)
             self.end_headers()
             if self.command == "HEAD":
                 return
@@ -228,6 +252,18 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
         def _handle(self, method: str) -> None:
             if not server.client_ok(str(self.client_address[0]), _own(self)):
                 self._json(403, {"error": "only this computer and the home network"})
+                return
+            host = self.headers.get("Host")
+            if host and not home_net.home_host(host):
+                # A web page whose own name a DNS rebinding pointed here asks
+                # under that public name: never answered, token or not.
+                self._json(403, {"error": "ask by this computer's address or a home name"})
+                return
+            from .phone_remote import cross_site
+            if cross_site(self.headers, host):
+                # A web page in a browser here or at home (a fetch, a form):
+                # Home Assistant, scripts and players send no Origin.
+                self._json(403, {"error": "not for a web page"})
                 return
             parts = urlsplit(self.path)
             path = parts.path.rstrip("/") or "/"
@@ -301,10 +337,7 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
                 self._json(404, {"error": "sharing is off"})
                 return
             if path == "/playlist.m3u":
-                host = self.headers.get("Host") or f"127.0.0.1:{server.port}"
-                if not _host_ok(host):
-                    host = f"127.0.0.1:{server.port}"
-                text = share.m3u(f"http://{host}", server.token)
+                text = share.m3u(server.base(self.headers.get("Host"), _own(self)), server.token)
                 self._send(200, text.encode("utf-8"), "audio/x-mpegurl; charset=utf-8")
                 return
             gz = path.endswith(".gz")
@@ -322,7 +355,7 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             if not url:
                 self._json(404, {"error": "no such channel"})
                 return
-            self._send(302, b"", "text/plain", {"Location": url})
+            self._send(302, b"", "text/plain", {"Location": header_safe(str(url))})
 
         def do_GET(self):      # noqa: N802 - stdlib hook
             self._handle("GET")

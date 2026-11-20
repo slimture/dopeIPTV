@@ -271,6 +271,73 @@ def is_home_client(address: str, own: str = "") -> bool:
     return any(ip.version == net.version and ip in net for net in CLIENT_NETS)
 
 
+# -- the names a home network has ---------------------------------------------------------
+
+#: Name endings a home network's own names have: RFC 6762's .local (mDNS),
+#: RFC 8375's home.arpa, ICANN's .internal for private use, the routers'
+#: usual .lan, .home and .localdomain, AVM's .fritz.box (a Fritz!Box answers
+#: names under it itself) and Tailscale's MagicDNS .ts.net (answered inside
+#: the tailnet). A deliberate list, kept short: a DNS rebinding needs a name
+#: whose answers a web page's owner sets, and these are answered at home.
+HOME_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain",
+                 ".fritz.box", ".ts.net")
+#: What a Host is written with when an address of the app's own is made
+#: from it: a name, an IPv4 or a bracketed IPv6 address, a port.
+_HOST_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:[]")
+
+
+def host_name(host: str | None) -> str:
+    """The name or address in a ``Host`` header, without its port and
+    brackets, in lower case; "" for none (an unclosed bracket)."""
+    name = (host or "").strip().lower()
+    if name.startswith("["):                       # [IPv6]:port
+        end = name.find("]")
+        if end < 0:
+            return ""
+        name = name[1:end]
+    elif name.count(":") == 1:
+        name = name.rsplit(":", 1)[0]
+    return name.rstrip(".")
+
+
+def home_host(host: str | None) -> bool:
+    """Whether the ``Host`` a request came under is a name of the home
+    network: an IP address, localhost, this computer's own name, a name
+    without a dot, or one with a home ending (HOME_SUFFIXES). A web page
+    whose own name a DNS rebinding pointed at this computer asks under that
+    public name - which is none of these. Devices at home ask by address,
+    or by a name their router or mDNS answers."""
+    name = host_name(host)
+    if not name:
+        return False
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        pass
+    if name == "localhost" or "." not in name or name.endswith(HOME_SUFFIXES):
+        return True
+    try:
+        own = socket.gethostname().lower().rstrip(".")
+    except OSError:
+        own = ""
+    return bool(own) and name == own
+
+
+def host_for_addresses(host: str | None) -> str:
+    """*host* as an address of the app's own may be written with it - a
+    playlist's stream addresses, a tuner's lineup: the ``Host`` the client
+    asked under when it is a home network's name or an address
+    (``home_host``) and holds only what a host is written with; else "".
+    Never any Host a request happens to carry: an address made from one
+    sends whoever uses it - and the token in it - wherever that Host
+    points."""
+    text = (host or "").strip()
+    if not text or len(text) > 255 or any(c not in _HOST_CHARS for c in text):
+        return ""
+    return text if home_host(text) else ""
+
+
 # -- this computer's own networks (what needs no token) ----------------------------------
 
 Network = ipaddress.IPv4Network | ipaddress.IPv6Network

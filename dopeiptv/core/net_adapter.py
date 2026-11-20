@@ -19,7 +19,7 @@ import socket
 import threading
 from typing import Any, Callable
 
-from . import cert_pin, net_route
+from . import cert_pin, dest_guard, net_route
 from .net_route import Route
 
 
@@ -35,10 +35,10 @@ def _classes(route: Route, resolve: bool) -> dict[str, type]:
         host = str(conn.host)
         if (not resolve or getattr(conn, "_tunnel_host", None) or getattr(conn, "proxy", None)
                 or not route.changes(host, conn.port, "http")):
-            return base._new_conn(conn)
+            return dest_guard.check_peer(conn, base._new_conn(conn))
         try:
-            return net_route.open_connection(route, host, conn.port, conn.timeout,
-                                             conn.source_address, conn.socket_options)
+            return dest_guard.check_peer(conn, net_route.open_connection(
+                route, host, conn.port, conn.timeout, conn.source_address, conn.socket_options))
         except (socket.timeout, TimeoutError) as e:
             raise ConnectTimeoutError(conn, f"Connection to {host} timed out. "
                                             f"(connect timeout={conn.timeout})") from e
@@ -89,10 +89,13 @@ def _classes(route: Route, resolve: bool) -> dict[str, type]:
 
 
 def adapter(route: Route) -> Any:
-    """A requests adapter for *route*."""
-    from requests.adapters import HTTPAdapter
+    """A requests adapter for *route* - on the app's capped adapter
+    (core/_lazy_requests.py), so an answer read whole has its ceiling on a
+    route too."""
+    from ._lazy_requests import capped_adapter
+    base: Any = capped_adapter()
 
-    class NetAdapter(HTTPAdapter):
+    class NetAdapter(base):  # type: ignore[misc]
         def __init__(self) -> None:
             self.route = route
             super().__init__()
@@ -117,6 +120,7 @@ def mount(session: Any, route: Route) -> bool:
     if not route.active:
         return False
     a = adapter(route)
+    a.max_response = getattr(session, "max_response", None)
     session.mount("http://", a)
     session.mount("https://", a)
     return True
@@ -129,9 +133,11 @@ def remount(session: Any, route: Route) -> None:
         mount(session, route)
         return
     if type(session.get_adapter("https://x/")).__name__ == "NetAdapter":
-        from requests.adapters import HTTPAdapter
-        session.mount("http://", HTTPAdapter())
-        session.mount("https://", HTTPAdapter())
+        from ._lazy_requests import capped_adapter
+        for scheme in ("http://", "https://"):
+            plain = capped_adapter()()
+            plain.max_response = getattr(session, "max_response", None)
+            session.mount(scheme, plain)
 
 
 _sessions: dict[Route, Any] = {}
@@ -141,7 +147,7 @@ MAX_SESSIONS = 8
 
 def session_for(route: Route) -> Any:
     """A session of its own for *route* (kept, so connections are reused)."""
-    import requests
+    from ._lazy_requests import requests
     with _lock:
         s = _sessions.get(route)
         if s is None:

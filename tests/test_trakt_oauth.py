@@ -215,6 +215,78 @@ def test_loopback_captures_the_redirect_query():
     assert out["params"] == {"code": "C", "state": "S"}
 
 
+def _ask(port, path):
+    """GET *path*; its status (urllib raises on 4xx) and headers."""
+    for _ in range(50):
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=15) as r:
+                return r.status, r.headers
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers
+        except OSError:
+            time.sleep(0.1)
+    raise AssertionError("the listener never answered")
+
+
+def test_loopback_waits_for_the_real_redirect_and_a_silent_connection_holds_nothing():
+    """Any GET to /callback or / ended the wait - a page on this computer
+    guessing the port could end the sign-in, or hand it a code of its own
+    - and a connection that sent nothing held handle_request(), so Cancel
+    and the time limit were never reached. Only a code with the state
+    asked for, or the provider's error, is taken now; a silent connection
+    is let go."""
+    port = _free_port()
+    cancel = {"v": False}
+    out = {}
+
+    def run():
+        out["params"] = capture_oauth_redirect(port, timeout=20, state="S3cret",
+                                               should_cancel=lambda: cancel["v"])
+
+    th = threading.Thread(target=run)
+    th.start()
+    assert _ask(port, "/callback")[0] == 400                       # nothing in it
+    assert _ask(port, "/?code=EVIL")[0] == 400                     # no state
+    assert _ask(port, "/callback?code=EVIL&state=wrong")[0] == 400
+    assert th.is_alive(), "still waiting for the real one"
+    silent = socket.create_connection(("127.0.0.1", port))      # says nothing
+    status, headers = _ask(port, "/callback?code=C&state=S3cret")
+    silent.close()
+    th.join(10)
+    assert status == 200 and out["params"] == {"code": "C", "state": "S3cret"}
+    assert headers["Cache-Control"] == "no-store" and headers["X-Content-Type-Options"] == "nosniff"
+
+    # A silent connection leaves Cancel working.
+    port = _free_port()
+    th = threading.Thread(target=lambda: out.__setitem__(
+        "params", capture_oauth_redirect(port, timeout=60, state="S",
+                                         should_cancel=lambda: cancel["v"])))
+    th.start()
+    _ask(port, "/x")
+    silent = socket.create_connection(("127.0.0.1", port))
+    t0 = time.monotonic()
+    cancel["v"] = True
+    th.join(15)
+    silent.close()
+    assert not th.is_alive() and out["params"] is None and time.monotonic() - t0 < 10
+
+
+def test_loopback_says_a_sign_in_turned_down():
+    port = _free_port()
+    out = {}
+    th = threading.Thread(target=lambda: out.__setitem__(
+        "params", capture_oauth_redirect(port, timeout=10, state="S")))
+    th.start()
+    # An error without the state asked for is no answer: another program
+    # that finds the port cannot end the sign-in.
+    assert _ask(port, "/callback?error=access_denied")[0] == 400
+    assert _ask(port, "/callback?error=access_denied&state=wrong")[0] == 400
+    assert th.is_alive()
+    assert _ask(port, "/callback?error=access_denied&state=S")[0] == 200
+    th.join(5)
+    assert out["params"] == {"error": "access_denied", "state": "S"}
+
+
 def test_loopback_cancel_returns_none():
     cancel = {"v": False}
     out = {}

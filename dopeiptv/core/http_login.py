@@ -34,8 +34,10 @@ def get_with_login(url: str, getter: Any = None, **kw: Any) -> Any:
     digest when the server's 401 asks for that. *getter* is requests.get
     or a session's get."""
     if getter is None:
-        import requests     # not at startup: the window opens without it
-        getter = requests.get
+        # The app's own (capped, its connections and redirects judged:
+        # core/dest_guard.py); not at startup - the window opens without it.
+        from ._lazy_requests import requests as own
+        getter = own.get
     parts = split_login(url)
     if parts is None:
         return getter(url, **kw)

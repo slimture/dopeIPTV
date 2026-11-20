@@ -16,7 +16,8 @@ from __future__ import annotations
 import time
 from ..providers.client import b64, epg_times
 from ..i18n import tr
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import for_log, url_for_log
 from .notices import hub_of
 from ..core.workers import run_async
 from .qt_i18n import format_when
@@ -309,7 +310,8 @@ class _TimeshiftMixin:
             return
         log.debug("[ts] probe back_min=%s prog=%s days=%s start=%s "
                   "candidates=%s", back_min, bool(prog), days,
-                  datetime.fromtimestamp(start), urls)
+                  for_log(datetime.fromtimestamp(start)),
+                  [url_for_log(u) for u in urls])
         name = self.channel_display_name(it)
         title = (tr("ts_title_programme", what=what, name=name) if what
                  else tr("ts_title_channel", name=name))
@@ -422,16 +424,26 @@ class _TimeshiftMixin:
         try:
             fmt = str(self.settings.value("stream_format", "ts") or "ts")
             live = self.client.live_url(it.get("stream_id"), fmt) or ""
-            url = catchup.for_programme(
-                src, live, datetime.fromtimestamp(start, timezone.utc),
-                datetime.fromtimestamp(end, timezone.utc),
-                catchup_id=str(it.get("catchup_id") or ""),
-                channel_source=str(it.get("catchup_source") or ""))
+            begin, finish = (datetime.fromtimestamp(start, timezone.utc),
+                             datetime.fromtimestamp(end, timezone.utc))
+            cid, channel = str(it.get("catchup_id") or ""), str(it.get("catchup_source") or "")
+            now = datetime.now(timezone.utc)
+            url = catchup.for_programme(src, live, begin, finish, catchup_id=cid,
+                                        channel_source=channel, now=now)
+            template, mode = catchup.settings_of(src)
+            if url and channel and not template and url == catchup.archive_url(
+                    live, begin, finish, template, mode, now, cid, channel):
+                # The channel's own catch-up address, no template or rule of
+                # the person's in it: the source's word, judged as its stream
+                # addresses are (core/stream_address.py).
+                judge = getattr(self.client, "played_from_source", None)
+                if callable(judge):
+                    url = judge(url) or None
         except Exception as e:
             log.info("[ts] the source's catch-up address could not be made: %s", e)
             return None
         if url:
-            log.debug("[ts] the source's own catch-up address first: %s", redact_url(url))
+            log.debug("[ts] the source's own catch-up address first: %s", url_for_log(url))
         return url
 
     def _probe_ts_candidates(self, urls) -> tuple:
@@ -461,7 +473,7 @@ class _TimeshiftMixin:
                 r.close()
             except Exception as e:
                 log.debug("[ts] probe network error for %s: %s",
-                          redact_url(u), e)
+                          url_for_log(u), e)
                 network_failed = True
                 continue
             head = chunk.lstrip()

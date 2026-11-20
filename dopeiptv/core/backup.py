@@ -14,8 +14,20 @@ control's token (one is made on the computer that turns it on), and caches
 the app fills again by itself. Of the other three files only the person's
 own keys go; the rest of them is cache.
 
-Logins go in as plain text, as they are in the settings themselves: with no
-crypto library to lock the file, the app says so where the file is made.
+Logins go in as they are in the settings themselves: as plain text, unless
+the person gives the backup a password - the app says so where the file is
+made. With one (lock, for_file) the file is one JSON object of its own: a
+header that says how it is locked (MAGIC "encrypted", v, kdf, cipher,
+rounds, salt, nonce) and *data* - the backup without a password, byte for
+byte, encrypted with ChaCha20-Poly1305 (core/chacha20poly1305.py) under the
+key PBKDF2-HMAC-SHA256 makes of the password (NFC, UTF-8) and the salt, the
+header itself as the associated data, so a changed header fails as a
+changed byte does. read_any() checks the header before any work (Locked);
+Locked.unlock() makes the key and opens the file - slow, a worker's job -
+and a wrong password and a changed file are one error ("password"), never
+which. What is inside then goes on as a backup without one does. The
+design, and what it does not protect against: docs/SECURITY.md, "A
+backup's password".
 
 Folders and files a setting names (_PATHS) go in as they are. A restore
 takes one only where it exists on the computer restoring and keeps that
@@ -48,17 +60,23 @@ profile's again.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import json
 import math
 import os
 import re
+import secrets
 import tempfile
+import unicodedata
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
+from . import chacha20poly1305 as _aead
 from . import profiles as _profiles
 from .log import log
 
@@ -103,7 +121,7 @@ _LEFT_OUT = frozenset({
     "media_device_id",
     # Server mode's token (whoever has it watches through this computer) and
     # its HDHomeRun device id: two computers with one id confuse Plex.
-    "nerd_server_token", "nerd_server_device_id",
+    "nerd_server_token", "nerd_server_admin_token", "nerd_server_device_id",
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "cast_last_device", "subtitle_files", "nerd_health_data",
@@ -113,6 +131,9 @@ _LEFT_OUT = frozenset({
     # When this computer's own copy of yt-dlp was last compared with the
     # newest release.
     "ytdlp_checked",
+    # The PIN's wrong guesses and how long they lock it (core/pins.Tries):
+    # an older file put back would give the guesses back.
+    "pin_tries",
 })
 # update_*: the update channel and what its check last found; ts_*: what a
 # source's timeshift probe learned; "_": the files' own markers;
@@ -130,13 +151,27 @@ _PATHS = {"recordings_dir": "dir", "local_open_dir": "dir",
 #: Settings that run something or send the connections, or what is played,
 #: elsewhere: a restore shows them before it is made. Headers by their
 #: names only (a value may be a token).
-RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_proxy",
-         "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
-         "nerd_mqtt_host", "nerd_dns_url")
+#: The shaders run on the graphics card; the other networks let more of the
+#: network reach server mode's tuner, which takes no token.
+RISKY = ("nerd_rec_post", "nerd_mpv_options", "nerd_mpv_config_dir", "nerd_shaders",
+         "nerd_proxy", "nerd_headers", "nerd_udpxy", "nerd_hooks_urls", "nerd_hooks_header",
+         "nerd_mqtt_host", "nerd_dns_url", "nerd_other_networks")
 #: Switches that let others in or send out what is played: shown when on.
-RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands")
+#: Server mode among them: it serves the channels to the home network, its
+#: tuner without a token; and a log file kept, which names what plays.
+RISKY_ON = ("nerd_remote", "nerd_share", "nerd_mqtt_commands", "nerd_server", "nerd_log_file")
 #: Those of them that the home network choice (nerd_remote_lan) opens wider.
 _LAN_ON = ("nerd_remote", "nerd_share")
+#: Server mode's channels for adults: said with its switch when both are on.
+_SERVER_ADULT = "nerd_server_adult"
+#: The sync code: a backup that has one joins this computer to that sync -
+#: whoever made the file reads what is synced from here on. Shown as set,
+#: never its value (core/sync.K_CODE).
+SYNC_CODE = "sync_code"
+#: A sign-in to a watch history (any profile's): what plays here is marked
+#: on that account from then on - another person's, in a file of theirs.
+#: Shown as set, never its token.
+SIGN_INS = ("trakt_access_token", "simkl_access_token")
 #: A playlist's own options that do the same for its connections (its
 #: backup addresses, a certificate trusted for it, its own DNS server).
 RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
@@ -173,7 +208,10 @@ class Settings(Protocol):
 class BackupError(ValueError):
     """A file that is not a backup this app can put back. *reason*:
     "unreadable" (the file could not be read; *detail* says why), "invalid"
-    (not a backup, or damaged) or "newer" (*detail*: the version it came from)."""
+    (not a backup, or damaged), "newer" (*detail*: the version it came
+    from), "locked" (a backup with a password, read where none is asked
+    for: read_any() and Locked.unlock() open one) or "password" (the wrong
+    password, or a file changed since it was made - never which)."""
 
     def __init__(self, reason: str, detail: str = "") -> None:
         super().__init__(f"{reason}: {detail}" if detail else reason)
@@ -313,11 +351,17 @@ def collect(stores: Mapping[str, Settings | None], app_version: str,
             "stores": out}
 
 
+def encode(doc: Mapping[str, Any]) -> bytes:
+    """*doc* as the bytes of its file (and, with a password, what is
+    encrypted). Raises ValueError for what JSON cannot hold."""
+    return json.dumps(doc, ensure_ascii=False, indent=2,
+                      allow_nan=False).encode("utf-8")
+
+
 def write(path: str, doc: Mapping[str, Any]) -> None:
     """*doc* to *path* as a whole or not at all: written beside it and moved
     over it. Raises OSError (and leaves no half file) when it cannot be."""
-    data = json.dumps(doc, ensure_ascii=False, indent=2,
-                      allow_nan=False).encode("utf-8")
+    data = encode(doc)
     folder = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(prefix=".dopeiptv-", suffix=".tmp", dir=folder)
     try:
@@ -334,10 +378,170 @@ def write(path: str, doc: Mapping[str, Any]) -> None:
         raise
 
 
+# -- a password on it ------------------------------------------------------------
+
+#: MAGIC's value in a backup with a password, and that layout's number.
+LOCKED = "encrypted"
+LOCK_V = 1
+KDF = "pbkdf2-sha256"
+CIPHER = "chacha20-poly1305"
+#: PBKDF2's rounds for a backup locked now - as many as a PIN's
+#: (core/pins.ROUNDS), some tenths of a second.
+ROUNDS = 600_000
+#: The shortest password a backup is locked with: a short one is guessed
+#: whatever the rounds.
+PASSWORD_MIN = 10
+#: What a file may say: fewer is no file of ours and quicker to guess at,
+#: more would take minutes to open. Refused before any work.
+MIN_ROUNDS = 100_000
+MAX_ROUNDS = 5_000_000
+SALT_BYTES = 16
+NONCE_BYTES = 12
+_TAG_BYTES = 16
+#: A locked file's fields besides "data", in the order it has them.
+_HEADER = (MAGIC, "v", "kdf", "cipher", "rounds", "salt", "nonce")
+
+
+def _key(password: str, salt: bytes, rounds: int) -> bytes:
+    """The 32-byte key PBKDF2-HMAC-SHA256 makes of *password* and *salt*.
+    NFC first: the same word typed on another keyboard or system, its
+    letters composed otherwise, is the same key."""
+    return hashlib.pbkdf2_hmac("sha256", unicodedata.normalize("NFC", password).encode("utf-8"),
+                               salt, rounds, 32)
+
+
+def _aad(header: Mapping[str, Any]) -> bytes:
+    """The header as the tag covers it: canonical JSON - keys sorted, no
+    spaces, ASCII - so any change to it fails as a changed byte does."""
+    return json.dumps(dict(header), sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True).encode("ascii")
+
+
+def _b64(raw: bytes) -> str:
+    return base64.b64encode(raw).decode("ascii")
+
+
+def _unb64(text: Any, size: int = 0) -> bytes:
+    """Base64 as this app writes it, strictly: the alphabet and padding
+    only, the canonical spelling, *size* bytes when given."""
+    if not isinstance(text, str) or not text.isascii():
+        raise BackupError("invalid", "base64")
+    try:
+        raw = base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError):
+        raise BackupError("invalid", "base64") from None
+    if _b64(raw) != text or (size and len(raw) != size):
+        raise BackupError("invalid", "base64")
+    return raw
+
+
+def seal(plain: bytes, password: str, rounds: int = ROUNDS,
+         salt: bytes | None = None, nonce: bytes | None = None) -> dict[str, Any]:
+    """*plain* - a backup's bytes (encode()) - locked with *password*: the
+    file's object, its header and its data. *salt* and *nonce* are new
+    random bytes every time (secrets); given only by the test vectors.
+    Raises ValueError for an empty password, rounds out of range, or a salt
+    or nonce of the wrong size."""
+    if not password:
+        raise ValueError("an empty password locks nothing")
+    if isinstance(rounds, bool) or not MIN_ROUNDS <= rounds <= MAX_ROUNDS:
+        raise ValueError("rounds out of range")
+    salt = secrets.token_bytes(SALT_BYTES) if salt is None else salt
+    nonce = secrets.token_bytes(NONCE_BYTES) if nonce is None else nonce
+    if len(salt) != SALT_BYTES or len(nonce) != NONCE_BYTES:
+        raise ValueError("a salt or nonce of the wrong size")
+    header = {MAGIC: LOCKED, "v": LOCK_V, "kdf": KDF, "cipher": CIPHER,
+              "rounds": rounds, "salt": _b64(salt), "nonce": _b64(nonce)}
+    key = _key(password, salt, rounds)
+    try:
+        data = _aead.encrypt(key, nonce, plain, _aad(header))
+    finally:
+        del key
+    return {**header, "data": _b64(data)}
+
+
+def lock(doc: Mapping[str, Any], password: str, rounds: int = ROUNDS) -> dict[str, Any]:
+    """collect()'s *doc* locked with *password* (seal(), of its bytes).
+    Slow - PBKDF2's rounds, then the whole file in plain Python: never on
+    the window's thread."""
+    return seal(encode(doc), password, rounds)
+
+
+def for_file(doc: Mapping[str, Any], password: str = "") -> Mapping[str, Any]:
+    """What goes in the file: *doc* itself without a password - the backup
+    exactly as it always was - or, with one, lock()'s."""
+    return lock(doc, password) if password else doc
+
+
+def is_locked(data: Any) -> bool:
+    """Whether the decoded JSON *data* is a backup with a password."""
+    return isinstance(data, dict) and data.get(MAGIC) == LOCKED
+
+
+@dataclass(frozen=True, repr=False)
+class Locked:
+    """A backup with a password as read: its header checked (locked()),
+    what it holds still sealed until unlock()."""
+
+    rounds: int
+    salt: bytes
+    nonce: bytes
+    data: bytes
+    aad: bytes
+
+    def __repr__(self) -> str:
+        return f"Locked({self.rounds} rounds, {len(self.data)} bytes)"
+
+    def unlock(self, password: str) -> Backup:
+        """The backup inside, opened with *password*. Slow - PBKDF2's
+        rounds, then the whole file in plain Python - so a worker's job,
+        never the window's thread. A wrong password and a changed file are
+        one error, BackupError "password": nothing says which. What is
+        inside is then read as a backup without a password is."""
+        key = _key(password, self.salt, self.rounds)
+        try:
+            plain: bytes | None = _aead.decrypt(key, self.nonce, self.data, self.aad)
+        except ValueError:
+            plain = None
+        finally:
+            del key
+        if plain is None:
+            raise BackupError("password")
+        data = _decoded(plain, said=False)
+        if is_locked(data):
+            raise BackupError("invalid", "locked twice")
+        return parse(data)
+
+
+def locked(data: Mapping[str, Any]) -> Locked:
+    """The header of a backup with a password (is_locked) checked whole,
+    before any work: its layout, scheme, rounds within MIN_ROUNDS and
+    MAX_ROUNDS, a salt and a nonce of their exact sizes, strict base64.
+    Raises BackupError ("invalid", or "newer" for a later layout)."""
+    v = data.get("v")
+    if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+        raise BackupError("invalid", "format")
+    if v > LOCK_V:
+        raise BackupError("newer", "")
+    if set(data) != {*_HEADER, "data"}:
+        raise BackupError("invalid", "fields")
+    if data["kdf"] != KDF or data["cipher"] != CIPHER:
+        raise BackupError("invalid", "scheme")
+    rounds = data["rounds"]
+    if isinstance(rounds, bool) or not isinstance(rounds, int) \
+            or not MIN_ROUNDS <= rounds <= MAX_ROUNDS:
+        raise BackupError("invalid", "rounds")
+    salt = _unb64(data["salt"], SALT_BYTES)
+    nonce = _unb64(data["nonce"], NONCE_BYTES)
+    sealed = _unb64(data["data"])
+    if len(sealed) <= _TAG_BYTES:
+        raise BackupError("invalid", "data")
+    return Locked(rounds, salt, nonce, sealed, _aad({k: data[k] for k in _HEADER}))
+
+
 # -- reading one -----------------------------------------------------------------
 
-def read(path: str) -> Backup:
-    """The backup in the file *path*, checked whole. Raises BackupError."""
+def _raw(path: str) -> bytes:
     try:
         if os.path.getsize(path) > MAX_BYTES:
             raise BackupError("invalid", "too large")
@@ -345,11 +549,35 @@ def read(path: str) -> Backup:
             raw = fh.read(MAX_BYTES + 1)
     except OSError as e:
         raise BackupError("unreadable", str(e)) from e
+    if len(raw) > MAX_BYTES:
+        raise BackupError("invalid", "too large")
+    return raw
+
+
+def _decoded(raw: bytes, said: bool = True) -> Any:
+    """*raw* as JSON. *said*: the parser's words in the error (not for what
+    a password opened - they can quote a byte of it)."""
     try:
-        data = json.loads(raw.decode("utf-8-sig"))
-    except (UnicodeDecodeError, ValueError) as e:
-        raise BackupError("invalid", str(e)) from e
-    return parse(data)
+        return json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, ValueError, RecursionError) as e:
+        raise BackupError("invalid", str(e) if said else type(e).__name__) from None
+
+
+def read_any(path: str) -> Backup | Locked:
+    """The backup in the file *path*, checked whole - or, for one with a
+    password, its header checked and the rest still sealed (Locked).
+    Raises BackupError."""
+    data = _decoded(_raw(path))
+    return locked(data) if is_locked(data) else parse(data)
+
+
+def read(path: str) -> Backup:
+    """The backup in the file *path*, checked whole. Raises BackupError -
+    "locked" for one with a password (read_any)."""
+    got = read_any(path)
+    if isinstance(got, Locked):
+        raise BackupError("locked")
+    return got
 
 
 def _sources(raw: Any) -> list[dict]:
@@ -568,13 +796,23 @@ def _shown(key: str, value: str) -> str:
 
 def risky(b: Backup) -> list[tuple[str, str]]:
     """(key, what to show) of the RISKY settings *b* sets and the RISKY_ON
-    switches it turns on ("" for a switch, or "nerd_remote_lan" when it
-    also opens them to the home network)."""
+    switches it turns on ("" for a switch, or the setting that widens it:
+    "nerd_remote_lan" when it also opens them to the home network,
+    "nerd_server_adult" when server mode hands out channels for adults),
+    and (SYNC_CODE, "") when it joins this computer to a sync, (a SIGN_INS
+    key, "") for each watch history it signs in to."""
     main = _taken(b, "main")
     out = [(key, shown) for key in RISKY
            if isinstance(main.get(key), str) and (shown := _shown(key, main[key]))]
     lan = "nerd_remote_lan" if _on(main.get("nerd_remote_lan")) else ""
-    out += [(key, lan if key in _LAN_ON else "") for key in RISKY_ON if _on(main.get(key))]
+    adult = _SERVER_ADULT if _on(main.get(_SERVER_ADULT)) else ""
+    out += [(key, lan if key in _LAN_ON else adult if key == "nerd_server" else "")
+            for key in RISKY_ON if _on(main.get(key))]
+    if isinstance(main.get(SYNC_CODE), str) and main[SYNC_CODE].strip():
+        out.append((SYNC_CODE, ""))
+    for token in SIGN_INS:
+        if any(isinstance(v, str) and v.strip() and _base(k) == token for k, v in main.items()):
+            out.append((token, ""))
     return out
 
 

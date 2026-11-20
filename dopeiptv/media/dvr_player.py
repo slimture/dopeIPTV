@@ -28,7 +28,8 @@ from PyQt6.QtCore import QStandardPaths, QTimer
 from typing import TYPE_CHECKING
 
 from ..core.local_buffer import BufferWindow, buffer_window
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import tr
 
 if TYPE_CHECKING:
@@ -52,10 +53,26 @@ def dvr_base() -> Path:
     base = Path(loc or Path.home() / ".cache" / "dopeiptv") / "dvr"
     if not _swept:
         _swept = True
-        from ..core.dvr_store import sweep_abandoned
-        threading.Thread(target=sweep_abandoned, args=(base,),
-                         name="dvr-sweep", daemon=True).start()
+        from ..core.dvr_store import memory_base, sweep_abandoned
+
+        def sweep() -> None:
+            sweep_abandoned(base)
+            memory = memory_base()
+            if memory is not None and memory.is_dir():
+                sweep_abandoned(memory)
+        threading.Thread(target=sweep, name="dvr-sweep", daemon=True).start()
     return base
+
+
+def dvr_memory() -> Path | None:
+    """Where a channel watched privately from its start keeps its buffer
+    in memory (core/dvr_store.memory_base), or None."""
+    from ..core.dvr_store import memory_base
+    try:
+        return memory_base()
+    except Exception as e:      # never in the way of playback
+        log.debug("DVR: no buffer in memory: %s", e)
+        return None
 
 
 class DvrPlayerMixin:
@@ -120,25 +137,32 @@ class DvrPlayerMixin:
             if self._dvr_pool is None:
                 from ..core.dvr_pool import DvrPool     # only when it is used
                 self._dvr_pool = DvrPool(dvr_base(), minutes * 60,
-                                         self._dvr_space_bytes())
+                                         self._dvr_space_bytes(), memory=dvr_memory())
             self._dvr_pool.configure(minutes * 60, self._dvr_space_bytes())
-            session = self._dvr_pool.open(url, key, source=self._dvr_source())
+            session = self._dvr_pool.open(url, key, source=self._dvr_source(),
+                                          private=self._dvr_playing_private())
         except Exception as e:
             from ..core.dvr_ingest import NotAStream
+            from ..core.dvr_pool import NoPrivateBuffer
             if isinstance(e, NotAStream):
                 # Its provider sent a page or a message, not a stream: mpv
                 # opens the address itself and says what it found.
                 log.info("DVR: %s, not a stream - playing as before", e)
+            elif isinstance(e, NoPrivateBuffer):
+                # Watched privately with no memory out of a disk's reach:
+                # no buffer of the app's - never one on the disk.
+                log.info("DVR: private viewing - no rewind buffer of the app's (%s)", e)
             else:
                 log.warning("DVR: own buffer unavailable (%s) - playing as "
                             "before", e)
             return None
         self._dvr = session
+        self._dvr_private(session)
         self._dvr_origin = session.origin
         self._dvr_open_wall = None
         self._dvr_open_seq = None
         self._dvr_reopened = 0.0
-        log.info("DVR: own buffer for %s (%d min, %d GB)", redact_url(url),
+        log.info("DVR: own buffer for %s (%d min, %d GB)", url_for_log(url),
                  minutes, self._dvr_space_bytes() >> 30)
         return session.live_url()
 
@@ -158,12 +182,56 @@ class DvrPlayerMixin:
             log.warning("DVR: the server's channel not shared (%s) - playing as before", e)
             return None
         self._dvr = session
+        self._dvr_private(session)
         self._dvr_origin = session.origin
         self._dvr_open_wall = None
         self._dvr_open_seq = None
         self._dvr_reopened = 0.0
         log.info("DVR: the server's connection for this channel, shared")
         return url
+
+    # -- private viewing ---------------------------------------------------------
+
+    @staticmethod
+    def _dvr_playing_private() -> bool:
+        from ..core import privacy
+        try:
+            return bool(privacy.playing_private())
+        except Exception as e:
+            log.debug("DVR: private viewing not known: %s", e)
+            return False
+
+    @staticmethod
+    def _dvr_private(session: "DvrSession") -> None:
+        """A channel watched privately (core/privacy.py: asked of the
+        playback, which play() was told of before it got here): its
+        history goes when it is left, and never outlives the app."""
+        from ..core import privacy
+        try:
+            if privacy.playing_private():
+                session.mark_private()
+        except Exception as e:
+            log.debug("DVR: not marked private: %s", e)
+
+    def dvr_mark_private(self) -> None:
+        """Private viewing was turned on while a channel plays."""
+        if self._dvr is not None:
+            self._dvr.mark_private()
+
+    def private_reopen_needed(self) -> bool:
+        """Private viewing was turned on while a stream plays whose rewind
+        buffer is on the disk - the app's (core/dvr_pool.on_disk_private)
+        or mpv's own disk cache: it must be opened again, so what follows
+        is kept in memory or not at all."""
+        pool = self._dvr_pool
+        if self._dvr is not None and pool is not None and pool.on_disk_private():
+            return True
+        return bool(getattr(self, "_mpv_cache_on_disk", False))
+
+    def dvr_forget_private(self) -> None:
+        """Private viewing ended: the buffers of the channels left in it go."""
+        if self._dvr_pool is not None:
+            self._dvr_pool.forget_private()
 
     def dvr_pool_for_server(self, keep_seconds: float) -> "DvrPool":
         """The pool server mode reads its channels from: the player's own
@@ -173,7 +241,7 @@ class DvrPlayerMixin:
             from ..core.dvr_pool import DvrPool
             minutes = self._live_rewind_minutes()
             self._dvr_pool = DvrPool(dvr_base(), max(keep_seconds, minutes * 60),
-                                     self._dvr_space_bytes())
+                                     self._dvr_space_bytes(), memory=dvr_memory())
         return self._dvr_pool
 
     def _end_dvr(self) -> None:

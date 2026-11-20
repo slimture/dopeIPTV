@@ -14,6 +14,7 @@ request #22. Opt-in; with it off, live channels play exactly as before.
 from __future__ import annotations
 
 import secrets
+import shutil
 import threading
 import time
 from collections.abc import Callable
@@ -22,7 +23,7 @@ from pathlib import Path
 from .dvr_ingest import Ingest
 from .dvr_record import BufferRecorder
 from .dvr_server import LIVE_LEAD, LocalServer
-from .dvr_store import Segment, SegmentStore, session_dir
+from .dvr_store import Segment, SegmentStore, mark_private, session_dir
 from .log import log
 
 IngestFactory = Callable[[str, SegmentStore], Ingest]
@@ -34,7 +35,8 @@ class DvrSession:
                  max_bytes: int, ingest: Ingest | None = None,
                  key: str | None = None,
                  ingest_factory: IngestFactory | None = None,
-                 source: str = "") -> None:
+                 source: str = "", min_free: int | None = None,
+                 memory: bool = False) -> None:
         self.url = url
         self.key = key or url
         #: The source (id) whose account its connection is on - what the
@@ -42,8 +44,14 @@ class DvrSession:
         #: the player moved on; "" when not known (it counts on every one).
         self.source = source
         self.token = secrets.token_hex(8)
+        # *memory*: its folder checked to be in memory before anything
+        # starts - dvr_store.NotInMemory, and no connection was opened.
         self.store = SegmentStore(session_dir(base, self.token),
-                                  keep_seconds, max_bytes)
+                                  keep_seconds, max_bytes, min_free=min_free,
+                                  memory=memory)
+        #: In memory (dvr_store.memory_base) with this cap: a private
+        #: session from its start. None: on disk.
+        self.memory_cap: int | None = None
         # Session time 0, kept across freezes: positions in the row stay put.
         self.origin = time.time()
         self.last_used = self.origin
@@ -61,7 +69,17 @@ class DvrSession:
         # the buffer (providers/cast_feed.py), or a live cast that may go
         # back in it, keeps it streaming, as a recording does.
         self._holds: set[str] = set()
+        #: Watched in private viewing (core/privacy.py): its history is not
+        #: kept once the channel is left (the pool), nor past the app.
+        self.private = False
+        self._closing: threading.Thread | None = None
         self.ingest.start()
+
+    def mark_private(self) -> None:
+        """What it holds was watched privately - from now to its end."""
+        if not self.private:
+            self.private = True
+            mark_private(self.store.root)
 
     # -- where to play from --------------------------------------------------
 
@@ -267,8 +285,28 @@ class DvrSession:
         for r in recs:
             r.stop()
         self.ingest.stop()
-        threading.Thread(target=self._finish, args=(recs,), name="dvr-close",
-                         daemon=True).start()
+        self._closing = threading.Thread(target=self._finish, args=(recs,),
+                                         name="dvr-close", daemon=True)
+        self._closing.start()
+
+    def purge(self) -> None:
+        """Closed, and nothing reads it: its files off the disk now, on the
+        caller's thread - the app is ending, and the thread that would
+        delete them may not get to. What a reader still has open (Windows)
+        is left to that thread."""
+        if not self._closed:
+            return
+        with self._lock:
+            if self.recorders:
+                return          # they write what they hold first (_finish)
+        self.store.close()
+        shutil.rmtree(self.store.root, ignore_errors=True)
+
+    def join(self, timeout: float) -> None:
+        """Wait for a closed session's files to be gone, at most *timeout*."""
+        t = self._closing
+        if t is not None:
+            t.join(max(0.0, timeout))
 
     def _finish(self, recs: list[BufferRecorder]) -> None:
         for r in recs:

@@ -15,8 +15,26 @@ from ..core._lazy_requests import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
+from ..core import privacy
 from ..core.log import log
 from ..core.workers import run_async
+
+_BRACKETED = re.compile(r"[\[({][^\])}]*[\])}]")
+#: A bare year, in brackets or not, with the spaces round it - the spaces
+#: before it taken from where their run begins, never from inside it.
+_YEAR_LEFT = re.compile(r"(?:(?<!\s)\s++)?\(?\b(19|20)\d{2}\b\)?\s*+")
+
+
+def without_brackets(text: str, repl: str = " ") -> str:
+    """Every bracketed part of *text* - "[MULTI]", "(1080p)", "{x}" - put
+    as *repl*: re.sub(_BRACKETED, repl, text), in linear time. A bracket
+    opened after the last one closed begins no part, so what follows the
+    last closing bracket is never searched (a provider's name of many
+    opening brackets was scanned to its end from each)."""
+    last = max(text.rfind("]"), text.rfind(")"), text.rfind("}"))
+    if last < 0:
+        return text
+    return _BRACKETED.sub(repl, text[:last + 1]) + text[last + 1:]
 
 
 def _tmdb_dbg(msg: str) -> None:
@@ -680,7 +698,7 @@ class PosterResolver(QObject):
         # a single trailing one: '[AR-ENG]', '[MULTI]', '(1080p)',
         # '{x}'. Provider libraries often stack several, sometimes with
         # a dangling unclosed bracket ('... [AR-ENG] [').
-        t = re.sub(r"[\[({][^\])}]*[\])}]", " ", t)
+        t = without_brackets(t)
         # Drop any leftover stray/unclosed bracket characters so a title
         # ending '... [' doesn't defeat the TMDB search.
         t = re.sub(r"[\[\](){}]", " ", t)
@@ -692,8 +710,10 @@ class PosterResolver(QObject):
             r"REMUX|EXTENDED|UNRATED|DIRECTORS?[ .]CUT)\b.*$", "",
             t, flags=re.IGNORECASE)
         # Strip any leftover bare year, optionally in parens, so it
-        # doesn't confuse the TMDB search string.
-        t = re.sub(r"\s*\(?\b(19|20)\d{2}\b\)?\s*", " ", t)
+        # doesn't confuse the TMDB search string. The spaces before it
+        # are taken whole from where they begin (_YEAR_LEFT): linear on a
+        # long run of them.
+        t = _YEAR_LEFT.sub(" ", t)
         # Trim leftover punctuation / whitespace
         t = t.strip(" -_.|:;/[](){}\t\n")
         t = re.sub(r"\s+", " ", t)
@@ -823,7 +843,8 @@ class PosterResolver(QObject):
         entry = self._cache.get(key)
         tid = entry.get("tmdb_id") if isinstance(entry, dict) else None
         if (not isinstance(entry, dict) or not isinstance(tid, int)
-                or "backdrop_url" in entry or key in self._backdrop_asked):
+                or "backdrop_url" in entry or key in self._backdrop_asked
+                or privacy.title_private(title)):
             return False
         self._backdrop_asked.add(key)
         # Bound after the test: a default is typed where it is written.
@@ -894,7 +915,8 @@ class PosterResolver(QObject):
         if not title:
             return True
         key = self._key(title, kind)
-        return key in self._cache or key in self._failed
+        return (key in self._cache or key in self._failed
+                or privacy.title_private(title))
 
     def get_full(self, title: str, kind: str,
                  callback: Callable[[dict], None]) -> dict | None:
@@ -906,6 +928,10 @@ class PosterResolver(QObject):
         if key in self._cache:
             return self._cache[key]
         if key in self._failed:
+            return {}
+        if privacy.title_private(title):
+            # What plays privately: TMDB is not asked about it (what it
+            # answered before is above). No match, for now.
             return {}
         self._waiting.setdefault(key, []).append(callback)
         self._ensure_fetch(title, kind, key)

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
+from . import picture_files
 from .log import log
 
 # A browser-style User-Agent for image fetches. python-requests'
@@ -80,7 +81,7 @@ def tmdb_url_from_provider(url: str | None) -> str | None:
     return f"https://image.tmdb.org/t/p/w500/{token}.{ext}"
 
 
-def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
+def choose_cover_url(title_tmdb, raw_provider, kind, is_dead, rewrite: bool = True):
     """Pick the cover URL for a list row, in priority order:
 
       1. the TMDB title-search poster (None when there's no TMDB key
@@ -98,8 +99,10 @@ def choose_cover_url(title_tmdb, raw_provider, kind, is_dead):
     Pure function shared by MainWindow.cover_url and the tests so the
     two can't drift; the no-TMDB path is exercised directly by passing
     title_tmdb=None."""
+    # *rewrite* False (TMDB turned off): the provider's address as it is,
+    # never one on image.tmdb.org that the provider did not name.
     embed = (tmdb_url_from_provider(raw_provider)
-             if kind in ("vod", "series") else None)
+             if rewrite and kind in ("vod", "series") else None)
     if title_tmdb and not is_dead(title_tmdb):
         return title_tmdb
     if embed:
@@ -119,8 +122,79 @@ from PyQt6.QtGui import QImage, QImageReader, QPixmap
 #: already in one becomes a pixmap without a conversion on the GUI thread.
 _PIXMAP_FORMATS = (QImage.Format.Format_RGB32, QImage.Format.Format_ARGB32_Premultiplied)
 
+#: The most memory one decoded picture may take, in MiB, whoever asks Qt to
+#: decode it (the limit is Qt's own, for the whole process). A small file
+#: can say it is 30000 x 30000 pixels: 3.4 GiB to decode. Set here, and not
+#: left to Qt's default or to QT_IMAGEIO_MAXALLOC: 256 is 8192 x 8192
+#: pixels, more than any poster, cover or camera picture in a folder.
+PICTURE_ALLOC_MIB = 256
+QImageReader.setAllocationLimit(PICTURE_ALLOC_MIB)
+#: And one that came from outside (a provider's logo, a poster): 128 MiB is
+#: an 8K frame, twice the largest poster TMDB has. Four may be decoded at
+#: once, and no real one comes near.
+OUTSIDE_PICTURE_MIB = 128
+#: The most a picture's download may be: posters are a few MB.
+PICTURE_DOWNLOAD_MAX = 64 * 1024 * 1024
 
-def decode_image(data: bytes, fit: int = 0) -> QImage | None:
+
+class PictureTooLarge(ValueError):
+    """A picture's download past PICTURE_DOWNLOAD_MAX: not read further."""
+
+
+def _outside(data: bytes, sized: bool = True) -> bytes | None:
+    """*data* - a picture from outside (a provider's, a server's, the
+    web's) - as it is decoded, or None when it is none the app decodes. An
+    SVG is screened first: Qt's SVG reader opens the files a picture names
+    (core/svg_safe.py), and then reads what was screened. With *sized*, one
+    that says it is larger than OUTSIDE_PICTURE_MIB is not decoded.
+
+    Both are read from the bytes here, before any reader is made for them
+    (``_reader``, ``ready``)."""
+    from . import svg_safe
+    if svg_safe.maybe_svg(data):
+        clean = svg_safe.screened(data)
+        if clean is None:
+            return None
+        data = clean
+    size = picture_files.picture_size(data) if sized else None
+    if size is not None and size[0] * size[1] * 4 > OUTSIDE_PICTURE_MIB << 20:
+        return None
+    return data
+
+
+def _reader(data: bytes, own: bool, sized: bool = True
+            ) -> tuple[QImageReader, QBuffer, bytes] | None:
+    """A reader for *data* with the device it reads from and the bytes it
+    reads - or None when *data* is no picture the app decodes. One that is
+    not the person's *own* is looked at first (``_outside``)."""
+    if not own:
+        looked = _outside(data, sized) if data else None
+        if looked is None:
+            return None
+        data = looked
+    buf = _read_only(data)
+    if buf is None:
+        return None
+    reader = QImageReader(buf)
+    return (reader, buf, data) if ready(reader) else None
+
+
+def ready(reader: QImageReader) -> bool:
+    """Whether *reader* has a handler for its picture - found now, with the
+    GIL held, so that ``read()``, which lets go of it, finds one made.
+
+    Qt finds a picture's handler under one lock for every image plugin in
+    the process, and each plugin asks the device; a device made in Python
+    (our QBuffer) answers through sip, which takes the GIL. Left to
+    ``read()``, a worker held Qt's lock and waited for the GIL while the
+    window's thread - an icon for a field's clear button, a picture loaded
+    - held the GIL and waited for Qt's lock: the app stopped for good.
+    ``canRead()`` keeps the GIL, and the handler it finds stays."""
+    return reader.canRead()
+
+
+def decode_image(data: bytes, fit: int = 0, own: bool = False,
+                 sized: bool = True) -> QImage | None:
     """*data* as a picture, or None when it is none - on the calling thread,
     which is a worker's, never the GUI thread's.
 
@@ -133,11 +207,17 @@ def decode_image(data: bytes, fit: int = 0) -> QImage | None:
     first (a JPEG is in it already), then that very ``scaled(fit, fit,
     KeepAspectRatio, SmoothTransformation)`` - so the pixels are the same;
     not the reader's own scaled decoding, whose pixels differ a little. The
-    result becomes a QPixmap without a conversion."""
-    buf = _read_only(data)
-    if buf is None:
+    result becomes a QPixmap without a conversion.
+
+    *own*: a file of the person's own choosing (a picon of Nerd's folder),
+    decoded as Qt always decoded it - anything else is taken as from
+    outside (``_outside``). *sized* False: a file on this computer (a cover
+    beside the person's music may be a camera's picture), held to Qt's own
+    ceiling alone."""
+    got = _reader(data, own, sized)
+    if got is None:
         return None
-    img = QImageReader(buf).read()
+    img = got[0].read()
     if img.isNull():
         return None
     if img.format() not in _PIXMAP_FORMATS:
@@ -149,11 +229,50 @@ def decode_image(data: bytes, fit: int = 0) -> QImage | None:
     return img
 
 
+def checked_picture(data: bytes) -> bytes | None:
+    """*data* as the disk cache keeps a picture from outside, or None when
+    it is none: decoded whole (a truncated file fails), on a worker, the
+    GIL let go meanwhile - as ``decode_image``. The bytes to keep are the
+    ones that were decoded: an SVG's screened ones, so that whatever reads
+    the cache's file later (the system's media controls, a notification,
+    the phone) never opens what the original named."""
+    got = _reader(data, False)
+    if got is None or got[0].read().isNull():
+        return None
+    return got[2]
+
+
 def is_picture(data: bytes) -> bool:
-    """Whether *data* decodes as a picture: decoded whole (a truncated file
-    fails), on a worker, the GIL let go meanwhile - as ``decode_image``."""
-    buf = _read_only(data)
-    return buf is not None and not QImageReader(buf).read().isNull()
+    """Whether *data* decodes as a picture (``checked_picture``)."""
+    return checked_picture(data) is not None
+
+
+def _kept(data: bytes) -> bytes:
+    """A decoded picture's bytes as the disk cache keeps them: an SVG as it
+    was screened, anything else as it came."""
+    return _outside(data) or data
+
+
+def read_capped(r: Any, limit: int = PICTURE_DOWNLOAD_MAX) -> bytes:
+    """A picture's answer read a chunk at a time, at most *limit* bytes:
+    more - its Content-Length says so, or it keeps coming - raises
+    PictureTooLarge, the connection closed."""
+    try:
+        said = int(r.headers.get("Content-Length") or 0)
+    except (AttributeError, TypeError, ValueError):
+        said = 0
+    parts: list[bytes] = []
+    size = 0
+    if said <= limit:
+        for chunk in r.iter_content(64 * 1024):
+            size += len(chunk)
+            if size > limit:
+                break
+            parts.append(chunk)
+    if said > limit or size > limit:
+        r.close()
+        raise PictureTooLarge(f"a picture larger than {limit >> 20} MB")
+    return b"".join(parts)
 
 
 def _read_only(data: bytes) -> QBuffer | None:
@@ -407,6 +526,11 @@ class LogoLoader(QObject):
         # of re-hitting the network.
         self.disk_dir: Path | None = (
             Path(cache_dir) if cache_dir is not None else None)
+        # Where the app's own pictures are (core/picture_files.py): its
+        # cache - the frames and album art made there, this loader's copies.
+        picture_files.trust_also("cache", str(default_image_cache_dir("images").parent))
+        if self.disk_dir is not None:
+            picture_files.trust_also("cache", str(self.disk_dir))
         # The disk cache had NO automatic bound - it grew for every image
         # ever fetched until the user found the manual clear button in
         # Settings. Prune it back under budget (2.5 GB - generous, covers
@@ -600,13 +724,14 @@ class LogoLoader(QObject):
                 # Too big for this reader only: the lists may still show it.
                 _img_dbg(f"file too big {url}")
                 return None
-            if not is_picture(data):
+            kept = checked_picture(data)
+            if kept is None:
                 _img_dbg(f"file not a picture ({len(data)}B) {url}")
                 self._mark_dead(url, self.dead_ttl_permanent)
                 return None
             dp.parent.mkdir(parents=True, exist_ok=True)
             tmp = dp.with_name(dp.name + f".{threading.get_ident()}.part")
-            tmp.write_bytes(data)
+            tmp.write_bytes(kept)
             tmp.replace(dp)
             _img_dbg(f"file ok {len(data)}B {url}")
             return dp
@@ -663,15 +788,21 @@ class LogoLoader(QObject):
         # no picture. A QImage, never a QPixmap: QPixmap is GUI-thread only in
         # Qt6 and touching one here aborts the whole process on newer PyQt6.
         def fetch(u: str = src, dp: Path | None = disk_path) -> tuple[str, QImage | None]:
-            # A local absolute path (a generated video thumbnail, never a
-            # provider URL) is read straight off disk - no network machinery,
-            # no circuit breaker, no second disk cache.
-            if u.startswith("/") or u.startswith("file://"):
-                try:
-                    data = Path(u.removeprefix("file://")).read_bytes()
-                except OSError:
+            # A file's path (a frame the app made, a cover beside the
+            # person's music, a picon) is read straight off disk - no
+            # network machinery, no circuit breaker, no second disk cache.
+            # A provider writes its rows' pictures too, so only from where
+            # the app's own pictures are, a plain file, of a picture's size
+            # (core/picture_files.py): "/dev/zero" was read until the
+            # memory was gone.
+            local = picture_files.local_path(u)
+            if local is not None:
+                data = picture_files.read(local)
+                if data is None:
+                    _img_dbg(f"not a picture file the app reads {u}")
                     return u, None
-                return u, decode_image(data, fit)
+                return u, decode_image(data, fit, own=picture_files.in_group("picons", local),
+                                       sized=False)
             # Disk cache read: validate by decoding it. If a previous
             # session was killed mid-write (e.g. crash on shutdown) the file
             # is truncated and does not decode - in that case unlink the bad
@@ -707,22 +838,32 @@ class LogoLoader(QObject):
             # worker ~3 s, not the full read timeout - with hundreds
             # of URLs on one dead provider host that difference is
             # what keeps the queue from starving the working hosts.
-            r = _image_get(u)(u, headers=_IMG_HEADERS, timeout=(3.05, 15))
-            # ANY HTTP response - even a 404 - proves the host itself
-            # is alive, so reset its circuit-breaker strikes. Only
-            # connection-level failures (reset, timeout, DNS) should
-            # ever take a whole host down; a panel with some missing
-            # image files must not have its working covers blocked.
-            self._clear_host(u)
-            # Long TTL for legitimately-dead endpoints (and 400s -
-            # a malformed URL from provider data never starts
-            # working), short TTL for everything else so a temporary
-            # 500 gets a brief cooldown instead of a session-long ban.
-            if r.status_code in (400, 404, 410, 451):
-                _img_dbg(f"net {r.status_code} DEAD(1h) {u}")
-                self._mark_dead(u, self.dead_ttl_permanent)
-            r.raise_for_status()
-            data = r.content
+            # Read a chunk at a time, up to a size no picture has: an
+            # answer that never ends filled the memory.
+            r = _image_get(u)(u, headers=_IMG_HEADERS, timeout=(3.05, 15), stream=True)
+            try:
+                # ANY HTTP response - even a 404 - proves the host itself
+                # is alive, so reset its circuit-breaker strikes. Only
+                # connection-level failures (reset, timeout, DNS) should
+                # ever take a whole host down; a panel with some missing
+                # image files must not have its working covers blocked.
+                self._clear_host(u)
+                # Long TTL for legitimately-dead endpoints (and 400s -
+                # a malformed URL from provider data never starts
+                # working), short TTL for everything else so a temporary
+                # 500 gets a brief cooldown instead of a session-long ban.
+                if r.status_code in (400, 404, 410, 451):
+                    _img_dbg(f"net {r.status_code} DEAD(1h) {u}")
+                    self._mark_dead(u, self.dead_ttl_permanent)
+                r.raise_for_status()
+                try:
+                    data = read_capped(r)
+                except PictureTooLarge:
+                    _img_dbg(f"net too large DEAD(1h) {u}")
+                    self._mark_dead(u, self.dead_ttl_permanent)
+                    return u, QImage()
+            finally:
+                r.close()
             _img_dbg(f"net {r.status_code} ok {len(data)}B {u}")
             if not data:
                 return u, None
@@ -735,9 +876,11 @@ class LogoLoader(QObject):
                     dp.parent.mkdir(parents=True, exist_ok=True)
                     # Write to a sibling temp path and rename so a crash
                     # mid-write can never leave a truncated file behind
-                    # for the next session to trip over.
+                    # for the next session to trip over. An SVG as it was
+                    # screened (checked_picture): the file is read by more
+                    # than this loader.
                     tmp = dp.with_name(dp.name + ".part")
-                    tmp.write_bytes(data)
+                    tmp.write_bytes(_kept(data))
                     tmp.replace(dp)
                 except OSError as e:
                     _img_dbg(f"disk WRITE FAILED {e} {u}")

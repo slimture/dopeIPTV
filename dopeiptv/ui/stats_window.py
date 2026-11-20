@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 from ..core import viewing_stats as vs
 from ..i18n import tr
 from .theme import P
+from .widgets import plain_text
 
 #: The setting that remembers the period last shown (this computer's).
 PERIOD_KEY = "stats_period"
@@ -215,7 +216,7 @@ class _Elided(QLabel):
         super().__init__()
         self._full = text
         self.setTextFormat(Qt.TextFormat.PlainText)
-        self.setToolTip(text)
+        self.setToolTip(plain_text(text))
         self.setStyleSheet(f"font-size:13px; color:{P['text']}; background:transparent;")
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.setText(text)

@@ -13,7 +13,7 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
-from ..core import m3u_ids, mirrors
+from ..core import m3u_ids, mirrors, stream_address
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
@@ -778,17 +778,38 @@ class M3UClient(OfflineClient):
     LOG_NAME = "m3u"
 
     # A quoted attribute may hold a comma (group-title="News, Sports"); the
-    # loose form still reads a line whose quotes do not balance.
+    # loose form still reads a line whose quotes do not balance. Possessive
+    # (*+): what one part takes no other part takes back - the same match,
+    # in linear time on a provider's line of any length (a run of digits
+    # with no comma took quadratic time, the whole window waiting).
     _EXTINF = re.compile(
-        r'#EXTINF:\s*-?[\d.]*(?P<attrs>(?:[^,"]|"[^"]*")*),(?P<name>.*)')
-    _EXTINF_LOOSE = re.compile(r'#EXTINF:-?\d*\s*(?P<attrs>[^,]*),(?P<name>.*)')
+        r'#EXTINF:\s*+-?[\d.]*+(?P<attrs>(?:[^,"]|"[^"]*")*+),(?P<name>.*)')
+    _EXTINF_LOOSE = re.compile(r'#EXTINF:-?\d*+\s*+(?P<attrs>[^,]*+),(?P<name>.*)')
     # A failed download is tried again after this long, not on every call.
     RETRY_SECS = 60.0
-    _ATTR = re.compile(r'([\w-]+)="([^"]*)"')
+    # An attribute begins where a word begins: findall never starts again
+    # inside a long word that is no attribute.
+    _ATTR = re.compile(r'(?<![\w-])([\w-]++)="([^"]*)"')
+
+    def _guide_ok(self, url: str) -> bool:
+        """The playlist's own guide address (url-tvg) as the app may fetch
+        it itself: from a playlist over the network only http(s), and from
+        one on the internet never a host on this computer or a link-local
+        one (core/stream_address.py, as for its streams). A playlist file
+        on this computer names what it likes, as before."""
+        if not self.server.lower().startswith(("http://", "https://")):
+            return True
+        if not url.lower().startswith(("http://", "https://")):
+            return False
+        return not (stream_address.on_internet(self.server)
+                    and stream_address.host_refusal(url, home=not self.home_ok))
 
     def __init__(self, url: str, stable: bool = False, map_path: str = "") -> None:
         super().__init__()
         self.server = (url or "").strip()
+        #: The source's own option (core/stream_address.HOME_OPTION), set by
+        #: make_client: a list on the internet may name devices at home.
+        self.home_ok = False
         # core/m3u_ids.py: *stable* - a channel's id made from the channel,
         # else its place in the list (and *map_path* told what each place's
         # stable id is, for the move at the next start).
@@ -827,8 +848,18 @@ class M3UClient(OfflineClient):
             from urllib.parse import urlparse
             from urllib.request import url2pathname
             url = url2pathname(urlparse(url).path)
+        from ..core import picture_files
+        from ..core._lazy_requests import LIST_MAX
         with open(url, "rb") as fh:
-            raw = fh.read()
+            # As far as a playlist from the network is read, and no further
+            # (a path that is no file - a device - never ends).
+            raw = fh.read(LIST_MAX + 1)
+        if len(raw) > LIST_MAX:
+            raise ValueError(f"the playlist is larger than {LIST_MAX >> 20} MB")
+        # A playlist file of the person's own may name logos beside it:
+        # its folder is one the image loader reads pictures from
+        # (core/picture_files.py).
+        picture_files.trust_also("playlists", os.path.dirname(os.path.abspath(url)))
         try:
             return raw.decode("utf-8-sig")
         except UnicodeDecodeError:
@@ -872,7 +903,7 @@ class M3UClient(OfflineClient):
                     "catchup": catchup,
                     "catchup_source": catchup_src,
                     "tv_archive": 1 if has_archive else 0,
-                    "tv_archive_duration": int(days) if days.isdigit() else (
+                    "tv_archive_duration": int(days) if days.isdecimal() and len(days) <= 9 else (
                         7 if has_archive else 0),
                 }
                 # What a Nerd catch-up template's {catchup-id} stands for.
@@ -887,7 +918,9 @@ class M3UClient(OfflineClient):
                 if url:
                     # A playlist may list several comma-separated guides; the
                     # first reachable one is the sensible default.
-                    self.epg_url = url.split(",")[0].strip()
+                    first = url.split(",")[0].strip()
+                    if self._guide_ok(first):
+                        self.epg_url = first
             elif line.startswith("#"):
                 continue                       # other directives: ignore
             elif pending is not None:
@@ -895,7 +928,10 @@ class M3UClient(OfflineClient):
                 pending["stream_id"] = sid
                 pending["num"] = sid
                 pending["category_id"] = pending["category_name"]
-                pending["_url"] = line
+                # What is no stream whoever lists it (an edit list or a
+                # filter graph in the address, core/stream_address.py) is no
+                # address: the channel keeps its place and does not play.
+                pending["_url"] = stream_address.played(line, False, "m3u")
                 channels.append(pending)
                 pending = None
         stable = m3u_ids.stable_ids(
@@ -1056,11 +1092,12 @@ def _list_cache_path(playlist: dict) -> str | None:
     pid = (playlist or {}).get("id")
     if not pid:
         return None
+    from ..core.source_files import file_part
     from .epg import _epg_cache_dir
     try:
         d = _epg_cache_dir()
         d.mkdir(parents=True, exist_ok=True)
-        return str(d / f"lists_{pid}.json")
+        return str(d / f"lists_{file_part(pid)}.json")
     except Exception:
         return None
 
@@ -1137,6 +1174,10 @@ def make_client(playlist: dict):
     route = net_route.route_for(source)
     session = getattr(client, "session", None)
     if session is not None:
+        # A source's lists and playlists are the largest answers there are:
+        # their own ceiling, above any real one (core/_lazy_requests.py).
+        from ..core._lazy_requests import LIST_MAX
+        session.max_response = LIST_MAX
         nerd.current().apply_session(session, source)
         if route.active:
             from ..core import net_adapter
@@ -1183,12 +1224,45 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
     from ..core import nerd_lists
     from ..core.url_rewrite import rewrite
     streams, url = client.live_streams, client.live_url
+    kind = str(source.get("_kind") or "xtream")
+    server = str(source.get("_server") or "")
+    remote = _is_remote(kind, server)
+    internet = remote and _on_internet(kind, server, source)
+    # A source on the internet never sends the app to a device at home -
+    # unless the person said this one's list is their own (its option).
+    home_ok = stream_address.home_allowed(source)
+    if hasattr(client, "home_ok"):
+        client.home_ok = home_ok
+
+    def theirs(address: Any) -> str:
+        """*address* as the source's own word may be played: what a stream
+        can be from where the source is (core/stream_address.py)."""
+        return stream_address.played(address, remote, kind, internet=internet, home_ok=home_ok)
+
+    def handed(raw: Any, udpxy: bool = False) -> Any:
+        """What is played for the address the source gave: through the
+        person's rewrite rules (and udpxy), and only what a stream can be
+        (core/stream_address.py) - the source says what goes to the player,
+        the recorder and a cast. The source's word is judged as the source's,
+        from the internet as such; what the person's own rules made of it is
+        theirs - only what is no stream whoever lists it is kept from it -
+        and their udpxy in front of a multicast group a stream of the home
+        network's."""
+        if not raw:
+            return raw
+        out = rewrite(raw, source)
+        from_source = out == raw
+        if from_source and not theirs(out):
+            return ""
+        if udpxy:
+            out = nerd_lists.udpxy_url(out, source)
+        return stream_address.played(out, remote and from_source, kind)
 
     def live_streams(category_id: str | None = None) -> list[dict]:
         return nerd_lists.decorate(streams(category_id), source, pid)
 
     def live_url(stream_id: int | str, fmt: str = "ts") -> str:
-        return nerd_lists.udpxy_url(rewrite(url(stream_id, fmt), source), source)
+        return handed(url(stream_id, fmt), udpxy=True)
 
     client.live_streams = live_streams
     client.live_url = live_url
@@ -1196,23 +1270,161 @@ def _nerd_lists(client, source: dict, pid: str | None) -> None:
                                    for n in ("vod_url", "episode_url", "timeshift_urls", "copy_url"))
     if copy is not None:
         def copy_url(stream_id: int | str) -> str:
-            got = copy(stream_id)
-            return nerd_lists.udpxy_url(rewrite(got, source), source) if got else got
+            return handed(copy(stream_id), udpxy=True)
         client.copy_url = copy_url
     if vod is not None:
         def vod_url(stream_id: int | str, ext: str | None = None) -> str:
-            return rewrite(vod(stream_id, ext), source)
+            return handed(vod(stream_id, ext))
         client.vod_url = vod_url
     if episode is not None:
         def episode_url(episode_id: int | str, ext: str | None = None) -> str:
-            return rewrite(episode(episode_id, ext), source)
+            return handed(episode(episode_id, ext))
         client.episode_url = episode_url
     if archive is not None:
         def timeshift_urls(stream_id: int | str, start_dt: datetime,
                            duration_min: int) -> list[str]:
             urls = archive(stream_id, start_dt, duration_min)
-            return [rewrite(u, source) for u in urls] if urls else urls
+            if not urls:
+                return urls
+            return [u for u in map(handed, urls) if u]
         client.timeshift_urls = timeshift_urls
+    link = getattr(client, "archive_link", None)
+    if link is not None:
+        def archive_link(stream_id: int | str, start: float,
+                         stop: float | None = None) -> dict | None:
+            # A portal's archive by programme: its link is the portal's word
+            # too (not rewritten: it was never one of the source's lists').
+            got = link(stream_id, start, stop)
+            if got is not None and not theirs(got.get("url")):
+                return None
+            return got
+        client.archive_link = archive_link
+    # A whole address the source gave outside these calls (a channel's own
+    # catch-up address, ui/mw_timeshift.py): judged as these are.
+    client.played_from_source = theirs
+    if internet:
+        _keep_pictures(client, home=not home_ok)
+
+
+def _is_remote(kind: str, server: str) -> bool:
+    """Whether a source's addresses come over the network: every kind but a
+    playlist file on this computer (core/stream_address.py)."""
+    return kind != "m3u" or server.strip().lower().startswith(("http://", "https://"))
+
+
+#: Where a row or an info answer names a picture the lists fetch: a logo, a
+#: poster, a backdrop, a still - by the app's own names for them and the
+#: panels' and portals' that come through as they are.
+PICTURE_KEYS = frozenset((
+    "stream_icon", "cover", "cover_big", "movie_image", "backdrop_path", "backdrop",
+    "screenshot_uri", "poster", "poster_path", "poster_url", "logo", "icon", "icon_url",
+    "thumb", "image", "still", "still_path", "profile_path"))
+#: The calls whose answers carry a source's pictures.
+_PICTURE_CALLS = ("live_streams", "vod_streams", "series_list", "series_info", "vod_info",
+                  "held_series", "resume_items")
+#: How deep an info answer is looked through (a series: its episodes by
+#: season, each with its info).
+_PICTURE_DEPTH = 6
+
+
+def _picture_kept(value: Any, home: bool = False) -> Any:
+    """*value* (an address or a list of them) without what names this
+    computer or a link-local host - with *home*, a device at home too
+    (core/stream_address.picture_refusal)."""
+    if isinstance(value, str):
+        return "" if value and stream_address.picture_refusal(value, home) else value
+    if isinstance(value, list):
+        kept = [v for v in value if not (isinstance(v, str) and v
+                                         and stream_address.picture_refusal(v, home))]
+        return kept if len(kept) != len(value) else value
+    return value
+
+
+def _row_pictures(row: dict, home: bool = False) -> None:
+    for key in row.keys() & PICTURE_KEYS:
+        value = row[key]
+        kept = _picture_kept(value, home)
+        if kept is not value:
+            row[key] = kept
+
+
+def _deep_pictures(found: Any, depth: int = 0, home: bool = False) -> None:
+    """An info answer's pictures, at any depth (a series' seasons and its
+    episodes' own)."""
+    if depth > _PICTURE_DEPTH:
+        return
+    if isinstance(found, dict):
+        _row_pictures(found, home)
+        found = found.values()
+    elif not isinstance(found, (list, tuple)):
+        return
+    for value in found:
+        if isinstance(value, (dict, list, tuple)):
+            _deep_pictures(value, depth + 1, home)
+
+
+def _pictures_kept(found: Any, home: bool = False) -> Any:
+    """*found* - a list of rows, an info answer - with every picture a
+    source on the internet named on this computer or a link-local host
+    taken out, in place: the app itself fetches a row's pictures, and such
+    an address had it send requests to this computer's or the cloud's
+    services. With *home* a device of the home network's too (a source the
+    person did not let in there). A list's rows are looked at for their own
+    pictures; an info answer through and through."""
+    if isinstance(found, dict):
+        _deep_pictures(found, 0, home)
+    elif isinstance(found, (list, tuple)):
+        for item in found:
+            if isinstance(item, dict):
+                _row_pictures(item, home)
+            elif isinstance(item, (list, tuple)):
+                _pictures_kept(item, home)
+    return found
+
+
+def _picture_call(call: Any, home: bool = False) -> Any:
+    """*call* with what it answers through _pictures_kept - a list the
+    source's cache hands out again as it was looked at once."""
+    last: dict[Any, Any] = {}
+
+    def kept(*args: Any, **kwargs: Any) -> Any:
+        got = call(*args, **kwargs)
+        key: Any = (args, tuple(sorted(kwargs.items())))
+        try:
+            if last.get(key) is got:
+                return got
+        except TypeError:
+            key = None
+        _pictures_kept(got, home)
+        if key is not None:
+            if len(last) >= 64:
+                last.clear()
+            last[key] = got
+        return got
+    return kept
+
+
+def _keep_pictures(client: Any, home: bool = False) -> None:
+    """A source on the internet's lists and pages handed out with their
+    pictures through _pictures_kept (*home*: a device at home's too)."""
+    for name in _PICTURE_CALLS:
+        call = getattr(client, name, None)
+        if call is not None:
+            setattr(client, name, _picture_call(call, home))
+
+
+def _on_internet(kind: str, server: str, options: dict) -> bool:
+    """Whether a source is on the internet (core/stream_address.on_internet):
+    its own address, or one of the backup addresses its lists may come from
+    instead (core/mirrors.py) - a source is the home network's only when
+    every address it is read from is."""
+    found = [server]
+    if kind in mirrors.KINDS and options.get(mirrors.KEY):
+        try:
+            found += mirrors.parse(options.get(mirrors.KEY), kind)
+        except Exception:
+            return True
+    return any(stream_address.on_internet(a) for a in found)
 
 
 def _make_client(playlist: dict):

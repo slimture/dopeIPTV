@@ -20,7 +20,8 @@ from ..core.privacy import for_log
 
 _QUALITY = re.compile(r"\b(uhd|fhd|hd|sd|hevc|h265|4k|1080p?|720p?|50fps|backup)\b")
 # A provider's country prefix: "SE: ", "SE | ", "|UK| " (not "SVT-1").
-_PREFIX = re.compile(r"^\s*\|?\s*[a-z]{2,3}\s*[:|]\s*")
+# Possessive spaces: the same match, linear on a name of many spaces.
+_PREFIX = re.compile(r"^\s*+\|?\s*+[a-z]{2,3}\s*+[:|]\s*")
 
 
 def name_key(name: str) -> str:
@@ -91,7 +92,7 @@ class Shown:
 def kids_rows(client: Any, rows: list[dict], names: Mapping[str, str] | None = None) -> list[dict]:
     """*rows* of another source as a kids profile may see them: none the
     provider marks for adults, none in a category named for them (by the
-    name the user gave it, *names*, else the provider's). A source whose
+    name the user gave it, *names*, or the provider's own). A source whose
     categories cannot be read gives none of its categorised rows."""
     from ..core.profiles import adult_category, adult_item
     rows = [r for r in rows if not adult_item(r)]
@@ -103,7 +104,7 @@ def kids_rows(client: Any, rows: list[dict], names: Mapping[str, str] | None = N
     given = names or {}
     adult = {str(c.get("category_id")) for c in cats
              if isinstance(c, dict) and adult_category(
-                 given.get(str(c.get("category_id"))) or str(c.get("category_name") or ""))}
+                 given.get(str(c.get("category_id"))), c.get("category_name"))}
     return [r for r in rows if str(r.get("category_id")) not in adult]
 
 

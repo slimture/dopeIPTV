@@ -380,7 +380,7 @@ def test_add_kodi_checks_before_it_keeps(app):
         def device(self, label):
             return kodi.KodiDevice("Den", "10.0.0.5", 8081, "kodi", "pw", manual=True)
 
-        def add(self, host, port, user, password):
+        def add(self, host, port, user, password, name="", secure=False):
             asked.append((host, port, user, password))
             done.set()
             if host == "10.0.0.9":

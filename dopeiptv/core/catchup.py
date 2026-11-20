@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlsplit
 
 from . import nerd
+from .num import digits
 from .nerd_check import (
     FAIL, INFO, OK, WARN, Check, _shown_headers, redact_url, scrub,
     source_secrets,
@@ -72,7 +73,7 @@ def _known(name: str, arg: str | None) -> bool:
     if name in _TIMES:
         return arg is None or bool(_FORMAT_LETTERS.search(arg))
     if name in _SPANS:
-        return arg is None or (arg.isdigit() and int(arg) > 0)
+        return arg is None or bool(digits(arg))
     return arg is None and (name in _PARTS or name == "catchup-id")
 
 
@@ -318,7 +319,7 @@ def check_archive(url: str, user_agent: str = "", headers: dict[str, str] | None
     """Ask the archive address as the app's probe does (the first bytes,
     with the source's user agent, headers and proxy) and say what came
     back. *channel*: whose archive it is, for the line."""
-    import requests
+    from ._lazy_requests import requests
     secrets = list(secrets or [])
     hdrs = dict(headers or {})
     if user_agent:

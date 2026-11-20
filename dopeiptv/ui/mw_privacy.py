@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtCore import QEvent, QObject, Qt
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QPushButton
 
 from ..core import privacy
+from ..core.log import log
 from ..i18n import tr
 from .theme import P
 
@@ -32,6 +33,29 @@ class _Follow(QObject):
                             QEvent.Type.LayoutRequest):
             self._place()
         return False
+
+
+def note_titles(ctx: dict | None) -> None:
+    """The names what just began to play goes by (*ctx*: the window's
+    _last_playback, or a cast's context), said to core/privacy right after
+    playback_started: for a private playback nothing is asked about them
+    elsewhere (TMDB) while it lasts."""
+    try:
+        lp = ctx or {}
+        item = lp.get("item") if isinstance(lp.get("item"), dict) else {}
+        series = lp.get("series_ctx") if isinstance(lp.get("series_ctx"), dict) else {}
+        privacy.playback_titles(
+            lp.get("title"), item.get("name"), item.get("title"),
+            item.get("_clean_title"), item.get("_series_title"),
+            series.get("name"), series.get("title"))
+    except Exception:
+        log.debug("private viewing: titles", exc_info=True)
+
+
+def wake_reason(title: str) -> str:
+    """Why the screen is kept awake, as the system is told (and lists to
+    whoever asks it): never the title of a private playback."""
+    return tr("wake_playing", title="dopeIPTV" if privacy.playing_private() else title)
 
 
 class _PrivacyMixin:
@@ -72,6 +96,27 @@ class _PrivacyMixin:
         follow = _Follow(pill, self._place_private_pill)
         logo.installEventFilter(follow)
         logo.parentWidget().installEventFilter(follow)
+        # A rewind buffer watched privately that a crash left on disk goes
+        # at this start, not at the first channel watched with the buffer.
+        QTimer.singleShot(4000, self._privacy_sweep_buffers)
+
+    def _privacy_sweep_buffers(self) -> None:
+        try:
+            from ..media.dvr_player import dvr_base
+            dvr_base()                  # sweeps once, on a thread of its own
+        except Exception:
+            log.debug("private viewing: buffers not swept", exc_info=True)
+        # A private cast's work and a private subtitle a crash left in
+        # memory (core/memory_safe): gone now, not at the next logout.
+        import threading
+
+        def sweep() -> None:
+            from ..core import memory_safe
+            for name in ("cast", "subs"):
+                base = memory_safe.private_base(name)
+                if base is not None and base.is_dir():
+                    memory_safe.sweep(base)
+        threading.Thread(target=sweep, name="private-sweep", daemon=True).start()
 
     def _place_private_pill(self) -> None:
         pill = getattr(self, "_private_pill", None)
@@ -104,8 +149,29 @@ class _PrivacyMixin:
             if getattr(self, "_cast_device", None) and cast.get("key") is not None \
                     and cast.get("kind"):
                 privacy.playback_started(cast["kind"], cast["key"])
+                note_titles(cast)
             elif p is not None and getattr(p, "current_url", None) and lp:
                 privacy.playback_started(lp.get("kind") or "", lp.get("key"))
+                note_titles(lp)
+                # Its rewind buffer goes when the channel is left, and
+                # stream health counts no more of it.
+                mark = getattr(p, "dvr_mark_private", None)
+                if callable(mark):
+                    mark()
+                # A buffer on the disk - the app's or mpv's own - holds
+                # nothing more of it: the channel opened again, its buffer
+                # in memory out of a disk's reach, or none (core/dvr_pool).
+                reopen = getattr(p, "private_reopen_needed", None)
+                if callable(reopen) and reopen() and lp.get("kind") == "live":
+                    log.info("private viewing: the channel's buffer is on the disk - opened again")
+                    QTimer.singleShot(0, self._retry_last_stream)
+            # A cast whose converter works on the disk: sent again, its work
+            # in memory out of a disk's reach - or stopped and said so.
+            if hasattr(self, "_cast_private_on"):
+                self._cast_private_on()
+            health = getattr(self, "health", None)
+            if health is not None:
+                health.leave()
             # A Trakt or Simkl scrobble already under way is let go, not
             # stopped: a stop would report the progress and file it in the
             # history.
@@ -119,6 +185,12 @@ class _PrivacyMixin:
             # Watch together tells the others what plays: out of the room.
             if hasattr(self, "_together_private_on"):
                 self._together_private_on()
+        elif was:
+            # Private viewing ended: the rewind buffers of the channels
+            # left in it go now (the one still playing when it is left).
+            forget = getattr(getattr(self, "player", None), "dvr_forget_private", None)
+            if callable(forget):
+                forget()
         # Home Assistant's retained state says it at once, either way.
         if hasattr(self, "_events_private_changed"):
             self._events_private_changed(on)

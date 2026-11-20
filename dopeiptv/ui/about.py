@@ -104,7 +104,7 @@ def show_about(win: Any, *, parent: QWidget | None = None) -> None:
         taps[:] = [t for t in taps if now - t < 3.0] + [now]
         if len(taps) >= 7:
             taps.clear()
-            win._unlock_nerd()
+            win._unlock_nerd(in_settings=parent is not None)
 
     title.mousePressEvent = tap
     desc = QLabel(tr("about_desc"))

@@ -35,13 +35,43 @@ on:
         required: false
         default: ""
 
+# Read-only unless a job says otherwise. Each build job attaches its own
+# packages to the release (contents: write, used on a tag); the update key is
+# handed only to the checksums job, which builds nothing (docs/MAINTAINING.md,
+# "The release key").
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # ---------------------------------------------------------------- yt-dlp ---
+  # The yt-dlp release every build names (core/ytdlp_pin.py): the newest one
+  # whose SHA2-256SUMS yt-dlp's own key has signed (gpgv, against
+  # packaging/yt-dlp-signing-key.asc), its files' SHA-256s written into the
+  # app - so the app's signed release, not a list downloaded beside the file,
+  # says which yt-dlp the app may run. Done once, on Linux, and handed to
+  # every build. A failure pins nothing (the build then downloads no yt-dlp)
+  # and says so; it never stops a release.
+  ytdlp-pin:
+    name: yt-dlp release, by its signature
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Pin the newest yt-dlp release whose signature checks out
+        run: python3 tools/ytdlp_pin.py --or-none
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core/ytdlp_pin.py
+          retention-days: 7
+
   # ---------------------------------------------------------------- Python ---
   python-dist:
+    needs: ytdlp-pin
     name: sdist + wheel (pipx / PyPI)
+    permissions:
+      contents: write      # attaches its packages to the release (on a tag)
     if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     # Pinned, not ubuntu-latest: that label moves to Ubuntu 26.04 from
     # 2026-10-19, and a release must not meet a new image unannounced.
@@ -49,7 +79,14 @@ jobs:
     # A test build publishes what was built; a release fails loud.
     continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -117,11 +154,20 @@ jobs:
           else
             echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: '3.12'
-      - run: python -m pip install --upgrade build
-      - run: python -m build
+      - name: Build tools (pip and build, as pinned)
+        run: |
+          # pip first, then everything through it: exact versions, and each
+          # file's SHA-256, from packaging/requirements-release.txt.
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install -c packaging/requirements-release.txt build
+      - name: Build the sdist and the wheel
+        env:
+          # The build's own environment takes setuptools as pinned, too.
+          PIP_CONSTRAINT: ${{ github.workspace }}/packaging/requirements-release.txt
+        run: python -m build
       - name: Smoke test - install wheel in a fresh venv
         run: |
           # Verify the wheel actually installs into a clean environment and
@@ -143,18 +189,21 @@ jobs:
           /tmp/smoke/bin/python -c 'from dopeiptv.i18n import LANGUAGES, _NATIVE_NAMES; missing=[c for c in _NATIVE_NAMES if c not in LANGUAGES]; assert not missing, f"languages missing from wheel: {missing}"; print(f"wheel languages OK: {len(LANGUAGES)} loaded")'
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65   # v2.6.2
         with:
           files: dist/*
           body_path: RELEASE_NOTES.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: python-dist
           path: dist/*
 
   # ------------------------------------------------ AppImage + Debian pkg ---
   linux-bundle:
+    needs: ytdlp-pin
     name: AppImage + .deb (${{ matrix.arch }})
+    permissions:
+      contents: write      # attaches its packages to the release (on a tag)
     if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     strategy:
       fail-fast: false
@@ -182,7 +231,14 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -250,10 +306,12 @@ jobs:
           else
             echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: '3.12'
       - name: System deps (libmpv, ffmpeg, Qt runtime, fpm, appimagetool)
+        env:
+          ARCH: ${{ matrix.arch }}
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -268,35 +326,29 @@ jobs:
             libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-xkb1 \
             libxcb-image0 libxcb-render-util0 libxcb-shape0 libxcb-util1
           sudo gem install --no-document fpm
-          # Retried, because one flaky transfer used to fail the whole Linux
-          # build - the primary platform - on a download that works if you
-          # ask twice. The Windows job's fetches have had this since they
-          # were written; these two never did.
-          fetch() {
-            # A 5xx from GitHub's release downloads is retried too, for
-            # up to about two minutes: the 504s of 8 Nov 2026 came and went.
-            wget -q --tries=8 --timeout=30 --waitretry=15 \
-              --retry-connrefused --retry-on-http-error=429,500,502,503,504 \
-              -O "$1" "$2"
-          }
-          fetch /usr/local/bin/appimagetool \
-            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage
+          # appimagetool and the runtime, AppImage's own files: each only as
+          # the bytes packaging/build-inputs.json names (tools/build_inputs.py
+          # checks the SHA-256 and stops otherwise - a changed or truncated
+          # download makes no AppImage). The tool retries a flaky transfer,
+          # which used to fail the whole Linux build - the primary platform.
+          python tools/build_inputs.py fetch "appimagetool-${ARCH}" /usr/local/bin/appimagetool
           chmod +x /usr/local/bin/appimagetool
           # Statically-linked AppImage runtime. The default runtime needs the
           # host to have libfuse2 installed - which newer Ubuntu drops, so the
           # AppImage refuses to start with a cryptic FUSE error until the user
           # runs "apt install libfuse2". This static runtime carries its own
-          # FUSE, so the AppImage "just runs" on a stock system.
-          fetch /usr/local/bin/appimage-runtime \
-            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${{ matrix.arch }}
-          # A truncated download is worse than a failed one: appimagetool
-          # would run and produce an AppImage nobody can start.
-          test -s /usr/local/bin/appimagetool
-          test -s /usr/local/bin/appimage-runtime
+          # FUSE, so the AppImage "just runs" on a stock system. It is what
+          # every AppImage runs first: when upstream's rolling build has moved
+          # on, the tool takes the listed one from a release of our own.
+          python tools/build_inputs.py fetch "appimage-runtime-${ARCH}" /usr/local/bin/appimage-runtime
       - name: Python build deps
         run: |
-          python -m pip install --upgrade pip pyinstaller
-          python -m pip install -r requirements.txt
+          # pip first, then everything through it: exact versions, and each
+          # file's SHA-256, from packaging/requirements-release.txt - what
+          # goes into the bundle is what the repository names.
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install -c packaging/requirements-release.txt pyinstaller
+          python -m pip install -c packaging/requirements-release.txt -r requirements.txt
       - name: PyInstaller bundle
         run: pyinstaller --noconfirm dopeiptv.spec   # -> dist/dopeiptv/
       - name: Build manifest - the bundle's own files, signed
@@ -307,8 +359,14 @@ jobs:
         # both carry it. Without the key (a fork) nothing is signed and the
         # build calls itself modified; a release without it stops here.
         env:
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
-        run: python tools/build_manifest.py frozen dist/dopeiptv/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
+          DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
+        run: python -I -S tools/build_manifest.py frozen dist/dopeiptv/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Audit host Wayland libraries
         run: |
           found=$(find dist/dopeiptv -name 'libwayland-*.so*' -print)
@@ -673,13 +731,13 @@ jobs:
           launch_and_check "$(command -v dopeiptv)" deb
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65   # v2.6.2
         with:
           files: |
             *.AppImage
             *.deb
           body_path: RELEASE_NOTES.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: linux-bundle-${{ matrix.arch }}
           path: |
@@ -704,7 +762,10 @@ jobs:
   # a fork - the .app is signed ad hoc as before and users allow the first
   # launch under Privacy & Security -> Open Anyway.
   macos-dmg:
+    needs: ytdlp-pin
     name: macOS .dmg (${{ matrix.arch }})
+    permissions:
+      contents: write      # attaches its packages to the release (on a tag)
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -749,7 +810,14 @@ jobs:
     # A test build publishes what was built, whatever the leg.
     continue-on-error: ${{ matrix.experimental || (inputs.nightly_version || '') != '' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -831,7 +899,7 @@ jobs:
           else
             echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: '3.12'
       - name: System deps (mpv, ffmpeg, create-dmg)
@@ -856,9 +924,10 @@ jobs:
           # activated and not on PATH: the spec is told where things are.
           MM="${RUNNER_TEMP}/mm"
           mkdir -p "$MM"
-          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
-            https://micro.mamba.pm/api/micromamba/osx-64/latest \
-            | tar -xj -C "$MM" bin/micromamba
+          # micromamba as packaging/build-inputs.json names it (conda-forge's
+          # own package, checked by its SHA-256 - tools/build_inputs.py).
+          python3 tools/build_inputs.py fetch micromamba-osx-64 "${RUNNER_TEMP}/micromamba.tar.bz2"
+          tar -xjf "${RUNNER_TEMP}/micromamba.tar.bz2" -C "$MM" bin/micromamba
           ENVDIR="${RUNNER_TEMP}/mpvenv"
           MAMBA_ROOT_PREFIX="$MM/root" "$MM/bin/micromamba" create -y \
             -p "$ENVDIR" -c conda-forge --override-channels \
@@ -877,6 +946,9 @@ jobs:
           echo "mpv ${MPV_VER}"
           git clone --quiet --depth 1 --branch "v${MPV_VER}" \
             https://github.com/mpv-player/mpv.git "${RUNNER_TEMP}/mpv-src"
+          # The tag's commit as packaging/build-inputs.json names it; a
+          # version it does not know yet (conda-forge moved on) is said.
+          python3 tools/build_inputs.py verify-git mpv "${RUNNER_TEMP}/mpv-src" --tag "v${MPV_VER}" --unknown-ok
           cd "${RUNNER_TEMP}/mpv-src"
           # mpv's own bug, and why conda-forge's libmpv is broken too: the
           # CoreAudio outputs use cfstr_from_cstr/cfstr_get_cstr from
@@ -936,8 +1008,13 @@ jobs:
             export PIP_CONSTRAINT="$C"
             cat "$C"
           fi
-          python -m pip install --upgrade pip pyinstaller pyobjc-core
-          python -m pip install -r requirements.txt
+          # pip first, then everything through it: exact versions, and each
+          # file's SHA-256, from packaging/requirements-release.txt (which
+          # names PyObjC 12.2.2 for Intel and the newer one for Apple
+          # Silicon, as the constraint above does).
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install -c packaging/requirements-release.txt pyinstaller pyobjc-core
+          python -m pip install -c packaging/requirements-release.txt -r requirements.txt
           python -m pip list 2>/dev/null | grep -i '^pyobjc' || true
       - name: Version
         id: v
@@ -991,8 +1068,14 @@ jobs:
         # signed: the list lies in Contents/Resources, linked from where
         # the app reads it, and the signature seals it with the rest.
         env:
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
-        run: python tools/build_manifest.py frozen dist/dopeIPTV.app/Contents/MacOS/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
+          DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
+        run: python -I -S tools/build_manifest.py frozen dist/dopeIPTV.app/Contents/MacOS/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Developer ID keychain
         id: sign
         env:
@@ -1305,11 +1388,11 @@ jobs:
           echo "::endgroup::"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65   # v2.6.2
         with:
           files: '*.dmg'
           body_path: RELEASE_NOTES.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: macos-dmg-${{ matrix.arch }}
           path: '*.dmg'
@@ -1341,7 +1424,10 @@ jobs:
   # v1.2.0 did); the Linux/macOS jobs run independently and still attach their
   # own assets, so a Windows hiccup never removes those.
   windows-zip:
+    needs: ytdlp-pin
     name: Windows (${{ matrix.arch }})
+    permissions:
+      contents: write      # attaches its packages to the release (on a tag)
     if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ (inputs.nightly_version || '') != '' }}
@@ -1362,7 +1448,14 @@ jobs:
             mpv_arch: aarch64
             cmake_arch: ARM64
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -1428,13 +1521,16 @@ jobs:
           if [ -z "${DOPEIPTV_SIMKL_CLIENT_ID}" ]; then
             echo "::warning::SIMKL_CLIENT_ID secret is empty - Simkl will NOT be offered in this build."
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
         with:
           python-version: '3.12'
       - name: Python build deps
         shell: bash
         run: |
-          python -m pip install --upgrade pip pillow
+          # pip first, then everything through it: exact versions, and each
+          # file's SHA-256, from packaging/requirements-release.txt.
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install -c packaging/requirements-release.txt pillow
           # Build PyInstaller's BOOTLOADER FROM SOURCE rather than taking the
           # prebuilt wheel. Every PyInstaller app on earth ships the same
           # prebuilt bootloader bytes, and that is what several engines -
@@ -1443,43 +1539,28 @@ jobs:
           # this binary its own bytes and clears the signature matches.
           # (Heuristic and reputation flags are a separate problem; the fix
           # for those is an authenticode signature, not a build flag.)
-          python -m pip install --upgrade --no-binary pyinstaller pyinstaller
-          python -m pip install -r requirements.txt
+          python -m pip install -c packaging/requirements-release.txt --no-binary pyinstaller pyinstaller
+          python -m pip install -c packaging/requirements-release.txt -r requirements.txt
       - name: Fetch libmpv (mpv-2.dll)
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          MPV_ARCH: ${{ matrix.mpv_arch }}
         run: |
           mkdir -p libmpv
-          # Latest self-contained libmpv dev build (ffmpeg is baked in).
-          # Authenticate the API call: unauthenticated GitHub API is 60 req/hr
-          # on the runner's shared IP and got rate-limited, returning a body
-          # with no "assets" key. That raised KeyError, and under this job's
-          # continue-on-error it silently shipped a release with NO Windows zip
-          # (v1.2.0). Auth lifts the limit to 1000/hr; empty URL now fails loud.
+          # The self-contained libmpv build (ffmpeg is baked in) that
+          # packaging/build-inputs.json names, by its SHA-256 - not whatever
+          # is newest that day: this DLL plays every stream on every PC, and
+          # it comes from a build service of someone else's. To take a newer
+          # one, change the list (docs/MAINTAINING.md, "What the build
+          # downloads"; tools/pick_mpv_asset.py picks the baseline archive of
+          # a release - not the AVX2-only v3 build, which loads on the runner
+          # and then refuses to on an older PC).
           #
-          # The release lists several archives per architecture - a baseline
-          # build, an x86-64-v3 (AVX2-only) build, LGPL variants - and a
-          # substring test matched more than one, with the API's listing order
-          # deciding which one shipped. The picker matches the whole name and
-          # insists on exactly one hit (tools/pick_mpv_asset.py); it exits
-          # non-zero with the response's head when there is none.
-          api() {
-            curl -sSL --retry 3 --retry-delay 5 \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest
-          }
-          url=$(api | python tools/pick_mpv_asset.py ${{ matrix.mpv_arch }})
-          echo "mpv-dev: $url"
-          # -f: a 504 page is an error to retry, not an archive to unpack
-          # (it was saved as mpv-dev.7z, 92 bytes, on 8 Nov 2026).
-          curl -fsSL --retry 8 --retry-delay 15 --retry-all-errors \
-            -o mpv-dev.7z "$url"
-          7z x mpv-dev.7z -ompv-dev
-          dll=$(find mpv-dev -iname 'libmpv-2.dll' -o -iname 'mpv-2.dll' | head -1)
-          echo "libmpv dll: $dll"
-          cp "$dll" libmpv/mpv-2.dll
+          # Upstream keeps a build for 30 days; after that the tool takes the
+          # same DLL from the release of our own that shipped it. It retries
+          # a flaky transfer, and anything but the listed bytes stops here
+          # (a 504 page saved as an archive did once: 92 bytes, 8 Nov 2026).
+          python tools/build_inputs.py fetch "libmpv-windows-${MPV_ARCH}" libmpv/mpv-2.dll
           ls -la libmpv
       - name: Vulkan loader (vulkan-1.dll)
         shell: bash
@@ -1503,6 +1584,8 @@ jobs:
           # OpenGL anyway. Apache-2.0; its notice ships beside it.
           git clone --quiet --depth 1 --branch "${VULKAN_LOADER_TAG}" \
             https://github.com/KhronosGroup/Vulkan-Loader vulkan-loader
+          # A tag can be moved; the commit the repository names for it cannot.
+          python tools/build_inputs.py verify-git vulkan-loader vulkan-loader --tag "${VULKAN_LOADER_TAG}"
           cmake -S vulkan-loader -B vulkan-loader/build -A ${{ matrix.cmake_arch }} \
             -D CMAKE_BUILD_TYPE=Release -D UPDATE_DEPS=ON -D BUILD_TESTS=OFF \
             -D BUILD_WERROR=OFF
@@ -1537,8 +1620,14 @@ jobs:
         # and the zip are made of dist/dopeiptv.
         shell: bash
         env:
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
-        run: python tools/build_manifest.py frozen dist/dopeiptv/dopeiptv.exe ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
+          DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
+        run: python -I -S tools/build_manifest.py frozen dist/dopeiptv/dopeiptv.exe ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Audit - what the shipped DLLs import
         shell: bash
         run: |
@@ -1589,7 +1678,7 @@ jobs:
           Stop-Process -Id $p.Id -Force
       - name: Keep the picture of the started app
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: windows-start-${{ matrix.arch }}
           path: windows-start-*.png
@@ -1699,13 +1788,13 @@ jobs:
       # the run red without removing those.
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65   # v2.6.2
         with:
           files: |
             *.zip
             *-setup.exe
           body_path: RELEASE_NOTES.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: dopeIPTV-windows-setup-${{ matrix.arch }}
           path: '*-setup.exe'
@@ -1713,7 +1802,7 @@ jobs:
       # the Actions artifact download UI always re-zips whatever you give it, so
       # uploading our .zip produced a zip-in-a-zip. Uploading the folder means
       # one unzip yields the runnable dopeiptv\ directory.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
         with:
           name: dopeIPTV-windows-${{ matrix.arch }}
           path: dist/dopeiptv
@@ -1724,7 +1813,10 @@ jobs:
   # loud (#36 - every start crashed from 1.5.0 to 1.6.5 and nothing here
   # noticed, the job was allowed to fail). A test build only names it missing.
   flatpak:
+    needs: ytdlp-pin
     name: Flatpak
+    permissions:
+      contents: write      # attaches its packages to the release (on a tag)
     if: ${{ (inputs.replace_macos_dmg || '') == '' }}
     # Only the host: the build runs in the container below. Pinned for the
     # same reason as python-dist.
@@ -1741,7 +1833,14 @@ jobs:
       volumes:
         - /var/lib/flatpak
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -1817,14 +1916,20 @@ jobs:
         # Flatpak carries none and says it runs from source.
         continue-on-error: true
         env:
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
+          DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
         run: |
           if ! command -v python3 >/dev/null 2>&1; then
             echo "::warning::no python3 in this container - the Flatpak carries no build manifest"
             exit 0
           fi
-          python3 tools/build_manifest.py tree dopeiptv
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+          python3 -I -S tools/build_manifest.py tree dopeiptv
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3   # v6.8
         with:
           bundle: dopeIPTV.flatpak
           manifest-path: packaging/flatpak/io.github.slimture.dopeIPTV.yaml
@@ -1905,7 +2010,7 @@ jobs:
           echo "BUNDLE=dopeIPTV-${V}.flatpak" >> "$GITHUB_ENV"
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65   # v2.6.2
         with:
           files: ${{ env.BUNDLE }}
           body_path: RELEASE_NOTES.md
@@ -1917,33 +2022,103 @@ jobs:
   # installs an update only when its file is on a list signed so
   # (dopeiptv/core/update_keys.py), and sync-releases.sh moves the site to
   # a release only once it is signed. Also after a .dmg is replaced.
-  checksums:
-    needs: [python-dist, linux-bundle, macos-dmg, windows-zip, flatpak]
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/') || (inputs.replace_macos_dmg || '') != '') }}
+  #
+  # Its environment, release-signing, holds the update key and waits for a
+  # person's approval (Settings > Environments: a required reviewer, the
+  # secret there and not among the repository's): nothing signs a release
+  # that the maintainer did not let through, whatever else ran before it.
+  # Known vulnerabilities in what is shipped, checked again for this very
+  # release (tools/audit_deps.py, as ci.yml's audit job): nothing is signed
+  # until it passed - a finding or an audit that did not finish keeps the
+  # signing job below from running at all.
+  audit:
+    name: Known vulnerabilities in what is shipped
     runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: '3.12'
+      - name: pip-audit, as pinned
+        run: |
+          python -m pip install --require-hashes -r packaging/requirements-pip.txt
+          python -m pip install --require-hashes -r packaging/requirements-audit.txt
+      - name: Audit
+        run: python tools/audit_deps.py
+
+  checksums:
+    needs: [python-dist, linux-bundle, macos-dmg, windows-zip, flatpak, audit]
+    if: ${{ !cancelled() && needs.audit.result == 'success' && (startsWith(github.ref, 'refs/tags/') || (inputs.replace_macos_dmg || '') != '') }}
+    runs-on: ubuntu-24.04
+    environment: release-signing
+    permissions:
+      contents: write      # the release's notes, and its signed checksum list
     env:
-      GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.replace_macos_dmg || github.ref_name }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
       - name: Tidy the release notes
         # This release its own notes only, the one before it folded - before
         # the site sees the release complete (the signed list, next).
         continue-on-error: true
-        run: python3 tools/tidy_release_notes.py
-      - name: Sign the release's checksums
         env:
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/tidy_release_notes.py
+      - name: The release's files and their checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir rel
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir rel
           rm -f rel/SHA256SUMS rel/SHA256SUMS.sig
           (cd rel && sha256sum -- * > ../SHA256SUMS)
           cat SHA256SUMS
+      - name: Sign the release's checksums
+        # The one step that is handed the update key. It runs the signing
+        # tool - the repository's own code on Python's own library (-I -S) -
+        # and nothing else: no token, no download, no other program. This job
+        # builds nothing and installs nothing.
+        env:
+          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_UPDATE_KEY }}
+        run: |
           if [ -z "$DOPEIPTV_UPDATE_KEY" ]; then
             echo "::error::DOPEIPTV_UPDATE_KEY is not set: the release is not signed, and the app will not install it"
             exit 1
           fi
-          python3 tools/sign_sums.py SHA256SUMS
-          gh release upload "$TAG" SHA256SUMS SHA256SUMS.sig --clobber --repo "$GITHUB_REPOSITORY"
+          python3 -I -S tools/sign_sums.py SHA256SUMS
+      - name: Attach the signed checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" SHA256SUMS SHA256SUMS.sig --clobber --repo "$GITHUB_REPOSITORY"
 
+  # ------------------------------------------------------------ provenance ---
+  # Where each file of the release was made, as a signed statement of
+  # GitHub's own (Sigstore): this repository, this workflow, this commit.
+  # Anyone can check a download against it without trusting the project's
+  # own key: gh attestation verify <file> --repo slimture/dopeIPTV
+  # Made from the signed checksum list, once the release is complete - and
+  # never in a release's way: the files are out and signed by then.
+  attest:
+    name: Provenance of the release's files
+    needs: checksums
+    if: ${{ !cancelled() && needs.checksums.result == 'success' }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write        # the workflow's identity, for the signature
+      attestations: write    # stores the statement with the repository
+    env:
+      TAG: ${{ inputs.replace_macos_dmg || github.ref_name }}
+    steps:
+      - name: The release's checksum list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --dir .
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8   # v4.2.2
+        with:
+          subject-checksums: SHA256SUMS

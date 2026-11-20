@@ -12,7 +12,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import http.client
-import json
 import re
 import sys
 
@@ -20,6 +19,7 @@ import pytest
 
 from dopeiptv.core import phone_page, tv_input
 from dopeiptv.core.phone_remote import PhoneServer
+from tests.phone_sign import signed_request
 
 TOKEN = "Ab3_-x9Ab3_-x9Ab3_-x9Ab3_-x9Qz12"
 
@@ -32,8 +32,8 @@ def _no_proxy(monkeypatch):
 
 def ask(port, method, path, body=None):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    data = json.dumps(body).encode() if body is not None else None
-    conn.request(method, path, body=data, headers={"Content-Type": "application/json"} if data else {})
+    path, data, h = signed_request(TOKEN, method, path, body)
+    conn.request(method, path, body=data, headers=h)
     r = conn.getresponse()
     raw = r.read()
     conn.close()

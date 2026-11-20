@@ -12,6 +12,14 @@ Presence keeps all of that on a thread of its own: the window only hands it
 the activity wanted (never blocking, never raising), and the thread connects
 when there is something to show, says it, and - when Discord is not running,
 or quits - tries again quietly a little later.
+
+What plays is said to this user's own Discord and to nobody else. Discord
+itself falls back to /tmp when there is no runtime folder, so /tmp is
+looked in - where any account can make a socket called discord-ipc-0 and
+wait: a socket is only spoken to when it is this user's (``mine``: the
+file's owner, and once connected the user at the other end, ``peer_uid``),
+and the user's own runtime folder is looked through first. On Windows a
+pipe served from another login session is left alone (``pipe_is_ours``).
 """
 from __future__ import annotations
 
@@ -19,6 +27,7 @@ import json
 import os
 import posixpath
 import socket
+import stat
 import struct
 import sys
 import threading
@@ -83,7 +92,9 @@ def set_activity(activity: Mapping[str, Any] | None, pid: int,
 def socket_paths(env: Mapping[str, str] | None = None,
                  platform: str | None = None) -> list[str]:
     """Where Discord may be listening, in the order to try: the plain app,
-    then the Flatpak's and the Snap's own folders, for discord-ipc-0..9."""
+    then the Flatpak's and the Snap's own folders, for discord-ipc-0..9 -
+    all of the user's own runtime folder first, then the temporary folders
+    Discord falls back to without one (everybody's: see ``mine``)."""
     env = os.environ if env is None else env
     platform = sys.platform if platform is None else platform
     if platform.startswith("win"):
@@ -95,11 +106,79 @@ def socket_paths(env: Mapping[str, str] | None = None,
             bases.append(v)
     if "/tmp" not in bases:
         bases.append("/tmp")
-    dirs: list[str] = []
+    paths: list[str] = []
     for base in bases:
-        dirs.append(base)
-        dirs += [posixpath.join(base, sub) for sub in _FLATPAK_DIRS]
-    return [posixpath.join(d, f"discord-ipc-{i}") for i in range(10) for d in dirs]
+        dirs = [base] + [posixpath.join(base, sub) for sub in _FLATPAK_DIRS]
+        paths += [posixpath.join(d, f"discord-ipc-{i}") for i in range(10) for d in dirs]
+    return paths
+
+
+# -- whose socket it is ------------------------------------------------------------
+
+def mine(path: str) -> bool:
+    """Whether what is at *path* is a socket of this user's own. In /tmp
+    anyone can make one called discord-ipc-0, and would be told what this
+    user watches."""
+    try:
+        st = os.stat(path)
+        return stat.S_ISSOCK(st.st_mode) and st.st_uid == os.getuid()
+    except (OSError, AttributeError):
+        return False
+
+
+def peer_uid(sock: socket.socket) -> int | None:
+    """The user at the other end of a connected Unix socket, where the
+    system says (Linux, macOS, the BSDs); None where it does not."""
+    try:
+        if hasattr(socket, "SO_PEERCRED"):
+            data = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
+                                   struct.calcsize("3i"))
+            _pid, uid, _gid = struct.unpack("3i", data)
+            return int(uid)
+        if sys.platform == "darwin" or "bsd" in sys.platform:
+            # struct xucred: version, uid, number of groups, groups.
+            data = sock.getsockopt(0, getattr(socket, "LOCAL_PEERCRED", 1), 76)
+            _version, uid = struct.unpack_from("=II", data)
+            return int(uid)
+    except (OSError, struct.error, ValueError):
+        return None
+    return None
+
+
+def pipe_is_ours(handle: int, kernel32: Any = None) -> bool | None:
+    """Windows: whether the pipe behind *handle* is served from this login
+    session - a pipe's name is the whole machine's, and another account
+    signed in beside this one could have made it first. None when Windows
+    does not say."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = kernel32 if kernel32 is not None else ctypes.WinDLL(  # type: ignore[attr-defined]
+            "kernel32", use_last_error=True)
+        k32.GetNamedPipeServerSessionId.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+        k32.GetNamedPipeServerSessionId.restype = wintypes.BOOL
+        k32.ProcessIdToSessionId.argtypes = [wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+        k32.ProcessIdToSessionId.restype = wintypes.BOOL
+        k32.GetCurrentProcessId.restype = wintypes.DWORD
+        theirs, ours = wintypes.ULONG(0), wintypes.DWORD(0)
+        if not k32.GetNamedPipeServerSessionId(wintypes.HANDLE(handle), ctypes.byref(theirs)):
+            return None
+        if not k32.ProcessIdToSessionId(k32.GetCurrentProcessId(), ctypes.byref(ours)):
+            return None
+        return int(theirs.value) == int(ours.value)
+    except Exception:
+        return None
+
+
+_left: set[str] = set()
+
+
+def _leave(path: str, why: str) -> PermissionError:
+    """A socket that is not this user's Discord: said once, never spoken to."""
+    if path not in _left:
+        _left.add(path)
+        log.warning("discord: %s is %s - nothing is said to it", path, why)
+    return PermissionError(f"{path}: {why}")
 
 
 def _text(value: Any) -> str:
@@ -170,10 +249,18 @@ class Pipe(Protocol):
 
 class _UnixPipe:
     def __init__(self, path: str) -> None:
+        # Whose it is, before a byte goes out: the file's owner, and once
+        # connected the user at the other end (the file could be swapped
+        # between the look and the connect).
+        if not mine(path):
+            raise _leave(path, "not a socket of this user's")
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.settimeout(IO_TIMEOUT_S)
         try:
             self.sock.connect(path)
+            uid = peer_uid(self.sock)
+            if uid is not None and uid != os.getuid():
+                raise _leave(path, "another user's")
         except OSError:
             self.sock.close()
             raise
@@ -204,6 +291,14 @@ class _UnixPipe:
 class _WinPipe:
     def __init__(self, path: str) -> None:
         self.fh = open(path, "r+b", buffering=0)     # kept open: the pipe
+        try:
+            import msvcrt
+            ours = pipe_is_ours(msvcrt.get_osfhandle(self.fh.fileno()))  # type: ignore[attr-defined]
+        except (ImportError, OSError, ValueError):
+            ours = None
+        if ours is False:
+            self.fh.close()
+            raise _leave(path, "served from another login session")
 
     def send(self, data: bytes) -> None:
         self.fh.write(data)

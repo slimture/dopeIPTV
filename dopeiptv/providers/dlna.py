@@ -9,9 +9,22 @@ is served to it from here. Only the standard library - nothing to install.
 DlnaManager answers to the same calls as ChromecastManager, and CastHub
 (providers/casting.py) puts the two behind the one object the window casts
 with.
+
+Anything on the network can answer a search and say it is a TV, so what an
+answer says is taken narrowly: a description only where a TV can be - on
+the device that answered, or elsewhere on the home network (an SSDP relay
+answers for a TV on another part of it), never on this computer itself or
+outside the home's ranges (``_from_sender``) -, its control addresses only
+on the device the description came from (``same_host``), its service types
+only as UPnP writes them (``_SERVICE``), no redirect followed and no answer
+read past MAX_XML or for longer than READ_S. Otherwise a device on the
+network sends this computer's requests - and, when it is cast to, the
+stream's address - wherever it likes.
 """
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import os
 import re
 import secrets
@@ -27,11 +40,13 @@ from urllib.parse import quote, urljoin, urlparse
 from xml.sax.saxutils import escape
 
 from .. import APP_NAME, VERSION
+from ..core import home_net, safe_xml
 from ..core._lazy_requests import requests
-from ..core.log import log, redact_url
+from ..core.log import log
+from ..core.privacy import url_for_log
 from ..i18n import LocalizedError
 from .cast_bridge import lan_address
-from ..core.exclusive_bind import ExclusiveBindMixin, IdleTimeoutMixin
+from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 
 SSDP_ADDR = ("239.255.255.250", 1900)
 SEARCH_TARGETS = ("urn:schemas-upnp-org:device:MediaRenderer:1",
@@ -102,13 +117,134 @@ def _clean_name(name: str) -> str:
     return name[:80] or "TV"
 
 
+#: A UPnP service type, as the specification writes one
+#: (urn:schemas-upnp-org:service:AVTransport:1). It goes into the request's
+#: SOAPAction header and into its envelope: nothing but these letters.
+_SERVICE = re.compile(r"urn:[A-Za-z0-9._-]+:service:[A-Za-z0-9._-]+:[0-9][0-9.]{0,7}")
+
+
+def host_of(url: str) -> str:
+    """The host an http address names ("192.168.1.20"), "" for none."""
+    try:
+        return (urlparse(url).hostname or "").lower() if "://" in url else ""
+    except ValueError:
+        return ""
+
+
+def _addresses(host: str, timeout: float = 1.5) -> set[str]:
+    """The addresses *host* stands for: itself when it is one, else what its
+    name resolves to within *timeout* (looked up on a thread of its own - a
+    name that never resolves must not hold a search)."""
+    try:
+        return {str(ipaddress.ip_address(host.strip("[]")))}
+    except ValueError:
+        pass
+    found: list[set[str]] = []
+
+    def look() -> None:
+        try:
+            found.append({str(info[4][0]) for info in socket.getaddrinfo(host, None)})
+        except (OSError, UnicodeError):
+            found.append(set())
+    t = threading.Thread(target=look, daemon=True)
+    t.start()
+    t.join(timeout)
+    return found[0] if found else set()
+
+
+def same_host(url: str, other: str) -> bool:
+    """Whether the http address *url* is on *other* - an address (the one
+    an answer came from) or another address's host: the same name, or names
+    for the same address."""
+    a = host_of(url)
+    b = host_of(other) if "://" in other else other.strip("[]").lower()
+    if not a or not b:
+        return False
+    return a == b or bool(_addresses(a) & _addresses(b))
+
+
+#: How long an answer may take to arrive whole.
+READ_S = 8.0
+
+
+def _read_body(r: Any, limit: int = MAX_XML) -> bytes:
+    """What a device answered, read to *limit* and for READ_S, no further:
+    one that never stops sending is neither kept in memory nor waited for.
+    (More than *limit* is a byte over it, which no reader below takes for a
+    description.)"""
+    chunks = getattr(r, "iter_content", None)
+    if not callable(chunks):
+        return bytes(r.content or b"")[:limit + 1]
+    out = b""
+    until = time.monotonic() + READ_S
+    try:
+        for chunk in chunks(16 * 1024):
+            out += chunk or b""
+            if len(out) > limit or time.monotonic() > until:
+                break
+    finally:
+        close = getattr(r, "close", None)
+        if callable(close):
+            close()
+    return out[:limit + 1]
+
+
+#: Descriptions named by a host's name (not its address) looked up in one
+#: search: each takes a lookup, and an answer is free to send.
+_NAMED_MAX = 8
+#: Descriptions one search takes at most: a home has a handful of TVs.
+MAX_ANSWERS = 64
+
+
+def _elsewhere_at_home(address: str) -> bool:
+    """Whether *address* is one on the home network that is not this
+    computer's own."""
+    try:
+        ip = ipaddress.ip_address(address.strip("[]"))
+    except ValueError:
+        return False
+    if ip.is_loopback or ip.is_unspecified or ip.is_multicast:
+        return False
+    return str(ip) != lan_address() and home_net.is_home_client(str(ip))
+
+
+def _from_sender(data: bytes, sender: str, named: list[int]) -> list[str]:
+    """The description addresses in one answer that are where a TV can be:
+    on the device that sent the answer - or, the answer coming from the
+    home network (an SSDP relay answers for a TV on another part of it),
+    elsewhere on the home network. Never on this computer itself, and never
+    outside the home's ranges: that is not where a TV is, but where an
+    answer would send this computer's requests."""
+    out: list[str] = []
+    for loc in _locations(data):
+        host = host_of(loc)
+        try:
+            at = str(ipaddress.ip_address(host.strip("[]")))
+            ok = at == sender or (_elsewhere_at_home(at) and home_net.is_home_client(sender))
+        except ValueError:
+            if not host or named[0] >= _NAMED_MAX:
+                continue
+            named[0] += 1
+            ok = sender in _addresses(host)
+        if ok:
+            out.append(loc)
+        elif len(_left) < 32 and (sender, host) not in _left:
+            _left.add((sender, host))
+            log.info("dlna: an answer from %s names a description elsewhere (%s) - left",
+                     sender, host)
+    return out
+
+
+_left: set[tuple[str, str]] = set()
+
+
 def _parse_xml(body: bytes) -> ET.Element:
     """Parse what a device on the network sent. A device description never
     needs a DTD or entities, so a document carrying one is refused rather
-    than expanded."""
-    if len(body) > MAX_XML or b"<!DOCTYPE" in body or b"<!ENTITY" in body:
+    than expanded - however it is written (core/safe_xml.py)."""
+    if len(body) > MAX_XML:
         raise ValueError("not a device description")
-    root = ET.fromstring(body)
+    root = safe_xml.fromstring(body, "A device's description")
     for el in root.iter():
         if isinstance(el.tag, str) and "}" in el.tag:
             el.tag = el.tag.split("}", 1)[1]
@@ -141,7 +277,9 @@ class Renderer:
         except (AttributeError, TypeError):
             return None
         ok = (r.av_url.startswith("http://") and r.av_type.startswith(AVT_PREFIX)
-              and (not r.rc_url or r.rc_url.startswith("http://")))
+              and bool(_SERVICE.fullmatch(r.av_type))
+              and (not r.rc_url or (r.rc_url.startswith("http://")
+                                    and bool(_SERVICE.fullmatch(r.rc_type)))))
         return r if ok else None
 
 
@@ -173,18 +311,15 @@ def ssdp_search(timeout: float = 3.0,
             for _ in range(2):          # UDP: a search can simply get lost
                 sock.sendto(msg, addr)
         deadline = time.monotonic() + timeout
+        named = [0]
         while time.monotonic() < deadline:
             try:
-                data, _addr = sock.recvfrom(65507)
+                data, sender = sock.recvfrom(65507)
             except socket.timeout:
                 continue
-            for line in data.decode("utf-8", "replace").split("\r\n"):
-                key, _, value = line.partition(":")
-                value = value.strip()
-                if (key.strip().lower() == "location"
-                        and value.startswith("http://")
-                        and value not in found):
-                    found.append(value)
+            for loc in _from_sender(data, str(sender[0]), named):
+                if loc not in found and len(found) < MAX_ANSWERS:
+                    found.append(loc)
     except OSError as e:
         log.info("dlna: the search could not be sent (%s)", e)
     finally:
@@ -243,6 +378,7 @@ def ssdp_unicast(hosts: list[str], timeout: float = 2.0, port: int = 1900,
                     break               # no route there, or the buffer is full
         sock.setblocking(False)
         deadline = time.monotonic() + timeout
+        named = [0]
         while True:
             left = deadline - time.monotonic()
             if left <= 0 or (cancel is not None and cancel.is_set()):
@@ -254,9 +390,10 @@ def ssdp_unicast(hosts: list[str], timeout: float = 2.0, port: int = 1900,
                 data, addr = sock.recvfrom(65507)
             except OSError:
                 continue
-            for loc in _locations(data):
-                got = found.setdefault(str(addr[0]), [])
-                if loc not in got:
+            sender = str(addr[0])
+            for loc in _from_sender(data, sender, named):
+                got = found.setdefault(sender, [])
+                if loc not in got and len(got) < 8:
                     got.append(loc)
     except (OSError, ValueError) as e:
         log.info("dlna: the search by address stopped (%s)", e)
@@ -270,10 +407,13 @@ def describe(location: str, session: Any = None) -> Renderer | None:
     (no AVTransport) or does not answer sensibly."""
     http = session or requests
     try:
-        r = http.get(location, timeout=4, headers={"User-Agent": UA})
+        # As it stands: a description is not somewhere else (no redirect
+        # followed), and it is a few kilobytes (_read_body).
+        r = http.get(location, timeout=4, headers={"User-Agent": UA},
+                     allow_redirects=False, stream=True)
         if r.status_code != 200:
             return None
-        root = _parse_xml(r.content)
+        root = _parse_xml(_read_body(r))
     except Exception as e:
         log.info("dlna: no description from %s (%s)", location, e)
         return None
@@ -283,10 +423,16 @@ def describe(location: str, session: Any = None) -> Renderer | None:
         for svc in dev.iter("service"):
             stype = (svc.findtext("serviceType") or "").strip()
             ctrl = (svc.findtext("controlURL") or "").strip()
-            if not ctrl:
+            if not ctrl or not _SERVICE.fullmatch(stype):
                 continue
             url = urljoin(base, ctrl)
             if not url.startswith("http://"):
+                continue
+            if not same_host(url, location):
+                # A TV is controlled where it is: an address elsewhere is
+                # where the stream's address would be posted to.
+                log.info("dlna: %s names a control address elsewhere (%s) - left",
+                         host_of(location), host_of(url))
                 continue
             if stype.startswith(AVT_PREFIX) and av is None:
                 av = (url, stype)
@@ -312,6 +458,10 @@ def soap(url: str, service: str, action: str,
          session: Any = None) -> dict[str, str]:
     """Call *action* on a renderer. Arguments in the order the service
     declares them - some TVs read them by position."""
+    if not _SERVICE.fullmatch(service or ""):
+        # It goes into a header and the envelope as it is: only a service
+        # type as UPnP writes one (a device's description says it).
+        raise SoapError("0", "not a UPnP service type")
     body = "".join(f"<{k}>{escape(str(v))}</{k}>" for k, v in args)
     envelope = (
         '<?xml version="1.0" encoding="utf-8"?>'
@@ -320,12 +470,15 @@ def soap(url: str, service: str, action: str,
         f'<s:Body><u:{action} xmlns:u="{service}">{body}</u:{action}>'
         "</s:Body></s:Envelope>")
     http = session or requests
+    # Sent to the TV and nowhere it points on to: a redirect of this request
+    # would carry the stream's address along.
     r = http.post(url, data=envelope.encode("utf-8"), timeout=timeout,
                   headers={"Content-Type": 'text/xml; charset="utf-8"',
                            "SOAPAction": f'"{service}#{action}"',
-                           "User-Agent": UA})
+                           "User-Agent": UA},
+                  allow_redirects=False, stream=True)
     try:
-        root = _parse_xml(r.content or b"<x/>")
+        root = _parse_xml(_read_body(r) or b"<x/>")
     except Exception:
         root = ET.Element("x")
     if r.status_code != 200:
@@ -349,7 +502,11 @@ class _FileHandler(IdleTimeoutMixin, BaseHTTPRequestHandler):
 
     def _target(self) -> tuple[str, int] | None:
         srv = self.server
-        if self.path.split("?", 1)[0] != srv.url_path:  # type: ignore[attr-defined]
+        # The address holds the cast's token: compared in the same time
+        # whatever a guess got right.
+        asked = self.path.split("?", 1)[0].encode("utf-8", "replace")
+        own = str(srv.url_path).encode("utf-8")         # type: ignore[attr-defined]
+        if not hmac.compare_digest(asked, own):
             self.send_error(404)
             return None
         path = srv.file_path                            # type: ignore[attr-defined]
@@ -422,7 +579,7 @@ class _FileHandler(IdleTimeoutMixin, BaseHTTPRequestHandler):
             log.info("dlna: serving the file stopped (%s)", e)
 
 
-class _FileServer(ExclusiveBindMixin, ThreadingHTTPServer):
+class _FileServer(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
     daemon_threads = True
 
     def handle_error(self, request, client_address) -> None:
@@ -440,7 +597,7 @@ class FileShare:
         name = quote(re.sub(r"[^\w.-]+", "_", os.path.basename(path))[-80:]
                      or "media")
         srv = _FileServer(("0.0.0.0", 0), _FileHandler)
-        srv.url_path = f"/{secrets.token_urlsafe(12)}/{name}"  # type: ignore[attr-defined]
+        srv.url_path = f"/{secrets.token_urlsafe(18)}/{name}"  # type: ignore[attr-defined]
         srv.file_path = path                                    # type: ignore[attr-defined]
         srv.mime = mime_for(path)                               # type: ignore[attr-defined]
         threading.Thread(target=srv.serve_forever,
@@ -504,6 +661,14 @@ class DlnaManager:
 
     def knows(self, name: str) -> bool:
         return name in self.renderers or name.endswith(SUFFIX)
+
+    def find(self, name: str) -> bool:
+        """Whether *name* is a renderer here - searched for first when this
+        run has not met it yet (as cast() does)."""
+        with self._lock:
+            if name not in self.renderers:
+                self.scan()
+            return name in self.renderers
 
     @staticmethod
     def _place(found: dict[str, Renderer], r: Renderer) -> str | None:
@@ -636,7 +801,7 @@ class DlnaManager:
         self._played = False
         self.last_position = self.position_offset = self.position_at = 0.0
         self.duration = 0.0 if dvr else float(duration or 0.0)
-        log.info("dlna -> %s: %s (%s)", device_name, redact_url(target), mime)
+        log.info("dlna -> %s: %s (%s)", device_name, url_for_log(target), mime)
         meta = didl(target, title, mime)
         try:
             self._set_uri(target, meta)

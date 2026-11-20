@@ -162,6 +162,7 @@ def test_wiping_waits_for_a_reader_where_an_open_file_cannot_go(tmp_path, monkey
         if not os.listdir(path):
             os.rmdir(path)
     monkeypatch.setattr(dvr_store, "open", Held, raising=False)
+    monkeypatch.setattr(dvr_store, "open_private", Held)        # the writer's
     monkeypatch.setattr(dvr_store.shutil, "rmtree", windows_rmtree)
     s, _clock = store(tmp_path)
     s.append(b"a" * 188)
@@ -237,3 +238,29 @@ def test_after_a_run_playback_goes_on_from_the_next_run_not_the_same(tmp_path):
     # Without the segment's number, by time alone, the same answer.
     assert s.next_run_after(short.t0 + 0.1) is nxt
     assert s.next_run_after(first.t0, first.seq) is short
+
+
+def test_what_was_watched_is_this_user_s_alone(tmp_path):
+    """The buffer holds the channel watched: its folder 0700 - narrowed
+    when it was there before - and every segment 0600, whatever the
+    umask."""
+    import os
+    import stat
+
+    import pytest
+    if os.name != "posix":
+        pytest.skip("modes are POSIX")
+    (tmp_path / "s").mkdir(mode=0o755)
+    os.chmod(tmp_path / "s", 0o755)
+    old = os.umask(0o022)
+    try:
+        s, clock = store(tmp_path)
+        s.append(b"x" * 1000)
+        clock.t += 2.5
+        s.append(b"y" * 1000)
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE(os.stat(tmp_path / "s").st_mode) == 0o700
+    assert [stat.S_IMODE(os.stat(g.path).st_mode) for g in s._segs] == [0o600, 0o600]
+    assert s._segs[1].path.read_bytes() == b"y" * 872
+    s.close()

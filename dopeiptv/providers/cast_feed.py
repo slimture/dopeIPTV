@@ -32,8 +32,9 @@ import time
 from typing import IO, Any, Callable
 from urllib.parse import urlsplit
 
-from ..core.log import log, redact_url
-from ..core.player_exec import NO_WINDOW
+from ..core.log import log
+from ..core.privacy import url_for_log
+from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
 
 #: What the converter reads instead of an address.
 INPUT = "pipe:0"
@@ -84,6 +85,8 @@ def reader_args(exe: str, url: str, start: float = 0.0, ts_offset: float = 0.0,
         "-progress", "pipe:2",
         "-analyzeduration", "8000000", "-probesize", "8000000",
         *(net or []),
+        # What the piece's address leads to stays a stream's.
+        *ffmpeg_protocols(url),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
         *KEYFRAME_INPUT, "-i", url,
         "-map", "0:v:0?", "-map", f"0:a:{max(0, int(audio))}?", "-sn", "-dn",
@@ -280,7 +283,7 @@ class Feed:
         if stop.is_set():
             _end(proc)
         log.info("cast feed: reading the %s from %s", self.kind,
-                 redact_url(url))
+                 url_for_log(url))
         out: list[float] = [0.0]
         errs = threading.Thread(target=_progress, args=(proc, out), daemon=True)
         errs.start()

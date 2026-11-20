@@ -18,6 +18,7 @@ from .notices import activity
 from ..i18n import tr
 from . import theme
 from .theme import P
+from .widgets import plain_text
 
 BOX_KINDS = ("enigma2", "tvheadend", "hdhomerun", "vdr", "dvbviewer", "nextpvr", "mythtv", "satip")
 # Media servers (ui/media_signin.py signs in to them).
@@ -92,6 +93,7 @@ class FindOnNetwork(QPushButton):
             f"QPushButton#FindOnNetwork:hover {{ text-decoration: underline; }}"
             f"QPushButton#FindOnNetwork:disabled {{ color: {P['muted2']}; }}")
         self.status = QLabel("")
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color:{P['muted2']}; font-size:11px;")
         self.status.hide()
@@ -178,6 +180,6 @@ class FindOnNetwork(QPushButton):
         title.setEnabled(False)
         for d in found:
             act = menu.addAction(f"{d['name']}  ·  {SHORT_NAMES.get(d['kind'], d['kind'])}")
-            act.setToolTip(d["server"])
+            act.setToolTip(plain_text(d["server"]))     # what the network answered
             act.triggered.connect(lambda _c=False, d=d: self.picked.emit(d))
         menu.popup(self.mapToGlobal(self.rect().bottomLeft()))

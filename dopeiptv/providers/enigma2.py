@@ -129,6 +129,32 @@ def picon_name(sref: str) -> str:
     return "_".join(f).strip("_").upper()
 
 
+#: The most the box's screenshot (/grab) is read: a 4K frame as a BMP is
+#: 33 MB, its JPEG a few hundred KB.
+GRAB_MAX = 64 * 1024 * 1024
+#: What /grab sends: a JPEG, a PNG or a BMP (by their first bytes).
+GRAB_KINDS = (b"\xff\xd8", b"\x89PNG", b"BM")
+
+
+def _read_most(r: Any, limit: int) -> bytes | None:
+    """*r*'s streamed body, or None past *limit* bytes - its Content-Length
+    says so, or it keeps coming (read no further)."""
+    try:
+        said = int(r.headers.get("Content-Length") or 0)
+    except (AttributeError, TypeError, ValueError):
+        said = 0
+    if said > limit:
+        return None
+    chunks: list[bytes] = []
+    size = 0
+    for chunk in r.iter_content(64 * 1024):
+        size += len(chunk)
+        if size > limit:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 class Enigma2Client(BoxClient):
     LOG_NAME = "enigma2"
     KIND = "Enigma2"
@@ -485,8 +511,16 @@ class Enigma2Client(BoxClient):
         params = {"format": "jpg"}
         if mode in ("video", "osd"):
             params["mode"] = mode
-        data = self.get("/grab", params, timeout=(6.0, 30.0)).content or b""
-        if not data.startswith((b"\xff\xd8", b"\x89PNG", b"BM")):
+        r = self.get("/grab", params, timeout=(6.0, 30.0), stream=True)
+        try:
+            data = _read_most(r, GRAB_MAX)
+        finally:
+            r.close()
+        if data is None:
+            log.warning("enigma2: the box's screenshot is larger than %d MB - not read",
+                        GRAB_MAX >> 20)
+            raise LocalizedError("err_box_no_grab")
+        if not data.startswith(GRAB_KINDS):
             raise LocalizedError("err_box_no_grab")
         return data
 
@@ -755,7 +789,7 @@ class Enigma2Client(BoxClient):
 def _int(text: str) -> int:
     try:
         return int(float(text))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

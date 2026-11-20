@@ -11,6 +11,8 @@ mixin.
 from __future__ import annotations
 
 import math
+import re
+from typing import Any
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import (
@@ -20,6 +22,15 @@ from PyQt6.QtWidgets import QColorDialog, QMenu
 
 from ..i18n import tr
 from .theme import HEART, P, nav_active_colors, on_accent
+
+_HEX = re.compile(r"#[0-9A-Fa-f]{6}")
+
+
+def nav_colour(value: Any) -> str:
+    """A nav entry's colour as the settings keep it (the picker's #rrggbb),
+    or "" for anything else - a backup or another computer's sync can
+    bring any text, and it goes into a style sheet: never as it is."""
+    return value if isinstance(value, str) and _HEX.fullmatch(value) else ""
 
 
 class _NavMixin:
@@ -132,8 +143,8 @@ class _NavMixin:
         b = self.nav_btns.get(key)
         if b is None:
             return
-        fg = self.settings.value(f"nav_color_{key}", "") or ""
-        bg = self.settings.value(f"nav_bg_{key}", "") or ""
+        fg = nav_colour(self.settings.value(f"nav_color_{key}", ""))
+        bg = nav_colour(self.settings.value(f"nav_bg_{key}", ""))
         if not fg and not bg:
             b.setStyleSheet("")
             b.set_active_colors("", "")
@@ -181,7 +192,7 @@ class _NavMixin:
 
     def _pick_nav_color(self, key: str, which: str) -> None:
         skey = f"nav_bg_{key}" if which == "bg" else f"nav_color_{key}"
-        cur = self.settings.value(skey, "") or ""
+        cur = nav_colour(self.settings.value(skey, ""))
         # Force Qt's own dialog: the native colour picker can open behind the
         # window or hang on some Linux setups (same as the file dialog).
         col = QColorDialog.getColor(

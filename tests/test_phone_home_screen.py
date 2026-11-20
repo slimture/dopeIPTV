@@ -33,7 +33,7 @@ def test_the_page_points_at_its_manifest_and_icons():
 def test_the_manifest_stays_under_the_token_and_names_every_icon():
     m = json.loads(phone_page.manifest("#101010"))
     assert m["name"] == "dopeIPTV Remote" and m["display"] == "standalone"
-    assert m["start_url"] == "./" and m["scope"] == "./"      # relative: the token stays
+    assert "start_url" not in m and m["scope"] == "./"      # the address the phone is on, its # too
     assert m["background_color"] == "#101010"
     assert {i["src"] for i in m["icons"]} <= set(phone_page.ICONS)
     assert any(i["purpose"] == "maskable" for i in m["icons"])
@@ -62,13 +62,13 @@ def server():
 
 
 def test_the_server_hands_out_the_manifest_and_icons_under_the_token(server):
-    code, ctype, body = _get(f"{server}/{TOKEN}/manifest.webmanifest")
+    code, ctype, body = _get(f"{server}/r/manifest.webmanifest")
     assert code == 200 and ctype == "application/manifest+json"
     assert json.loads(body)["name"] == "dopeIPTV Remote"
-    code, ctype, body = _get(f"{server}/{TOKEN}/icon-180.png")
+    code, ctype, body = _get(f"{server}/r/icon-180.png")
     assert code == 200 and ctype == "image/png" and body.startswith(b"\x89PNG")
-    assert _get(f"{server}/{TOKEN}/icon-512.png")[0] == 404        # not drawn: none
-    assert _get(f"{server}/{'x' * 40}/manifest.webmanifest")[0] == 403   # never without it
+    assert _get(f"{server}/r/icon-512.png")[0] == 404        # not drawn: none
+    assert _get(f"{server}/{'x' * 40}/manifest.webmanifest")[0] == 403   # nowhere else
 
 
 def test_the_window_draws_square_edge_to_edge_icons():

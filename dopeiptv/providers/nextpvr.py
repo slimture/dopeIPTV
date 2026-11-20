@@ -29,6 +29,7 @@ NextPVR 4's older recording fields (start_time, duration; both read).
 from __future__ import annotations
 
 import hashlib
+import re
 import threading
 import time
 from typing import Any, Callable
@@ -60,7 +61,7 @@ def _int(value: Any) -> int:
 def _secs(text: str) -> int:
     """A time NextPVR writes as Unix seconds or milliseconds."""
     s = (text or "").strip()
-    if not s.lstrip("-").isdigit():
+    if not re.fullmatch(r"-?\d{1,19}", s):
         return 0
     n = int(s)
     return n // 1000 if n > 10 ** 11 else n

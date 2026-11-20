@@ -48,7 +48,10 @@ from PyQt6.QtWidgets import QApplication, QInputDialog, QMenu
 from ..core import mitt, places, privacy, profiles
 from ..core.log import log
 from ..core.privacy import for_log
-from ..core.stores import FAV_DEFAULT_GROUP, FavoriteStore, FollowedSeriesStore, HistoryStore
+from ..core.stores import (
+    CategoryOverrides, FAV_DEFAULT_GROUP, FavoriteStore, FollowedSeriesStore, HistoryStore,
+    lock_hides,
+)
 from ..core.workers import run_async
 from ..i18n import tr
 from ..media.players import launch_player
@@ -108,6 +111,16 @@ class _Source:
     locked: set = field(default_factory=set)
     new: list | None = None
     raw: dict = field(default_factory=dict)
+    #: Another source's categories locked while the lock is shut, per mode
+    #: (the source in use's rows come filtered).
+    shut: dict = field(default_factory=dict)
+
+
+def _lock_keeps(row: Any, shut: dict) -> bool:
+    """(the worker) Another source's kept row as its lists may show it:
+    none of a category locked while the lock is shut - nor, while one of
+    its kind is, one kept without its category (no catalogue to ask)."""
+    return not shut or lock_hides(row, shut) is False
 
 
 @dataclass
@@ -155,12 +168,14 @@ def _build(snap: _Snap) -> _Data:
         rkey = f"resume_positions_{pid}" if pid else "resume_positions"
         resume = ResumeStore(_Raw({rkey: src.resume_raw}), pid or None)
         rows = src.cont if src.cont is not None else resume.continue_watching()
+        rows = [r for r in rows if _lock_keeps(r, src.shut)]
         local = [{"_kind": "local", "_key": key, "_url": key,
                   "name": os.path.splitext(os.path.basename(str(key)))[0],
                   "_resume_pos": pos, "_resume_dur": dur, "_ts": ts}
                  for key, pos, dur, ts in resume.positions("local")]
         cont.append(mitt.continue_entries(list(rows) + local, pid))
         history = src.history if src.active else HistoryStore(raw, f"history_{pid}").items()
+        history = [h for h in history if _lock_keeps(h, src.shut)]
         entries = mitt.history_entries(history, pid)
         for e in entries:
             kind = {mitt.FILM: "movie", mitt.EPISODE: "episode", mitt.LOCAL: "local"}.get(e.kind)
@@ -458,8 +473,10 @@ class _MittMixin:
         except Exception:
             log.debug("mine: continue", exc_info=True)
             cont = []
+        # The parental lock as the lists have it: none of a locked category
+        # (Continue watching's are left out by _continue_rows).
         here = _Source(active, names.get(active, ""), True,
-                       history=list(getattr(self.history, "entries", []) or []),
+                       history=self._lock_filter(getattr(self.history, "entries", []) or []),
                        resume_raw=str(resume_s.value(
                            f"resume_positions_{active}" if active else "resume_positions", "")
                            or ""),
@@ -486,7 +503,7 @@ class _MittMixin:
                 sources.append(_Source(pid, names.get(pid, ""), False,
                                        resume_raw=str(resume_s.value(
                                            f"resume_positions_{pid}", "") or ""),
-                                       raw=raw))
+                                       raw=raw, shut=self._mitt_shut(pid, unlocked)))
         radio_locked = set() if unlocked else set(self.radio_favs.locked_groups())
         web_locked = set() if unlocked else set(self.web_favs.locked_groups())
         radio = mitt.fav_rows(self.radio_favs.groups, "stationuuid", radio_locked)
@@ -499,6 +516,14 @@ class _MittMixin:
         return _Snap(made_for, sources, radio, web, list(wl.movies), list(wl.shows),
                      mitt.parse_order(own.value(mitt.ORDER_KEY, "")), log_titles,
                      getattr(self, "_kids_keep", lambda _m: None)("live"), datetime.now())
+
+    def _mitt_shut(self, pid: str, unlocked: bool) -> dict[str, frozenset[str]]:
+        """Per mode, another source's categories locked while the lock is
+        shut - from its own lock rules, as the window keeps them under its id."""
+        if unlocked:
+            return {}
+        cats = CategoryOverrides(self.settings, f"category_overrides_{pid}")
+        return {m: ids for m in ("live", "vod", "series") if (ids := cats.locked_ids(m))}
 
     def _mitt_worker(self) -> QThreadPool:
         if self._mitt_pool is None:

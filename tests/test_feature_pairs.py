@@ -1021,8 +1021,12 @@ def test_a_multiview_cell_plays_with_the_sources_nerd_options_as_the_player_does
         assert cell._mpv_play("http://provider.example/live/1.ts")
         assert m.played == "http://provider.example/live/1.ts"
         assert m["user-agent"] == "Kodi/21"
-        # Own DNS (or a trusted certificate): through the route's bridge.
-        assert str(m["http-proxy"]).startswith("http://127.0.0.1:")
+        # Own DNS (or a trusted certificate): through the route's bridge,
+        # on this computer and with the bridge's own key (core/net_bridge.py).
+        from urllib.parse import urlsplit
+        px = urlsplit(str(m["http-proxy"]))
+        assert px.scheme == "http" and px.hostname == "127.0.0.1" and px.port
+        assert px.username == "dopeiptv" and len(px.password or "") >= 22
     finally:
         nerd.set_source(None)
         nerd.install(None)

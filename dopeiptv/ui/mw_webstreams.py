@@ -38,7 +38,7 @@ from .notices import hub_of
 from .theme import P
 
 #: Error reasons (core/ytdlp.YtdlpError) -> what the person is told.
-_ERR_TEXT = {"platform": "ytdlp_err_platform", "release": "ytdlp_err_download",
+_ERR_TEXT = {"platform": "ytdlp_err_platform", "pin": "ytdlp_err_pin", "release": "ytdlp_err_download",
              "download": "ytdlp_err_download", "checksum": "ytdlp_err_checksum",
              "runs": "ytdlp_err_runs", "busy": "ytdlp_err_busy",
              "missing": "ytdlp_err_runs", "failed": "web_play_failed"}

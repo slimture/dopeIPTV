@@ -364,7 +364,8 @@ class _ReportMixin:
             if dlg is not None:
                 dlg.reply_failed(code, wait)
             return
-        words = report.scrub(text, self._personal_values()).strip()[:report.REPLY_MAX]
+        personal = self._personal_values()
+        words = report.scrub(text, personal).strip()[:report.REPLY_MAX]
         if not words:
             return
         h = report.code_hash(code)
@@ -399,8 +400,8 @@ class _ReportMixin:
                 return
             if win is not None:
                 win.reply_failed(code, "failed")
-        run_async(self.pool, partial(report.send_status, "feedback", words, extra=fields), done,
-                  lambda _e=None: done(0))
+        run_async(self.pool, partial(report.send_status, "feedback", words, personal=personal,
+                                     extra=fields), done, lambda _e=None: done(0))
 
     def _answered(self) -> list[dict]:
         settings = getattr(self, "settings", None)
@@ -538,6 +539,7 @@ class _ReportMixin:
             if not d.exec():
                 return
             payload = report.scrub(d.payload(), self._personal_values())
+        personal = self._personal_values()
         if not payload.strip():
             return
         if copy_only:
@@ -564,5 +566,6 @@ class _ReportMixin:
             from PyQt6.QtGui import QGuiApplication
             QGuiApplication.clipboard().setText(payload)
             self._show_toast(tr("report_not_sent"), 9000)
-        run_async(self.pool, lambda: report.send(kind, payload, extra=fields), done, lambda _e=None: done(False))
+        run_async(self.pool, lambda: report.send(kind, payload, personal=personal, extra=fields), done,
+                  lambda _e=None: done(False))
         log.info("report: %s sent by the person", kind)

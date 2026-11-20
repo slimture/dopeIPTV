@@ -49,6 +49,50 @@ def test_a_channel_keeps_its_id_when_the_list_changes_around_it():
     assert len(set(after.values())) == 4
 
 
+def _probed_one_by_one(keys):
+    """stable_ids as it was: each taken id tried in turn."""
+    import zlib
+    taken, seen, out = set(), {}, []
+    for key in keys:
+        n = seen.get(key, 0)
+        seen[key] = n + 1
+        sid = m3u_ids.LINE_MAX | (zlib.crc32(f"{key}\x1f{n}".encode()) & (m3u_ids.LINE_MAX - 1))
+        while sid in taken:
+            sid = m3u_ids.LINE_MAX | ((sid + 1) & (m3u_ids.LINE_MAX - 1))
+        taken.add(sid)
+        out.append(sid)
+    return out
+
+
+def test_ids_that_hash_alike_are_found_at_once_and_stay_the_same(monkeypatch):
+    """A list made to hash alike took a step for every channel before it,
+    each time: quadratic, minutes for a large list. The free id is found
+    at once now - and it is the id it always was."""
+    import random
+    import time
+    import types
+    keys = [m3u_ids.channel_key("", f"Ch {i % 700}") for i in range(3000)]
+    assert m3u_ids.stable_ids(keys) == _probed_one_by_one(keys)
+    rnd = random.Random(7)
+    hashes = {}
+
+    def clustered(data):
+        # Few distinct hashes, close together: long runs of taken ids,
+        # one wrapping past the top of the range.
+        return hashes.setdefault(data, rnd.choice((5, 9, 40, m3u_ids.LINE_MAX - 3)))
+    fake = types.SimpleNamespace(crc32=clustered)
+    monkeypatch.setattr(m3u_ids, "zlib", fake)
+    import zlib as real
+    monkeypatch.setattr(real, "crc32", clustered)
+    small = [f"k{i}" for i in range(2000)]
+    assert m3u_ids.stable_ids(small) == _probed_one_by_one(small)
+    monkeypatch.setattr(m3u_ids, "zlib", types.SimpleNamespace(crc32=lambda data: 12345))
+    t0 = time.perf_counter()
+    ids = m3u_ids.stable_ids(f"same {i}" for i in range(200_000))
+    assert time.perf_counter() - t0 < 5.0
+    assert len(set(ids)) == 200_000 and ids[:3] == [m3u_ids.LINE_MAX | n for n in (12345, 12346, 12347)]
+
+
 def test_the_same_name_twice_is_two_channels_told_apart_by_turn():
     c = _client(_m3u("Sport", "News", "Sport"), stable=True)
     a, b = c._channels[0]["stream_id"], c._channels[2]["stream_id"]

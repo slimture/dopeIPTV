@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 from .log import log
+from .num import whole
 
 if TYPE_CHECKING:               # core.nerd imports this module, nerd_check imports nerd
     from .nerd_check import Check
@@ -71,10 +72,7 @@ class Cap:
 def cap_of(quality: str | None, kbps: int | str | None = 0) -> Cap:
     """The cap the Nerd page's two settings ask for (*kbps*: kbit/s)."""
     q = str(quality or "").strip().lower().rstrip("p")
-    try:
-        bits = max(0, int(float(kbps or 0))) * 1000
-    except (TypeError, ValueError):
-        bits = 0
+    bits = max(0, whole(kbps or 0, 0, hi=10_000_000)) * 1000
     if q == "lowest":
         return Cap(lowest=True)
     return Cap(height=HEIGHTS.get(q, 0), bits=bits)

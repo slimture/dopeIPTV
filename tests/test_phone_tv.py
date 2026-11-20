@@ -18,6 +18,7 @@ import pytest
 from dopeiptv.core import events, mqtt_control, phone_page, phone_remote, tv_input
 from dopeiptv.core.phone_remote import PhoneServer
 from dopeiptv.core.remote_api import RemoteServer
+from tests.phone_sign import signed_request
 
 TOKEN = "Ab3_-x9Ab3_-x9Ab3_-x9Ab3_-x9Qz12"
 
@@ -30,11 +31,7 @@ def _no_proxy(monkeypatch):
 
 def ask(port, method, path, body=None, headers=None):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    h = dict(headers or {})
-    data = None
-    if body is not None:
-        data = json.dumps(body).encode()
-        h["Content-Type"] = "application/json"
+    path, data, h = signed_request(TOKEN, method, path, body, headers)
     conn.request(method, path, body=data, headers=h)
     r = conn.getresponse()
     raw = r.read()

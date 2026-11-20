@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..core import health, nerd
+from ..core import health, nerd, privacy
 from ..core.log import log
 from ..i18n import tr
 
@@ -44,7 +44,10 @@ class _HealthMixin:
                       kind: str, catchup: bool) -> None:
         """The player was asked to play something (_start_playback)."""
         try:
-            if kind != "live" or catchup:
+            if kind != "live" or catchup or privacy.playback_private(kind, key):
+                # No channel, or one watched privately: nothing of it is
+                # counted to the end of that playback, though private
+                # viewing ends before it does.
                 self.health.leave()
                 return
             name = (item or {}).get("name") or title or ""

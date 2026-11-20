@@ -43,14 +43,51 @@ def last_device(settings, live: bool) -> str:
     return str(got.get("live" if live else "title") or got.get("any") or "")
 
 
-def remember_device(settings, live: bool, name: str) -> None:
-    """*name* is the TV cast to last (for this kind of thing, and at all)."""
+#: How many devices are known by what they were when last cast to.
+KNOWN_MAX = 32
+
+
+def remember_device(settings, live: bool, name: str, ident: str = "") -> None:
+    """*name* is the TV cast to last (for this kind of thing, and at all) -
+    and *ident* which device it was (providers/casting.CastHub.ident: its
+    kind, its own id, its address), so that another one answering to that
+    name later is not taken for it."""
     if not name:
         return
     got = _last_devices(settings)
     got["live" if live else "title"] = name
     got["any"] = name
+    if ident:
+        ids = got.get("ids")
+        ids = dict(ids) if isinstance(ids, dict) else {}
+        ids.pop(name, None)
+        ids[name] = ident                       # the newest last
+        got["ids"] = dict(list(ids.items())[-KNOWN_MAX:])
     settings.setValue(LAST_DEVICE_KEY, json.dumps(got))
+
+
+def known_ident(settings, name: str) -> str:
+    """Which device *name* was when it was last cast to; "" for one never
+    cast to (or before the app kept this)."""
+    ids = _last_devices(settings).get("ids")
+    return str(ids.get(name) or "") if isinstance(ids, dict) else ""
+
+
+def same_device(known: str, now: str) -> bool:
+    """Whether two of CastHub.ident's "kind:id@address" are one device: by
+    its own id where it has one - a TV the router gave another address is
+    still that TV - else by its address."""
+    def parts(ident: str) -> tuple[str, str, str]:
+        head, _, address = ident.rpartition("@")
+        kind, _, own = head.partition(":")
+        return kind, own, address
+    k_kind, k_own, k_addr = parts(known)
+    n_kind, n_own, n_addr = parts(now)
+    if k_kind != n_kind:
+        return False
+    if k_own or n_own:
+        return k_own == n_own
+    return k_addr == n_addr
 
 
 def last_first(names: list[str], last: str) -> list[str]:
@@ -129,6 +166,10 @@ class CastDialog(QDialog):
         self.managing = managing
         self.chosen = chosen
         self.height, self.fps = 0, 0.0
+        # Devices that answer to a name cast to before but are not the
+        # device it was then (another id, another address): never picked
+        # for the person, and said (_note_stranger).
+        self._strangers: set[str] = set()
         self.setWindowTitle(tr("cast_title"))
         self.setMinimumWidth(400)
         lay = QVBoxLayout(self)
@@ -260,6 +301,7 @@ class CastDialog(QDialog):
         self.list.currentItemChanged.connect(
             lambda item, *_a: self.cast_btn.setText(
                 cast_button_text(item.text() if item is not None else None)))
+        self.list.currentItemChanged.connect(lambda *_a: self._note_stranger())
         self.rescan_btn.clicked.connect(self._scan)
         self.cast_btn.clicked.connect(self._cast)
         self.stop_btn.clicked.connect(self._stop)
@@ -448,6 +490,40 @@ class CastDialog(QDialog):
         except RuntimeError:
             pass
 
+    # -- which device a name stands for ----------------------------------------
+
+    def _hub_says(self, what: str, name: str | None) -> str:
+        fn = getattr(self.window.cast, what, None)
+        try:
+            return str(fn(name) or "") if callable(fn) and name else ""
+        except Exception:
+            return ""
+
+    def _is_stranger(self, name: str) -> bool:
+        """Whether the device answering to *name* now is another than the
+        one cast to under that name before. Anything on the network can
+        announce itself as "Living room TV"."""
+        known = known_ident(self.window.settings, name)
+        now = self._hub_says("ident", name)
+        return bool(known and now and not same_device(known, now))
+
+    def _add_device(self, name: str) -> None:
+        """*name* in the list, its address in its tooltip: which device the
+        name stands for."""
+        self.list.addItem(name)
+        where = self._hub_says("where", name)
+        if where:
+            self.list.item(self.list.count() - 1).setToolTip(where)
+
+    def _note_stranger(self) -> None:
+        """The device picked is not the one its name was the last time:
+        said, with its address, before anything is sent to it."""
+        item = self.list.currentItem()
+        if item is None or item.text() not in self._strangers:
+            return
+        self._set_status(tr("cast_other_device", name=item.text(),
+                            address=self._hub_says("where", item.text())))
+
     def _show_remembered(self) -> None:
         """The devices from last time, without asking the network."""
         if self.list.count():
@@ -455,7 +531,7 @@ class CastDialog(QDialog):
         remembered = self.window.settings.value("cast_devices", "") or ""
         last = last_device(self.window.settings, self.live)
         for name in last_first([n for n in remembered.split("\n") if n], last):
-            self.list.addItem(name)
+            self._add_device(name)
         # Land on the one that is playing, when there is one.
         active = getattr(self.window, "_cast_device", None)
         for i in range(self.list.count()):
@@ -480,10 +556,14 @@ class CastDialog(QDialog):
                 self.window.settings.setValue(
                     "cast_devices", "\n".join(names or []))
                 self.list.clear()
+                names = list(names or [])
+                # A device that answers to a name cast to before but is not
+                # the device it was: listed, never picked for the person.
+                self._strangers = {n for n in names if self._is_stranger(n)}
+                last = last_device(self.window.settings, self.live)
                 # The TV used last on top, picked: one press casts to it.
-                for name in last_first(list(names or []),
-                                       last_device(self.window.settings, self.live)):
-                    self.list.addItem(name)
+                for name in last_first(names, "" if last in self._strangers else last):
+                    self._add_device(name)
                 status = (tr("cast_devices_found", n=len(names)) if names
                           else none_found_text())
                 if not names and not ChromecastManager.available():
@@ -493,9 +573,14 @@ class CastDialog(QDialog):
                     status += "\n\n" + (
                         tr("msg_cast_package_broken", why=why) if why
                         else tr("msg_cast_needs_package"))
+                if last in self._strangers:
+                    status += "\n\n" + tr("cast_other_device", name=last,
+                                          address=self._hub_says("where", last))
                 self._set_status(status)
-                if names:
-                    self.list.setCurrentRow(0)
+                first = next((i for i in range(self.list.count())
+                              if self.list.item(i).text() not in self._strangers), -1)
+                if first >= 0 and last not in self._strangers:
+                    self.list.setCurrentRow(first)
             except RuntimeError:
                 pass
 
@@ -529,7 +614,9 @@ class CastDialog(QDialog):
         # is running once this dialog is closed - local playback has stopped,
         # so the player pane is just black.
         def done(n):
-            remember_device(self.window.settings, self.live, n)
+            self._strangers.discard(n)
+            remember_device(self.window.settings, self.live, n,
+                            self._hub_says("ident", n))
             self._set_status(tr("airplay_pick_window") if self._is_airplay(n)
                              else tr("cast_casting_to", name=n))
             self._banner(n, self.stream_title)
@@ -569,6 +656,12 @@ class CastDialog(QDialog):
             # (mw_cast._cast_can_go_back); the window lets the pieces go.
             feed = None
         more = {"feed": feed} if feed is not None else {}
+        # The device this name was the last time it was cast to: nothing is
+        # sent to another one answering to it now (CastHub.cast) - unless it
+        # is picked here as what it is, its address said (_note_stranger).
+        expect = "" if name in self._strangers else known_ident(self.window.settings, name)
+        if expect:
+            more["expect"] = expect
         if isinstance(ctx, dict):
             ctx.update(url=self.url, source=self.source, codecs=self.codecs,
                        height=self.height, fps=self.fps,

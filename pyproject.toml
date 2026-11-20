@@ -7,7 +7,7 @@ name = "dopeiptv"
 # MUST stay in lock-step with dopeiptv/__init__.py's __version__. A test
 # (tests/test_version.py) fails the build if they drift, so a release can't
 # ship an sdist named after the wrong version again. Bump BOTH on a release.
-version = "1.6.8"
+version = "1.6.9"
 description = "IPTV player for Xtream Codes, M3U playlists and Stalker portals, the TV servers at home and Jellyfin, Emby and Plex"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -116,6 +116,8 @@ files = [
     "dopeiptv/core/home_net.py",
     "dopeiptv/providers/radio_browser.py",
     "dopeiptv/core/ytdlp.py",
+    "dopeiptv/core/ytdlp_pin.py",
+    "dopeiptv/core/dest_guard.py",
     "dopeiptv/core/tv_input.py",
     "dopeiptv/core/tv_nav.py",
     "dopeiptv/providers/kodi.py",
@@ -151,9 +153,11 @@ files = [
     "dopeiptv/core/night_mode.py",
     "dopeiptv/core/rec_mp4.py",
     "dopeiptv/core/rec_view.py",
+    "dopeiptv/core/num.py",
     "dopeiptv/core/viewing_stats.py",
     "dopeiptv/core/donate_rhythm.py",
     "dopeiptv/core/profiles.py",
+    "dopeiptv/core/pins.py",
     "dopeiptv/core/catchup.py",
     "dopeiptv/core/url_rewrite.py",
     "dopeiptv/core/hls_cap.py",
@@ -181,12 +185,20 @@ files = [
     "dopeiptv/core/discord_rpc.py",
     "dopeiptv/core/instance.py",
     "dopeiptv/providers/dlna.py",
+    "dopeiptv/providers/device_urls.py",
+    "dopeiptv/core/safe_xml.py",
+    "dopeiptv/core/source_files.py",
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",
     "dopeiptv/core/video_mode.py",
     "dopeiptv/core/local_buffer.py",
     "dopeiptv/core/stream_info.py",
+    "dopeiptv/core/stream_address.py",
+    "dopeiptv/core/picture_files.py",
+    "dopeiptv/core/svg_safe.py",
+    "dopeiptv/core/_lazy_requests.py",
     "dopeiptv/core/dvr_store.py",
+    "dopeiptv/core/memory_safe.py",
     "dopeiptv/core/dvr_server.py",
     "dopeiptv/core/dvr_ingest.py",
     "dopeiptv/core/dvr_session.py",

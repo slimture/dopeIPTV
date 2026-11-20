@@ -46,7 +46,7 @@ build without tagging, run `release.yml` by hand (`workflow_dispatch`) on
 | `packaging/` | AppStream metainfo, desktop file, icons, Flatpak manifest, macOS helpers |
 | `*.spec` | PyInstaller specs (Linux, macOS, Windows) |
 | `.github/workflows/` | `ci.yml`, `nightly.yml`, `release.yml` |
-| `docs/` | Architecture, developer notes, features, translating, this file |
+| `docs/` | Architecture, developer notes, features, translating, the threat model (`SECURITY.md`) and the security reviews, this file |
 
 ## Every day
 
@@ -73,7 +73,8 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
 ## The workflows
 
 - **`ci.yml`** - every push and pull request: ruff, mypy and pytest on
-  Linux, plus an advisory dependency audit. (The packaging checks -
+  Linux, and - a job of its own - the audit of the Python packages the
+  builds ship ("What the build downloads" below). (The packaging checks -
   versions, icons, paths workflows name - are tests in the suite.)
 - **`nightly.yml`** - every push to `testing`: builds every package the way
   a release does (it calls `release.yml` with `nightly_version`) and
@@ -93,6 +94,16 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   that crashed at every start while the leg was allowed to fail). A flaky
   download (GitHub, conda-forge, micromamba) is the usual reason a leg goes
   red - re-run the failed jobs before looking for a bug.
+
+Every workflow is read-only unless a job says otherwise (`permissions:`),
+names each action by its commit (the version in a comment beside it), and
+leaves no token in its clone (`persist-credentials: false`). The update key
+is handed to one step in each of `release.yml` (the `checksums` job) and
+`nightly.yml` (`publish`): jobs that build and install nothing, where the
+step runs `python3 -I -S tools/sign_sums.py` and nothing else. After a
+release or test build is published, an `attest` job records where its files
+were made (GitHub's artifact attestations: `gh attestation verify <file>
+--repo slimture/dopeIPTV`); it may fail without failing the run.
 
 Platform notes that are easy to forget:
 
@@ -142,6 +153,13 @@ Platform notes that are easy to forget:
      paragraph and list item on one line: GitHub shows a release's every
      line break (`tests/test_tidy_release_notes.py` checks it)
 2. Push `testing`; wait for CI to be green (and ideally try the test build).
+   Then the security review (AGENTS.md, rule 13): on the `website` branch,
+   `python3 tools/review_kit.py --app <checkout of testing> --ref testing
+   --out review-kit` makes every question of the transparency page with
+   its code, and the questions about the rest of the app, in one file
+   (`review-kit/ALL.txt`). Give it to at least one independent AI
+   assistant, fix or answer every finding, and add the round - who asked,
+   what came back, what was done - to `docs/SECURITY_REVIEWS.md`.
 3. Run **`tools/release.sh x.y.z`**. It never trusts a local branch: it
    fetches, merges `origin/testing` into `main`, checks that all five
    places agree, pushes `main`, and tags `vx.y.z`. Safe to re-run.
@@ -176,7 +194,8 @@ Only names here - the values are with the owner.
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
 | GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
-| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`), and every build job its build manifest (`tools/build_manifest.py`, "Official builds" below); its public half is in `dopeiptv/core/update_keys.py`. Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned, the app will not install it, and it calls itself modified (its online services off) |
+| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`) - only there, never in a build job; its public half is in `dopeiptv/core/update_keys.py` (`UPDATE_KEYS`). Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned and the app will not install it |
+| GitHub Actions secret `DOPEIPTV_BUILD_KEY` | the build manifest's own key (Ed25519, base64): every build job signs its list of the app's files with it (`tools/build_manifest.py`, "Official builds" below); its public half is in `BUILD_KEYS` in `dopeiptv/core/update_keys.py`. It signs nothing else - an update needs the update key | every build calls itself modified (its online services off), and a tag's build stops (`--require-key`) |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` / `DOPEIPTV_SIMKL_CLIENT_ID` in
@@ -203,6 +222,105 @@ or a checksum changed beside the file, gets nothing installed.
 - `tools/sign_sums.py` refuses a secret whose public half the app does not
   carry, so a wrong secret stops the build instead of shipping a release
   no app will install.
+- **Who lets a signature happen (since 1.6.9).** release.yml's `checksums`
+  job runs in the environment `release-signing`, nightly.yml's `publish` in
+  `nightly-signing`. Set them up once, in the repository's Settings >
+  Environments: `release-signing` with yourself as a required reviewer and
+  deployment branches and tags limited to `main` and `v*`; `nightly-signing`
+  limited to `testing`. Put `DOPEIPTV_UPDATE_KEY` in each environment's own
+  secrets and delete the repository-wide one. Then no workflow on another
+  branch can read the key, and no release is signed until you approve the
+  job in the Actions tab - a changed workflow or a stolen token alone signs
+  nothing. Until then the jobs run as before (an environment that does not
+  exist is made without rules, and the repository-wide secret still
+  reaches it).
+- **The build jobs' own key (required since 1.6.9).** Every build job
+  signs its build manifest ("Official builds" below) after it has run
+  PyInstaller, pip's packages and other people's tools, so those jobs never
+  get the update key: they get `DOPEIPTV_BUILD_KEY`, which signs file lists
+  and nothing else. Set it up once, in this order:
+  1. `python3 tools/make_update_key.py` on your own computer, as for the
+     update key; keep the private half in the password manager.
+  2. Put its PUBLIC half in `BUILD_KEYS` in `dopeiptv/core/update_keys.py`,
+     commit and push `testing` first.
+  3. Then add the private half as the Actions secret `DOPEIPTV_BUILD_KEY`.
+  Until both are done every nightly calls itself modified and a tag's build
+  stops at the manifest step. In the other order (secret first) every build
+  stops with "the secret's public half is not one the app carries". If the
+  build key leaks, a modified build could call itself official - it could
+  not sign an update; replace it the same way and drop the old public half.
+- **If the update key leaks:** delete the secret, make a new key, add its
+  public half beside the old one and release at once - signed with the OLD
+  key, so the copies out there take it - then sign with the new key only and
+  drop the old public half one release later. There is no way to make a copy
+  already installed distrust the old key before it updates: until then it is
+  protected by where updates come from (dopeiptv.org and GitHub over https),
+  not by the signature. A second, offline key in `UPDATE_KEYS` from now on
+  (never in GitHub, only in the password manager) would let you sign that
+  release even after deleting the leaked one's secret.
+
+### What the build downloads
+
+Nothing a build runs or ships is "whatever is newest that day":
+
+- **Binaries fetched by address** - the libmpv build for Windows
+  (zhongfly/mpv-winbuild, with FFmpeg linked in), the AppImage runtime and
+  appimagetool, micromamba for the Intel Mac build - are listed in
+  `packaging/build-inputs.json` with their SHA-256, and fetched only through
+  `tools/build_inputs.py fetch <name> <file>`, which stops on any other
+  bytes. An input may list several sources, tried in order: upstream's own
+  file first, then a release of ours that shipped the same bytes (upstream
+  keeps a libmpv build 30 days and replaces the runtime's "continuous" file
+  now and then; our releases stay). The same file names the commit each
+  source tree cloned by tag must be (`verify-git`: the Vulkan loader, mpv
+  for the Intel Mac build).
+  *To take a newer libmpv:* pick a release of zhongfly/mpv-winbuild
+  (`tools/pick_mpv_asset.py` names the baseline archive), put its two
+  archives' addresses and SHA-256 and the DLLs' SHA-256 in the two
+  `libmpv-windows-*` entries as their first source, and remove the second
+  source until a release of ours has shipped that DLL - then add that
+  release's Windows zips as the second source (within 30 days, or the
+  Windows build stops once upstream removes the archive). *A newer runtime:*
+  the same, with a release's AppImages as the second source.
+- **Python packages** - `packaging/requirements-release.txt` names the exact
+  version of everything pip installs for the AppImage, .deb, Windows and
+  macOS builds and the SHA-256 of every file pip may take
+  (`requirements-pip.txt` the same for pip itself, installed first;
+  `requirements-audit.txt` for the audit job). They are made from the `.in`
+  files beside them with the `uv pip compile` command in each one's first
+  lines - never edited by hand. `release.yml` installs with
+  `-c packaging/requirements-release.txt`: pip then refuses a file whose hash
+  is not listed, and a package that is not in the lock at all. The Flatpak
+  has its own pinned wheels in its manifest.
+- **The audit** (`ci.yml`, job `audit`; `tools/audit_deps.py`) asks PyPI's
+  advisory database about exactly those versions - every platform's, and the
+  Flatpak's wheels. A known vulnerability fails the job: move the lock (or
+  the manifest) to the fixed version, or accept it for a while in
+  `packaging/audit-allowlist.txt` with a reason and a date after which it
+  fails again. An audit that did not finish fails too (exit 2): the
+  advisory service not reached after three tries a minute apart, or a
+  package pip-audit left unchecked - run the job again once it answers.
+  `release.yml` runs the same audit; its `checksums` job (the signing) runs
+  only once it passed.
+- **The yt-dlp the app may download** for web streams is named in the
+  build, not at the user's: `release.yml`'s first job, `ytdlp-pin`, runs
+  `tools/ytdlp_pin.py --or-none`, which takes the newest yt-dlp release,
+  checks its `SHA2-256SUMS.sig` with `gpgv` against yt-dlp's own key
+  (`packaging/yt-dlp-signing-key.asc`, fingerprint in
+  `core/ytdlp_pin.py`'s `KEY`) and writes that release's tag and the
+  SHA-256 of each file into `dopeiptv/core/ytdlp_pin.py`, which every build
+  job downloads in. The app installs only that release, only those bytes,
+  and runs only a copy it marked itself. A new yt-dlp reaches the users
+  with the next release or nightly. If the check fails the build pins
+  nothing (a warning in the job; the app then downloads no yt-dlp and uses
+  the system's). Should yt-dlp change its key: check the new one by its
+  own announcement, replace the `.asc` and `KEY` in one commit.
+- **Still as the package manager gives them** (their own signatures or
+  checksums, not pinned here): apt's packages on Linux (libmpv and FFmpeg in
+  the AppImage and .deb are Ubuntu's, with Ubuntu's security updates at
+  build time), Homebrew's mpv and ffmpeg (Apple Silicon), conda-forge's
+  libraries (Intel Mac), NSIS from Chocolatey on the ARM runner, the Flatpak
+  runtime and SDK from Flathub, and the container image of the Flatpak job.
 
 ### Official builds (the build manifest)
 
@@ -236,7 +354,7 @@ installer and zip are made, and on macOS before the app is signed, the list
 in `Contents/Resources` linked from `Contents/Frameworks`). The tool asks the
 bundle itself what it holds (`dopeiptv --build-files OUT`: its data files on
 disk, and its modules as its PyInstaller archive stores them - a bundle has
-no .py files), signs that with `DOPEIPTV_UPDATE_KEY`, writes
+no .py files), signs that with `DOPEIPTV_BUILD_KEY`, writes
 `_build_manifest.json` and `.sig` beside the package inside the bundle, and
 asks the bundle again: it must now say official, or the job fails. The
 macOS job asks the signed app on the mounted .dmg once more. The Flatpak
@@ -248,9 +366,9 @@ build is modified; a tag without the key fails at this step
 (`--require-key`). Both files are git-ignored: never commit them.
 
 To try it locally: build with PyInstaller, then
-`DOPEIPTV_UPDATE_KEY=<a test seed> python3 tools/build_manifest.py frozen
+`DOPEIPTV_BUILD_KEY=<a test seed> python3 tools/build_manifest.py frozen
 dist/dopeiptv/dopeiptv` - with a key of your own the tool refuses unless its
-public half is in `update_keys.py`, so put a test key there in a scratch
+public half is in `BUILD_KEYS`, so put a test key there in a scratch
 copy only (`tests/test_build_check.py` does the round trip with a test key).
 
 **The honest limit.** This stops the builds that do not bother: a changed

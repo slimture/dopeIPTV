@@ -111,9 +111,14 @@ def thumbnail(path: str, size: int = THUMB_PX) -> bytes:
     """(server's thread) A picture file made small: JPEG, or PNG when it
     has transparency (a station's logo); b"" when it is no picture."""
     from PyQt6.QtCore import QBuffer, Qt
-    from PyQt6.QtGui import QImage
-    img = QImage(path)
-    if img.isNull():
+
+    from ..core import picture_files
+    from ..core.workers import decode_image
+    # Read and decoded as the image loader does: a plain file of a
+    # picture's size, an SVG screened (the cache may hold one from outside).
+    data = picture_files.read_file(path)
+    img = decode_image(data) if data else None
+    if img is None:
         return b""
     if img.width() > size or img.height() > size:
         img = img.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
@@ -153,6 +158,10 @@ class _PhoneBrowseMixin:
         if snap.get("locked"):
             out.update(pb.paged([], 0), locked=True)
             return out
+        if snap.get("kids") and head in ("local", "rec"):
+            # Never a kids profile's (mw_profiles.KIDS_NEVER), whatever asks.
+            out.update(pb.paged([], 0))
+            return out
         if head in ("vod", "series"):
             title, rows = (self._pb_titles(snap, head, rest) if rest
                            else (snap["section"], self._pb_categories(snap, head)))
@@ -187,7 +196,7 @@ class _PhoneBrowseMixin:
                 if cid is None or str(cid) in shown.excluded:
                     continue
                 name = shown.names.get(str(cid)) or str(c.get("category_name") or "?")
-                if snap["kids"] and adult_category(name):
+                if snap["kids"] and adult_category(name, c.get("category_name")):
                     continue
                 ref = refs.put("cat", f"{mode}:{cid}", (mode, cid, name))
                 out.append({"k": "dir", "p": f"{mode}/{ref}", "name": name})
@@ -534,6 +543,7 @@ class _PhoneBrowseMixin:
 
     def _pb_snapshot(self, mode: str) -> dict[str, Any]:
         """What a list of *mode* needs of the window, read at once."""
+        self._pb_era_kept()             # another source or profile: its ids forgotten
         snap: dict[str, Any] = {"locked": bool(self._profile_locked()), "client": self.client,
                                 "cid": id(self.client), "kids": bool(self._profile_kids())}
         if snap["locked"]:
@@ -570,8 +580,10 @@ class _PhoneBrowseMixin:
 
     def _pb_history_shown(self, rows: list[dict]) -> list[dict]:
         """History as the phone may list it: a kids profile's limits, and
-        no channel, film or episode the lists leave out now."""
+        no channel, film or episode the lists leave out now - one kept
+        without its category held back until the catalogue said it."""
         unlocked = bool(getattr(self.parental, "session_unlocked", False))
+        rows = self._lock_filter(rows)
         out = []
         excluded = {m: self.overrides.excluded_ids(m, include_locked=not unlocked)
                     for m in ("live", "vod", "series")}
@@ -607,6 +619,8 @@ class _PhoneBrowseMixin:
         """The series *sid* - the one playing, the series page's, or one the
         phone listed - with what the window already holds of its episodes
         (the series page's answer, kept ten minutes)."""
+        if not self._pb_era_kept():
+            listed = None               # listed for another source or profile
         if self._profile_locked():
             return {"locked": True}
         lp = getattr(self, "_last_playback", None) or {}
@@ -674,11 +688,40 @@ class _PhoneBrowseMixin:
             self.series_ctx = saved
         return out
 
+    def _pb_era(self) -> tuple:
+        """Whose the ids the phone was given are: the source and the profile
+        in use when they were listed."""
+        from ..core import profiles
+        return (id(self.client), profiles.active_id())
+
+    def _pb_era_kept(self) -> bool:
+        """(the window's thread) Whether the ids handed out are still of the
+        source and profile in use; when not, they are forgotten with the
+        lists that carry them - a row listed for another profile or source
+        never plays, and every list is built again with ids of its own."""
+        era = self._pb_era()
+        if self.__dict__.get("_pb_refs_for") == era:
+            return True
+        lists, refs, _t, _l = self._pb()
+        lists.clear()
+        refs.clear()
+        self._pb_refs_for = era
+        return False
+
     def _pb_play(self, kind: str, value: Any) -> dict[str, Any]:
-        """A row the phone listed, played through the window's own path."""
+        """A row the phone listed, played through the window's own path -
+        if the lists would show it now (the lock, a kids profile)."""
         self._profile_refuse_locked()
+        if not self._pb_era_kept():
+            raise ValueError("no such title")
         self._phone_asked()
         self._come_forward()
+        if kind in ("local", "rec") and self._profile_kids():
+            raise ValueError("no such title")       # never a kids profile's
+        if kind == "continue" and not self._pb_continue_allowed(value):
+            raise ValueError("no such title")
+        if kind == "history" and not self._pb_history_shown([value]):
+            raise ValueError("no such title")
         if kind == "movie":
             if not self._pb_movie_allowed(value):
                 raise ValueError("no such title")
@@ -711,6 +754,16 @@ class _PhoneBrowseMixin:
                 self._sp_start_once = None
             return {"ok": True}
         raise ValueError("no such title")
+
+    def _pb_continue_allowed(self, row: dict) -> bool:
+        """A Continue watching row as the lists show it now."""
+        if not isinstance(row, dict) or not self._lock_filter([row]):
+            return False
+        if row.get("_kind") == "episode":
+            ctx = row.get("_series_ctx")
+            return (self._pb_series_allowed(ctx if isinstance(ctx, dict) else {}, "")
+                    and self._kids_allows(row, "series"))
+        return self._pb_movie_allowed(row)
 
     def _pb_movie_allowed(self, row: dict) -> bool:
         unlocked = bool(getattr(self.parental, "session_unlocked", False))

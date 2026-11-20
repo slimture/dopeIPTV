@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Put the signed list of a build's own files into the build.
 
-    DOPEIPTV_UPDATE_KEY=<base64 secret> python3 tools/build_manifest.py frozen dist/dopeiptv/dopeiptv
-    DOPEIPTV_UPDATE_KEY=<base64 secret> python3 tools/build_manifest.py tree dopeiptv
+    DOPEIPTV_BUILD_KEY=<base64 secret> python3 tools/build_manifest.py frozen dist/dopeiptv/dopeiptv
+    DOPEIPTV_BUILD_KEY=<base64 secret> python3 tools/build_manifest.py tree dopeiptv
 
 The app tells an official build from a modified one by this list
 (dopeiptv/core/build_check.py): each file's SHA-256 and the version,
@@ -24,6 +24,15 @@ Without the key nothing is written: a fork's build calls itself modified,
 which it is. --require-key makes that an error (a release). The key's
 public half must be one the app carries (dopeiptv/core/update_keys.py),
 or nothing is signed. Never in git: .gitignore names both files.
+
+The key is DOPEIPTV_BUILD_KEY - a key that signs file lists and nothing
+else, whose public half is in update_keys.BUILD_KEYS - and never the update
+key: a build job runs PyInstaller, pip's packages and other people's tools
+before it signs, so what it holds must not be able to sign an update. The
+key is read once and taken out of the environment (DOPEIPTV_UPDATE_KEY
+too, should a job be handed it) before the bundle is started: the bundle
+holds every third-party package the app ships, and none of them is handed
+a signing key.
 """
 from __future__ import annotations
 
@@ -41,14 +50,36 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from dopeiptv.core import build_check, ed25519  # noqa: E402
-from dopeiptv.core.update_keys import UPDATE_KEYS  # noqa: E402
+#: Where the signing key comes from.
+KEY_VAR = "DOPEIPTV_BUILD_KEY"
+#: Taken out of the environment however it got there: no program this tool
+#: starts inherits a signing key.
+KEY_VARS = (KEY_VAR, "DOPEIPTV_UPDATE_KEY")
+
+
+def _take_secret() -> str:
+    """The build key, and every signing key out of the environment for
+    good: nothing this process starts after it inherits one."""
+    found = os.environ.pop(KEY_VAR, "").strip()
+    for var in KEY_VARS:
+        os.environ.pop(var, None)
+    return found
+
+
+# Before the package is imported: importing it in a checkout runs git
+# (dopeiptv/__init__.py), and git is whatever the PATH names.
+_GIVEN = _take_secret()
+
+from dopeiptv.core import build_check, ed25519, update_keys  # noqa: E402
+
+#: The keys a build's file list may be signed with here: build keys alone.
+UPDATE_KEYS = update_keys.BUILD_KEYS
 
 
 def _seed(require: bool, keys: tuple[str, ...]) -> bytes | None:
-    secret = os.environ.get("DOPEIPTV_UPDATE_KEY", "").strip()
+    secret = _take_secret() or _GIVEN
     if not secret:
-        msg = "DOPEIPTV_UPDATE_KEY is empty: no build manifest - this build will call itself modified"
+        msg = "DOPEIPTV_BUILD_KEY is empty: no build manifest - this build will call itself modified"
         if require:
             raise SystemExit(msg)
         print(f"::warning::{msg}")
@@ -56,8 +87,8 @@ def _seed(require: bool, keys: tuple[str, ...]) -> bytes | None:
     seed = base64.b64decode(secret, validate=True)
     public = base64.b64encode(ed25519.public_key(seed)).decode()
     if public not in keys:
-        raise SystemExit("the secret's public half is not one the app carries "
-                         "(dopeiptv/core/update_keys.py): nothing signed")
+        raise SystemExit("the secret's public half is not a build key the app carries "
+                         "(BUILD_KEYS in dopeiptv/core/update_keys.py): nothing signed")
     return seed
 
 
@@ -91,8 +122,10 @@ def _ask(app: str) -> dict:
     os.close(fd)
     try:
         # Absolute, in the system's own form: CreateProcess on Windows.
+        # Never with a signing key in its environment (KEY_VARS).
+        env = {k: v for k, v in os.environ.items() if k not in KEY_VARS}
         proc = subprocess.run([os.path.abspath(app), "--build-files", out], stdin=subprocess.DEVNULL,
-                              capture_output=True, text=True, errors="replace",
+                              capture_output=True, text=True, errors="replace", env=env,
                               timeout=300, check=False)
         try:
             with open(out, encoding="utf-8") as fh:
@@ -183,7 +216,7 @@ def main(argv: list[str] | None = None, keys: tuple[str, ...] = UPDATE_KEYS) -> 
     p.add_argument("path", help="frozen: the bundle's executable; tree: the package folder")
     p.add_argument("--pyproject", default=os.path.join(ROOT, "pyproject.toml"))
     p.add_argument("--require-key", action="store_true",
-                   help="fail without DOPEIPTV_UPDATE_KEY (a release)")
+                   help="fail without DOPEIPTV_BUILD_KEY (a release)")
     a = p.parse_args(argv)
     if a.mode == "frozen":
         return frozen(a.path, a.require_key, keys)

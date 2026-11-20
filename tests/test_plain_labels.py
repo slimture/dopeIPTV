@@ -97,3 +97,95 @@ def test_tv_mode_s_headings_are_words(app):
     for make in (TvScreen._title, TvScreen._note):
         lbl = make(None, HOSTILE)
         assert lbl.textFormat() == Qt.TextFormat.PlainText and lbl.text() == HOSTILE
+
+
+def _one_line(lbl: QLabel) -> bool:
+    """Laid out as words: a 200 px span read as markup is far taller."""
+    return lbl.sizeHint().height() < 100
+
+
+def test_a_source_s_page_shows_its_name_and_account_as_words(app):
+    from dopeiptv.ui.source_page import SourcePage
+
+    class Store:
+        def __init__(self, pl):
+            self.pl = pl
+
+        def get(self, _pid):
+            return self.pl
+
+        def update(self, _pid, **fields):
+            self.pl.update(fields)
+    pl = {"id": "s1", "name": HOSTILE, "type": "xtream", "server": "http://x", "username": "u"}
+    page = SourcePage(dict(pl), store=Store(dict(pl)), nerd_on=False)
+    page._account_came(HOSTILE)        # the provider's status, expiry, connections
+    for lbl in (page.title, page.subtitle, page.crumb_name, page.problem_label):
+        assert lbl.textFormat() == Qt.TextFormat.PlainText
+    assert page.title.text() == HOSTILE and _one_line(page.title)
+    assert HOSTILE in page.subtitle.text()
+    page.close()
+
+
+def test_a_settings_row_names_a_device_as_words(app):
+    from dopeiptv.ui.settings_ui import SettingsPage
+    page = SettingsPage("cast", HOSTILE, HOSTILE)
+    card = page.card(HOSTILE)
+    row = card.row(HOSTILE, None, HOSTILE)
+    note = card.note(HOSTILE)
+    for lbl in (row.label, row.hint_label, note):
+        assert lbl.textFormat() == Qt.TextFormat.PlainText and lbl.text() == HOSTILE
+    assert _one_line(row.label)
+    shown = [lbl for lbl in page.findChildren(QLabel) if lbl.text() == HOSTILE]
+    assert len(shown) >= 5
+    assert all(lbl.textFormat() == Qt.TextFormat.PlainText for lbl in shown)
+    page.close()
+
+
+def test_the_lists_tooltips_show_words(app):
+    from dopeiptv.ui.channel_list import ChannelListModel
+    from dopeiptv.ui.media_cards import Card, CardModel
+    cards = CardModel()
+    cards.set_items([Card(key="a", title=HOSTILE, line="2021")])
+    tip = cards.data(cards.index(0), Qt.ItemDataRole.ToolTipRole)
+    assert "<img" not in tip and "<span" not in tip
+    assert _shown(tip).replace(" ", "\n") == HOSTILE.replace(" ", "\n") + "\n2021"
+    rows = ChannelListModel()
+    rows.set_items([{"name": "x", "_tip": HOSTILE}], "vod")
+    tip = rows.data(rows.index(0), Qt.ItemDataRole.ToolTipRole)
+    assert "<img" not in tip and "Recording" in _shown(tip)
+    rows.set_items([{"name": "x", "_tip": "Movies/2021"}], "vod")
+    assert rows.data(rows.index(0), Qt.ItemDataRole.ToolTipRole) == "Movies/2021"
+
+
+def test_the_cast_card_names_the_tv_as_words(app):
+    from dopeiptv.ui.cast_card import CastCard
+    card = CastCard()
+    card.set_device(HOSTILE, where="192.168.1.20")
+    assert card.device.textFormat() == Qt.TextFormat.PlainText
+    tip = card.device.toolTip()
+    assert "<img" not in tip and "192.168.1.20" in _shown(tip)
+
+
+def test_the_seek_bar_s_programme_tip_is_words(app):
+    from dopeiptv.media.seek_slider import _SeekSlider
+    win = QWidget()
+    slider = _SeekSlider(win)
+    assert slider._hover_tip_label().textFormat() == Qt.TextFormat.PlainText
+    win.close()
+
+
+def test_a_box_s_names_in_its_questions_are_words(app, monkeypatch):
+    from types import SimpleNamespace
+
+    from PyQt6.QtWidgets import QInputDialog
+
+    from dopeiptv.ui.mw_box import _BoxMixin
+    asked = []
+
+    def get_text(_parent, _title, label, **_kw):
+        asked.append(label)
+        return "", False
+    monkeypatch.setattr(QInputDialog, "getText", get_text)
+    _BoxMixin._box_rec_rename(SimpleNamespace(), {"name": HOSTILE, "stream_id": "1"})
+    assert asked and "<img" not in asked[0] and "<span" not in asked[0]
+    assert "Recording" in _shown(asked[0])
