@@ -35,7 +35,7 @@ SITE=$BASE/site
 FILES=$PUB/files
 REL=$PUB/releases.json
 COUNTS=$BASE/downloads.json
-DL_LOG=${IPTV_DOWNLOAD_LOG:-/var/log/nginx/iptv.dope.rs-downloads.log}
+DL_LOG=${IPTV_DOWNLOAD_LOG:-/var/log/nginx/iptv.dope.rs-dl-counts.log}
 LOG_STATE=$BASE/.downloads-log.state
 REPO=slimture/dopeIPTV
 UA=dopeiptv-site-sync
@@ -92,10 +92,14 @@ mkdir -p "$FILES"
 # ---- Download counts -------------------------------------------------------------
 # dl.php counted a download per request; nginx now answers /dl.php itself,
 # in a log of its own, and the count is taken from that log with dl.php's
-# rules: a plain GET that was sent on to the file (302), from something
-# that names itself and does not say it is a bot. The log is read from where
-# the last run stopped, the end of the file it was rotated into included.
-# Counted before GitHub is asked, so a run GitHub fails still counts.
+# rules: a plain GET that was sent on to the file (302), from a browser -
+# not the app updating itself, not something that says it is a robot or
+# names nothing. That log holds the request line, the answer and that kind
+# alone (nginx's iptv_dl_count: no address, no time, no browser's name); a
+# line of the log of before (nginx's combined) is read too, by its browser.
+# The log is read from where the last run stopped, the end of the file it
+# was rotated into included. Counted before GitHub is asked, so a run GitHub
+# fails still counts.
 inode() { ls -i "$1" | awk '{ print $1 }'; }
 count_downloads() {
     if [ ! -e "$DL_LOG" ]; then
@@ -136,16 +140,23 @@ count_downloads() {
     off=$((old_off + $(wc -c < "$TMP/log.cur" | tr -d ' ')))
     cat "$TMP/log.cur" >> "$TMP/log.new"
 
-    # Combined format: "$request" is field 2 and "$http_user_agent" field 6
-    # between double quotes (nginx writes a quote inside a value as \x22).
+    # The request line is field 2 between double quotes; after it the
+    # answer and the kind (the counter's log), or the answer, the size and,
+    # as field 6, the browser's name (combined, before; nginx writes a quote
+    # inside a value as \x22).
     awk -F '"' '
         $2 ~ /^GET \/dl\.php\?/ && $3 ~ /^ 302 / {
-            ua = tolower($6)
-            if (ua == "" || ua == "-") next
-            # The app fetching its own update (dopeIPTV/<version>): counted
-            # by stats_collect.py as an update, not here as a download.
-            if (ua ~ /^dopeiptv\//) next
-            if (ua ~ /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|skype|embed|monitor|scan/) next
+            if ($3 ~ /^ 302 [a-z]+ *$/) {
+                kind = $3; sub(/^ 302 /, "", kind); sub(/ *$/, "", kind)
+                # The app fetching its own update: counted by
+                # stats_collect.py as an update, not here as a download.
+                if (kind != "browser") next
+            } else {
+                ua = tolower($6)
+                if (ua == "" || ua == "-") next
+                if (ua ~ /^dopeiptv\//) next
+                if (ua ~ /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|discord|skype|embed|monitor|scan/) next
+            }
             split($2, req, " ")
             q = req[2]; sub(/^[^?]*\?/, "", q)
             n = split(q, args, "&"); name = ""

@@ -81,8 +81,7 @@ def stats_line(top, request_uri: str, ua: str = UA, ip: str = "81.2.69.160", sta
         "http_x_real_ip": ip, "time_iso8601": NOW.isoformat(timespec="seconds"),
         "iptv_log_method": map_value(top, "$iptv_log_method", method),
         "iptv_log_uri": logged_uri(top, request_uri), "status": str(status),
-        "iptv_ref": map_value(top, "$iptv_ref", ref), "iptv_log_ua": map_value(top, "$iptv_log_ua", ua),
-        "iptv_lang": "en"})
+        "iptv_log_ua": map_value(top, "$iptv_log_ua", ua), "iptv_lang": "en"})
 
 
 def dl_line(top, request_uri: str, ua: str = UA, ip: str = "81.2.69.160", status: int = 302,
@@ -93,8 +92,7 @@ def dl_line(top, request_uri: str, ua: str = UA, ip: str = "81.2.69.160", status
         "iptv_log_method": map_value(top, "$iptv_log_method", method),
         "iptv_dl_file": map_value(top, "$iptv_dl_file", _arg(query, "f")),
         "server_protocol": "HTTP/1.0", "status": str(status), "body_bytes_sent": "154",
-        "iptv_ref": map_value(top, "$iptv_ref", ref), "iptv_log_ua": map_value(top, "$iptv_log_ua", ua),
-        "http_x_real_ip": ip})
+        "iptv_log_ua": map_value(top, "$iptv_log_ua", ua), "http_x_real_ip": ip})
 
 
 # -- what each side says ------------------------------------------------------------
@@ -149,7 +147,7 @@ def test_hit_keeps_what_the_page_sends_and_the_statistics_read_and_nothing_else(
     assert logged_uri(top, "/hit") == "/hit?p=&ev=&t=&x=&n=&s=&l=&bl=&w=&h=&hl=&r="
     # A page that linked here of any length is cut, never the fields before it.
     long = logged_uri(top, "/hit?p=%2F&ev=view&l=en&w=1&h=2&r=" + "x" * 5000)
-    assert len(long) == 2048 and parse_qs(long.partition("?")[2])["l"] == ["en"]
+    assert len(long) == 1024 and parse_qs(long.partition("?")[2])["l"] == ["en"]
     # Another address is a page's: its path.
     assert logged_uri(top, "/hitx?p=1") == "/hitx" and logged_uri(top, "/hit/?p=1") == "/hit/"
 
@@ -194,7 +192,9 @@ def _counted(stats_lines: list, dl_lines: list) -> tuple:
     folder = os.path.join(root, "stats", "visits")
     for f in sorted(os.listdir(folder)):
         with open(os.path.join(folder, f), encoding="utf-8") as fh:
-            visits += [{k: v for k, v in visit.items() if k != "id"} for visit in json.load(fh)]
+            # A visit's names for its visitor are its run's own (a key each):
+            # the rest is the same.
+            visits += [{k: v for k, v in visit.items() if k not in ("id", "w", "e")} for visit in json.load(fh)]
     return days, visits
 
 
@@ -232,10 +232,10 @@ def test_the_statistics_read_a_line_of_before_and_one_of_now_alike():
     # ...and they counted what was there to count.
     day = days[NOW.date().isoformat()]
     assert day["views"] == 2 and day["visitors"] == 2 and day["requests"] == 2
-    assert day["refs"] == {"forum.example.net": 1} and day["sources"] == {"news": 1}
+    assert day["refs"] == {"example.net": 1} and day["sources"] == {"other": 1}
     assert day["files"] == {"dopeIPTV-1.6.8-x86_64.AppImage": 1, "dopeIPTV-1.6.8-x64-setup.exe": 1}
     assert sum(day["update_files"].values()) == 1
-    assert sorted(v["time"] for v in visits) == [12, 48]
+    assert sorted(v["time"] for v in visits) == [10, 50]         # to ten seconds, as kept
     # And a line of now has nothing of what the links carried.
     for u, method, status, ua, ip in asked:
         assert "fbclid" not in stats_line(top, u, ua, ip, status, method)

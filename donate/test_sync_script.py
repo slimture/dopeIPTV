@@ -153,6 +153,31 @@ def test_a_download_is_a_key_of_its_own_only_when_the_site_knows_its_name(base, 
         "dopeIPTV-1.6.6-x86_64.AppImage": 1, "dopeIPTV-1.6.8.90-x86_64.AppImage": 1}
 
 
+def test_the_counters_own_log_has_no_address_and_counts_alike(base, tmp_path):
+    """nginx's iptv_dl_count: the request line, the answer and what asked -
+    nothing else - counted as the log of before was."""
+    b, env = base
+    (b / "public" / "files").mkdir()
+    (b / "public" / "files" / "dopeIPTV-1.6.6-x86_64.AppImage").write_bytes(b"x")
+    (b / "downloads.json").write_text(json.dumps({"dopeIPTV-1.6.6-x86_64.AppImage": 3}))
+
+    def line(name: str, status: int = 302, kind: str = "browser") -> str:
+        return f'"GET /dl.php?f={name} HTTP/1.1" {status} {kind}\n'
+    log = tmp_path / "dl-counts.log"
+    log.write_text(line("dopeIPTV-1.6.6-x86_64.AppImage") + line("dopeIPTV-1.6.6-x86_64.AppImage")
+                   + line("dopeIPTV-1.6.6-x86_64.AppImage", kind="app")
+                   + line("dopeIPTV-1.6.6-x86_64.AppImage", kind="robot")
+                   + line("dopeIPTV-1.6.6-x86_64.AppImage", kind="none")
+                   + line("dopeIPTV-1.6.6-x86_64.AppImage", 404))
+    assert "203.0.113" not in log.read_text()
+    run = _run(b, dict(env, IPTV_DOWNLOAD_LOG=str(log)))
+    assert run.returncode == 0, run.stderr
+    assert "counted 2 download(s)" in run.stderr
+    assert json.loads((b / "downloads.json").read_text()) == {"dopeIPTV-1.6.6-x86_64.AppImage": 5}
+    src = open(os.path.join(ROOT, "sync-releases.sh"), encoding="utf-8").read()
+    assert "IPTV_DOWNLOAD_LOG:-/var/log/nginx/iptv.dope.rs-dl-counts.log}" in src
+
+
 # -- a release mirrored only as its signed checksum list says ------------------------
 
 def _github(tmp_path, b, env, seed: bytes, change=None, extra=None):

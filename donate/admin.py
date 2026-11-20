@@ -12,13 +12,15 @@ service's socket (X-Admin-User) proves nothing once the first admin exists.
                                        the visits of that day, week, month or year,
                                        and the app's own updates among them
                                        (type "update" - never a visit)
-    GET /admin/visitor?id=...          every visit kept of one visitor
+    GET /admin/visitor?id=...          every visit kept of one visitor - of
+                                       one day: nothing kept ties two days
+                                       of a visitor together
     GET /admin/find?by=country&value=SE&days=30   the kept visits one row of
                                        the overview's lists counted
 
 Visitors come from stats_collect.py's STATS_DIR/stats.json, without what
-the visits judged likely robots added (kept apart there, and which visitors
-were which in kinds.json); the all-time
+the visits judged likely robots added (kept apart there; how many different
+people and robots in the days' sketches, sketches.json); the all-time
 download counts from the site's downloads.json; tips and monthly support
 from Stripe itself - the succeeded payments on dopeIPTV's own account, found
 with Stripe's search and kept for five minutes. Donations taken before the
@@ -205,12 +207,42 @@ def _frozen_part(f: dict, days: list, per_day: dict):
     return n + sum((per_day.get(d) or {}).get("visitors", 0) for d in want - covered)
 
 
-def _union(uniques: dict, days: list, per_day: dict, kinds: dict, frozen: dict | None = None):
+class _Fields:
+    """The days' sketches (stats_collect.py, sketch.py), each read once."""
+
+    def __init__(self, sketches: dict) -> None:
+        self.sketches = sketches if isinstance(sketches, dict) else {}
+        self._got: dict = {}
+
+    def __contains__(self, day: str) -> bool:
+        return isinstance(self.sketches.get(day), dict)
+
+    def judged(self, day: str) -> bool:
+        return day in self and "p" in self.sketches[day]
+
+    def get(self, day: str, kind: str) -> int:
+        import sketch
+        if (day, kind) not in self._got:
+            entry = self.sketches.get(day) or {}
+            if kind == "n" and "n" not in entry:
+                kind_read = "u"             # a day counted before visits were judged
+            else:
+                kind_read = kind
+            self._got[(day, kind)] = sketch.decode(entry.get(kind_read))
+        return self._got[(day, kind)]
+
+    def count(self, days, kind: str) -> int:
+        import sketch
+        return sketch.count(sketch.union(self.get(d, kind) for d in days if d in self))
+
+
+def _union(sketches, days: list, per_day: dict, frozen: dict | None = None):
     """Different visitors over these days, the likely robots left out - a
-    month at a time, since a visitor's hash is its month's own (a key per
-    month) - or None where a day had visitors whose hashes are gone and no
-    count of them is kept: the page then shows the visits summed instead. A
-    month whose key has gone is counted from its numbers (*frozen*)."""
+    month at a time, since a visitor's mark is its month's own (a key per
+    month) - or None where a day had visitors and no sketch of them is kept:
+    the page then shows the visits summed instead. A month whose sketches
+    have gone is counted from its numbers (*frozen*)."""
+    fields = sketches if isinstance(sketches, _Fields) else _Fields(sketches)
     frozen = frozen or {}
     by_month: dict = {}
     for d in days:
@@ -223,47 +255,61 @@ def _union(uniques: dict, days: list, per_day: dict, kinds: dict, frozen: dict |
                 return None
             total += part
             continue
-        if any((per_day.get(d) or {}).get("visitors") and d not in uniques for d in ds):
+        if any((per_day.get(d) or {}).get("visitors") and d not in fields for d in ds):
             return None
-        seen: set = set()
-        for d in ds:
-            robots = set((kinds.get(d) or {}).get("r", ()))
-            seen.update(x for x in uniques.get(d, ()) if x not in robots)
-        total += len(seen)
+        total += fields.count(ds, "n")
     return total
 
 
-def _judged(uniques: dict, kinds: dict, days: list, per_day: dict, frozen: dict | None = None) -> dict:
+def _judged(sketches, days: list, per_day: dict, frozen: dict | None = None) -> dict:
     """Over these days: the different visitors who showed they were people,
     those judged likely robots (and nothing else), and from which day visits
-    were judged - a day counted before that was not. A month whose hashes
+    were judged - a day counted before that was not. A month whose sketches
     are gone counts with its numbers when the days hold all of it, else as
     not judged."""
+    fields = sketches if isinstance(sketches, _Fields) else _Fields(sketches)
     frozen = frozen or {}
     want = set(days)
-    judged = [d for d in days if d in kinds]
-    people: set = set()
-    robots: set = set()
-    others: set = set()
-    for d in judged:
-        r = set(kinds[d].get("r", ()))
-        people.update(kinds[d].get("p", ()))
-        robots.update(r)
-        others.update(x for x in uniques.get(d, ()) if x not in r)
-    n_people, n_robots = len(people), len(robots - others)
+    judged = [d for d in days if fields.judged(d)]
+    n_people = fields.count(judged, "p")
+    n_robots = max(0, fields.count(judged, "u") - fields.count(judged, "n"))
     for f in frozen.values():
         fj = set(f.get("judged") or [])
         if fj and fj <= want:
             judged += sorted(fj)
             n_people += int(f.get("people") or 0)
             n_robots += int(f.get("robots") or 0)
+    judged_set = set(judged)
     left_out = [(per_day.get(d) or {}).get("robots") or {} for d in days]
     return {"people": n_people, "robots": n_robots,
             "views": sum(rb.get("views", 0) for rb in left_out),
             "downloads": sum(sum(((rb.get("lists") or {}).get("downloads") or {}).values()) for rb in left_out),
             "since": min(judged) if judged else None,
-            "all": all(d in kinds or d in set(judged) for d in days
-                       if (per_day.get(d) or {}).get("visitors"))}
+            "all": all(d in judged_set for d in days if (per_day.get(d) or {}).get("visitors"))}
+
+
+def _add_rest(sums: dict, stats: dict, range_days: list) -> None:
+    """A month's own lists (stats_collect.fold_day: the names its days
+    counted fewer than five times) where the span holds every day of it
+    that was counted: those names again, out of "other"."""
+    want = set(range_days)
+    days = stats.get("days") or {}
+    for m, rest in (stats.get("rest") or {}).items():
+        if not isinstance(rest, dict):
+            continue
+        counted = [d for d in days if d[:7] == m]
+        if not counted or not set(counted) <= want:
+            continue
+        for k, lst in rest.items():
+            if k not in sums or not isinstance(lst, dict):
+                continue
+            for name, n in lst.items():
+                if name == "other" or not isinstance(n, int):
+                    continue
+                sums[k][name] = sums[k].get(name, 0) + n
+                sums[k]["other"] = sums[k].get("other", 0) - n
+            if sums[k].get("other", 0) <= 0:
+                sums[k].pop("other", None)
 
 
 SUMMED = ("views", "visitors", "requests", "visits", "engaged", "bounces", "returning", "timed")
@@ -292,8 +338,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
     robots are left out of every count, and told apart in "judged"."""
     days = days if days in RANGES else 30
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
-    uniques = _load(os.path.join(stats_dir, "uniques.json"), {})
-    kinds = _load(os.path.join(stats_dir, "kinds.json"), {})
+    fields = _Fields(_load(os.path.join(stats_dir, "sketches.json"), {}))
     frozen = _load(os.path.join(stats_dir, "uniques-months.json"), {})
     per_day = {d: _net(row) for d, row in (stats.get("days") or {}).items()}
     today = datetime.now().astimezone().date()  # the server's day, as the logs' dates
@@ -327,13 +372,14 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         totals["updates"] = totals.get("updates", 0) + _updates(row)
         for k, total in sums.items():
             _sum_into(total, row.get(k))
+    _add_rest(sums, stats, range_days)
     if step != "day":                           # a week's or month's different visitors
         for key_b, ds in bucket_days.items():
-            u = _union(uniques, ds, per_day, kinds, frozen)
+            u = _union(fields, ds, per_day, frozen)
             if u is not None:
                 buckets[key_b]["visitors"] = u
     series = [dict(date=k, **v) for k, v in sorted(buckets.items())]
-    totals["unique"] = _union(uniques, range_days, per_day, kinds, frozen)
+    totals["unique"] = _union(fields, range_days, per_day, frozen)
 
     before = None
     if days:
@@ -346,7 +392,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
                 before[k] += _timed(row) if k == "timed" else row.get(k, 0)
             before["downloads"] += sum((row.get("downloads") or {}).values())
             before["updates"] += _updates(row)
-        before["unique"] = _union(uniques, prev_days, per_day, kinds, frozen)
+        before["unique"] = _union(fields, prev_days, per_day, frozen)
 
     don = donations(key, api_version)
     since = datetime.combine(first, datetime.min.time()).astimezone().timestamp()
@@ -374,7 +420,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         y["donations"] += 1
         y["sums"][r["currency"]] = y["sums"].get(r["currency"], 0) + r["amount"]
     for y in years.values():
-        y["unique"] = _union(uniques, y.pop("days"), per_day, kinds, frozen)
+        y["unique"] = _union(fields, y.pop("days"), per_day, frozen)
 
     dl_all = _load(downloads_json, {})
     return {
@@ -386,7 +432,7 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
         "geo": bool(stats.get("geo")),
         "today": {k: (per_day.get(today.isoformat()) or {}).get(k, 0) for k in ("views", "visitors")},
         "totals": totals,
-        "judged": _judged(uniques, kinds, range_days, per_day, frozen),
+        "judged": _judged(fields, range_days, per_day, frozen),
         "before": before,
         "series": series,
         "top": {k: _top(v) for k, v in sums.items()},
@@ -539,7 +585,16 @@ def live(stats_dir: str, downloads_json: str) -> dict:
                                       sum(1 for v in raw if v.get("kind") == "robot"))
     vs = [v for d in (today - timedelta(days=1), today) for v in _visits_file(stats_dir, d.isoformat())
           if v.get("kind") != "robot"]
-    here = {v.get("id") for v in vs if (v.get("pages") or v.get("downloads")) and now - v.get("end", 0) <= LIVE_WINDOW}
+    # Who is here now is in the collector's memory, to the second; the
+    # visits kept on disk say when only to the ten minutes.
+    try:
+        import stats_collect
+        here_n = stats_collect.here_now(LIVE_WINDOW, now)
+    except Exception:  # noqa: BLE001 - the kept visits instead
+        here_n = None
+    if here_n is None:
+        here_n = len({v.get("id") for v in vs if (v.get("pages") or v.get("downloads"))
+                      and now - v.get("end", 0) <= LIVE_WINDOW})
     recent = sorted(([d[0], d[1], v.get("country", "")] for v in vs for d in v.get("downloads") or ()
                      if isinstance(d, list) and len(d) > 1), reverse=True)[:5]
     stats = _load(os.path.join(stats_dir, "stats.json"), {"days": {}})
@@ -549,7 +604,7 @@ def live(stats_dir: str, downloads_json: str) -> dict:
     st = _load(os.path.join(stats_dir, "state.json"), {})
     upd = sorted((r for r in (st.get("recent_updates") or []) if isinstance(r, list) and len(r) >= 5),
                  key=lambda r: r[0] or 0, reverse=True)[:5]
-    return {"at": int(now), "rev": rev, "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": len(here),
+    return {"at": int(now), "rev": rev, "updated": stats.get("updated"), "window": LIVE_WINDOW, "here": here_n,
             "today": {"visitors": row.get("visitors", 0), "views": row.get("views", 0), "updates": _updates(row),
                       "updates_own": own},
             "recent": recent, "updates_recent": upd, "dl": download_counts(stats_dir, downloads_json)}
@@ -621,9 +676,9 @@ def visitor(stats_dir: str, vid: str) -> dict:
 # Each of the overview's lists, and what of a visit it counted. A visitor's
 # country, browser and the rest were counted on a page they opened, so only
 # visits with a page match those; downloads match by what was downloaded.
-FIND_BY = ("country", "channel", "ref", "ref_page", "source", "page", "lang", "os_version", "browser",
+FIND_BY = ("country", "channel", "ref", "source", "page", "lang", "os_version", "browser",
            "browser_version", "device", "screen", "download", "file")
-_PLAIN = {"ref": "ref", "ref_page": "ref_page", "source": "source", "os_version": "os", "browser": "browser", "device": "device"}
+_PLAIN = {"ref": "ref", "source": "source", "os_version": "os", "browser": "browser", "device": "device"}
 
 
 def _counted_under(v: dict, by: str, value: str) -> bool:
@@ -647,7 +702,7 @@ def _counted_under(v: dict, by: str, value: str) -> bool:
         return f"{v.get('browser') or ''} {v.get('bv') or ''}".strip() == value
     if by == "screen":
         size = v.get("screen") or ""
-        return size.count("\u00d7") == 1 and screen_of(*size.split("\u00d7"))[1] == value
+        return (screen_of(*size.split("\u00d7"))[1] if size.count("\u00d7") == 1 else size) == value
     return (v.get(_PLAIN[by]) or "") == value
 
 

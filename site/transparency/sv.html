@@ -17,13 +17,13 @@
 <dt>Kan ni se vad jag tittar på?</dt>
 <dd><strong>Nej.</strong> Appen berättar ingenting för oss om vad du spelar. Din leverantör ser det – den skickar strömmen till dig – och The Movie Database ser titeln på en film eller serie när appen hämtar dess affisch, om du inte stänger av det. <a href="#watching">Del 2</a></dd>
 <dt>Vet ni vem jag är?</dt>
-<dd><strong>Nej.</strong> Det finns inget konto, ingen inloggning hos oss och inget id i appen. Det appen skickar till oss av sig själv är uppdateringskontrollen: appens namn, version och ditt system. Som varje webbplats ser vår server vilken IP-adress ett anrop kommer från; vår webbservers logg sparar den i högst två dygn. Om du ger oss dricks tar Stripe emot betalningen, och vi ser av den det en butik ser (<a href="/payments/">betalningsvillkoren</a>). <a href="#updates">Del 3</a></dd>
+<dd><strong>Nej.</strong> Det finns inget konto, ingen inloggning hos oss och inget id i appen. Det appen skickar till oss av sig själv är uppdateringskontrollen: appens namn, version och ditt system. Som varje webbplats ser vår server vilken IP-adress ett anrop kommer från; den skriver inte ned den någonstans – ingen av våra loggar sparar den. Om du ger oss dricks tar Stripe emot betalningen, och vi ser av den det en butik ser (<a href="/payments/">betalningsvillkoren</a>). <a href="#updates">Del 3</a></dd>
 <dt>Vart ansluter appen av sig själv?</dt>
 <dd>Till din leverantör; till dopeiptv.org en gång om dagen, för att leta efter en uppdatering (GitHub om vi inte svarar); och till The Movie Database, för affischer. De två sista kan du stänga av. Allt annat bara när du använder det – varje adress i appens kod finns listad. <a href="#hosts">Del 4</a></dd>
 <dt>Kan någon få in en skadlig uppdatering i min app?</dt>
 <dd>Inte utan vår releasenyckel: appen installerar ingenting som inte står på en lista som är signerad med den – inte ens från vår egen webbplats. <a href="#builds">Del 5</a></dd>
 <dt>Om någon bröt sig in på dopeiptv.org, vad skulle de hitta om mig?</dt>
-<dd>Inga inloggningar och ingenting om vad du tittar på – vi får dem aldrig. Som mest: en felrapport eller feedback som du själv valde att skicka, rensad från det appen kände igen som ditt; en synkkopia eller meddelanden från Titta tillsammans som de inte kan öppna; och din IP-adress i webbserverns logg från de senaste två dygnen. <a href="#webservers">Del 11</a></dd>
+<dd>Inga inloggningar och ingenting om vad du tittar på – vi får dem aldrig. Som mest: en felrapport eller feedback som du själv valde att skicka, rensad från det appen kände igen som ditt; en synkkopia eller meddelanden från Titta tillsammans som de inte kan öppna. Din IP-adress finns inte i något av det: servrarna skriver inte ned den någonstans. <a href="#webservers">Del 11</a></dd>
 <dt>Måste jag lita på ert ord?</dt>
 <dd><strong>Nej.</strong> Varje del nedan visar koden som gör det, ett riktigt exempel framtaget genom att köra den koden och en länk till exakt de raderna på GitHub – och en knapp som lämnar alltihop till valfri AI-assistent som kan granska oss.</dd>
 </dl>
@@ -141,7 +141,7 @@
 
 <h2 id="updates">3. Vet ni vem jag är?</h2>
 <p class="tp-promise">Appen har inget konto och inget eget id: när den letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering – och IP-adressen den kom från, i högst två dygn. Inte vem du är.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering – inte från vilken adress, och inte vem du är.</p>
 <h3>Så fungerar det</h3>
 <p>En gång om dagen frågar appen dopeiptv.org vilken version som är den senaste (GitHub, om vi inte svarar). Anropet innehåller en user agent och en rad till som säger om det är en officiell version. Det är allt: inget id, inga inställningar, inget om vad du tittar på.</p>
 <details class="tp-proof">
@@ -160,7 +160,7 @@
 </details>
 <h3>Det här skyddar det inte mot</h3>
 <ul>
-<li>Kontrollen kommer från din IP-adress, och vår webbservers logg sparar den i högst två dygn, som för varje besök (<a href="#website">del 10</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
+<li>Kontrollen kommer från din IP-adress, som servrarna inte skriver ned någonstans (<a href="#webservers">del 11</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
 <li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
 </ul>
 
@@ -413,35 +413,41 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 </ul>
 
 <h2 id="website">10. Spårar den här webbplatsen mig?</h2>
-<p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster och utan att spara din IP-adress i statistiken.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> att någon besökte sidan, från vilket land och vilka sidor – i 30 dagar under ett id som byts varje månad, därefter bara som antal. Din IP-adress bara i webbserverns logg, i högst två dygn.</p>
+<p class="tp-promise">Vi räknar besök utan kakor, utan externa tjänster – och utan att din IP-adress någonsin skrivs ned, inte ens i en logg.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> att någon besökte sidan, från vilket land och vilka sidor – i 30 dagar som ett besök bara den dagen, därefter bara som antal och som anonyma besök som vart och ett delas av minst fem olika personer. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
-<li><b>Webbservern</b> skriver varje sidvisning i en logg – med IP-adressen, och av adressen du bad om bara sidan, aldrig det en länk lade till. Loggen raderas efter högst två dygn. Frontservern före den för ingen logg över anrop.</li>
-<li><b>Var femtonde minut</b> läses loggen: adressen blir ett land (uppslaget på vår egen server) och ett besökar-id, och skrivs inte vidare.</li>
-<li><b>Efter 30 dagar</b> förlorar ett besök sitt id, klockslaget och skärmstorleken. Bara anonyma siffror finns kvar.</li>
+<li><b>Webbservern</b> skriver ingenting: den lämnar varje sidvisning direkt till en liten tjänst av våra, genom en socket på samma maskin – med IP-adressen, och av adressen du bad om bara sidan, aldrig det en länk lade till. Frontservern före den för ingen logg över anrop.</li>
+<li><b>Inom en minut</b> räknar tjänsten den, i sitt minne: adressen blir ett land (uppslaget på vår egen server) och ett besökarmärke, och glöms. Ingen logg, ingen fil och ingen säkerhetskopia innehåller den någonsin.</li>
+<li><b>Det som skrivs</b> är besöket utan adressen och utan märket: besökaren namngiven bara för den dagen, tiden på tio minuter när, sorten av skärm, aldrig dess storlek.</li>
+<li><b>Efter 30 dagar</b> förlorar ett besök även det, och sparas bara om det liknar besöken från minst fyra andra personer samma månad. En dags summor behåller inget land, språk eller version som färre än fem personer hade.</li>
 </ol>
-<p>Besökar-id:t är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel som bara finns på vår server, och kortas till tolv tecken. Nyckeln är ny varje månad, och en månads nyckel raderas när månaden efter är slut. Inom en månad får samma besökare samma id, så att vi kan räkna unika och återkommande besökare. Id:t visar inte adressen, men det är pseudonymt, inte anonymt: så länge månadens nyckel finns skulle den som hade både statistiken och nyckeln kunna prova adresser tills en passar. När nyckeln är borta kan ingen det – inte heller vi.</p>
-<p>Hur länge varje del sparas: loggen med din adress högst två dygn; varje besök i detalj – dess id, sekunden det kom, webbläsarens version, skärmen, språken, sidan som länkade hit, som tillsammans skulle kunna peka ut en person – 30 dagar; nyckeln som gjorde dess id, och månadens id:n med den, tills månaden efter är slut – sedan bara antalet olika besökare den månaden och dess veckor; de anonyma besök som sparas därefter görs vart och ett likt besöken från minst fyra andra personer samma månad, eller tas bort – så att varje kombination av det som sparas delas av minst fem olika besökare. Den som kom fem gånger räknas som en av dem, inte fem: de skiljs åt, bara i det steget, av en kort hash av månadens besökar-id, som försvinner med det. En betalning noteras aldrig på ett besök – ett tips räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
+<p>Besökarmärket är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel för månaden, och kortas till tolv tecken. Nyckeln finns bara i tjänstens minne – aldrig i en fil på en disk, alltså aldrig i en säkerhetskopia – och glöms efter tre månader, eller direkt när tjänsten startar om. Inom en månad får samma besökare samma märke, så att vi kan räkna unika och återkommande besökare – men själva märket skrivs aldrig ned. Ett sparat besök har två saker i dess ställe: ett namn på besökaren som gäller bara den dagen – inget som sparas knyter ihop en besökares besök från två dagar – och märket förseglat med månadens nyckel, slumpmässigt för den som inte har den. Bara den körande tjänsten kan öppna det, medan den har nyckeln: så att ett besök kan fortsätta efter en omstart, och så att fem olika personer kan skiljas från en person som kom fem gånger när en månad görs anonym.</p>
+<p>Hur många olika besökare som kom under flera dagar sparas som <strong>skisser</strong>: ett fält med 131 072 bitar för varje dag, där varje besökare sätter två – vilka två vet bara nyckeln. Tillsammans räknar de en veckas eller en månads besökare på några tusendelar när; de innehåller inget märke, ingen lista och ingen ordning, och utan nyckeln säger de ingenting om någon.</p>
+<p>Hur länge varje del sparas: din IP-adress – aldrig; i högst en minut i minnet. Varje besök i detalj – bara den dagen, tiden på tio minuter när, webbläsarens huvudversion, sorten av skärm, sidans språk och webbläsarens utan sitt land, webbplatsen som länkade under sitt registrerade namn – 30 dagar. Skisserna tills månaden efter är slut, sedan bara antalet olika besökare den månaden och dess veckor. De anonyma besöken därefter för alltid, vart och ett likt besöken från minst fyra andra personer samma månad – personer, inte besök: de skiljs åt av de förseglade märkena, som försvinner i samma steg – eller borttagna. Dagens summor för alltid, utan land, språk, version, webbplats eller märkning som färre än fem hade när dagen är en månad gammal. En betalning noteras aldrig på ett besök – ett tips räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
 <details class="tp-proof">
 <summary>Vill du se hur det fungerar bakom kulisserna?</summary>
 <div class="tp-proof-body">
 <h3>Så ser det ut</h3>
-<p class="tp-ex-h">En rad i webbserverns logg (en påhittad besökare, från IP-adresserna som är reserverade för dokumentation):</p>
+<p class="tp-ex-h">En rad så som webbservern lämnar den till tjänsten – i minnet, aldrig nedskriven (en påhittad besökare, från IP-adresserna som är reserverade för dokumentation):</p>
 <!--tp:ex website log-->
-<p class="tp-ex-h">Det statistiken sparar av det besöket – ingen IP-adress:</p>
+<p class="tp-ex-h">Det statistiken sparar av det besöket – ingen IP-adress, inget märke, tiden på tio minuter när:</p>
 <!--tp:ex website visit-->
-<p class="tp-ex-h">Samma besök efter 30 dagar:</p>
+<p class="tp-ex-h">Samma besök efter 30 dagar, tills dess månad görs anonym:</p>
 <!--tp:ex website anon-->
 <p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad nyckel.</p>
 <h3>Koden</h3>
-<p>Webbserverns loggformat för sidvisningar – den och nedladdningarnas logg är de enda loggar som sparar din IP-adress som regel (<a href="#webservers">del 11</a> räknar upp varje logg som finns):</p>
+<p>Webbserverns rad för en sidvisning, och vart den går – tjänstens socket, inte en fil (<a href="#webservers">del 11</a> räknar upp varje logg som finns):</p>
 <!--tp:code website log-->
-<p>Besökar-id:t och besöket så som det sparas:</p>
+<p>Socketen och raderna som väntar i minnet:</p>
+<!--tp:code website inbox-->
+<p>Månadsnycklarna, bara i minnet; besökarmärket; dagens namn och det förseglade märket; besöket så som det sparas:</p>
 <!--tp:code website visitor-->
-<p>Hur länge besöken och id:na sparas, och det enda ställe där ett tips räknas – per dag, aldrig på besöket:</p>
+<p>Skisserna som räknar olika besökare utan något märke:</p>
+<!--tp:code website sketch-->
+<p>Hur länge besöken sparas, och det enda ställe där ett tips räknas – per dag, aldrig på besöket:</p>
 <!--tp:code website kept-->
-<p>Det ett besök behåller efter 30 dagar:</p>
+<p>Det ett besök behåller efter 30 dagar, hur en månad görs anonym efter personer, och en dags summor när den är en månad gammal:</p>
 <!--tp:code website anon-->
 <h3>Kontrollera det själv</h3>
 <p>Här kan du kontrollera mer än koden. Öppna webbläsarens utvecklarverktyg på valfri sida på webbplatsen:</p>
@@ -450,41 +456,40 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><strong>Lagring (Application i Chrome):</strong> inga kakor, och i den lokala lagringen bara de få val som <a href="/privacy/#kakor">integritetspolicyn</a> räknar upp.</li>
 <li><strong>Sidans svarshuvuden:</strong> <code>Content-Security-Policy</code> listar varje ställe sidan får ladda något från, och webbläsaren ser till att det följs.</li>
 </ul>
-<blockquote class="tp-ask" data-for="website"><p>Här nedan finns kod från webbplatsen dopeiptv.org – hur den räknar besökare ur sin webbservers logg. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: vad sparar den om en besökare, kan en besökare identifieras ur det, och hur anonyma är siffrorna egentligen? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
+<blockquote class="tp-ask" data-for="website"><p>Här nedan finns kod från webbplatsen dopeiptv.org – hur den räknar besökare ur raderna som dess webbserver lämnar till den, i minnet. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: skrivs en besökares IP-adress ned någonstans, vad sparar den om en besökare, kan en besökare identifieras ur det – av oss, eller av någon med en kopia av serverns diskar – och hur anonyma är siffrorna egentligen? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
 <!--tp:copy website-->
 </div>
 </details>
 <h3>Det här skyddar det inte mot</h3>
 <ul>
 <li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
-<li>Din IP-adress finns i webbserverns logg i högst två dygn. Medan den finns där knyter den varje anrop till en adress – det är vad en åtkomstlogg är.</li>
-<li>Under sina första 30 dagar sparas ett besök i detalj, och tills månaden efter är slut går dess id att spåra med den månadens nyckel. Den som tog över vår server under den tiden skulle kunna knyta nya besök till adresser. Därefter är besöket anonymt och nyckeln borta.</li>
+<li>Medan tjänsten körs passerar din adress dess minne, och månadens nyckel finns där. Den som tog över den körande servern skulle kunna se anropen när de kommer, som på vilken webbserver som helst – det som finns på dess diskar, nu eller i en säkerhetskopia, leder inte tillbaka till dig.</li>
+<li>Ett besök som sparas i 30 dagar säger vad som gjordes under det, på tio minuter när. Den som redan visste att du besökte sidan ungefär då skulle kunna plocka ut det besöket bland dagens – aldrig dina besök en annan dag.</li>
 </ul>
 
 <h2 id="webservers">11. Vad ser och skriver servrarna bakom dopeiptv.org ner?</h2>
-<p class="tp-promise">Ditt besök går genom två webbservrar och en liten tjänst, och av alla deras loggar sparar bara statistikens två din adress som regel – borta efter högst två dygn. Här är varje logg som finns, och inställningarna som avgör det.</p>
-<p class="tp-know"><b>Det här kan vi veta:</b> din IP-adress och sidorna du ber om, i statistikens två loggar, i högst två dygn – och ingenting alls om det appens tjänster bär.</p>
+<p class="tp-promise">Ditt besök går genom två webbservrar och en liten tjänst, och ingen av deras loggar sparar din adress som regel: statistikens rader går direkt till tjänstens minne. Här är varje logg som finns, och inställningarna som avgör det.</p>
+<p class="tp-know"><b>Det här kan vi veta:</b> sidorna du ber om – din IP-adress bara medan tjänsten räknar dem i minnet, i högst en minut – och ingenting alls om det appens tjänster bär.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Frontservern</b>, en TLS-proxy i en egen jail, har webbplatsens certifikat och svarar på din krypterade anslutning. Den skickar anropet vidare med din adress i ett huvud som den sätter själv, <code>X-Real-IP</code> – det din webbläsare skickade under det namnet ersätts.</li>
-<li><b>Innehållsservern</b>, på en egen port, lämnar ut sidorna och filerna – alla gjorda i förväg, var femtonde minut; ingen PHP, inget program som körs för en sida – och skriver statistikens två loggar.</li>
+<li><b>Innehållsservern</b>, på en egen port, lämnar ut sidorna och filerna – alla gjorda i förväg, var femtonde minut; ingen PHP, inget program som körs för en sida – och lämnar statistikens rader till tjänsten, utan att skriva ned någon av dem.</li>
 <li><b>En liten tjänst</b> i Python (<code>donate.py</code>) svarar på det som inte är en fil: dricks och supporternyckeln, feedback och felrapporter, synkronisering, Titta tillsammans och administrationssidan. Den lyssnar på en Unix-socket, inte på nätverket, så utifrån nås den bara genom innehållsservern, på de sökvägar som den servern lämnar vidare – och på maskinen kan bara innehållsservern och tjänsten själv ansluta till den.</li>
 </ol>
-<p>En jail är FreeBSD:s sätt att skilja delar av en och samma maskin från varandra, var och en med egna filer, användare och program. Innehållsservern och tjänsten körs i en egen jail på servern, som inte rymmer något annat – bara dem och de två schemalagda jobben som gör sidorna och läser statistikens loggar. Tjänsten körs som en egen användare, som inget annat program på maskinen delar utom de två jobben, och det någon av dem raderar är borta ur serverns säkerhetskopior inom två dygn också.</p>
-<p><strong>Vad som når dem.</strong> En brandvägg på servern släpper in i den jailen bara frontservern, och bara på den enda porten. Ut från den får jailen bara slå upp namn och öppna https-anslutningar – som tjänsten och de schemalagda jobben använder till Stripe, GitHub, webbläsarnas push-tjänster för administratörernas aviseringar och nedladdningen av landsdatabasen. nginx:s egen lista över vem som släpps in, som innehållsservern inte ens startar utan, är ett andra lås bakom brandväggen.</p>
+<p>En jail är FreeBSD:s sätt att skilja delar av en och samma maskin från varandra, var och en med egna filer, användare och program. Innehållsservern och tjänsten körs i en egen jail på servern, som inte rymmer något annat – bara dem och det schemalagda jobbet som gör sidorna och räknar nedladdningarna. Tjänsten körs som en egen användare, som inget annat program på maskinen delar utom det jobbet, och det någon av dem raderar är borta ur serverns säkerhetskopior inom två dygn också.</p>
+<p><strong>Vad som når dem.</strong> En brandvägg på servern släpper in i den jailen bara frontservern, och bara på den enda porten. Ut från den får jailen bara slå upp namn och öppna https-anslutningar – som tjänsten och det schemalagda jobbet använder till Stripe, GitHub, webbläsarnas push-tjänster för administratörernas aviseringar och nedladdningen av landsdatabasen. nginx:s egen lista över vem som släpps in, som innehållsservern inte ens startar utan, är ett andra lås bakom brandväggen.</p>
 <p><strong>Vad var och en ser.</strong> Frontservern måste se allt för att kunna svara: din adress, adressen du ber om, det din webbläsare skickar med och ett anrops innehåll – en rapport, en synkkopia (redan låst av appen). Innehållsservern får samma anrop från den som vanlig HTTP, med din adress i <code>X-Real-IP</code>, och litar på det huvudet – därför hålls dess port till frontservern ensam, av brandväggen och en gång till av nginx. Tjänsten får bara anropen till sina egna sökvägar, med samma huvud; den håller din adress bara i minnet, för sina gränser (<a href="#reports">del 7</a>), och dess egen logg säger vad som gick fel, aldrig från vilken adress.</p>
-<p><strong>Vad som skrivs ned.</strong> Ingen av frontserverns servrar för webbplatsen – dopeiptv.org, www.dopeiptv.org, vanlig <code>http://</code> och det gamla iptv.dope.rs – för någon logg över anrop, och var och en skriver ett fel bara på den nivå som stoppar nginx själv (<code>crit</code>): annars skulle ett nekat eller trasigt anrop skrivas där med sin adress. Innehållsservern är likadan som helhet, utom två loggar, båda för statistiken:</p>
+<p><strong>Vad som skrivs ned.</strong> Ingen av frontserverns servrar för webbplatsen – dopeiptv.org, www.dopeiptv.org, vanlig <code>http://</code> och det gamla iptv.dope.rs – för någon logg över anrop, och var och en skriver ett fel bara på den nivå som stoppar nginx själv (<code>crit</code>): annars skulle ett nekat eller trasigt anrop skrivas där med sin adress. Innehållsservern är likadan som helhet: den skriver statistikens rader till ingen fil, utan lämnar dem till tjänsten genom dess socket – och för en liten logg för den öppna nedladdningsräknaren:</p>
 <ul>
-<li><strong>Sidvisningar:</strong> förstasidan, hjälpsidan och <code>/hit</code>, signalen en sida skickar när den har visats (<a href="#website">del 10</a>). En rad var: din adress, tidpunkten, metoden, sidans sökväg – aldrig det en länk lade till efter den, ett <code>?fbclid=</code> eller ett <code>?utm_…</code> –, för <code>/hit</code> bara de fält signalen skickar, statusen, sidan som länkade hit utan sin frågedel eller sitt fragment, webbläsarens namn och sidans språk – webbläsarens namn avkortat vid 1 024 tecken, adresserna vid 2 048.</li>
-<li><strong>Nedladdningar:</strong> <code>/dl.php</code>, som varje nedladdningslänk och appens egen uppdatering går genom: nginx:s vanliga format med samma avkortningar och inget användarnamn, av adressen som efterfrågades bara filens namn, din adress som sista fält.</li>
+<li><strong>Statistikens rader:</strong> förstasidan, hjälpsidan och <code>/hit</code>, signalen en sida skickar när den har visats (<a href="#website">del 10</a>). En rad var: din adress, tidpunkten, metoden, sidans sökväg – aldrig det en länk lade till efter den, ett <code>?fbclid=</code> eller ett <code>?utm_…</code> –, för <code>/hit</code> bara de fält signalen skickar, statusen, sidan som länkade hit utan sin frågedel eller sitt fragment, webbläsarens namn och sidans språk – webbläsarens namn avkortat vid 512 tecken, adressen som efterfrågades vid 1 024, så att en rad ryms i ett meddelande på socketen. En nedladdning går samma väg. I tjänstens minne räknas de inom en minut och är sedan borta; ingen fil innehåller dem.</li>
+<li><strong>Nedladdningsräknaren:</strong> <code>/dl.php</code>, som varje nedladdningslänk och appens egen uppdatering går genom: metoden, filens namn och protokollet, svaret, och om en webbläsare, appen, en robot eller ingenting frågade – ingen adress, ingen tidpunkt, inget webbläsarnamn.</li>
 </ul>
-<p>Inget annat: ingen annan sida, ingen kaka, inget som ett anrop har med sig i sitt innehåll, inget om synk, Titta tillsammans, feedback, dricks eller administrationssidan. En webbläsare som har öppnat administrationssidan lämnas utanför båda. Båda loggarna läses var femtonde minut, byts vid midnatt, och bara föregående dygn sparas – högst två dygn.</p>
-<p><strong>Varje logg som finns.</strong> De två är de enda loggar som sparar din adress som regel. Alla loggar på servern, vad var och en innehåller, hur länge den sparas och vem som kan läsa den:</p>
+<p>Inget annat: ingen annan sida, ingen kaka, inget som ett anrop har med sig i sitt innehåll, inget om synk, Titta tillsammans, feedback, dricks eller administrationssidan. En webbläsare som har öppnat administrationssidan lämnas utanför båda. Räknarens logg byts vid midnatt, och bara föregående dygn sparas – högst två dygn.</p>
+<p><strong>Varje logg som finns.</strong> Ingen av dem sparar din adress som regel. Alla loggar på servern, vad var och en innehåller, hur länge den sparas och vem som kan läsa den:</p>
 <ul>
-<li><code>iptv.dope.rs-stats.log</code> och <code>iptv.dope.rs-downloads.log</code> – innehållsserverns två ovan: högst två dygn. Kan läsas av nginx:s egen användare och användaren som kör statistiken, ingen annan (läge 640).</li>
+<li><code>iptv.dope.rs-dl-counts.log</code> – nedladdningsräknarens ovan, utan adress: högst två dygn. Kan läsas av nginx:s egen användare och användaren som räknar nedladdningarna, ingen annan (läge 640).</li>
 <li><code>error.log</code>, en för varje webbserver – bara det som stoppar nginx (<code>crit</code>), vilket är sällsynt. En sådan rad anger anropet den gällde: på frontservern med din adress, på innehållsservern med frontserverns. Ingen av dem byts av sig själv: en rad finns kvar tills vi rensar bort den. Frontserverns delas med de andra webbplatserna bakom den. Kan läsas bara av nginx (600).</li>
-<li><code>iptv-donate.log</code> – tjänstens: när den startar och hur den är inställd; ett fel efter sitt slag och filen och raden där det hände, aldrig dess ord; varför Stripe nekade en betalning, med Stripes egna koder; en push-avisering som misslyckades; en nekad inloggning på administrationssidan och varför – aldrig det som skrevs, aldrig varifrån; och en gång om dagen hur många synkkopior, rum i Titta tillsammans, rapporter och nekade ändrade versioner som kom och gick – bara antal. Ingen adress, inget anrop, inget du skickade. Fem gamla kopior om högst en megabyte var: i dess takt månader, kanske år. Bara tjänstens (600).</li>
-<li><code>iptv-stats.log</code> – statistikens egen körning: när landsdatabasen hämtades, eller varför inte; hur många loggrader som inte gick att läsa – ett antal, aldrig raden; ett dygn som rymde så många besök som ett dygn får. Inget om ett besök. Sparas som tjänstens, och bara tjänstens användare kan läsa den (600).</li>
+<li><code>iptv-donate.log</code> – tjänstens: när den startar och hur den är inställd; ett fel efter sitt slag och filen och raden där det hände, aldrig dess ord; varför Stripe nekade en betalning, med Stripes egna koder; en push-avisering som misslyckades; en nekad inloggning på administrationssidan och varför – aldrig det som skrevs, aldrig varifrån; och en gång om dagen hur många synkkopior, rum i Titta tillsammans, rapporter och nekade ändrade versioner som kom och gick – bara antal; och statistikens egna rader: när landsdatabasen hämtades, eller varför inte, hur många rader som inte gick att läsa – ett antal, aldrig raden. Ingen adress, inget anrop, inget du skickade. Fem gamla kopior om högst en megabyte var: i dess takt månader, kanske år. Bara tjänstens (600).</li>
 <li><code>iptv-sync.log</code> – jobbet som speglar varje version från GitHub och gör sidorna, inget med synkronisering av inställningar att göra: vilken version, vilka filer som hämtades, hur många nedladdningar som räknades – ett antal –, hur många sidor som gjordes. Inget om ett besök. Sparas som tjänstens (600).</li>
 </ul>
 <p>Utöver dem bara FreeBSD:s egna systemloggar, som inte innehåller något om ett anrop.</p>
@@ -504,9 +509,9 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code webservers path-->
 <p>Det som aldrig skrivs ned – varje server i frontserverns två filer för webbplatsen, innehållsservern som helhet, och dess jails egen nginx.conf:</p>
 <!--tp:code webservers nolog-->
-<p>De två loggarna: vad en rad innehåller och hur mycket av det som skickades, vem som lämnas utanför, och de enda ställena där de skrivs:</p>
+<p>Statistikens rader och räknarens logg: vad en rad innehåller och hur mycket av det som skickades, vem som lämnas utanför, och vart var och en går – tjänstens socket, och den enda filen:</p>
 <!--tp:code webservers logs-->
-<p>Hur länge de sparas – serverns loggrotation så som <code>DEPLOY.md</code> ger den, hela: de två loggarna med din adress byts vid midnatt (<code>@T00</code>), en gammal kopia sparas (<code>1</code>); tjänstens och de två schemalagda jobbens loggar, som inte innehåller någon adress, fem gamla kopior om högst en megabyte var (<code>5 1024</code>), som bara deras egen användare kan läsa (<code>600</code>). Sedan loggarna som redan finns, begränsade för hand till detsamma – nginx:s fellogg till nginx, dess två loggar till nginx och statistiken:</p>
+<p>Hur länge de sparas – serverns loggrotation så som <code>DEPLOY.md</code> ger den, hela: räknarens logg byts vid midnatt (<code>@T00</code>), en gammal kopia sparas (<code>1</code>); tjänstens och det schemalagda jobbets loggar, som inte innehåller någon adress, fem gamla kopior om högst en megabyte var (<code>5 1024</code>), som bara deras egen användare kan läsa (<code>600</code>). Sedan de gamla loggarna som innehöll adresser raderade, varje kopia av dem, och statistikens schemalagda jobb borttaget:</p>
 <!--tp:code webservers kept-->
 <p>Gränserna på båda servrarna, den största storlek varje väg tar emot, i minnet, och svaren, som inte heller skrivs till disk:</p>
 <!--tp:code webservers limits-->
@@ -517,7 +522,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <pre class="tp-cmd"><code>curl -sI https://dopeiptv.org/
 curl -sI https://dopeiptv.org/.gitignore
 curl -s https://dopeiptv.org/.well-known/security.txt</code></pre>
-<blockquote class="tp-ask" data-for="webservers"><p>Här nedan finns konfigurationen för servrarna bakom dopeiptv.org, webbplatsen för tv-spelaren dopeIPTV med öppen källkod: TLS-frontproxyn (nginx), innehållsservern bakom den (nginx), den lilla Python-tjänsten bakom den, och hur länge deras loggar sparas. Förklara på enkel svenska, steg för steg, vad som händer med en besökares anrop – vad varje del ser, och vad den skriver ned. Granska den sedan som en angripare skulle: kan någon nå innehållsservern eller tjänsten på annat sätt än genom frontproxyn, få dem att tro på en annan adress, ta sig runt en gräns, få nginx att skriva ett anrop, dess innehåll eller ett svar till disk eller till en logg, få en fil utlämnad som inte borde lämnas ut – genom en symbolisk länk, till exempel –, eller ladda webbplatsens sidor i en annan webbplats? Jämför det kommentarerna och den här sidan lovar – ingen logg över anrop utom statistikens två, det som skärs bort ur dem, hur länge varje logg sparas och vem som kan läsa den, innehåll och svar som hålls i minnet, inga symboliska länkar som följs, huvudena på varje svar – med vad direktiven verkligen gör, och säg var de skiljer sig. Peka ut svagheter och vad konfigurationen inte skyddar mot. Gissa inte: säg till där något beror på det som inte finns med – frontproxyns huvudfil nginx.conf, filen som håller innehållsserverns port till proxyn, resten av tjänstens kod.</p></blockquote>
+<blockquote class="tp-ask" data-for="webservers"><p>Här nedan finns konfigurationen för servrarna bakom dopeiptv.org, webbplatsen för tv-spelaren dopeIPTV med öppen källkod: TLS-frontproxyn (nginx), innehållsservern bakom den (nginx), den lilla Python-tjänsten bakom den, och hur länge deras loggar sparas. Förklara på enkel svenska, steg för steg, vad som händer med en besökares anrop – vad varje del ser, och vad den skriver ned. Granska den sedan som en angripare skulle: kan någon nå innehållsservern eller tjänsten på annat sätt än genom frontproxyn, få dem att tro på en annan adress, ta sig runt en gräns, få nginx att skriva ett anrop, dess innehåll eller ett svar till disk eller till en logg, få en fil utlämnad som inte borde lämnas ut – genom en symbolisk länk, till exempel –, eller ladda webbplatsens sidor i en annan webbplats? Jämför det kommentarerna och den här sidan lovar – ingen logg över anrop utom nedladdningsräknarens, som inte innehåller någon adress, statistikens rader till tjänstens minne och aldrig till en fil, det som skärs bort ur dem, hur länge varje logg sparas och vem som kan läsa den, innehåll och svar som hålls i minnet, inga symboliska länkar som följs, huvudena på varje svar – med vad direktiven verkligen gör, och säg var de skiljer sig. Peka ut svagheter och vad konfigurationen inte skyddar mot. Gissa inte: säg till där något beror på det som inte finns med – frontproxyns huvudfil nginx.conf, filen som håller innehållsserverns port till proxyn, resten av tjänstens kod.</p></blockquote>
 <!--tp:copy webservers-->
 </div>
 </details>

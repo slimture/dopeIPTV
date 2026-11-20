@@ -1739,3 +1739,140 @@ jexec dopeiptv rm /usr/local/www/iptv/public/link-check.txt
 
 Deploy as the rounds before (copy `site`, `public`, `donate` and restart
 `iptv_donate`), then run the check above.
+
+## No address written down, keys in memory (1.6.9 review, second round)
+
+The statistics are rebuilt so that nothing on the server's disks can lead
+back to a visitor - not for a minute, not in a backup. It supersedes what
+"Statistics and the admin page" and "Every log, and port 8081 closed" say
+about the statistics' logs. Nothing changes for a visitor or for the app;
+the admin page shows the same numbers (unique visitors are counted from
+sketches now, within a few in a thousand).
+
+- **No log with an address.** nginx hands each statistics line (a page
+  view, `/hit`, a click on a download) to the donate service over a socket
+  of its own (`/var/run/iptv_donate/stats.sock`, `syslog:` in the content
+  server's file) instead of writing `iptv.dope.rs-stats.log` and
+  `iptv.dope.rs-downloads.log`. The lines wait in the service's memory and
+  its own thread counts them every minute (`donate/stats_inbox.py`,
+  `donate.start_statistics`) - the cron job for `stats_collect.py` goes. The
+  public download counter (`sync-releases.sh`) gets a log of its own that
+  holds the request line, the answer and what asked (a browser, the app, a
+  robot) - no address, no time, no browser's name
+  (`iptv.dope.rs-dl-counts.log`, nginx's `iptv_dl_count`).
+- **Keys in memory alone.** The month keys the visitor marks are made with
+  are never in a file on a disk (`visitor-keys.json` is deleted at the first
+  run). A restart starts new ones - a visitor before and after it counts
+  twice that month - unless `STATS_KEYS_DIR` names a folder on a file system
+  kept in memory (tmpfs, below), which a restart keeps and a reboot empties.
+- **Nothing kept ties two days of a visitor together.** A visit in the
+  visitor log names its visitor for its day alone; its mark is sealed with
+  the month's key (random without it). Its start is kept to the ten minutes
+  and what happened in it to ten seconds from there, a screen by its kind,
+  the browser's language without its country, the site that linked by the
+  name its owner registered, a link's tag only when it is one of ours or a
+  site everyone knows. The lists of visitors' marks (`uniques.json`,
+  `kinds.json`) become each day's sketches (`sketches.json`: two bits a
+  visitor, no mark) and are deleted.
+- **Kept for good, and anonymous for good.** The months' anonymous visits are
+  k-anonymous by different people, told apart by their sealed marks (a key
+  gone: one person at the most). A day's lists of who came (countries,
+  languages, versions, sites, tags) keep no name counted fewer than five
+  times once the day is a month old - those are the month's, where too a
+  name fewer than five times is "other" once the month is whole.
+
+### This round's deploy (host)
+
+The files and the service - at its start it opens the statistics' socket:
+
+```sh
+jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
+service -j dopeiptv iptv_donate restart
+jexec dopeiptv ls -l /var/run/iptv_donate/
+jexec dopeiptv grep "statistics:" /var/log/iptv-donate.log | tail -1
+```
+
+`srw-rw----  1 iptv  www ... stats.sock` beside `donate.sock`, and the
+line `[donate] statistics: lines from nginx at
+/var/run/iptv_donate/stats.sock (0660, group www), counted every 60 s, keys
+in memory alone`. Until nginx is switched the service still reads what is
+left of the old logs.
+
+The counter's log, then the content server's file:
+
+```sh
+jexec dopeiptv install -m 640 -o root -g iptv /dev/null /var/log/nginx/iptv.dope.rs-dl-counts.log
+cp /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf /root/iptv.dope.rs.conf.before-memory
+cp /usr/local/bastille/jails/dopeiptv/root/root/dopeiptv/deploy/content-iptv.dope.rs.conf /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/nginx/conf.d/iptv.dope.rs.conf
+jexec dopeiptv nginx -t && service -j dopeiptv nginx reload
+jexec dopeiptv grep -n emerg /var/log/nginx/error.log | tail -3
+```
+
+Open the site in a private window, wait a minute and look: the admin page's
+Visitors tab shows the visit, and nothing new is written to the old logs
+(`jexec dopeiptv ls -l /var/log/nginx/`: their size stays). Then the old
+download log's last lines into the counter, once, and the old logs away -
+with every copy newsyslog kept of them, and `iptv-stats.log`, whose cron
+job goes:
+
+```sh
+jexec -U iptv dopeiptv env IPTV_DOWNLOAD_LOG=/var/log/nginx/iptv.dope.rs-downloads.log /bin/sh /usr/local/www/iptv/sync-releases.sh
+jexec dopeiptv sed -i '' '/stats_collect\.py/d' /etc/crontab
+jexec dopeiptv grep -c stats_collect /etc/crontab
+jexec dopeiptv sh -c 'rm -f /var/log/nginx/iptv.dope.rs-stats.log* /var/log/nginx/iptv.dope.rs-downloads.log* /var/log/iptv-stats.log*'
+jexec dopeiptv ls -l /var/log/nginx/ /var/log/
+```
+
+`0` for the cron line. The site's newsyslog file, whole - the counter's
+log turned over at midnight with the day before kept uncompressed for
+`sync-releases.sh` (`P`), the scripts' and the service's as before:
+
+```sh
+cat > /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/newsyslog.conf.d/iptv.dope.rs.conf <<'LOGS'
+/var/log/nginx/iptv.dope.rs-dl-counts.log    root:iptv      640  1     *    @T00 JP    /var/run/nginx.pid 30
+/var/log/iptv-sync.log                       iptv:iptv      600  5     1024 *    JN
+/var/log/iptv-donate.log                     iptv:iptv      600  5     1024 *    J     /var/run/iptv_donate/iptv_donate.pid
+LOGS
+jexec dopeiptv sh -c 'newsyslog -nv 2>&1 | grep iptv'
+```
+
+A backup of the jail taken before this round holds those logs as they were:
+delete their copies there too (`var/log/nginx/iptv.dope.rs-stats.log*`,
+`iptv.dope.rs-downloads.log*`) - from now on no backup has them.
+
+**The keys through a restart (optional).** A small tmpfs in the jail, its
+owner the service's user, and the service told about it - `df -T` there says
+`tmpfs`, and the start line `keys in memory and /var/db/iptv-stats-keys`.
+`IPTV_UID` and `IPTV_GID` are `jexec dopeiptv id -u iptv` and `id -g iptv`:
+
+```sh
+mkdir -p /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys
+echo "tmpfs /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys tmpfs rw,size=1m,mode=0700,uid=IPTV_UID,gid=IPTV_GID 0 0" >> /usr/local/bastille/jails/dopeiptv/fstab
+mount -t tmpfs -o size=1m,mode=0700,uid=IPTV_UID,gid=IPTV_GID tmpfs /usr/local/bastille/jails/dopeiptv/root/var/db/iptv-stats-keys
+jexec dopeiptv df -T /var/db/iptv-stats-keys
+echo 'STATS_KEYS_DIR=/var/db/iptv-stats-keys' >> /usr/local/bastille/jails/dopeiptv/root/usr/local/etc/iptv-donate.conf
+service -j dopeiptv iptv_donate restart
+jexec dopeiptv grep "statistics:" /var/log/iptv-donate.log | tail -1
+```
+
+Then from any other computer, as after every round:
+
+```sh
+sh deploy/check-live.sh dopeiptv.org <the content jail's public-facing address>
+```
+
+### Every log on the server
+
+| Log | Jail | What it holds | Kept | Mode |
+|---|---|---|---|---|
+| `/var/log/nginx/iptv.dope.rs-dl-counts.log` | dopeiptv | `/dl.php`: the method, the file's name and the protocol, the answer, and whether a browser, the app, a robot or nothing asked - no address, no time, no browser's name | turned over at midnight, the day before kept: two days at the most (`1 * @T00`) | 640 `www:iptv` (newsyslog makes it `root:iptv`, nginx's reopen gives it to its workers' user) |
+| `/var/log/nginx/error.log` | dopeiptv | the jail's nginx, the site's alone; `crit` only: what stops nginx - a file it cannot open, the service's socket gone or refused. Such a line names the request and the proxy's address, not the visitor's | not turned over by any line of the site's: until removed by hand | 600 |
+| `/var/log/nginx/error.log` | webproxy | the proxy's, shared with the other sites behind it; the site's servers write `crit` only - a TLS handshake nginx cannot make sense of, a worker out of files. There the address on a line is the visitor's | the same | 600 |
+| `/var/log/iptv-donate.log` | dopeiptv | the service's (daemon `-o`): its start line and set-up, files it narrowed, a fault by its kind and file:line (never its words), Stripe's refusals in Stripe's fixed codes, a push that failed and the push service's host, an admin sign-in refused and why (an admin's name, never what was typed or from where), once a day how many sync copies, rooms, reports and modified builds' requests came and went, sync's space; the statistics' own lines - the country database fetched, how many lines could not be read or were dropped (a count, never a line), a day that held as many visits as a day may. Never an address, a request or its path, nor anything a visitor sent | five old copies of up to 1 MB (`5 1024 *`): months, perhaps years | 600 `iptv` |
+| `/var/log/iptv-sync.log` | dopeiptv | `sync-releases.sh`'s - the release mirroring and page rendering: GitHub's release, each file fetched or already current, how many downloads counted (a number), the pages rendered, nightly.json | five old copies of up to 1 MB: months | 600 `iptv` |
+
+Beside them only FreeBSD's own (cron, messages, auth.log...), which hold
+nothing of a request. The statistics' lines are in the service's memory for
+a minute and then only as what `stats_collect.py` keeps; the content
+server's other requests none (`access_log off`), the proxy's servers for
+the site none, the service none of a request.

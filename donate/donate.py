@@ -111,6 +111,16 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             admins are <STATS_DIR>/admin-users.json's.
     STATS_IGNORE            addresses, networks or host names whose visits
                             stats_collect.py leaves out (your own)
+    STATS_SOCKET            where nginx hands the statistics' lines, in a
+                            datagram each: unix:/var/run/iptv_donate/stats.sock
+                            (default; 0660, SOCKET_GROUP's like the other).
+                            They wait in this service's memory and its own
+                            thread counts them every minute - no log with
+                            an address is written (stats_inbox.py)
+    STATS_KEYS_DIR          a folder on a file system kept in memory (tmpfs)
+                            where the statistics' month keys wait through a
+                            restart; empty (the default), or a folder on a
+                            disk: in this service's memory alone
     STATS_DIR, DOWNLOADS_JSON  where stats_collect.py and sync-releases.sh keep
                             their counts (<site>/stats, <site>/downloads.json)
     ADMIN_SESSION_KEY_FILE  the key that signs the admin's session cookie
@@ -134,6 +144,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import socket
 import socketserver
 import sys
@@ -2114,6 +2125,69 @@ def open_to_nginx(path: str, group: str = SOCKET_GROUP) -> str:
         "iptv_donate_socket_group (on a developer's machine, a group of its own user's)")
 
 
+#: How often the statistics' own thread counts what nginx handed over.
+STATS_EVERY = 60
+
+
+def _stats_loop() -> None:
+    """The statistics counted every STATS_EVERY seconds from the lines in
+    memory (stats_collect.collect); the country database looked at once a
+    day. A run that fails is said by its kind and the next one comes."""
+    import stats_collect
+    fetched = 0.0
+    while True:
+        time.sleep(STATS_EVERY)
+        try:
+            fetch = time.time() - fetched > 86400
+            stats_collect.collect(with_fetch=fetch)
+            if fetch:
+                fetched = time.time()
+        except Exception as e:  # noqa: BLE001 - the next run comes all the same
+            print(f"[donate] statistics: a run failed ({type(e).__name__})", file=sys.stderr, flush=True)
+
+
+def start_statistics() -> str:
+    """The socket nginx sends the statistics' lines to (STATS_SOCKET), made
+    nginx's workers' and this service's alone as the other one is
+    (open_to_nginx), and the thread that counts them. Where the socket cannot
+    be kept to them it is not opened: no statistics, the rest of the service
+    runs. On SIGTERM the lines still waiting are counted before it stops."""
+    import stats_collect
+    import stats_inbox
+    where = stats_collect.SOCKET
+    if not where.startswith("unix:"):
+        return "off"
+    path = where[5:]
+    try:
+        receiver = stats_inbox.Receiver(path, stats_collect.INBOX)
+    except OSError as e:
+        print(f"[donate] statistics: no socket at {path} ({e})", file=sys.stderr, flush=True)
+        return "off"
+    try:
+        how = open_to_nginx(path)
+    except SocketNotPrivate as e:
+        receiver.close()
+        print(f"[donate] statistics off: {e}", file=sys.stderr, flush=True)
+        return "off"
+    receiver.start()
+    stats_collect._SERVING.append(True)
+    threading.Thread(target=_stats_loop, name="statistics", daemon=True).start()
+
+    def stop(signum, _frame) -> None:
+        try:
+            stats_collect.collect()
+        except Exception as e:  # noqa: BLE001 - stopping all the same
+            print(f"[donate] statistics: the last run failed ({type(e).__name__})", file=sys.stderr, flush=True)
+        receiver.close()
+        raise SystemExit(0)
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, stop)
+    print(f"[donate] statistics: lines from nginx at {path} ({how}), counted every {STATS_EVERY} s, "
+          f"keys {'in memory and ' + stats_collect.KEYS_DIR if stats_collect.keys_now().folder else 'in memory alone'}",
+          file=sys.stderr, flush=True)
+    return how
+
+
 def _connection():
     import http.client
     if LISTEN.startswith("unix:"):
@@ -2190,6 +2264,7 @@ def main() -> None:
         threading.Thread(target=_watch_donations, name="donations", daemon=True).start()
     threading.Thread(target=_sync_cleanup, name="sync-cleanup", daemon=True).start()
     threading.Thread(target=_forget_loop, name="forget-addresses", daemon=True).start()
+    start_statistics()
     srv.serve_forever()
 
 

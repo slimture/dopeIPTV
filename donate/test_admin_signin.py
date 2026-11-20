@@ -219,7 +219,7 @@ def test_failed_tries_are_forgotten_on_time_and_never_fill_the_memory():
     assert max(len(k) for k in auth._fails) <= 100
     auth.forget(time.time() + auth.FAIL_WINDOW + 1)
     assert not auth._fails
-    for i in range(auth.MAX_CHALLENGES + 50):
+    for _i in range(auth.MAX_CHALLENGES + 50):
         auth._challenge("login")
     assert len(auth._challenges) <= auth.MAX_CHALLENGES
     # What a passkey sends is refused when it cannot be read, never an error.

@@ -35,7 +35,6 @@
   const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
   const RANGES = [7, 30, 90, 365, 0];          // 0: everything kept
   const clock = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
-  const clockSec = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   let langNames = null, regionNames = null;
   try { langNames = new Intl.DisplayNames(["en"], { type: "language" }); } catch (e) { /* codes then */ }
   try { regionNames = new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) { /* codes then */ }
@@ -554,10 +553,11 @@
     }
     const sites = listCard("Sites that linked here", L.refs, (k) => k === "other" ? "Other sites" : k,
                            ["Tagged links", L.sources, null, "source"], "ref");
-    // The exact pages that linked here, before the tagged links: each opens
-    // the visits it brought, and its arrow the page itself.
+    // The exact pages that linked here, before the tagged links: each one's
+    // arrow opens the page itself.
     if ((L.ref_pages || []).length) {
-      const pages = rankList(L.ref_pages, (k) => k === "other" ? "Other pages" : k, "ref_page", "Page that linked");
+      // Counted per day only: a visit kept never says which page brought it.
+      const pages = rankList(L.ref_pages, (k) => k === "other" ? "Other pages" : k, null, "Page that linked");
       pages.querySelectorAll("li").forEach((li, i) => {
         const k = L.ref_pages[i][0];
         if (k !== "other") { li.append(outLink(k)); }
@@ -938,8 +938,16 @@
     (v.acts || []).forEach((a) => { const t = actText(a); if (t) { steps.push([a[0], t]); } });
     steps.sort((a, b) => a[0] - b[0]);
     const ol = mk("ol", "steps");
-    steps.forEach(([t, text]) => { const li = mk("li"); li.append(mk("span", "t", clockSec.format(new Date(t * 1000))), mk("span", "", text)); ol.append(li); });
+    // A visit is kept to the ten minutes, and what happened in it to ten
+    // seconds from its start: the steps say how long after.
+    steps.forEach(([t, text]) => {
+      const li = mk("li");
+      li.append(mk("span", "t", t > v.start ? "+" + duration(t - v.start) : clock.format(when)), mk("span", "", text));
+      ol.append(li);
+    });
     body.append(ol);
+    body.append(mk("p", "muted", "Kept to the ten minutes, without the visitor's address or anything that ties " +
+                   "it to another day."));
     const facts = mk("dl", "facts");
     if (v.ref_page) {
       const dd = mk("dd", "", "");
@@ -952,7 +960,7 @@
     }
     [["Screen", v.screen], ["Page language", v.lang && (langNames ? langNames.of(v.lang) : v.lang)],
      ["Browser language", v.blang], ["Tagged link", v.source], ["Judged", judgedText(v)],
-     ["Visitor", v.id]].forEach(([k, val]) => {
+     ["Visitor (this day)", v.id]].forEach(([k, val]) => {
       if (!val) { return; }
       facts.append(mk("dt", "", k), mk("dd", "", val));
     });
@@ -1343,7 +1351,7 @@
         $("visitor-head").hidden = false;
         drawDl();
         $("visitor-title").textContent = "Visitor " + res.id + " · " + num.format(list.length) +
-          (list.length === 1 ? " visit" : " visits") + " in the last " + keptFor();
+          (list.length === 1 ? " visit" : " visits") + " that day - another day is another visitor";
         $("visit-list").replaceChildren(...list.map((v) => visitRow(v, true, true)));
         window.scrollTo({ top: 0 });
         writeHash();

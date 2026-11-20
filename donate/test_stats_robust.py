@@ -110,7 +110,7 @@ def test_an_address_that_cannot_be_read_never_stops_the_run():
     day = _json(root, "stats.json")["days"][TODAY]
     # Every view is counted; one whose linking page cannot be read came from nowhere.
     assert day["views"] == 5 and day["visitors"] == 2
-    assert day["refs"] == {"forum.example.net": 1}
+    assert day["refs"] == {"example.net": 1}       # the site by its registered name
     # The run got to the end of the log: the next one has nothing to read.
     state = _json(root, "state.json")
     assert state["logs"]["stats"]["off"] == os.path.getsize(os.path.join(root, "stats.log"))
@@ -180,7 +180,8 @@ def test_a_day_keeps_no_more_visits_than_a_day_may():
     assert "as many as a day may" in said
     day = _json(root, "stats.json")["days"][TODAY]
     assert len(_json(root, "visits", TODAY + ".json")) == 1000
-    assert len(_json(root, "uniques.json")[TODAY]) == 1000
+    import sketch
+    assert abs(sketch.count(sketch.decode(_json(root, "sketches.json")[TODAY]["u"])) - 1000) <= 5
     assert day["views"] == 1300 and day["visitors"] == 1000 and day["capped"] == 300
     # A visitor already there goes on being counted; a download past the
     # limit is the day's, with no visit of its own.
@@ -276,9 +277,11 @@ def test_what_the_run_writes_is_the_services_alone_to_read():
     def mode(*path: str) -> int:
         return stat.S_IMODE(os.stat(os.path.join(stats, *path)).st_mode)
     assert mode() == 0o700 and mode("visits") == 0o700
-    for name in ("stats.json", "state.json", "uniques.json", "kinds.json", "visitor-keys.json",
-                 os.path.join("visits", TODAY + ".json")):
+    for name in ("stats.json", "state.json", "sketches.json", os.path.join("visits", TODAY + ".json")):
         assert mode(name) == 0o600, name
+    # No key, no list of visitors' marks: nothing on disk leads back to one.
+    for gone in ("visitor-keys.json", "uniques.json", "kinds.json"):
+        assert not os.path.exists(os.path.join(stats, gone)), gone
 
 
 def test_an_update_leaves_the_live_line_when_the_updates_themselves_go():

@@ -59,7 +59,7 @@ def row(v: dict, day: str) -> list:
             v.get("ref") or "", v.get("source") or "",
             _family(v.get("os") or ""), v.get("os") or "Other",
             browser, f"{browser} {v.get('bv') or ''}".strip(),
-            v.get("device") or "", screen_of(*size.split("×"))[1] if size.count("×") == 1 else "",
+            v.get("device") or "", screen_of(*size.split("×"))[1] if size.count("×") == 1 else size,
             lang if re.fullmatch(r"[a-z]{2,3}", lang) else "en",
             blang if re.fullmatch(r"[a-z]{2,3}", blang) else "",
             len(v.get("pages") or []), paths, v.get("time") or 0,

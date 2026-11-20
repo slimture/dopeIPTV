@@ -473,15 +473,18 @@ def test_every_limit_is_checked_before_the_answer():
     for loc in _locations(srv.body):
         if loc.all("limit_req"):
             assert not loc.all("return") and not any(i.all("return") for i in loc.all("if")), loc
-    for uri, zone, named, log in (("/dl.php", "iptv_dl", "@iptv_dl", "iptv.dope.rs-downloads.log iptv_dl"),
-                                  ("/hit", "iptv_hit", "@iptv_hit", "iptv.dope.rs-stats.log iptv_stats")):
+    sock = "syslog:server=unix:/var/run/iptv_donate/stats.sock,nohostname"
+    for uri, zone, named, logs in (
+            ("/dl.php", "iptv_dl", "@iptv_dl", [f"{sock},tag=iptv_dl iptv_dl",
+                                                "/var/log/nginx/iptv.dope.rs-dl-counts.log iptv_dl_count"]),
+            ("/hit", "iptv_hit", "@iptv_hit", [f"{sock},tag=iptv_stats iptv_stats"])):
         loc = find_location(srv, uri)
         assert loc.args == ["=", uri] and loc.values("limit_req") == [f"zone={zone} burst=60 nodelay"]
         assert loc.values("limit_req_status") == ["429"]
         tried = loc.values("try_files")[0].split()
         assert tried[-1] == named and not os.path.exists(os.path.join(ROOT, "public", tried[0].lstrip("/")))
         answer = _named(srv, named)
-        assert answer.values("access_log") == [f"/var/log/nginx/{log} if=$iptv_count"]
+        assert answer.values("access_log") == [f"{log} if=$iptv_count" for log in logs]
         assert not loc.all("access_log")           # a refused one is not written down
     assert _zones(conf())["iptv_dl"] == "$http_x_real_ip"
     assert [b.args for b in conf().all("limit_req_zone") if "zone=iptv_dl:1m" in b.args] == [
@@ -512,30 +515,66 @@ def test_a_log_line_holds_only_so_much_of_what_was_sent():
     top = conf()
     # Each value of the sender's own cut short (a header can be 8k); what
     # the site sets or nginx knows is written as it is.
-    cuts = {"$iptv_log_ua": 1024, "$iptv_log_uri": 2048, "$iptv_log_method": 16, "$iptv_ref": 2048}
+    cuts = {"$iptv_log_ua": 512, "$iptv_log_uri": 1024, "$iptv_log_method": 16}
     # ...and what the site works out ($iptv_dl_file: 120 characters at the
     # most, of a few; test_log_fields.py) or nginx checked as it read it.
     ours = {"$http_x_real_ip", "$time_iso8601", "$time_local", "$status", "$body_bytes_sent",
-            "$iptv_lang", "$remote_addr", "$iptv_dl_file", "$server_protocol"}
+            "$iptv_lang", "$remote_addr", "$iptv_dl_file", "$server_protocol", "$iptv_ua_kind"}
     for fmt in top.all("log_format"):
         used = set(re.findall(r"\$\w+", "".join(fmt.args[1:])))
         assert used <= set(cuts) | ours, (fmt.args[0], used - set(cuts) - ours)
-    assert {f.args[0] for f in top.all("log_format")} == {"iptv_stats", "iptv_dl"}
+    assert {f.args[0] for f in top.all("log_format")} == {"iptv_stats", "iptv_dl", "iptv_dl_count"}
     for var, most in cuts.items():
         long = "Mozilla/5.0 " + "x" * 9000
         assert map_value(top, var, long) == long[:most], var
         assert map_value(top, var, "GET") == "GET", var
         assert map_value(top, var, "") == "", var
-    # The page that linked: still without its query or fragment.
-    assert map_value(top, "$iptv_ref", "https://example.com/a/b?q=x#f") == "https://example.com/a/b"
+    # The page that linked: not sent at all (the page's own /hit says it).
+    assert not [m for m in top.all("map") if m.args[0] == "$http_referer"]
     # The download log as sync-releases.sh and stats_collect.py read it:
     # the request line second between quotes - of it the method, the file's
     # name and the protocol, nothing else the link carried -, the browser
     # sixth, the address last - and no user name the request could have sent.
     dl = "".join(next(f for f in top.all("log_format") if f.args[0] == "iptv_dl").args[1:])
     assert dl.split('"')[1] == "$iptv_log_method /dl.php?f=$iptv_dl_file $server_protocol"
-    assert dl.split('"')[5] == "$iptv_log_ua"
+    assert dl.split('"')[3] == "-" and dl.split('"')[5] == "$iptv_log_ua"
     assert dl.startswith("$remote_addr - - [$time_local] ") and dl.endswith('"$http_x_real_ip"')
+    # The public counter's own log: the request line, the answer, what asked
+    # - no address, no time, no browser's name.
+    count = "".join(next(f for f in top.all("log_format") if f.args[0] == "iptv_dl_count").args[1:])
+    assert count == '"$iptv_log_method /dl.php?f=$iptv_dl_file $server_protocol" $status $iptv_ua_kind'
+    for ua, kind in (("Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0", "browser"), ("", "none"), ("-", "none"),
+                     ("dopeIPTV/1.6.8 (Linux; x86_64)", "app"), ("Googlebot/2.1", "robot"),
+                     ("Mozilla/5.0 (compatible; bingbot/2.0)", "robot"), ("WhatsApp/2.23", "robot")):
+        assert map_value(top, "$iptv_ua_kind", ua) == kind, ua
+
+
+STATS_SOCKET = "syslog:server=unix:/var/run/iptv_donate/stats.sock,nohostname"
+
+
+def test_no_file_ever_holds_a_visitors_address():
+    """The statistics' lines go to the service's socket, in memory, never to
+    a file; the one log written to a file is the download counter's, which
+    has no address in it - and the socket is the one the service opens."""
+    top = conf()
+    formats = {f.args[0]: "".join(f.args[1:]) for f in top.all("log_format")}
+    to_socket, to_file = [], []
+    for loc in _locations(_server(top).body):
+        for v in loc.values("access_log"):
+            if v == "off":
+                continue
+            target, fmt = v.split()[:2]
+            (to_socket if target.startswith("syslog:") else to_file).append((target, fmt))
+    assert {f for _t, f in to_socket} == {"iptv_stats", "iptv_dl"}
+    for target, fmt in to_socket:
+        assert target == f"{STATS_SOCKET},tag={fmt}", target
+    assert to_file == [("/var/log/nginx/iptv.dope.rs-dl-counts.log", "iptv_dl_count")]
+    for _target, fmt in to_file:
+        assert "x_real_ip" not in formats[fmt] and "remote_addr" not in formats[fmt] and "time" not in formats[fmt]
+    src = open(os.path.join(HERE, "stats_collect.py"), encoding="utf-8").read()
+    assert 'CONF.get("STATS_SOCKET", "unix:/var/run/iptv_donate/stats.sock")' in src
+    inbox = open(os.path.join(HERE, "stats_inbox.py"), encoding="utf-8").read()
+    assert 'TAGS = ("iptv_stats", "iptv_dl")' in inbox
 
 
 def test_the_language_cookie_goes_over_https_and_only_from_the_site():
@@ -630,27 +669,37 @@ def test_every_log_is_turned_over_and_readable_only_by_its_own():
     # two access logs, which nginx makes its workers' user's when it reopens
     # them and stats_collect.py and sync-releases.sh read as iptv, through
     # their group (600 would lock them out).
-    readers = {"/var/log/nginx/iptv.dope.rs-stats.log", "/var/log/nginx/iptv.dope.rs-downloads.log"}
+    # nginx's access logs, in every round: the counter's now, the two with an
+    # address of before (deleted since: "No address written down").
+    readers = {"/var/log/nginx/iptv.dope.rs-stats.log", "/var/log/nginx/iptv.dope.rs-downloads.log",
+               "/var/log/nginx/iptv.dope.rs-dl-counts.log"}
     lines = _ROTATION.findall(deploy)
     assert len(lines) >= 9
     for path, owner, mode, *_rest in lines:
         assert (owner, mode) == ("root:iptv", "640") if path in readers else mode == "600", (path, owner, mode)
-    # The site's newsyslog file, written whole: a line for every log the
-    # site writes - nginx's access logs, the service's, cron's.
-    whole = re.search(r"<<'LOGS'\n(.*?)\nLOGS\n", deploy, re.S).group(1)
+    # The site's newsyslog file, written whole - as the newest round writes
+    # it: a line for every log the site writes now - nginx's one access log,
+    # the service's, cron's.
+    whole = re.findall(r"<<'LOGS'\n(.*?)\nLOGS\n", deploy, re.S)[-1]
     kept = {f[0]: f for f in _ROTATION.findall(whole)}
     assert len(kept) == len(whole.splitlines())
     srv = _server(conf())
-    written = {v.split()[0] for loc in _locations(srv.body) for v in loc.values("access_log") if v != "off"}
+    written = {v.split()[0] for loc in _locations(srv.body) for v in loc.values("access_log")
+               if v != "off" and not v.startswith("syslog:")}
     rc = open(os.path.join(ROOT, "deploy", "iptv_donate"), encoding="utf-8").read()
     service = re.search(r"^: \$\{iptv_donate_log:=(\S+)\}$", rc, re.M).group(1)
     cron = set(re.findall(r">> (/var/log/\S+) 2>&1", deploy))
-    assert written == readers and cron == {"/var/log/iptv-sync.log", "/var/log/iptv-stats.log"}
+    assert cron == {"/var/log/iptv-sync.log", "/var/log/iptv-stats.log"}
+    # stats_collect.py's cron line is taken out in the newest round: the
+    # service counts the statistics itself.
+    assert "/stats_collect\\.py/d" in deploy[deploy.rindex("<<'LOGS'") - 6000:]
+    cron -= {"/var/log/iptv-stats.log"}
+    assert written == {"/var/log/nginx/iptv.dope.rs-dl-counts.log"}
     assert set(kept) == written | {service} | cron
-    for path in readers:                         # daily, the day before kept as it is for the readers
+    for path in written:                         # daily, the day before kept as it is for the reader
         assert kept[path][3:] == ("1", "*", "@T00", "JP"), path
     # ...and every one, the error logs too, in the list of what each holds.
-    table = deploy[deploy.index("### Every log on the server"):]
+    table = deploy[deploy.rindex("### Every log on the server"):]
     table = table[:table.index("\n\n", table.index("|---"))]
     for path in set(kept) | {"/var/log/nginx/error.log"}:
         assert f"| `{path}` |" in table, path

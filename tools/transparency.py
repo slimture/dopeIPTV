@@ -148,15 +148,21 @@ CODE: dict[str, list[dict]] = {
     ],
     "website": [
         {"id": "log", "repo": "site", "path": "deploy/content-iptv.dope.rs.conf",
-         "from": r"^log_format iptv_stats", "to": r"';\s*$"},
+         "from": r"^log_format iptv_stats", "to": r"';\s*$",
+         "with": [{"repo": "site", "path": _CONTENT, "nginx": ["server > location @iptv_hit"]}]},
+        {"id": "inbox", "repo": "site", "path": "donate/stats_inbox.py", "names": ["FRAME", "Inbox", "Receiver"],
+         "with": [{"repo": "site", "path": "donate/donate.py", "names": ["start_statistics"]}]},
         {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["MonthKeys", "_hash", "_hash_before", "_new_visit"]},
+         "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest"]},
+        {"id": "sketch", "repo": "site", "path": "donate/sketch.py",
+         "names": ["BITS", "spots", "add", "has", "count"]},
         {"id": "kept", "repo": "site", "path": "donate/stats_collect.py",
          "from": r"^KEEP_PER_DAY = ", "to": r"^UPDATES_DAYS = ",
          "with": [{"repo": "site", "path": "donate/stats_collect.py",
                    "from": r"^    if ev in \(\"donate\", \"donated\"\):", "to": r"^        return$"}]},
         {"id": "anon", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["anonymous", "freeze_months", "K_ANON", "_QI", "_LESS", "k_anonymous"]},
+         "names": ["anonymous", "freeze_months", "K_ANON", "_QI", "_LESS", "_people_at_least", "k_anonymous",
+                   "FOLD", "fold_day"]},
     ],
     "webservers": [
         {"id": "path", "repo": "site", "path": _PROXY, "nginx": [_MAIN + " > location /"],
@@ -171,14 +177,15 @@ CODE: dict[str, list[dict]] = {
                   {"repo": "site", "path": _CONTENT, "nginx": ["server > access_log off", "server > error_log"]},
                   {"repo": "site", "path": _JAIL, "nginx": ["error_log", "http > access_log off"]}]},
         {"id": "logs", "repo": "site", "path": _CONTENT,
-         "nginx": ["map $arg_f", "map $http_referer", "map $request_method", "map $http_user_agent",
+         "nginx": ["map $arg_f", "map $request_method", "map $http_user_agent",
                    "map $request_uri", "map $iptv_log_uri_kept", "log_format", "map $cookie_iptv_nostats",
                    "server > location = /", "server > location = /help/", "server > location = /dl.php",
                    "server > location @iptv_dl", "server > location = /hit", "server > location @iptv_hit"]},
-        {"id": "kept", "repo": "site", "path": "DEPLOY.md",
+        {"id": "kept", "repo": "site", "path": "DEPLOY.md", "last": True,
          "from": r"^cat > \S*/usr/local/etc/newsyslog\.conf\.d/iptv\.dope\.rs\.conf <<'LOGS'$", "to": r"^LOGS$",
-         "with": [{"repo": "site", "path": "DEPLOY.md", "from": r"^jexec dopeiptv sh -c 'chmod 600 /var/log/iptv-sync",
-                   "to": r"^jexec dopeiptv sh -c 'chgrp iptv /var/log/nginx/"}]},
+         "with": [{"repo": "site", "path": "DEPLOY.md", "last": True,
+                   "from": r"^jexec -U iptv dopeiptv env IPTV_DOWNLOAD_LOG=",
+                   "to": r"^jexec dopeiptv sh -c 'rm -f /var/log/nginx/iptv\.dope\.rs-stats\.log"}]},
         {"id": "limits", "repo": "site", "path": _CONTENT,
          "nginx": ["limit_req_zone", "map $cookie_iptv_admin", "map $http_sec_fetch_mode|$http_accept",
                    "server > client_max_body_size", "server > client_body_buffer_size",
@@ -433,7 +440,9 @@ def excerpt(root: str, ref: str, block: dict) -> list[dict]:
             spans += [(_comments_above(lines, node["start"]), node["end"]) for node in nodes]
         spans = _merge(spans, lines)
     else:
-        start = next((i for i, ln in enumerate(lines, 1) if re.search(block["from"], ln)), None)
+        found = [i for i, ln in enumerate(lines, 1) if re.search(block["from"], ln)]
+        # The newest round's, where a file says the same in every round (DEPLOY.md).
+        start = (found[-1] if block.get("last") else found[0]) if found else None
         if start is None:
             raise SystemExit(f"{path}: nothing matches {block['from']!r}")
         end = next((i for i, ln in enumerate(lines[start:], start + 1) if re.search(block["to"], ln)),
@@ -620,25 +629,24 @@ import json, sys
 sys.path.insert(0, "donate")
 import stats_collect as s
 from datetime import date
-state = {"_keys": s.MonthKeys(None, date(2026, 11, 19), {"2026-11": "0" * 64})}
+s.secrets.token_bytes = lambda n: bytes(range(1, n + 1))      # the seal's nonce, made up too
+s.counted = lambda addr: True                                   # a documentation address, counted as a public one
+state = {"_keys": s.MonthKeys(date(2026, 11, 19), keys={"2026-11": "0" * 64})}
 ip, ua = "203.0.113.7", "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0"
 line = {"ip": ip, "t": "2026-11-19T21:04:31+01:00", "m": "POST",
         "u": "/hit?p=%2Fhelp%2F&ev=view&t=&x=&n=&s=&l=sv&bl=sv-SE&w=1920&h=1080&hl=&r=https%3A%2F%2Fduckduckgo.com%2F",
-        "s": 204, "r": "https://dopeiptv.org/help/", "a": ua, "l": "sv"}
+        "s": 204, "a": ua, "l": "sv"}
 class Geo:
     def country(self, addr): return "SE"
-class Visits:
-    def __init__(self): self.d = {}
-    def before(self, day, vid, earlier=""): return 0
-    def day(self, day): return self.d.setdefault(day, [])
-    def add(self, day, v): self.day(day).append(v)
-vid = s._hash(state, "2026-11-19", ip, ua)
-visit = s._new_visit(Visits(), "2026-11-19", vid, 1763582671, ip, ua, Geo())
-visit.update({"pages": [["help", 1763582671, 48]], "time": 48, "lang": "sv", "channel": "search",
-              "ref": "duckduckgo.com"})
-print(json.dumps({"log": json.dumps(line), "vid": vid,
-                  "visit": json.dumps(visit, ensure_ascii=False),
-                  "anon": json.dumps(s.anonymous(visit, "2026-11-19"), ensure_ascii=False)}))
+visits = s.Visits({}, state)
+s._page_line({"days": {}}, state, line, Geo(), visits)
+leave = dict(line, t="2026-11-19T21:05:19+01:00",
+             u="/hit?p=%2Fhelp%2F&ev=leave&t=48&x=&n=&s=&l=sv&bl=&w=&h=&hl=&r=")
+s._page_line({"days": {}}, state, leave, Geo(), visits)
+(visit,) = visits.day("2026-11-19")
+kept = s.at_rest(visit, "2026-11-19", state)
+print(json.dumps({"log": json.dumps(line), "visit": json.dumps(kept, ensure_ascii=False),
+                  "anon": json.dumps(s.anonymous(kept, "2026-11-19"), ensure_ascii=False)}))
 '''
 
 
