@@ -68,11 +68,11 @@ def _hide_value(m: re.Match[str]) -> str:
 
 
 def _not_an_address(text: str) -> bool:
-    """Loopback - or the app's own test build's version, which has four
-    numbers too ("1.6.0.123": the version and the build's run)."""
+    """Loopback - or exactly this build's own version where it has four
+    numbers ("1.6.8.259": a test build's run). Nothing else that only
+    begins as the version does: 1.6.8.10 can be someone's address."""
     from .. import __version__
-    base = ".".join(__version__.split(".")[:3])
-    return text.startswith("127.") or text.startswith(base + ".")
+    return text.startswith("127.") or (text == __version__ and text.count(".") == 3)
 
 
 def scrub(text: str, personal: Iterable[str] = ()) -> str:

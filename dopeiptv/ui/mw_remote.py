@@ -277,10 +277,10 @@ class _RemoteMixin:
             if kind == "live":
                 out["programme"] = snap.get("artist") or ""
             if privacy.playing_private():
-                # As the events say it (core/events.py): that something
-                # plays, how far and how loud - not what. The commands work
-                # as ever.
-                out.update(title="", private=True)
-                if "programme" in out:
-                    out["programme"] = ""
+                # That something plays and how loud - not what, from where,
+                # how long, on which TV or for whom. The commands work as
+                # ever.
+                out.update(title="", private=True, position=0.0, duration=0.0)
+                for name in ("programme", "source", "cast", "profile"):
+                    out.pop(name, None)
         return out

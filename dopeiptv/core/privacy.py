@@ -19,7 +19,6 @@ import json
 import time
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlsplit
 
 from .log import log, redact_url
 
@@ -129,17 +128,10 @@ def for_log(text: Any) -> Any:
 
 def url_for_log(url: Any) -> str:
     """A stream's address as a log line may carry it: its account taken out
-    (core/log.redact_url) - and, for what plays privately, everything that
-    says which stream or file it is: the server's name alone, nothing of a
-    file's path."""
+    (core/log.redact_url) - and, for what plays privately, nothing at all:
+    not the server's name either, which says whose service it is."""
     if not playing_private():
         return redact_url(url)
-    try:
-        parts = urlsplit(str(url or ""))
-        if parts.scheme and parts.hostname:
-            return f"{parts.scheme}://{parts.hostname}/<private>"
-    except ValueError:
-        pass
     return "<private>"
 
 

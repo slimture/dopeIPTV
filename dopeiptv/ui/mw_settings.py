@@ -449,6 +449,22 @@ class _SettingsMixin:
         from datetime import date
 
         from ..core import backup
+        if password and len(password) < backup.PASSWORD_MIN:
+            QMessageBox.warning(parent, tr("backup_title"),
+                                tr("backup_pw_short", n=backup.PASSWORD_MIN))
+            return False
+        if not password:
+            # The file holds every login, token and the sync code: kept
+            # without a password only when the person says so, Cancel the
+            # default.
+            box = QMessageBox(QMessageBox.Icon.Warning, tr("backup_title"),
+                              tr("backup_no_pw_warn"),
+                              QMessageBox.StandardButton.Cancel, parent)
+            plain = box.addButton(tr("backup_no_pw_go"), QMessageBox.ButtonRole.AcceptRole)
+            box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            box.exec()
+            if box.clickedButton() is not plain:
+                return False
         # The same name with a password or without: the file says inside
         # what it is, and the restore finds either kind the same way.
         path, _f = QFileDialog.getSaveFileName(

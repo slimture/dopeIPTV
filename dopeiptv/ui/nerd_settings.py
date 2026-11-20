@@ -1056,6 +1056,13 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
             got = hs.read_config(settings).token
         return got
 
+    def admin_token() -> str:
+        """The page's own (hs.K_ADMIN): the playlist's does not open it."""
+        got = str(settings.value(hs.K_ADMIN, "") or "").strip()
+        if not got or got == token():
+            got = hs.read_config(settings).admin
+        return got
+
     def base() -> str:
         from ..core.remote_api import lan_addresses
         return f"http://{(lan_addresses() or ['127.0.0.1'])[0]}:{port.value()}"
@@ -1076,7 +1083,7 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         from urllib.parse import quote
 
         from ..core.xdg import open_url
-        open_url(f"http://127.0.0.1:{port.value()}/?token={quote(token())}")
+        open_url(f"http://127.0.0.1:{port.value()}/?token={quote(admin_token())}")
     open_btn.clicked.connect(lambda _c=False: open_page())
     copy_tuner.clicked.connect(lambda _c=False: copy(copy_tuner, base()))
     copy_m3u.clicked.connect(lambda _c=False: copy(copy_m3u, f"{base()}/playlist.m3u?token={token()}"))

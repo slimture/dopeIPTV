@@ -121,7 +121,7 @@ _LEFT_OUT = frozenset({
     "media_device_id",
     # Server mode's token (whoever has it watches through this computer) and
     # its HDHomeRun device id: two computers with one id confuse Plex.
-    "nerd_server_token", "nerd_server_device_id",
+    "nerd_server_token", "nerd_server_admin_token", "nerd_server_device_id",
     # Caches the app fills again by itself.
     "local_tmdb_posters", "local_tmdb_posters_v2", "music_art_v1",
     "cast_devices", "cast_last_device", "subtitle_files", "nerd_health_data",
@@ -388,6 +388,9 @@ CIPHER = "chacha20-poly1305"
 #: PBKDF2's rounds for a backup locked now - as many as a PIN's
 #: (core/pins.ROUNDS), some tenths of a second.
 ROUNDS = 600_000
+#: The shortest password a backup is locked with: a short one is guessed
+#: whatever the rounds.
+PASSWORD_MIN = 10
 #: What a file may say: fewer is no file of ours and quicker to guess at,
 #: more would take minutes to open. Refused before any work.
 MIN_ROUNDS = 100_000

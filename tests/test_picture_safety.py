@@ -603,3 +603,30 @@ def test_the_desktops_media_controls_are_not_pointed_at_a_rows_path(qapp, tmp_pa
                     "//evil.example/share/a.png", "file:////evil.example/share/a.png"):
         assert mpris.art_url(hostile) == "", hostile
         assert media_session.local_art(hostile) is None, hostile
+
+
+def test_a_link_in_a_trusted_folder_to_elsewhere_is_not_read(tmp_path, monkeypatch):
+    """Someone else's link left in a shared picon folder or a share, to a
+    file outside the trusted folders: not read. One the person made to a
+    file of their own still is."""
+    import os
+
+    from dopeiptv.core import picture_files as pf
+    trusted = tmp_path / "picons"
+    trusted.mkdir()
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    secret = outside / "secret.png"
+    secret.write_bytes(b"\x89PNG\r\n\x1a\nsecret")
+    (trusted / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\nlogo")
+    (trusted / "trap.png").symlink_to(secret)
+    monkeypatch.setattr(pf, "_roots", {"picons": (str(trusted),)})
+    assert pf.read(str(trusted / "logo.png")) == b"\x89PNG\r\n\x1a\nlogo"
+    # The person's own link to their own file: read.
+    assert pf.read(str(trusted / "trap.png")) == b"\x89PNG\r\n\x1a\nsecret"
+    # Another user's link, or one to another user's file: not read.
+    real_uid = os.getuid()
+    monkeypatch.setattr(os, "getuid", lambda: real_uid + 1)
+    assert pf.read(str(trusted / "trap.png")) is None
+    assert pf.read(str(trusted / "logo.png")) == b"\x89PNG\r\n\x1a\nlogo"
+    assert pf.read(str(outside / "secret.png")) is None

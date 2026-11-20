@@ -71,6 +71,11 @@ K_PORT = "nerd_server_port"
 K_TUNERS = "nerd_server_tuners"
 K_SOURCES = "nerd_server_sources"
 K_TOKEN = "nerd_server_token"
+#: The page in a browser and its api/ - what it is doing, who watches what,
+#: and its settings: a token of their own, so that the playlist's token
+#: (handed to every TV and player, in every address of the playlist) never
+#: changes the server.
+K_ADMIN = "nerd_server_admin_token"
 K_DEVICE = "nerd_server_device_id"
 #: Channels and categories for adults handed out too (off: left out).
 K_ADULT = "nerd_server_adult"
@@ -118,6 +123,9 @@ class Config:
     #: the active source, every category.
     sources: dict[str, list[str]] = field(default_factory=dict)
     token: str = ""
+    #: The page's and its api's own (K_ADMIN); the playlist's token does not
+    #: open them.
+    admin: str = ""
     device_id: str = ""
     #: Channels for adults in the lineup and the share (``kept_out``); off,
     #: as a TV in a child's room has no profile or PIN.
@@ -156,6 +164,10 @@ def read_config(settings: Any) -> Config:
     if not token:
         token = secrets.token_urlsafe(24)
         settings.setValue(K_TOKEN, token)
+    admin = str(settings.value(K_ADMIN, "") or "").strip()
+    if not admin or admin == token:
+        admin = secrets.token_urlsafe(24)
+        settings.setValue(K_ADMIN, admin)
     device = str(settings.value(K_DEVICE, "") or "").strip().upper()
     if not hdhr.valid_device_id(device):
         device = hdhr.new_device_id()
@@ -163,7 +175,8 @@ def read_config(settings: Any) -> Config:
     return Config(port=_int(settings.value(K_PORT, DEFAULT_PORT), DEFAULT_PORT, 1024, 65535),
                   tuners=_int(settings.value(K_TUNERS, 0), 0, 0, MAX_TUNERS),
                   sources=parse_sources(settings.value(K_SOURCES, "")),
-                  token=token, device_id=device, adult=read_flag(settings.value(K_ADULT, False)))
+                  token=token, admin=admin, device_id=device,
+                  adult=read_flag(settings.value(K_ADULT, False)))
 
 
 def changes_from_page(body: dict, known: list[str]) -> dict[str, str]:
@@ -581,8 +594,9 @@ class HomeServer:
 
     def addresses(self, base: str) -> dict[str, str]:
         q = f"?token={quote(self.config.token)}"
+        page = f"?token={quote(self.config.admin or self.config.token)}"
         return {"tuner": base, "playlist": f"{base}/playlist.m3u{q}",
-                "guide": f"{base}/xmltv.xml{q}", "page": f"{base}/{q}"}
+                "guide": f"{base}/xmltv.xml{q}", "page": f"{base}/{page}"}
 
     def _may_discover(self, ip: str) -> bool:
         return self.local.allows(ip)
@@ -747,10 +761,18 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
             return (self.headers.get("X-Dopeiptv-Token") or "").strip() or \
                 (query.get("token") or [""])[0]
 
-        def _authorized(self, given: str) -> bool:
-            token = server.config.token
-            return bool(token) and hmac.compare_digest(given.encode("utf-8", "replace"),
-                                                       token.encode("utf-8"))
+        def _authorized(self, given: str, admin: bool = False) -> bool:
+            """*given* opens what is asked: the page and its api/ only with
+            the admin token; the playlist, the guide and the streams with
+            either."""
+            cfg = server.config
+            tokens = [cfg.admin or cfg.token] if admin else [cfg.token, cfg.admin]
+            got = given.encode("utf-8", "replace")
+            ok = False
+            for t in tokens:
+                if t:
+                    ok |= hmac.compare_digest(got, t.encode("utf-8"))
+            return ok
 
         def _base(self) -> str:
             return server.base(self.headers.get("Host"), str(self.client_address[0]))
@@ -797,7 +819,8 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                     self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
                     return
                 given = self._token(query)
-                if not self._authorized(given):
+                admin = path == "/" or path.startswith("/api/")
+                if not self._authorized(given, admin):
                     # Only a try at the token counts: a browser asks for
                     # /favicon.ico by itself. Never this computer's nor a
                     # web page's: a page in a browser here would shut out

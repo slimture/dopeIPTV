@@ -461,12 +461,13 @@ def test_a_subtitle_files_name_stays_out_of_the_log(tmp_path):
     assert not [m for m in seen if "The Bridge" in m], seen
 
 
-def test_a_private_streams_address_says_only_its_server_in_the_log():
+def test_a_private_streams_address_says_nothing_in_the_log():
+    """Not even the server's name: it says whose service it is."""
     url = "http://tv.example:8080/live/anna/hemligt/4711.ts"
     assert privacy.url_for_log(url) == "http://tv.example:8080/live/***/***/4711.ts"
     assert privacy.url_for_log("/home/anna/Films/The Bridge.mkv").endswith("The Bridge.mkv")
     _began_private("live", 4711)
-    assert privacy.url_for_log(url) == "http://tv.example/<private>"
+    assert privacy.url_for_log(url) == "<private>"
     assert privacy.url_for_log("/home/anna/Films/The Bridge.mkv") == "<private>"
     assert privacy.url_for_log(None) == "<private>"
     assert privacy.for_log("The Bridge") == "<private>"
@@ -604,8 +605,12 @@ def test_the_remote_api_says_that_something_plays_privately_not_what():
     _began_private("live", 7)
     out = w._remote_status()
     assert out["state"] == "playing" and out["private"] is True
-    assert out["title"] == "" and out["programme"] == "" and out["volume"] == 50
-    assert out["position"] == 12.0 and "Hidden" not in json.dumps(out) and "Secret" not in json.dumps(out)
+    assert out["title"] == "" and "programme" not in out and out["volume"] == 50
+    # Nor how far or how long (a film's length names it), the source, the
+    # TV or who is watching.
+    assert out["position"] == 0.0 and out["duration"] == 0.0
+    assert not {"source", "cast", "profile"} & set(out)
+    assert "Hidden" not in json.dumps(out) and "Secret" not in json.dumps(out)
     privacy.playback_started("live", 9)
     out = w._remote_status()
     assert out["title"] == "Hidden Channel" and out["programme"] == "Secret Show"

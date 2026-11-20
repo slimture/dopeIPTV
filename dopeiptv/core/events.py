@@ -87,7 +87,7 @@ HA_PREFIX = "homeassistant"
 
 #: What an event may say about what plays: none of it while viewing privately.
 WHAT = frozenset({"title", "channel", "programme", "series", "source", "previous", "file", "error",
-                  "favorite"})
+                  "favorite", "profile", "cast", "device", "duration"})
 
 
 # -- the settings ----------------------------------------------------------------
@@ -863,7 +863,8 @@ class Dispatcher:
             self.state["volume"] = self.volume
         if self.tv_mode is not None and state != "off":
             self.state["tv_mode"] = self.tv_mode
-        if self.profile and state != "off":
+        if self.profile and state != "off" and not private:
+            # Never while viewing privately: who is watching is part of what.
             self.state["profile"] = self.profile
         for s in self.sinks:
             if isinstance(s, MqttSink):

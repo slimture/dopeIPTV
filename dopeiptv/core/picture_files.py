@@ -33,9 +33,9 @@ _roots: dict[str, tuple[str, ...]] = {}
 
 
 def _norm(path: str) -> str:
-    """*path* absolute and without ``..``, as written (a link inside one of
-    the person's folders is theirs to make); lower case where the system
-    does not tell cases apart."""
+    """*path* absolute and without ``..``, as written; lower case where the
+    system does not tell cases apart. Links are followed only when a file
+    is read (``read``)."""
     return os.path.normcase(os.path.abspath(path))
 
 
@@ -101,25 +101,62 @@ def in_group(group: str, path: str) -> bool:
     return _inside(path, trusted_folders(group))
 
 
-def read_file(path: str, limit: int = LOCAL_PICTURE_MAX) -> bytes | None:
+def read_file(path: str, limit: int = LOCAL_PICTURE_MAX, follow: bool = True) -> bytes | None:
     """The bytes of *path* when it is a plain file (not a device, a pipe or
-    a folder) of at most *limit* bytes; None otherwise."""
+    a folder) of at most *limit* bytes; None otherwise. *follow* False: a
+    link in its place now (swapped in since it was looked at) is not read."""
     try:
-        st = os.stat(path)
+        # Looked at before it is opened: opening a pipe would wait for a
+        # writer, a device would answer for ever.
+        st = os.stat(path) if follow else os.lstat(path)
         if not stat.S_ISREG(st.st_mode) or st.st_size > limit:
             return None
-        with open(path, "rb") as fh:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
+        if not follow:
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as fh:
+            st = os.fstat(fh.fileno())          # what was opened, swapped in or not
+            if not stat.S_ISREG(st.st_mode) or st.st_size > limit:
+                return None
             data = fh.read(limit + 1)
     except (OSError, ValueError):
         return None
     return data if len(data) <= limit else None
 
 
+def _resolved_inside(path: str) -> str | None:
+    """*path* with every symbolic link followed, when that is still inside
+    a trusted folder (each one's own links followed too); None when it
+    leads elsewhere - a link someone else left in a shared picon folder or
+    a share - or cannot be read."""
+    try:
+        real = os.path.realpath(path)
+        roots = [os.path.realpath(r) for r in trusted_folders()]
+        if _inside(real, roots):
+            return real
+        # A link the person made in their own folder, to a file of their
+        # own elsewhere (a music folder's cover kept with the album): theirs.
+        getuid = getattr(os, "getuid", None)
+        if getuid is not None and os.lstat(path).st_uid == getuid() \
+                and os.stat(real).st_uid == getuid():
+            return real
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def read(path: str, limit: int = LOCAL_PICTURE_MAX) -> bytes | None:
     """The bytes of the picture file *path*, or None when it is not one the
-    app reads: outside the trusted folders, not a plain file, larger than
-    *limit*, or unreadable."""
-    return read_file(path, limit) if trusted(path) else None
+    app reads: outside the trusted folders - by its name, and again once
+    every link in it is followed - not a plain file, larger than *limit*,
+    or unreadable."""
+    if not trusted(path):
+        return None
+    real = _resolved_inside(path)
+    if real is None:
+        return None
+    return read_file(real, limit, False)
 
 
 def mount_parents() -> list[str]:

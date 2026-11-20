@@ -521,13 +521,17 @@ def test_a_refused_report_is_not_called_sent():
         report._post = real
 
 
-def test_a_test_build_s_version_is_no_address():
-    from dopeiptv import __version__
-    base = ".".join(__version__.split(".")[:3])
-    out = report.scrub(f"dopeIPTV {base}.123\n09:10:58 INFO {base}.123 starting\n"
-                       "connected to 10.0.0.12 and 127.0.0.1")
-    assert f"dopeIPTV {base}.123" in out and f"INFO {base}.123 starting" in out
-    assert "10.0.0.12" not in out and "<ip>" in out and "127.0.0.1" in out
+def test_a_test_build_s_version_is_no_address(monkeypatch):
+    """This build's own four-number version stays; an address that only
+    begins as the version does is someone's (1.6.8.10)."""
+    import dopeiptv
+    monkeypatch.setattr(dopeiptv, "__version__", "1.6.8.123")
+    out = report.scrub("dopeIPTV 1.6.8.123\n09:10:58 INFO 1.6.8.123 starting\n"
+                       "connected to 10.0.0.12, 1.6.8.10 and 127.0.0.1")
+    assert "dopeIPTV 1.6.8.123" in out and "INFO 1.6.8.123 starting" in out
+    assert "10.0.0.12" not in out and "1.6.8.10" not in out and "127.0.0.1" in out
+    monkeypatch.setattr(dopeiptv, "__version__", "1.6.8")
+    assert "1.6.8.10" not in report.scrub("from 1.6.8.10")
 
 
 def test_logins_in_quotes_json_headers_and_addresses_without_a_scheme_go():
