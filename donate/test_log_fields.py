@@ -194,7 +194,7 @@ def _counted(stats_lines: list, dl_lines: list) -> tuple:
         with open(os.path.join(folder, f), encoding="utf-8") as fh:
             # A visit's names for its visitor are its run's own (a key each):
             # the rest is the same.
-            visits += [{k: v for k, v in visit.items() if k not in ("id", "w", "e")} for visit in json.load(fh)]
+            visits += [{k: v for k, v in visit.items() if k not in ("id", "w", "e", "f")} for visit in json.load(fh)]
     return days, visits
 
 

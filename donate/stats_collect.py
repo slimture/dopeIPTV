@@ -1015,6 +1015,8 @@ def at_rest(v: dict, day: str, state: dict) -> dict:
         v["did"] = day_id(state, day, vid) if vid and not v.get("_lost") else vid
     if "w" not in v and vid and not v.get("_lost"):
         v["w"], v["e"] = seal(state, day, vid)
+    if "f" not in v and v.get("dev") and v.get("e") and not v.get("_lost"):
+        v["f"] = seal(state, day, v["dev"])[0]       # under the same key as "w"
     try:
         start = int(v.get("start") or 0)
     except (TypeError, ValueError):
@@ -1045,7 +1047,7 @@ def at_rest(v: dict, day: str, state: dict) -> dict:
            "events": [[t(e[0]), *e[1:]] for e in v.get("events") or () if isinstance(e, list) and e]}
     if v.get("acts"):
         out["acts"] = [[t(a[0]), *a[1:]] for a in v["acts"] if isinstance(a, list) and a]
-    for k in ("channel", "lang", "hl", "acted", "kind", "why", "w", "e"):
+    for k in ("channel", "lang", "hl", "acted", "kind", "why", "w", "e", "f"):
         if k in v:
             out[k] = v[k]
     if "channel" in v:
@@ -1294,6 +1296,11 @@ def _page_line(stats: dict, state: dict, r: dict, db, visits: Visits) -> None:
         if ref_page:
             visit["ref_page"] = ref_page        # in memory, for robot_share; never kept
         visit["screen"] = screen_of(q.get("w", ""), q.get("h", ""))[1]
+        # The device without its address (browser, language, exact screen):
+        # one person whose address changes is one device. In memory alone;
+        # kept only sealed (at_rest), to count people (_people_at_least).
+        visit["dev"] = _hash(state, day, "dev", ua, q.get("l", "")[:5],
+                             f'{q.get("w", "")[:5]}x{q.get("h", "")[:5]}')
         _bump(d.setdefault("visit_channels", {}), visit["channel"])
         if visit["screen"]:
             _bump(d.setdefault("screens", {}), visit["screen"])
@@ -1311,8 +1318,6 @@ def _page_line(stats: dict, state: dict, r: dict, db, visits: Visits) -> None:
     _bump(d["channels"], channel_of(host, src))
     if site:
         _bump(d["refs"], site)
-    if ref_page:
-        _bump(d.setdefault("ref_pages", {}), ref_page)
     if source:
         _bump(d["sources"], source)
     lang = q.get("l") or r.get("l") or "en"
@@ -1464,7 +1469,6 @@ def robot_share(lst: list) -> tuple:
         lang = first.get("lang") or ""
         add("channels", first.get("channel") or "Direct or unknown")
         add("refs", first.get("ref") or "")
-        add("ref_pages", first.get("ref_page") or "")
         add("sources", first.get("source") or "")
         add("langs", lang if re.fullmatch(r"[a-z]{2,3}", lang) else "en")
         add("os", _os_family(first.get("os") or ""))
@@ -1599,12 +1603,20 @@ def collect(with_fetch: bool = False, lines: list | None = None) -> None:
         # A day's list of sites or files stays short, so the years stay small -
         # a flood of made-up referrers cannot grow the file without end.
         for d in stats["days"].values():
-            for k in ("refs", "ref_pages", "files", "sources", "update_files", "update_from"):
+            # The page that linked is never kept: its path can name a person
+            # (a profile, a shared link) where its site does not. Days kept
+            # before this lose theirs.
+            d.pop("ref_pages", None)
+            (d.get("robots") or {}).get("lists", {}).pop("ref_pages", None)
+            for k in ("refs", "files", "sources", "update_files", "update_from"):
                 _keep_top(d, k, KEEP_PER_DAY)
             # Languages, systems and browser versions are few in the world;
             # only made-up ones could make these long.
             for k in ("langs", "os_versions", "browser_versions"):
                 _keep_top(d, k, KEEP_WIDE)
+        for rest in (stats.get("rest") or {}).values():
+            if isinstance(rest, dict):
+                rest.pop("ref_pages", None)
         stats["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         stats["geo"] = db is not None
         visits.save(today)
@@ -1709,7 +1721,7 @@ def anonymous(v: dict, day: str) -> dict:
     (k_anonymous) and then drops them: random to anyone without that key,
     which is in this service's memory alone."""
     events = {e[1] for e in v.get("events") or []}
-    return {"w": v.get("w") or "", "e": v.get("e") or "", "day": day,
+    return {"w": v.get("w") or "", "e": v.get("e") or "", "f": v.get("f") or "", "day": day,
             "country": v.get("country") or "", "browser": v.get("browser") or "Other",
             "os": _family(v.get("os") or ""), "device": v.get("device") or "",
             "lang": v.get("lang") or "", "channel": v.get("channel") or "",
@@ -1840,6 +1852,7 @@ def _people_at_least(group: list, keys: MonthKeys | None) -> int:
     were sealed counts by "who" (its month's visitor), and one from before
     that as a person of its own, as it was counted then."""
     by_key: dict = {}
+    devices: dict = {}
     for i, a in enumerate(group):
         if a.get("who"):
             by_key.setdefault("who", set()).add(a["who"])
@@ -1848,9 +1861,16 @@ def _people_at_least(group: list, keys: MonthKeys | None) -> int:
         if not e:
             by_key.setdefault("visit", set()).add(i)
             continue
-        mark = unseal(keys, a.get("day") or "", a.get("w"), e) if keys is not None else ""
+        day = a.get("day") or ""
+        mark = unseal(keys, day, a.get("w"), e) if keys is not None else ""
         by_key.setdefault(e, set()).add(mark or "")
-    return max((len(v) for v in by_key.values()), default=0)
+        # Its device too ("f": browser, language and exact screen, no
+        # address): a person whose address changed is one device, so of the
+        # two counts the smaller is taken.
+        dev = unseal(keys, day, a.get("f"), e) if keys is not None and a.get("f") else ""
+        devices.setdefault(e, set()).add(("d", dev) if dev else ("m", mark or ""))
+    return max((min(len(v), len(devices[k])) if k in devices else len(v) for k, v in by_key.items()),
+               default=0)
 
 
 def k_anonymous(rows: list, k: int = K_ANON, keys: MonthKeys | None = None) -> list:
@@ -1889,7 +1909,7 @@ def k_anonymous(rows: list, k: int = K_ANON, keys: MonthKeys | None = None) -> l
     counts = people(out)
     kept = [a for a in out if counts[key(a)] >= k]
     for a in kept:
-        for gone in ("who", "w", "e"):
+        for gone in ("who", "w", "e", "f"):
             a.pop(gone, None)
     return kept
 
@@ -1915,7 +1935,7 @@ def _close_months() -> None:
 #: The lists of a day that tell who visited (countries, languages, versions,
 #: sites, tags): kept with no name fewer than K_DAY once the day is a month
 #: old - the rest goes into its month's (fold_day).
-FOLD = ("countries", "langs", "os_versions", "browser_versions", "refs", "ref_pages", "sources")
+FOLD = ("countries", "langs", "os_versions", "browser_versions", "refs", "sources")
 
 
 def fold_day(stats: dict, day: str) -> None:

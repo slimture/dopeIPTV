@@ -474,6 +474,18 @@ def test_k_anonymity_counts_different_people_not_visits():
     assert sc.k_anonymous(five, keys=gone) == [], "a key gone: one person at the most"
     # Kept before marks were sealed: "who" told people apart, as then.
     assert len(sc.k_anonymous([dict(base, who=f"p{i}") for i in range(5)], keys=keys)) == 5
+    # One person on one device whose address changed five times: five
+    # visitor marks, one device - one person.
+    dev = hashlib_hex("one phone")
+
+    def moved(i):
+        w, e = sc.seal(state, "2026-09-01", hashlib_hex(f"addr{i}"))
+        return dict(base, w=w, e=e, f=sc.seal(state, "2026-09-01", dev)[0])
+    assert sc.k_anonymous([moved(i) for i in range(5)], keys=keys) == [], "one device, five addresses"
+    devs = [dict(sealed(hashlib_hex(f"p{i}")), f=sc.seal(state, "2026-09-01", hashlib_hex(f"d{i}"))[0])
+            for i in range(5)]
+    out = sc.k_anonymous(devs, keys=keys)
+    assert len(out) == 5 and not any("f" in a for a in out), "five people, five devices: kept, marks gone"
     a = sc.anonymous({"id": one, "w": "ab" * 12, "e": "cd" * 4, "pages": ["/"], "browser": "Firefox"},
                      "2026-09-01")
     assert a["w"] == "ab" * 12 and "id" not in a and one not in json.dumps(a)
@@ -485,3 +497,14 @@ if __name__ == "__main__":
         fn()
         print("ok", name)
     print(f"{len(tests)} passed")
+
+
+def test_the_page_that_linked_is_never_kept():
+    """Its path can name a person (a profile, a shared link) where its site
+    does not: only the site is counted, and days kept before lose theirs."""
+    sc, _dir = _module()
+    import inspect
+    src = inspect.getsource(sc)
+    assert '_bump(d.setdefault("ref_pages"' not in src and 'add("ref_pages"' not in src
+    assert "ref_pages" not in sc.FOLD
+    assert 'd.pop("ref_pages", None)' in src and 'rest.pop("ref_pages", None)' in src

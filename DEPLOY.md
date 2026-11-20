@@ -517,8 +517,9 @@ How it counts, so the numbers are honest:
 - Sites that linked here, and the exact page when the linking site sends
   it (many send only their address - Google, Facebook and X always): host
   and path, never the query or fragment, which can carry what points to a
-  person; never for a search engine. Kept per visit (`ref_page`) and per
-  day (`ref_pages`, the top 200 like the sites).
+  person; never for a search engine. Since the third 1.6.9 review it is
+  kept nowhere: its path can name a person (a profile, a shared link), and
+  days kept before lose theirs at the next run - only the site counts.
 - Your own visits are left out: a browser that has opened `/admin/` gets a
   cookie nginx does not log (pages, downloads, `/hit`), addresses that are
   not public (your own network) never count, and `STATS_IGNORE` in
