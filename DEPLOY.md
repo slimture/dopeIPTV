@@ -103,7 +103,7 @@ n=0 bad=0
 for l in $(ls public/i18n | grep -v sitemap); do
   for p in '' help/; do
     n=$((n + 1))
-    fetch -qo /tmp/php.html "http://10.0.1.2:8081/${p}?lang=$l" \
+    fetch -qo /tmp/php.html "http://CONTENT_HOST:8081/${p}?lang=$l" \
       && cmp -s /tmp/php.html "public/i18n/$l/${p}index.html" \
       || { bad=$((bad + 1)); echo "different: /${p}?lang=$l"; }
   done
@@ -1194,12 +1194,12 @@ rm -f /var/log/nginx/error.log.[0-9]*
 ```
 
 **Port 8081: only the proxy.** The content server answers whoever reaches
-10.0.1.2:8081 and believes the X-Real-IP it is told (the statistics, every
+CONTENT_HOST:8081 (the content jail's address, as in the proxy's file) and believes the X-Real-IP it is told (the statistics, every
 limit per visitor), and the address that may is this server's own, never
 the repo's. From the host and from a jail other than webproxy:
 
 ```sh
-fetch -T 5 -qo /dev/null http://10.0.1.2:8081/ && echo "8081 answers here"
+fetch -T 5 -qo /dev/null http://CONTENT_HOST:8081/ && echo "8081 answers here"
 ```
 
 Only the proxy should get an answer. Where another does, the content
