@@ -1997,7 +1997,6 @@
   "together_alone": "Bado hakuna mwingine hapa – shiriki msimbo.",
   "together_alone_join": "Bado hakuna mwingine hapa. Kama ulitarajia mtu, angalia msimbo.",
   "together_code_bad": "Huo si msimbo wa chumba. Msimbo una herufi na tarakimu 10, kama K7PQM-2XDH9.",
-  "together_old_code": "Chumba hiki kina msimbo wa zamani, mfupi zaidi, ambao ni rahisi kukisia. Sasisheni dopeIPTV kwenye kompyuta zote, kisha anzisheni chumba kipya.",
   "together_name_needed": "Chagua jina ambalo wengine wataona.",
   "together_left_room": "Umeondoka chumbani. Wengine wanaendelea kutazama.",
   "together_private_left": "Umeondoka kwenye chumba cha kutazama pamoja: kutazama kwa faragha kumewashwa.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Majaribio mengi yasiyo sahihi. Jaribu tena baada ya sekunde {n}.",
   "cast_other_device": "“{name}” si kifaa kilekile cha mara ya mwisho - sasa kinajibu kutoka {address}. Kichague kwenye orodha ikiwa ni TV yako.",
   "settings_open_title": "Faili lako la mipangilio si la faragha",
-  "settings_open_body": "Lina taarifa zako za kuingia, na diski yake haikuruhusu lisomwe na wewe peke yako, kwa hiyo akaunti nyingine kwenye kompyuta hii huenda zikalisoma. Liko hapa: {path}"
+  "settings_open_body": "Lina taarifa zako za kuingia, na diski yake haikuruhusu lisomwe na wewe peke yako, kwa hiyo akaunti nyingine kwenye kompyuta hii huenda zikalisoma. Liko hapa: {path}",
+  "together_code_old": "Hiyo ni nambari ya chumba ya zamani na fupi zaidi iliyokuwa rahisi mno kukisia, kwa hiyo haifanyi kazi tena. Sasisha dopeIPTV kwenye kila kompyuta na uanzishe chumba kipya.",
+  "ytdlp_err_pin": "Nakala hii ya dopeIPTV haitaji toleo lolote la yt-dlp inaloliamini, kwa hiyo hakuna linalopakuliwa. Sakinisha yt-dlp kutoka kwenye vifurushi vya mfumo wako (au kwa pip), na programu italipata.",
+  "profile_err_kids_pin": "Wasifu wa watoto unahitaji PIN anayoijua mtu mzima. Kwanza mpe wasifu wa mtu mzima PIN, au weka PIN ya wazazi.",
+  "profile_kids_leave": "Kutoka kwenye wasifu wa watoto kunahitaji PIN ya mtu mzima. Weka PIN ya wasifu wa mtu mzima au PIN ya wazazi:",
+  "profile_kids_no_pin": "Hili linahitaji PIN ya mtu mzima, na bado hakuna iliyowekwa. Mtu mzima anaweza kuhamia wasifu wake mwenyewe na kuupa PIN, au kuweka PIN ya wazazi.",
+  "profile_kids_not_here": "Wasifu wa watoto hauwezi kucheza hicho.",
+  "backup_pw_short": "Tumia nenosiri la angalau herufi {n} - nakala rudufu ina maelezo yote ya kuingia na nambari ya kusawazisha.",
+  "backup_no_pw_warn": "Nakala rudufu ina maelezo yote ya kuingia, tokeni na nambari ya kusawazisha. Bila nenosiri, yeyote atakayepata faili ataweza kuyasoma. Ihifadhi bila nenosiri hata hivyo?",
+  "backup_no_pw_go": "Hifadhi bila nenosiri"
 }

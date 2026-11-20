@@ -1997,7 +1997,6 @@
   "together_alone": "Ingen annan är här än – dela koden.",
   "together_alone_join": "Ingen annan är här än. Om du väntade dig någon, kontrollera koden.",
   "together_code_bad": "Det där är ingen rumskod. En kod har 10 bokstäver och siffror, som K7PQM-2XDH9.",
-  "together_old_code": "Det här rummet har en gammal, kortare kod som är lättare att gissa. Uppdatera dopeIPTV på alla datorer och starta sedan ett nytt rum.",
   "together_name_needed": "Välj ett namn som de andra ser.",
   "together_left_room": "Du lämnade rummet. De andra fortsätter titta.",
   "together_private_left": "Du lämnade rummet för att titta tillsammans: privat läge är på.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "För många felaktiga försök. Försök igen om {n} s.",
   "cast_other_device": "”{name}” är inte samma enhet som förra gången - den svarar nu från {address}. Välj den i listan om det är din tv.",
   "settings_open_title": "Din inställningsfil är inte privat",
-  "settings_open_body": "Den innehåller dina inloggningar, och dess enhet lät den inte bli läsbar för bara dig, så andra konton på den här datorn kan kanske läsa den. Den ligger i {path}"
+  "settings_open_body": "Den innehåller dina inloggningar, och dess enhet lät den inte bli läsbar för bara dig, så andra konton på den här datorn kan kanske läsa den. Den ligger i {path}",
+  "together_code_old": "Det där är en gammal, kortare rumskod som var för lätt att gissa, så den fungerar inte längre. Uppdatera dopeIPTV på alla datorer och starta ett nytt rum.",
+  "ytdlp_err_pin": "Den här kopian av dopeIPTV anger ingen yt-dlp-version som den litar på, så ingen laddas ned. Installera yt-dlp från systemets paket (eller med pip), så hittar appen det.",
+  "profile_err_kids_pin": "En barnprofil behöver en PIN-kod som en vuxen har. Ge först en vuxens profil en PIN-kod, eller ställ in föräldralåsets PIN-kod.",
+  "profile_kids_leave": "Det krävs en vuxens PIN-kod för att lämna en barnprofil. Ange PIN-koden för en vuxens profil eller föräldralåsets PIN-kod:",
+  "profile_kids_no_pin": "Det här kräver en vuxens PIN-kod, och ingen är inställd ännu. En vuxen kan byta till sin egen profil och ge den en PIN-kod, eller ställa in föräldralåsets PIN-kod.",
+  "profile_kids_not_here": "En barnprofil kan inte spela det där.",
+  "backup_pw_short": "Använd ett lösenord på minst {n} tecken – säkerhetskopian innehåller alla inloggningar och synkkoden.",
+  "backup_no_pw_warn": "Säkerhetskopian innehåller alla inloggningar, token och synkkoden. Utan lösenord kan vem som helst som får tag på filen läsa dem. Spara ändå utan lösenord?",
+  "backup_no_pw_go": "Spara utan lösenord"
 }

@@ -1997,7 +1997,6 @@
   "together_alone": "Burada henüz başka kimse yok – kodu paylaş.",
   "together_alone_join": "Burada henüz başka kimse yok. Birini bekliyorsan kodu kontrol et.",
   "together_code_bad": "Bu bir oda kodu değil. Kod, K7PQM-2XDH9 gibi 10 harf ve rakamdan oluşur.",
-  "together_old_code": "Bu odanın eski, daha kısa bir kodu var; tahmin etmesi daha kolay. dopeIPTV'yi tüm bilgisayarlarda güncelleyin, sonra yeni bir oda başlatın.",
   "together_name_needed": "Diğerlerinin göreceği bir ad seç.",
   "together_left_room": "Odadan çıktın. Diğerleri izlemeye devam ediyor.",
   "together_private_left": "Birlikte izleme odasından çıktın: gizli izleme açık.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Çok fazla yanlış deneme. {n} sn sonra yeniden dene.",
   "cast_other_device": "“{name}” geçen seferki cihaz değil - şimdi {address} adresinden yanıt veriyor. Senin TV'nse listeden seç.",
   "settings_open_title": "Ayar dosyanız gizli değil",
-  "settings_open_body": "Giriş bilgilerinizi içeriyor ve sürücüsü onu yalnızca sizin okuyabileceğiniz hâle getirmeye izin vermedi; bu bilgisayardaki başka hesaplar onu okuyabilir. Konumu: {path}"
+  "settings_open_body": "Giriş bilgilerinizi içeriyor ve sürücüsü onu yalnızca sizin okuyabileceğiniz hâle getirmeye izin vermedi; bu bilgisayardaki başka hesaplar onu okuyabilir. Konumu: {path}",
+  "together_code_old": "Bu, tahmin edilmesi fazla kolay olan eski ve daha kısa bir oda kodu, bu yüzden artık çalışmıyor. dopeIPTV'yi her bilgisayarda güncelleyin ve yeni bir oda başlatın.",
+  "ytdlp_err_pin": "dopeIPTV'nin bu kopyası güvendiği bir yt-dlp sürümü belirtmiyor, bu yüzden hiçbiri indirilmiyor. yt-dlp'yi sisteminizin paketlerinden (ya da pip ile) yükleyin, uygulama onu bulur.",
+  "profile_err_kids_pin": "Bir çocuk profili, bir yetişkinin bildiği bir PIN gerektirir. Önce bir yetişkinin profiline PIN verin ya da ebeveyn PIN'ini ayarlayın.",
+  "profile_kids_leave": "Bir çocuk profilinden çıkmak için bir yetişkinin PIN'i gerekir. Bir yetişkin profilinin PIN'ini ya da ebeveyn PIN'ini girin:",
+  "profile_kids_no_pin": "Bunun için bir yetişkinin PIN'i gerekiyor ve henüz hiçbiri ayarlanmadı. Bir yetişkin kendi profiline geçip ona PIN verebilir ya da ebeveyn PIN'ini ayarlayabilir.",
+  "profile_kids_not_here": "Bir çocuk profili bunu oynatamaz.",
+  "backup_pw_short": "En az {n} karakterlik bir parola kullanın - yedek tüm oturum açma bilgilerini ve eşitleme kodunu içerir.",
+  "backup_no_pw_warn": "Yedek tüm oturum açma bilgilerini, belirteçleri ve eşitleme kodunu içerir. Parola olmadan dosyayı ele geçiren herkes bunları okuyabilir. Yine de parolasız kaydedilsin mi?",
+  "backup_no_pw_go": "Parolasız kaydet"
 }

@@ -1997,7 +1997,6 @@
   "together_alone": "Noch niemand sonst hier – teile den Code.",
   "together_alone_join": "Noch niemand sonst hier. Wenn du jemanden erwartest, prüfe den Code.",
   "together_code_bad": "Das ist kein Raumcode. Ein Code hat 10 Buchstaben und Ziffern, etwa K7PQM-2XDH9.",
-  "together_old_code": "Dieser Raum hat einen alten, kürzeren Code, der leichter zu erraten ist. Aktualisiert dopeIPTV auf allen Computern und startet dann einen neuen Raum.",
   "together_name_needed": "Wähle einen Namen, den die anderen sehen.",
   "together_left_room": "Du hast den Raum verlassen. Die anderen schauen weiter.",
   "together_private_left": "Du hast den Raum zum gemeinsamen Ansehen verlassen: Privates Ansehen ist an.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Zu viele falsche Versuche. Versuch es in {n} s noch einmal.",
   "cast_other_device": "„{name}“ ist nicht mehr dasselbe Gerät wie beim letzten Mal - es antwortet jetzt von {address}. Wähl es in der Liste aus, wenn das dein Fernseher ist.",
   "settings_open_title": "Ihre Einstellungsdatei ist nicht privat",
-  "settings_open_body": "Sie enthält Ihre Zugangsdaten, und ihr Laufwerk ließ nicht zu, dass nur Sie sie lesen können – andere Konten auf diesem Computer können sie vielleicht lesen. Sie liegt unter {path}"
+  "settings_open_body": "Sie enthält Ihre Zugangsdaten, und ihr Laufwerk ließ nicht zu, dass nur Sie sie lesen können – andere Konten auf diesem Computer können sie vielleicht lesen. Sie liegt unter {path}",
+  "together_code_old": "Das ist ein alter, kürzerer Raumcode, der zu leicht zu erraten war, deshalb funktioniert er nicht mehr. Aktualisiere dopeIPTV auf allen Computern und starte einen neuen Raum.",
+  "ytdlp_err_pin": "Diese Kopie von dopeIPTV nennt keine yt-dlp-Version, der sie vertraut, deshalb wird keine heruntergeladen. Installiere yt-dlp aus den Paketen deines Systems (oder mit pip), dann findet die App es.",
+  "profile_err_kids_pin": "Ein Kinderprofil braucht eine PIN, die ein Erwachsener kennt. Gib zuerst dem Profil eines Erwachsenen eine PIN oder lege die Eltern-PIN fest.",
+  "profile_kids_leave": "Zum Verlassen eines Kinderprofils ist die PIN eines Erwachsenen nötig. Gib die PIN eines Erwachsenenprofils oder die Eltern-PIN ein:",
+  "profile_kids_no_pin": "Dafür ist die PIN eines Erwachsenen nötig, und es ist noch keine festgelegt. Ein Erwachsener kann zu seinem eigenen Profil wechseln und ihm eine PIN geben oder die Eltern-PIN festlegen.",
+  "profile_kids_not_here": "Ein Kinderprofil kann das nicht abspielen.",
+  "backup_pw_short": "Verwende ein Passwort mit mindestens {n} Zeichen – die Sicherung enthält alle Anmeldungen und den Sync-Code.",
+  "backup_no_pw_warn": "Die Sicherung enthält alle Anmeldungen, Tokens und den Sync-Code. Ohne Passwort kann jeder, der die Datei bekommt, sie lesen. Trotzdem ohne Passwort speichern?",
+  "backup_no_pw_go": "Ohne Passwort speichern"
 }

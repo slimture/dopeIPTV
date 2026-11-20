@@ -1997,7 +1997,6 @@
   "together_alone": "Aún no hay nadie más aquí: comparte el código.",
   "together_alone_join": "Aún no hay nadie más aquí. Si esperabas a alguien, revisa el código.",
   "together_code_bad": "Eso no es un código de sala. Un código tiene 10 letras y cifras, como K7PQM-2XDH9.",
-  "together_old_code": "Esta sala tiene un código antiguo y más corto, más fácil de adivinar. Actualizad dopeIPTV en todos los ordenadores y luego cread una sala nueva.",
   "together_name_needed": "Elige un nombre que verán los demás.",
   "together_left_room": "Has salido de la sala. Los demás siguen viendo.",
   "together_private_left": "Has salido de la sala de ver juntos: la visualización privada está activada.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Demasiados intentos fallidos. Vuelve a intentarlo en {n} s.",
   "cast_other_device": "«{name}» no es el mismo dispositivo que la última vez: ahora responde desde {address}. Elígelo en la lista si es tu tele.",
   "settings_open_title": "Tu archivo de ajustes no es privado",
-  "settings_open_body": "Contiene tus inicios de sesión y su disco no permitió que solo tú pudieras leerlo, así que otras cuentas de este ordenador quizá puedan leerlo. Está en {path}"
+  "settings_open_body": "Contiene tus inicios de sesión y su disco no permitió que solo tú pudieras leerlo, así que otras cuentas de este ordenador quizá puedan leerlo. Está en {path}",
+  "together_code_old": "Ese es un código de sala antiguo y más corto, demasiado fácil de adivinar, así que ya no funciona. Actualiza dopeIPTV en todos los ordenadores y crea una sala nueva.",
+  "ytdlp_err_pin": "Esta copia de dopeIPTV no indica ninguna versión de yt-dlp en la que confíe, así que no se descarga ninguna. Instala yt-dlp desde los paquetes de tu sistema (o con pip) y la app lo encontrará.",
+  "profile_err_kids_pin": "Un perfil infantil necesita un PIN que conozca un adulto. Primero ponle un PIN al perfil de un adulto o configura el PIN parental.",
+  "profile_kids_leave": "Para salir de un perfil infantil hace falta el PIN de un adulto. Introduce el PIN del perfil de un adulto o el PIN parental:",
+  "profile_kids_no_pin": "Esto necesita el PIN de un adulto y todavía no hay ninguno configurado. Un adulto puede cambiar a su propio perfil y ponerle un PIN, o configurar el PIN parental.",
+  "profile_kids_not_here": "Un perfil infantil no puede reproducir eso.",
+  "backup_pw_short": "Usa una contraseña de al menos {n} caracteres: la copia de seguridad contiene todos los inicios de sesión y el código de sincronización.",
+  "backup_no_pw_warn": "La copia de seguridad contiene todos los inicios de sesión, tokens y el código de sincronización. Sin contraseña, cualquiera que consiga el archivo puede leerlos. ¿Guardar igualmente sin contraseña?",
+  "backup_no_pw_go": "Guardar sin contraseña"
 }

@@ -1997,7 +1997,6 @@
   "together_alone": "Nie ma tu jeszcze nikogo innego – udostępnij kod.",
   "together_alone_join": "Nie ma tu jeszcze nikogo innego. Jeśli na kogoś czekasz, sprawdź kod.",
   "together_code_bad": "To nie jest kod pokoju. Kod ma 10 liter i cyfr, np. K7PQM-2XDH9.",
-  "together_old_code": "Ten pokój ma stary, krótszy kod, który łatwiej odgadnąć. Zaktualizujcie dopeIPTV na wszystkich komputerach, a potem załóżcie nowy pokój.",
   "together_name_needed": "Wybierz imię, które zobaczą inni.",
   "together_left_room": "Opuszczono pokój. Inni oglądają dalej.",
   "together_private_left": "Opuszczono pokój wspólnego oglądania: oglądanie prywatne jest włączone.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Za dużo błędnych prób. Spróbuj ponownie za {n} s.",
   "cast_other_device": "„{name}” to nie to samo urządzenie co ostatnio - teraz odpowiada z adresu {address}. Wybierz je z listy, jeśli to twój telewizor.",
   "settings_open_title": "Twój plik ustawień nie jest prywatny",
-  "settings_open_body": "Zawiera Twoje dane logowania, a jego dysk nie pozwolił, by tylko Ty mógł go czytać, więc inne konta na tym komputerze mogą go odczytać. Znajduje się tutaj: {path}"
+  "settings_open_body": "Zawiera Twoje dane logowania, a jego dysk nie pozwolił, by tylko Ty mógł go czytać, więc inne konta na tym komputerze mogą go odczytać. Znajduje się tutaj: {path}",
+  "together_code_old": "To stary, krótszy kod pokoju, który było zbyt łatwo odgadnąć, więc już nie działa. Zaktualizuj dopeIPTV na każdym komputerze i utwórz nowy pokój.",
+  "ytdlp_err_pin": "Ta kopia dopeIPTV nie wskazuje żadnego wydania yt-dlp, któremu ufa, więc nic nie jest pobierane. Zainstaluj yt-dlp z pakietów swojego systemu (lub przez pip), a aplikacja je znajdzie.",
+  "profile_err_kids_pin": "Profil dziecka potrzebuje kodu PIN, który zna dorosły. Najpierw nadaj kod PIN profilowi dorosłego albo ustaw rodzicielski kod PIN.",
+  "profile_kids_leave": "Aby opuścić profil dziecka, potrzebny jest kod PIN dorosłego. Wpisz kod PIN profilu dorosłego lub rodzicielski kod PIN:",
+  "profile_kids_no_pin": "Do tego potrzebny jest kod PIN dorosłego, a żaden nie jest jeszcze ustawiony. Dorosły może przełączyć się na własny profil i nadać mu kod PIN albo ustawić rodzicielski kod PIN.",
+  "profile_kids_not_here": "Profil dziecka nie może tego odtworzyć.",
+  "backup_pw_short": "Użyj hasła o długości co najmniej {n} znaków – kopia zapasowa zawiera wszystkie dane logowania i kod synchronizacji.",
+  "backup_no_pw_warn": "Kopia zapasowa zawiera wszystkie dane logowania, tokeny i kod synchronizacji. Bez hasła każdy, kto zdobędzie plik, może je odczytać. Zapisać mimo to bez hasła?",
+  "backup_no_pw_go": "Zapisz bez hasła"
 }

@@ -1997,7 +1997,6 @@
   "together_alone": "Chưa có ai khác ở đây – hãy chia sẻ mã.",
   "together_alone_join": "Chưa có ai khác ở đây. Nếu bạn đang đợi ai đó, hãy kiểm tra mã.",
   "together_code_bad": "Đây không phải mã phòng. Mã gồm 10 chữ cái và chữ số, ví dụ K7PQM-2XDH9.",
-  "together_old_code": "Phòng này dùng mã cũ, ngắn hơn và dễ đoán hơn. Hãy cập nhật dopeIPTV trên mọi máy tính rồi tạo phòng mới.",
   "together_name_needed": "Chọn một cái tên mà mọi người sẽ thấy.",
   "together_left_room": "Bạn đã rời phòng. Mọi người vẫn xem tiếp.",
   "together_private_left": "Bạn đã rời phòng xem cùng nhau: đang bật xem riêng tư.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Quá nhiều lần thử sai. Thử lại sau {n} giây.",
   "cast_other_device": "“{name}” không còn là thiết bị như lần trước - giờ nó trả lời từ {address}. Hãy chọn nó trong danh sách nếu đó là TV của bạn.",
   "settings_open_title": "Tệp cài đặt của bạn không riêng tư",
-  "settings_open_body": "Tệp này chứa thông tin đăng nhập của bạn, và ổ đĩa của nó không cho phép chỉ mình bạn đọc được, nên các tài khoản khác trên máy tính này có thể đọc nó. Tệp nằm ở {path}"
+  "settings_open_body": "Tệp này chứa thông tin đăng nhập của bạn, và ổ đĩa của nó không cho phép chỉ mình bạn đọc được, nên các tài khoản khác trên máy tính này có thể đọc nó. Tệp nằm ở {path}",
+  "together_code_old": "Đó là mã phòng cũ, ngắn hơn và quá dễ đoán, nên không còn dùng được nữa. Hãy cập nhật dopeIPTV trên mọi máy tính và tạo phòng mới.",
+  "ytdlp_err_pin": "Bản dopeIPTV này không nêu bản phát hành yt-dlp nào mà nó tin cậy, nên không tải bản nào xuống. Hãy cài yt-dlp từ các gói của hệ thống (hoặc bằng pip), ứng dụng sẽ tìm thấy nó.",
+  "profile_err_kids_pin": "Hồ sơ trẻ em cần một mã PIN mà người lớn biết. Trước tiên hãy đặt mã PIN cho hồ sơ của một người lớn, hoặc đặt mã PIN phụ huynh.",
+  "profile_kids_leave": "Muốn rời hồ sơ trẻ em cần mã PIN của người lớn. Nhập mã PIN của hồ sơ người lớn hoặc mã PIN phụ huynh:",
+  "profile_kids_no_pin": "Việc này cần mã PIN của người lớn, mà chưa có mã nào được đặt. Người lớn có thể chuyển sang hồ sơ của mình và đặt mã PIN cho nó, hoặc đặt mã PIN phụ huynh.",
+  "profile_kids_not_here": "Hồ sơ trẻ em không thể phát nội dung đó.",
+  "backup_pw_short": "Hãy dùng mật khẩu dài ít nhất {n} ký tự - bản sao lưu chứa mọi thông tin đăng nhập và mã đồng bộ.",
+  "backup_no_pw_warn": "Bản sao lưu chứa mọi thông tin đăng nhập, token và mã đồng bộ. Không có mật khẩu, bất kỳ ai có được tệp đều đọc được chúng. Vẫn lưu mà không có mật khẩu?",
+  "backup_no_pw_go": "Lưu không có mật khẩu"
 }

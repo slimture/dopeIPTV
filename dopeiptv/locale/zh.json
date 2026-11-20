@@ -1997,7 +1997,6 @@
   "together_alone": "这里还没有其他人——分享房间码吧。",
   "together_alone_join": "这里还没有其他人。如果你在等人，请检查房间码。",
   "together_code_bad": "这不是房间码。房间码由 10 个字母和数字组成，例如 K7PQM-2XDH9。",
-  "together_old_code": "这个房间使用的是较短的旧房间码，更容易被猜到。请在所有电脑上更新 dopeIPTV，然后新建一个房间。",
   "together_name_needed": "选一个其他人会看到的名字。",
   "together_left_room": "你已离开房间。其他人会继续观看。",
   "together_private_left": "你已离开一起看房间：隐私观看已开启。",
@@ -3112,5 +3111,14 @@
   "pin_wait": "错误次数过多。请在 {n} 秒后重试。",
   "cast_other_device": "“{name}”已不是上次的那台设备——它现在从 {address} 应答。如果这是你的电视，请在列表中选择它。",
   "settings_open_title": "你的设置文件不是私密的",
-  "settings_open_body": "其中有你的登录信息，而它所在的磁盘不允许设为只有你能读取，因此这台电脑上的其他账户可能读到它。位置：{path}"
+  "settings_open_body": "其中有你的登录信息，而它所在的磁盘不允许设为只有你能读取，因此这台电脑上的其他账户可能读到它。位置：{path}",
+  "together_code_old": "这是旧的、较短的房间代码，太容易被猜到，因此已无法使用。请在每台电脑上更新 dopeIPTV，然后创建新房间。",
+  "ytdlp_err_pin": "此 dopeIPTV 副本未指定它信任的 yt-dlp 版本，因此不会下载任何版本。请通过系统的软件包（或 pip）安装 yt-dlp，应用会找到它。",
+  "profile_err_kids_pin": "儿童档案需要一个由成人掌握的 PIN。请先为某个成人的档案设置 PIN，或设置家长 PIN。",
+  "profile_kids_leave": "离开儿童档案需要成人的 PIN。请输入成人档案的 PIN 或家长 PIN：",
+  "profile_kids_no_pin": "这需要成人的 PIN，但目前尚未设置。成人可以切换到自己的档案并为其设置 PIN，或设置家长 PIN。",
+  "profile_kids_not_here": "儿童档案无法播放该内容。",
+  "backup_pw_short": "请使用至少 {n} 个字符的密码——备份中包含所有登录信息和同步代码。",
+  "backup_no_pw_warn": "备份中包含所有登录信息、令牌和同步代码。没有密码的话，任何拿到该文件的人都能读取它们。仍然不设密码保存吗？",
+  "backup_no_pw_go": "不设密码保存"
 }

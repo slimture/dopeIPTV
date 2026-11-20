@@ -1997,7 +1997,6 @@
   "together_alone": "Belum ada orang lain di sini – bagikan kodenya.",
   "together_alone_join": "Belum ada orang lain di sini. Kalau kamu menunggu seseorang, periksa kodenya.",
   "together_code_bad": "Itu bukan kode ruang. Kode terdiri dari 10 huruf dan angka, seperti K7PQM-2XDH9.",
-  "together_old_code": "Ruang ini memakai kode lama yang lebih pendek dan lebih mudah ditebak. Perbarui dopeIPTV di semua komputer, lalu mulai ruang baru.",
   "together_name_needed": "Pilih nama yang akan dilihat orang lain.",
   "together_left_room": "Kamu keluar dari ruang. Yang lain tetap menonton.",
   "together_private_left": "Kamu keluar dari ruang nonton bareng: tontonan pribadi aktif.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Terlalu banyak percobaan yang salah. Coba lagi dalam {n} dtk.",
   "cast_other_device": "“{name}” bukan perangkat yang sama seperti terakhir kali - sekarang ia menjawab dari {address}. Pilih di daftar jika itu memang TV-mu.",
   "settings_open_title": "File pengaturan Anda tidak pribadi",
-  "settings_open_body": "File ini berisi info masuk Anda, dan drive-nya tidak mengizinkan file ini hanya bisa dibaca oleh Anda, jadi akun lain di komputer ini mungkin bisa membacanya. Letaknya di {path}"
+  "settings_open_body": "File ini berisi info masuk Anda, dan drive-nya tidak mengizinkan file ini hanya bisa dibaca oleh Anda, jadi akun lain di komputer ini mungkin bisa membacanya. Letaknya di {path}",
+  "together_code_old": "Itu kode ruang lama yang lebih pendek dan terlalu mudah ditebak, jadi tidak berfungsi lagi. Perbarui dopeIPTV di setiap komputer dan mulai ruang baru.",
+  "ytdlp_err_pin": "Salinan dopeIPTV ini tidak menyebut rilis yt-dlp yang dipercayainya, jadi tidak ada yang diunduh. Pasang yt-dlp dari paket sistem Anda (atau dengan pip), dan aplikasi akan menemukannya.",
+  "profile_err_kids_pin": "Profil anak memerlukan PIN yang diketahui orang dewasa. Beri dulu PIN pada profil orang dewasa, atau atur PIN orang tua.",
+  "profile_kids_leave": "Keluar dari profil anak memerlukan PIN orang dewasa. Masukkan PIN profil orang dewasa atau PIN orang tua:",
+  "profile_kids_no_pin": "Ini memerlukan PIN orang dewasa, dan belum ada yang diatur. Orang dewasa dapat beralih ke profilnya sendiri dan memberinya PIN, atau mengatur PIN orang tua.",
+  "profile_kids_not_here": "Profil anak tidak dapat memutar itu.",
+  "backup_pw_short": "Gunakan kata sandi minimal {n} karakter - cadangan berisi semua info masuk dan kode sinkronisasi.",
+  "backup_no_pw_warn": "Cadangan berisi semua info masuk, token, dan kode sinkronisasi. Tanpa kata sandi, siapa pun yang mendapatkan berkasnya bisa membacanya. Tetap simpan tanpa kata sandi?",
+  "backup_no_pw_go": "Simpan tanpa kata sandi"
 }

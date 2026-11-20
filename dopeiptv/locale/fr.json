@@ -1997,7 +1997,6 @@
   "together_alone": "Personne d'autre ici pour l'instant – partage le code.",
   "together_alone_join": "Personne d'autre ici pour l'instant. Si tu attendais quelqu'un, vérifie le code.",
   "together_code_bad": "Ce n'est pas un code de salon. Un code a 10 lettres et chiffres, comme K7PQM-2XDH9.",
-  "together_old_code": "Ce salon a un ancien code, plus court et plus facile à deviner. Mettez dopeIPTV à jour sur tous les ordinateurs, puis créez un nouveau salon.",
   "together_name_needed": "Choisis un nom que les autres verront.",
   "together_left_room": "Tu as quitté le salon. Les autres continuent de regarder.",
   "together_private_left": "Tu as quitté le salon « Regarder ensemble » : le visionnage privé est activé.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Trop d'essais incorrects. Réessaie dans {n} s.",
   "cast_other_device": "« {name} » n'est plus le même appareil que la dernière fois : il répond maintenant depuis {address}. Choisis-le dans la liste si c'est bien ta télé.",
   "settings_open_title": "Votre fichier de réglages n'est pas privé",
-  "settings_open_body": "Il contient vos identifiants, et son disque n'a pas permis de le rendre lisible par vous seul : d'autres comptes de cet ordinateur peuvent peut-être le lire. Il se trouve ici : {path}"
+  "settings_open_body": "Il contient vos identifiants, et son disque n'a pas permis de le rendre lisible par vous seul : d'autres comptes de cet ordinateur peuvent peut-être le lire. Il se trouve ici : {path}",
+  "together_code_old": "C'est un ancien code de salle, plus court et trop facile à deviner : il ne fonctionne plus. Mettez à jour dopeIPTV sur chaque ordinateur et créez une nouvelle salle.",
+  "ytdlp_err_pin": "Cette copie de dopeIPTV n'indique aucune version de yt-dlp en laquelle elle a confiance, donc aucune n'est téléchargée. Installez yt-dlp depuis les paquets de votre système (ou avec pip), et l'application le trouvera.",
+  "profile_err_kids_pin": "Un profil enfant a besoin d'un code PIN connu d'un adulte. Donnez d'abord un code PIN au profil d'un adulte, ou définissez le code PIN parental.",
+  "profile_kids_leave": "Pour quitter un profil enfant, il faut le code PIN d'un adulte. Saisissez le code PIN du profil d'un adulte ou le code PIN parental :",
+  "profile_kids_no_pin": "Il faut le code PIN d'un adulte, et aucun n'est encore défini. Un adulte peut passer sur son propre profil et lui donner un code PIN, ou définir le code PIN parental.",
+  "profile_kids_not_here": "Un profil enfant ne peut pas lire cela.",
+  "backup_pw_short": "Utilisez un mot de passe d'au moins {n} caractères : la sauvegarde contient tous les identifiants et le code de synchronisation.",
+  "backup_no_pw_warn": "La sauvegarde contient tous les identifiants, les jetons et le code de synchronisation. Sans mot de passe, quiconque obtient le fichier peut les lire. Enregistrer quand même sans mot de passe ?",
+  "backup_no_pw_go": "Enregistrer sans mot de passe"
 }

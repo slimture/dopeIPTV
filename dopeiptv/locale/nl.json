@@ -1997,7 +1997,6 @@
   "together_alone": "Er is hier nog niemand anders – deel de code.",
   "together_alone_join": "Er is hier nog niemand anders. Verwacht je iemand, controleer dan de code.",
   "together_code_bad": "Dat is geen kamercode. Een code heeft 10 letters en cijfers, zoals K7PQM-2XDH9.",
-  "together_old_code": "Deze kamer heeft een oude, kortere code die makkelijker te raden is. Werk dopeIPTV op alle computers bij en start daarna een nieuwe kamer.",
   "together_name_needed": "Kies een naam die de anderen zien.",
   "together_left_room": "Je hebt de kamer verlaten. De anderen kijken verder.",
   "together_private_left": "Je hebt de kamer voor samen kijken verlaten: privé kijken staat aan.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Te veel verkeerde pogingen. Probeer het over {n} s opnieuw.",
   "cast_other_device": "‘{name}’ is niet hetzelfde apparaat als de vorige keer - het antwoordt nu vanaf {address}. Kies het in de lijst als dat jouw tv is.",
   "settings_open_title": "Je instellingenbestand is niet privé",
-  "settings_open_body": "Het bevat je inloggegevens, en de schijf liet niet toe dat alleen jij het kunt lezen, dus andere accounts op deze computer kunnen het misschien lezen. Het staat op {path}"
+  "settings_open_body": "Het bevat je inloggegevens, en de schijf liet niet toe dat alleen jij het kunt lezen, dus andere accounts op deze computer kunnen het misschien lezen. Het staat op {path}",
+  "together_code_old": "Dat is een oude, kortere kamercode die te makkelijk te raden was, dus hij werkt niet meer. Werk dopeIPTV op elke computer bij en start een nieuwe kamer.",
+  "ytdlp_err_pin": "Deze kopie van dopeIPTV noemt geen yt-dlp-versie die ze vertrouwt, dus er wordt er geen gedownload. Installeer yt-dlp uit de pakketten van je systeem (of met pip), dan vindt de app het.",
+  "profile_err_kids_pin": "Een kinderprofiel heeft een pincode nodig die een volwassene kent. Geef eerst het profiel van een volwassene een pincode, of stel de ouderlijke pincode in.",
+  "profile_kids_leave": "Voor het verlaten van een kinderprofiel is de pincode van een volwassene nodig. Voer de pincode van het profiel van een volwassene of de ouderlijke pincode in:",
+  "profile_kids_no_pin": "Hiervoor is de pincode van een volwassene nodig, en er is er nog geen ingesteld. Een volwassene kan naar het eigen profiel gaan en dat een pincode geven, of de ouderlijke pincode instellen.",
+  "profile_kids_not_here": "Een kinderprofiel kan dat niet afspelen.",
+  "backup_pw_short": "Gebruik een wachtwoord van minstens {n} tekens - de back-up bevat alle aanmeldingen en de synccode.",
+  "backup_no_pw_warn": "De back-up bevat alle aanmeldingen, tokens en de synccode. Zonder wachtwoord kan iedereen die het bestand krijgt ze lezen. Toch zonder wachtwoord opslaan?",
+  "backup_no_pw_go": "Opslaan zonder wachtwoord"
 }

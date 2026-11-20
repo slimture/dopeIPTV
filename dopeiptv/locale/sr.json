@@ -1997,7 +1997,6 @@
   "together_alone": "Ovde još nema nikog – podeli kod.",
   "together_alone_join": "Ovde još nema nikog. Ako si nekog očekivao, proveri kod.",
   "together_code_bad": "To nije kod sobe. Kod ima 10 slova i cifara, npr. K7PQM-2XDH9.",
-  "together_old_code": "Ova soba ima stari, kraći kod koji je lakše pogoditi. Ažurirajte dopeIPTV na svim računarima, a zatim pokrenite novu sobu.",
   "together_name_needed": "Izaberi ime koje će ostali videti.",
   "together_left_room": "Napustio si sobu. Ostali nastavljaju da gledaju.",
   "together_private_left": "Napustio si sobu za gledanje zajedno: privatno gledanje je uključeno.",
@@ -3112,5 +3111,14 @@
   "pin_wait": "Previše pogrešnih pokušaja. Pokušaj ponovo za {n} s.",
   "cast_other_device": "„{name}“ nije isti uređaj kao prošli put - sada odgovara sa adrese {address}. Izaberi ga na listi ako je to tvoj televizor.",
   "settings_open_title": "Vaša datoteka podešavanja nije privatna",
-  "settings_open_body": "Sadrži vaše prijave, a njen disk nije dozvolio da samo vi možete da je čitate, pa je možda mogu čitati drugi nalozi na ovom računaru. Nalazi se ovde: {path}"
+  "settings_open_body": "Sadrži vaše prijave, a njen disk nije dozvolio da samo vi možete da je čitate, pa je možda mogu čitati drugi nalozi na ovom računaru. Nalazi se ovde: {path}",
+  "together_code_old": "To je stari, kraći kod sobe koji je bilo previše lako pogoditi, pa više ne radi. Ažurirajte dopeIPTV na svakom računaru i napravite novu sobu.",
+  "ytdlp_err_pin": "Ova kopija dopeIPTV-a ne navodi nijedno izdanje yt-dlp-a kojem veruje, pa se ništa ne preuzima. Instalirajte yt-dlp iz paketa svog sistema (ili pomoću pip-a) i aplikacija će ga pronaći.",
+  "profile_err_kids_pin": "Dečjem profilu treba PIN koji zna odrasla osoba. Prvo dodelite PIN profilu odrasle osobe ili podesite roditeljski PIN.",
+  "profile_kids_leave": "Za izlazak iz dečjeg profila potreban je PIN odrasle osobe. Unesite PIN profila odrasle osobe ili roditeljski PIN:",
+  "profile_kids_no_pin": "Za ovo je potreban PIN odrasle osobe, a nijedan još nije podešen. Odrasla osoba može da pređe na svoj profil i dodeli mu PIN ili da podesi roditeljski PIN.",
+  "profile_kids_not_here": "Dečji profil ne može to da pusti.",
+  "backup_pw_short": "Koristite lozinku od najmanje {n} znakova – rezervna kopija sadrži sve prijave i kod za sinhronizaciju.",
+  "backup_no_pw_warn": "Rezervna kopija sadrži sve prijave, tokene i kod za sinhronizaciju. Bez lozinke svako ko dođe do datoteke može da ih pročita. Ipak sačuvati bez lozinke?",
+  "backup_no_pw_go": "Sačuvaj bez lozinke"
 }
