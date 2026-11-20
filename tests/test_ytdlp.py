@@ -1,9 +1,10 @@
 """yt-dlp for YouTube, Twitch and the like (core/ytdlp.py): which addresses
 go through it, which yt-dlp is used (the app's own copy, else the system's),
-the managed copy downloaded from a fake GitHub release - checked against
-its SHA2-256SUMS and tried before it replaces the old one - and updated at
-most once a day, the stream asked of a fake yt-dlp where the libmpv has no
-hook, and the wrapper a frozen build runs it through."""
+the managed copy downloaded from a fake GitHub release - only the release
+and the SHA-256 this build names (core/ytdlp_pin.py), tried before it
+replaces the old one, and a copy the app did not put there never run -
+the stream asked of a fake yt-dlp where the libmpv has no hook, and the
+wrapper a frozen build runs it through."""
 from __future__ import annotations
 
 import hashlib
@@ -102,6 +103,16 @@ def releases():
     srv.close()
 
 
+def pin_for(body: bytes = GOOD, tag: str = "2099.01.02") -> dict:
+    """What tools/ytdlp_pin.py writes, for a release whose file is *body*."""
+    return {"tag": tag, "sums": {ASSET: hashlib.sha256(body).hexdigest(), "yt-dlp.exe": "0" * 64}}
+
+
+@pytest.fixture(autouse=True)
+def _pinned(monkeypatch):
+    monkeypatch.setattr(ytdlp.ytdlp_pin, "PIN", pin_for())
+
+
 # -- the addresses -------------------------------------------------------------------
 
 def test_which_addresses_go_through_yt_dlp():
@@ -158,7 +169,12 @@ def test_the_apps_copy_first_while_it_is_on_else_the_systems(tmp_path):
     own.write_bytes(GOOD)
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)  # not runnable
     own.chmod(0o755)
+    assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)  # not the app's own
+    ytdlp._mark(tmp_path, "2099.01.02", "0" * 64)
     assert ytdlp.find(True, tmp_path, which) == Found(str(own), True)
+    own.write_bytes(GOOD + b"# changed since\n")
+    assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
+    ytdlp._mark(tmp_path, "2099.01.02", "0" * 64)
     # Off: the system's only, the app's copy is not used.
     assert ytdlp.find(False, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
     assert ytdlp.find(False, tmp_path, none) is None
@@ -204,24 +220,69 @@ def test_downloaded_checked_tried_and_put_in_place(tmp_path, releases):
     assert own.read_bytes() == GOOD and os.stat(own).st_mode & stat.S_IXUSR
     assert ytdlp.installed_tag(tmp_path) == "2099.01.02"
     assert seen and seen[-1] == (len(GOOD), len(GOOD))
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["release.txt", "yt-dlp"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["pinned.txt", "release.txt", "yt-dlp"]
     assert ytdlp.version_of(str(own)) == "2099.01.02"
     # Only the app's name and version go with each request.
     assert {ua for _p, ua in releases.hits} == {f"dopeIPTV/{VERSION}"}
-    # Already the newest: nothing downloaded again.
+    assert ytdlp.own_copy(tmp_path) and ytdlp.find(True, tmp_path, which=lambda _n: None).managed
+    # Only the file: no checksum list is asked of the release.
+    assert [p for p, _ua in releases.hits] == [f"/yt-dlp/yt-dlp/releases/download/2099.01.02/{ASSET}"]
+    # Already the release this build names: nothing asked of the network.
     before = len(releases.hits)
     assert ytdlp.update(tmp_path, releases=releases.url) is None
-    assert [p for p, _ua in releases.hits[before:]] == ["/yt-dlp/yt-dlp/releases/latest"]
+    assert releases.hits[before:] == []
 
 
 @posix
-def test_a_newer_release_replaces_the_copy(tmp_path, releases, monkeypatch):
+def test_a_newer_release_named_by_a_newer_app_replaces_the_copy(tmp_path, releases, monkeypatch):
     monkeypatch.setattr(ytdlp, "asset_name", lambda *a, **k: ASSET)
     ytdlp.install(tmp_path, releases=releases.url)
     releases.tag = "2099.02.01"
     releases.body = releases.sums_for = GOOD.replace(b"2099.01.02", b"2099.02.01")
+    # The release has moved on, but this build names the old one: kept.
+    assert ytdlp.update(tmp_path, releases=releases.url) is None
+    monkeypatch.setattr(ytdlp.ytdlp_pin, "PIN", pin_for(releases.body, "2099.02.01"))
     assert ytdlp.update(tmp_path, releases=releases.url) == "2099.02.01"
     assert ytdlp.version_of(str(ytdlp.managed_path(tmp_path))) == "2099.02.01"
+
+
+@posix
+def test_a_release_whose_file_and_sums_were_both_replaced_is_never_used(tmp_path):
+    """Whoever controls the release - its file and the SHA2-256SUMS beside
+    it - still does not get a file run: the SHA-256 is the build's own."""
+    evil = _script('case "$1" in --version) echo 2099.01.02; exit 0;; esac\necho pwned')
+    srv = Releases(body=evil, sums_for=evil)
+    try:
+        with pytest.raises(YtdlpError) as e:
+            ytdlp.install(tmp_path, releases=srv.url, asset=ASSET)
+        assert e.value.reason == "checksum"
+        assert not ytdlp.managed_path(tmp_path).exists()
+    finally:
+        srv.close()
+
+
+def test_a_build_that_names_no_release_downloads_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(ytdlp.ytdlp_pin, "PIN", None)
+    with pytest.raises(YtdlpError) as e:
+        ytdlp.install(tmp_path, releases="http://127.0.0.1:9/never", asset=ASSET)
+    assert e.value.reason == "pin"
+    assert ytdlp.update(tmp_path, releases="http://127.0.0.1:9/never") is None
+    for bad in ({"tag": "x y", "sums": {ASSET: "0" * 64}}, {"tag": "1", "sums": {ASSET: "zz"}},
+                {"tag": "1"}, "2099.01.02", ["2099"]):
+        assert ytdlp.pinned(bad) is None
+
+
+@posix
+def test_a_copy_the_app_did_not_put_there_is_not_run(tmp_path):
+    """An older app's copy, unpinned, or one changed since: the system's is
+    used, and the person is offered the build's own."""
+    own = ytdlp.managed_path(tmp_path)
+    own.write_bytes(GOOD)
+    own.chmod(0o755)
+    (tmp_path / "release.txt").write_text("2099.01.02\n")
+    assert not ytdlp.own_copy(tmp_path)
+    assert ytdlp.find(True, tmp_path, which=lambda _n: "/usr/bin/yt-dlp") == Found("/usr/bin/yt-dlp", False)
+    assert ytdlp.find(True, tmp_path, which=lambda _n: None) is None
 
 
 @posix
@@ -240,8 +301,9 @@ def test_a_download_that_does_not_match_its_checksum_is_never_used(tmp_path):
 
 
 @posix
-def test_a_download_that_does_not_start_is_never_used(tmp_path):
+def test_a_download_that_does_not_start_is_never_used(tmp_path, monkeypatch):
     srv = Releases(body=BROKEN)
+    monkeypatch.setattr(ytdlp.ytdlp_pin, "PIN", pin_for(BROKEN))
     try:
         with pytest.raises(YtdlpError) as e:
             ytdlp.install(tmp_path, releases=srv.url, asset=ASSET)
@@ -274,10 +336,10 @@ def test_no_release_binary_for_this_computer(tmp_path, monkeypatch):
     assert e.value.reason == "platform"
 
 
-def test_a_release_page_that_leads_nowhere(tmp_path, releases):
+def test_a_release_without_the_file_named(tmp_path, releases):
     with pytest.raises(YtdlpError) as e:
         ytdlp.install(tmp_path, releases=releases.url + "/nothing", asset=ASSET)
-    assert e.value.reason == "release"
+    assert e.value.reason == "download"
 
 
 # -- running it ---------------------------------------------------------------------------

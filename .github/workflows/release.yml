@@ -43,8 +43,32 @@ permissions:
   contents: read
 
 jobs:
+  # ---------------------------------------------------------------- yt-dlp ---
+  # The yt-dlp release every build names (core/ytdlp_pin.py): the newest one
+  # whose SHA2-256SUMS yt-dlp's own key has signed (gpgv, against
+  # packaging/yt-dlp-signing-key.asc), its files' SHA-256s written into the
+  # app - so the app's signed release, not a list downloaded beside the file,
+  # says which yt-dlp the app may run. Done once, on Linux, and handed to
+  # every build. A failure pins nothing (the build then downloads no yt-dlp)
+  # and says so; it never stops a release.
+  ytdlp-pin:
+    name: yt-dlp release, by its signature
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Pin the newest yt-dlp release whose signature checks out
+        run: python3 tools/ytdlp_pin.py --or-none
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core/ytdlp_pin.py
+          retention-days: 7
+
   # ---------------------------------------------------------------- Python ---
   python-dist:
+    needs: ytdlp-pin
     name: sdist + wheel (pipx / PyPI)
     permissions:
       contents: write      # attaches its packages to the release (on a tag)
@@ -58,6 +82,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -171,6 +200,7 @@ jobs:
 
   # ------------------------------------------------ AppImage + Debian pkg ---
   linux-bundle:
+    needs: ytdlp-pin
     name: AppImage + .deb (${{ matrix.arch }})
     permissions:
       contents: write      # attaches its packages to the release (on a tag)
@@ -204,6 +234,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -324,13 +359,13 @@ jobs:
         # both carry it. Without the key (a fork) nothing is signed and the
         # build calls itself modified; a release without it stops here.
         env:
-          # A key that signs file lists and nothing else, once the repository
-          # has one (docs/MAINTAINING.md, "The release key"): from then on
-          # the update key is not handed to this job at all. The tool runs
-          # with Python's own library only (-I -S) and starts the bundle
-          # without either key in its environment.
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
           DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY == '' && secrets.DOPEIPTV_UPDATE_KEY || '' }}
         run: python -I -S tools/build_manifest.py frozen dist/dopeiptv/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Audit host Wayland libraries
         run: |
@@ -727,6 +762,7 @@ jobs:
   # a fork - the .app is signed ad hoc as before and users allow the first
   # launch under Privacy & Security -> Open Anyway.
   macos-dmg:
+    needs: ytdlp-pin
     name: macOS .dmg (${{ matrix.arch }})
     permissions:
       contents: write      # attaches its packages to the release (on a tag)
@@ -777,6 +813,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -1027,13 +1068,13 @@ jobs:
         # signed: the list lies in Contents/Resources, linked from where
         # the app reads it, and the signature seals it with the rest.
         env:
-          # A key that signs file lists and nothing else, once the repository
-          # has one (docs/MAINTAINING.md, "The release key"): from then on
-          # the update key is not handed to this job at all. The tool runs
-          # with Python's own library only (-I -S) and starts the bundle
-          # without either key in its environment.
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
           DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY == '' && secrets.DOPEIPTV_UPDATE_KEY || '' }}
         run: python -I -S tools/build_manifest.py frozen dist/dopeIPTV.app/Contents/MacOS/dopeiptv ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Developer ID keychain
         id: sign
@@ -1383,6 +1424,7 @@ jobs:
   # v1.2.0 did); the Linux/macOS jobs run independently and still attach their
   # own assets, so a Windows hiccup never removes those.
   windows-zip:
+    needs: ytdlp-pin
     name: Windows (${{ matrix.arch }})
     permissions:
       contents: write      # attaches its packages to the release (on a tag)
@@ -1409,6 +1451,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -1573,13 +1620,13 @@ jobs:
         # and the zip are made of dist/dopeiptv.
         shell: bash
         env:
-          # A key that signs file lists and nothing else, once the repository
-          # has one (docs/MAINTAINING.md, "The release key"): from then on
-          # the update key is not handed to this job at all. The tool runs
-          # with Python's own library only (-I -S) and starts the bundle
-          # without either key in its environment.
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
           DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY == '' && secrets.DOPEIPTV_UPDATE_KEY || '' }}
         run: python -I -S tools/build_manifest.py frozen dist/dopeiptv/dopeiptv.exe ${{ startsWith(github.ref, 'refs/tags/') && '--require-key' || '' }}
       - name: Audit - what the shipped DLLs import
         shell: bash
@@ -1766,6 +1813,7 @@ jobs:
   # loud (#36 - every start crashed from 1.5.0 to 1.6.5 and nothing here
   # noticed, the job was allowed to fail). A test build only names it missing.
   flatpak:
+    needs: ytdlp-pin
     name: Flatpak
     permissions:
       contents: write      # attaches its packages to the release (on a tag)
@@ -1788,6 +1836,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
           persist-credentials: false
+      - name: The yt-dlp release this build names (the ytdlp-pin job)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0
+        with:
+          name: ytdlp-pin
+          path: dopeiptv/core
       - name: Nightly version
         if: ${{ inputs.nightly_version }}
         shell: bash
@@ -1863,13 +1916,13 @@ jobs:
         # Flatpak carries none and says it runs from source.
         continue-on-error: true
         env:
-          # A key that signs file lists and nothing else, once the repository
-          # has one (docs/MAINTAINING.md, "The release key"): from then on
-          # the update key is not handed to this job at all. The tool runs
-          # with Python's own library only (-I -S) and starts the bundle
-          # without either key in its environment.
+          # A key that signs file lists and nothing else (docs/MAINTAINING.md,
+          # "The release key") - never the update key: this job has run
+          # PyInstaller, pip's packages and other people's tools. Without
+          # it the build calls itself modified, and a release stops. The
+          # tool runs with Python's own library only (-I -S) and starts the
+          # bundle without the key in its environment.
           DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}
-          DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY == '' && secrets.DOPEIPTV_UPDATE_KEY || '' }}
         run: |
           if ! command -v python3 >/dev/null 2>&1; then
             echo "::warning::no python3 in this container - the Flatpak carries no build manifest"

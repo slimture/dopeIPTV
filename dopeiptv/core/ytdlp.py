@@ -7,10 +7,15 @@ Where it comes from:
 
 - the system's, on the PATH (a distribution's package, pip, Homebrew);
 - or a copy the app keeps in the user's data folder: the official release
-  binary for this platform from github.com/yt-dlp/yt-dlp, checked against
-  the release's SHA2-256SUMS before it is used, and checked for a newer
-  release at most once a day while it is used - YouTube changes often, and
-  an old yt-dlp is the usual reason a stream stops opening.
+  binary for this platform from github.com/yt-dlp/yt-dlp - only the release
+  this build names, and only the file whose SHA-256 it names
+  (core/ytdlp_pin.py: pinned once yt-dlp's own PGP signature checked out,
+  and part of the app's signed release - no checksum list downloaded with
+  the file is trusted). A newer app names a newer release, and the copy
+  follows it (looked at once a day, nothing asked of the network unless the
+  named release changed). A copy the app did not put there itself is not
+  run. YouTube changes often: where the named release is too old, the
+  system's yt-dlp (kept up to date by its package manager) is the way.
 
 It is never in the app's own packages. The managed copy can be turned off
 (``ytdlp_managed``): then only the system's is used and nothing is
@@ -40,6 +45,7 @@ from urllib.parse import urlsplit
 
 from .. import VERSION
 from ._lazy_requests import requests
+from . import ytdlp_pin
 from .log import log, redact_url
 from .xdg import BUNDLE_VARS, system_env
 
@@ -53,6 +59,11 @@ CHECK_EVERY = 24 * 3600
 #: A release binary is 15-40 MB; past this it is not one.
 MAX_BYTES = 200 * 1024 * 1024
 _TAG_FILE = "release.txt"
+#: Written by install() beside the copy it checked: its tag, SHA-256, size
+#: and modification time. A copy without it, or that no longer matches it,
+#: is none of the app's (an older app's, unpinned) and is not run.
+_MARK_FILE = "pinned.txt"
+_TAG_RE = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,63}")
 _WRAPPER = "yt-dlp-run"
 #: The format the app asks for when it resolves an address itself: picture
 #: and sound in one stream (a live stream's HLS always is).
@@ -69,8 +80,8 @@ _TWITCH_PAGES = frozenset({"videos", "directory", "downloads", "jobs", "p",
 
 
 class YtdlpError(Exception):
-    """*reason*: platform (no release binary for this computer), release
-    (the newest release could not be found), download, checksum, runs (the
+    """*reason*: platform (no release binary for this computer), pin (this
+    build names no release, or none for this computer), download, checksum, runs (the
     downloaded binary does not start), busy (the copy is in use), missing,
     failed (yt-dlp could not open the address; *detail* says why)."""
 
@@ -210,13 +221,54 @@ def _runnable(p: Path) -> bool:
         return False
 
 
+def pinned(pin: Any = None) -> tuple[str, dict[str, str]] | None:
+    """The release this build names and its files' SHA-256s
+    (core/ytdlp_pin.py), or None - none named, or not one well formed."""
+    p = ytdlp_pin.PIN if pin is None else pin
+    if not isinstance(p, dict):
+        return None
+    tag, sums = p.get("tag"), p.get("sums")
+    if not isinstance(tag, str) or not _TAG_RE.fullmatch(tag) or not isinstance(sums, dict):
+        return None
+    good = {str(k): str(v).lower() for k, v in sums.items()
+            if isinstance(k, str) and isinstance(v, str) and re.fullmatch(r"[0-9a-fA-F]{64}", v)}
+    return (tag, good) if good else None
+
+
+def _mark_of(p: Path) -> str:
+    st = p.stat()
+    return f"{st.st_size} {st.st_mtime_ns}"
+
+
+def _mark(base: str | Path | None, tag: str, sha256: str) -> None:
+    """The copy just checked marked as the app's own: its release and
+    SHA-256, its size and time as they are now."""
+    folder = managed_dir(base)
+    (folder / _TAG_FILE).write_text(tag + "\n", encoding="utf-8")
+    (folder / _MARK_FILE).write_text(f"{tag} {sha256} {_mark_of(managed_path(base))}\n",
+                                     encoding="utf-8")
+
+
+def own_copy(base: str | Path | None = None) -> bool:
+    """Whether the managed copy is one install() put there and checked: its
+    mark says so, and its size and time are what they were (a stat, no
+    read)."""
+    p = managed_path(base)
+    try:
+        mark = (managed_dir(base) / _MARK_FILE).read_text(encoding="utf-8").split()
+        return _runnable(p) and len(mark) == 4 and " ".join(mark[2:]) == _mark_of(p)
+    except OSError:
+        return False
+
+
 def find(managed_on: bool = True, base: str | Path | None = None,
          which: Callable[[str], str | None] = shutil.which) -> Found | None:
-    """The yt-dlp to use: the app's copy (kept up to date) while the
-    managed copy is on and there is one, else the system's on the PATH."""
+    """The yt-dlp to use: the app's copy while the managed copy is on and
+    there is one the app put there itself (``own_copy``), else the
+    system's on the PATH."""
     if managed_on:
         p = managed_path(base)
-        if _runnable(p):
+        if own_copy(base):
             return Found(str(p), True)
     system = which("yt-dlp")
     return Found(system, False) if system else None
@@ -374,43 +426,26 @@ def parse_sums(text: str) -> dict[str, str]:
     return out
 
 
-def latest_tag(releases: str = RELEASES, get: Callable[..., Any] | None = None) -> str:
-    """The newest release's tag, from where GitHub's "latest" link leads
-    (no API call, so no API rate limit)."""
-    get = get or requests.get
-    try:
-        r = get(f"{releases}/latest", allow_redirects=False, timeout=20,
-                headers=_headers())
-    except requests.RequestException as e:
-        raise YtdlpError("release", type(e).__name__) from e
-    m = re.search(r"/releases/tag/([A-Za-z0-9._-]+)", str(r.headers.get("Location") or ""))
-    if not m:
-        raise YtdlpError("release", f"HTTP {r.status_code}")
-    return m.group(1)
-
-
 def install(base: str | Path | None = None, *, releases: str = RELEASES,
-            tag: str | None = None, asset: str | None = None,
+            pin: Any = None, asset: str | None = None,
             run: Callable[..., Any] = subprocess.run,
             progress: Callable[[int, int], None] | None = None,
             cancelled: Callable[[], bool] | None = None) -> str:
-    """Download the release binary into the managed folder: checked
-    against the release's SHA2-256SUMS, then tried (``--version``), then
-    put in place of the old copy in one step. Returns the release's tag."""
+    """Download the release binary this build names into the managed
+    folder: its SHA-256 must be the one the build names (``pinned``; no
+    checksum list is downloaded), then it is tried (``--version``), then
+    put in place of the old copy in one step and marked as the app's own.
+    Returns the release's tag."""
     asset = asset or asset_name()
     if not asset:
         raise YtdlpError("platform", f"{sys.platform} {platform.machine()}")
-    tag = tag or latest_tag(releases)
-    base_url = f"{releases}/download/{tag}"
-    try:
-        r = _get(f"{base_url}/{SUMS}", timeout=20)
-    except requests.RequestException as e:
-        raise YtdlpError("download", type(e).__name__) from e
-    if r.status_code != 200:
-        raise YtdlpError("download", f"{SUMS}: HTTP {r.status_code}")
-    want = parse_sums(r.text).get(asset)
+    named = pinned(pin)
+    if named is None:
+        raise YtdlpError("pin", "this build names no yt-dlp release")
+    tag, sums = named
+    want = sums.get(asset)
     if not want:
-        raise YtdlpError("checksum", f"{asset} is not in {SUMS}")
+        raise YtdlpError("pin", f"{asset} is not named for {tag}")
     folder = managed_dir(base)
     folder.mkdir(parents=True, exist_ok=True)
     final = managed_path(base)
@@ -419,7 +454,7 @@ def install(base: str | Path | None = None, *, releases: str = RELEASES,
         digest = hashlib.sha256()
         size = 0
         try:
-            with _get(f"{base_url}/{asset}", stream=True, timeout=30) as resp:
+            with _get(f"{releases}/download/{tag}/{asset}", stream=True, timeout=30) as resp:
                 if resp.status_code != 200:
                     raise YtdlpError("download", f"HTTP {resp.status_code}")
                 total = int(resp.headers.get("Content-Length") or 0)
@@ -447,25 +482,28 @@ def install(base: str | Path | None = None, *, releases: str = RELEASES,
             os.replace(tmp, final)
         except PermissionError as e:
             raise YtdlpError("busy", str(final)) from e
-        (folder / _TAG_FILE).write_text(tag + "\n", encoding="utf-8")
+        _mark(base, tag, want)
     finally:
         try:
             tmp.unlink()
         except OSError:
             pass
-    log.info("yt-dlp %s installed at %s (%d bytes, checksum checked)", tag, final, size)
+    log.info("yt-dlp %s installed at %s (%d bytes, the SHA-256 this build names)", tag, final, size)
     return tag
 
 
 def update(base: str | Path | None = None, *, releases: str = RELEASES,
-           run: Callable[..., Any] = subprocess.run,
+           pin: Any = None, run: Callable[..., Any] = subprocess.run,
            progress: Callable[[int, int], None] | None = None) -> str | None:
-    """The managed copy brought to the newest release. The new tag when it
-    was updated, None when it was already the newest."""
-    tag = latest_tag(releases)
-    if tag == installed_tag(base) and _runnable(managed_path(base)):
+    """The managed copy brought to the release this build names. The new
+    tag when it was updated, None when it already was that one (nothing
+    asked of the network) or the build names none."""
+    named = pinned(pin)
+    if named is None:
         return None
-    return install(base, releases=releases, tag=tag, run=run, progress=progress)
+    if named[0] == installed_tag(base) and own_copy(base):
+        return None
+    return install(base, releases=releases, pin=pin, run=run, progress=progress)
 
 
 def describe(found: Found | None, version: str = "") -> str:

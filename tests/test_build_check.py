@@ -241,7 +241,7 @@ def test_the_tool_signs_a_package_pip_installs_and_it_checks_out(tmp_path, monke
     (pkg / "scripts" / "loose.py").write_text("x")           # no package: not installed
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[tool.setuptools.package-data]\ndopeiptv = ["locale/*.json", "assets/*.svg"]\n')
-    monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(SEED).decode())
+    monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(SEED).decode())
     assert bm.main(["tree", str(pkg), "--pyproject", str(pyproject)], keys=KEYS) == 0
     listed = json.loads((pkg / build_check.MANIFEST).read_text())["files"]
     assert set(listed) == {"dopeiptv/__init__.py", "dopeiptv/core/__init__.py", "dopeiptv/core/x.py",
@@ -261,13 +261,13 @@ def test_the_tool_signs_a_package_pip_installs_and_it_checks_out(tmp_path, monke
 def test_the_tool_without_the_key_writes_nothing_and_a_release_stops(tmp_path, monkeypatch):
     bm = _tool()
     pkg = _tree(tmp_path)
-    monkeypatch.delenv("DOPEIPTV_UPDATE_KEY", raising=False)
+    monkeypatch.delenv("DOPEIPTV_BUILD_KEY", raising=False)
     assert bm.main(["tree", str(pkg)], keys=KEYS) == 0
     assert not (pkg / build_check.MANIFEST).exists()
     with pytest.raises(SystemExit):
         bm.main(["tree", str(pkg), "--require-key"], keys=KEYS)
     # A secret whose public half the app does not carry signs nothing.
-    monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(bytes(range(64, 96))).decode())
+    monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(bytes(range(64, 96))).decode())
     with pytest.raises(SystemExit):
         bm.main(["tree", str(pkg)], keys=KEYS)
     assert not (pkg / build_check.MANIFEST).exists()
@@ -288,13 +288,13 @@ def test_the_tool_signs_a_frozen_bundle_and_asks_it_again(tmp_path, monkeypatch)
     bm = _tool()
     pkg, arc = _bundle(tmp_path), _archive()
     monkeypatch.setattr(bm, "_ask", _asker(pkg, arc))
-    monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(SEED).decode())
+    monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(SEED).decode())
     assert bm.frozen("dopeiptv", require=True, keys=KEYS) == 0
     assert _check_frozen(pkg, arc).kind == OFFICIAL
     # A bundle that would not call itself official (it carries another
     # key) stops the build.
     monkeypatch.setattr(bm, "_ask", _asker(pkg, arc, keys=(base64.b64encode(b"\1" * 32).decode(),)))
-    monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(SEED).decode())
+    monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(SEED).decode())
     with pytest.raises(SystemExit) as e:
         bm.frozen("dopeiptv", require=True, keys=KEYS)
     assert "does not call itself official" in str(e.value)
@@ -330,20 +330,30 @@ def test_a_build_key_signs_file_lists_and_never_an_update(tmp_path, monkeypatch)
     bm = _tool()
     build_seed = bytes(range(100, 132))
     build_key = base64.b64encode(ed25519.public_key(build_seed)).decode()
-    # The build key wins over the update key when both are given...
+    # The build key signs; an update key handed along is taken out and
+    # never used...
     pkg, arc = _bundle(tmp_path), _archive()
     both = (build_key, *KEYS)
     monkeypatch.setattr(bm, "_ask", _asker(pkg, arc, keys=both))
     monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(build_seed).decode())
     monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(SEED).decode())
     assert bm.frozen("dopeiptv", require=True, keys=both) == 0
+    assert "DOPEIPTV_UPDATE_KEY" not in os.environ
     data = (pkg / build_check.MANIFEST).read_bytes()
     sig = (pkg / build_check.SIGNATURE).read_text()
     assert build_check.signed_by(data, sig, (build_key,)) and not build_check.signed_by(data, sig, KEYS)
-    # ...and is refused while the app does not carry its public half.
+    # ...the update key alone signs nothing - a release stops...
+    (pkg / build_check.MANIFEST).unlink()
+    monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(SEED).decode())
+    with pytest.raises(SystemExit):
+        bm.frozen("dopeiptv", require=True, keys=both)
+    assert not (pkg / build_check.MANIFEST).exists()
+    # ...and a build key is refused while the app does not carry its public half.
     monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(build_seed).decode())
     with pytest.raises(SystemExit):
         bm.frozen("dopeiptv", require=True, keys=KEYS)
+    # The tool's own default: build keys only, never an update key.
+    assert bm.UPDATE_KEYS == update_keys.BUILD_KEYS
     # What the app takes a file list from: build keys and update keys; an
     # update only from an update key.
     assert build_check.MANIFEST_KEYS == tuple(dict.fromkeys((*update_keys.BUILD_KEYS, *update_keys.UPDATE_KEYS)))
@@ -358,7 +368,7 @@ def test_in_a_mac_app_the_list_lies_in_resources_linked_from_frameworks(tmp_path
     (contents / "Resources").mkdir()
     arc = _archive()
     monkeypatch.setattr(bm, "_ask", _asker(pkg, arc))
-    monkeypatch.setenv("DOPEIPTV_UPDATE_KEY", base64.b64encode(SEED).decode())
+    monkeypatch.setenv("DOPEIPTV_BUILD_KEY", base64.b64encode(SEED).decode())
     assert bm.frozen("dopeiptv", require=False, keys=KEYS) == 0
     kept = contents / "Resources" / "dopeiptv" / build_check.MANIFEST
     assert kept.is_file() and (pkg / build_check.MANIFEST).is_symlink()
@@ -392,6 +402,13 @@ class _Resp:
 def net(monkeypatch):
     """Every request through requests, kept: (method, url, headers)."""
     import requests
+
+    from dopeiptv.core import _lazy_requests
+    # The app's stand-in notes requests' own functions the first time it is
+    # used: before they are replaced here, or it takes the stand-ins below
+    # for requests' own and goes to the network (run on its own, this file
+    # was the first to use it).
+    _lazy_requests._classes()
     calls: list[tuple[str, str, dict]] = []
 
     def get(url, **kw):
@@ -671,12 +688,10 @@ def test_every_frozen_build_signs_its_manifest_before_it_is_packed():
                        ("PyInstaller bundle\n        shell: bash",
                         "python tools/build_manifest.py frozen dist/dopeiptv/dopeiptv.exe ")):
         s = step("Build manifest", after)
-        # A build key when the repository has one - and then no update key
-        # at all in a job that runs other people's code; else the update
-        # key, as before. The tool on Python's own library only (-I -S).
+        # The build key, and never the update key, in a job that runs
+        # other people's code. The tool on Python's own library only (-I -S).
         assert "DOPEIPTV_BUILD_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY }}" in s
-        assert ("DOPEIPTV_UPDATE_KEY: ${{ secrets.DOPEIPTV_BUILD_KEY == '' && "
-                "secrets.DOPEIPTV_UPDATE_KEY || '' }}") in s
+        assert "DOPEIPTV_UPDATE_KEY" not in s
         assert run.replace("python tools/", "python -I -S tools/") in s
         assert "--require-key" in s and "startsWith(github.ref, 'refs/tags/')" in s
     order = [text.index(m) for m in ("frozen dist/dopeiptv/dopeiptv ", "- name: Build AppImage",

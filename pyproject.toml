@@ -116,6 +116,8 @@ files = [
     "dopeiptv/core/home_net.py",
     "dopeiptv/providers/radio_browser.py",
     "dopeiptv/core/ytdlp.py",
+    "dopeiptv/core/ytdlp_pin.py",
+    "dopeiptv/core/dest_guard.py",
     "dopeiptv/core/tv_input.py",
     "dopeiptv/core/tv_nav.py",
     "dopeiptv/providers/kodi.py",
