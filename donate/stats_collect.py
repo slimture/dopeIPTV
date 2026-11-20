@@ -2101,7 +2101,16 @@ def _block_encrypted(name: str, sys_root: str, depth: int = 0) -> bool:
         except OSError:
             return ""
     if name.startswith("zram"):
-        return read("backing_dev") in ("", "none")
+        # No backing_dev at all: a kernel without zram writeback, nothing of
+        # it reaches a disk. One there that cannot be read is not counted.
+        backing = os.path.join(block, "backing_dev")
+        if not os.path.lexists(backing):
+            return True
+        try:
+            with open(backing, encoding="ascii", errors="replace") as f:
+                return f.read(4096).strip() in ("", "none")
+        except OSError:
+            return False
     if read("dm/uuid").startswith("CRYPT-"):
         return True
     try:

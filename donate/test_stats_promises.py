@@ -221,6 +221,12 @@ def test_zram_counts_only_without_a_disk_behind_it(tmp_path):
     assert sc._linux_encrypted("/dev/dm-1", root), "LVM on LUKS"
     assert not sc._linux_encrypted("/dev/dm-2", root), "LVM on a plain partition"
     assert not sc._linux_encrypted("/dev/sda3", root)
+    # A kernel without zram writeback has no backing_dev: safe. One there
+    # that cannot be read: not counted as safe.
+    (blocks / "zram5").mkdir()
+    assert sc._linux_encrypted("/dev/zram5", root)
+    (blocks / "zram6" / "backing_dev").mkdir(parents=True)     # cannot be read as a file
+    assert not sc._linux_encrypted("/dev/zram6", root)
 
 
 def test_swap_that_cannot_be_asked_is_said_too():
