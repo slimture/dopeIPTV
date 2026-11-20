@@ -678,7 +678,8 @@ is not made at all (`core/memory_safe.py`):
   mounted there, is found).
 - **Out of swap's reach.** A tmpfs's pages can be swapped out, so it
   counts only when what swap keeps cannot be read from a disk afterwards
-  (`swap_safe`): no swap, every swap area zram without a backing device or
+  (`swap_safe`): no swap, every swap area zram without a backing device (one
+  whose backing cannot be read does not count) or
   dm-crypt - directly, or under LVM or another mapping whose every part is
   one - a swap file on such a device; or the tmpfs mounted `noswap`, or
   ramfs. Swap on a plain partition, a swap file on a plain disk, a system
@@ -697,8 +698,9 @@ is not made at all (`core/memory_safe.py`):
   `DvrPool.on_disk_private`). A cast's converter does not wait for the
   window: each run - a cast, a seek, a recast, the watchdog's reconnect,
   each a run of its own - is watched once a second by a thread of its own,
-  and one whose work is on the disk stops the moment private viewing
-  begins, its files gone (`cast_bridge._watch`, `airplay_bridge._watch`,
+  and one whose work is on the disk stops within a second of private
+  viewing beginning, its files gone - what it wrote in that second was on
+  the disk for that second (`cast_bridge._watch`, `airplay_bridge._watch`,
   `private_stopped`). The window then sends the cast again under the same
   rule (`_cast_private_on`); a send still on its way is looked at again
   as soon as it is done (`_cast_send`'s `_private_check`). A disk buffer a
@@ -708,8 +710,9 @@ is not made at all (`core/memory_safe.py`):
   film's, the archive's or the rewind buffer's pieces, the spool a pause
   is kept in - is measured once a second while it runs, and past its room
   (`private_cap`: Settings' cap, `PRIVATE_CAP`, half of what is free in
-  memory) the converter stops and the cast says so (`folder_bytes`): never
-  a byte more in memory, never one on the disk.
+  memory) the converter stops and the cast says so (`folder_bytes`): a
+  budget looked at once a second, not a ceiling no byte can pass - a
+  second's worth of a stream more at the most, never one on the disk.
 - **A recording asks.** A recording of what plays, or one set from the
   guide, while viewing privately is a file kept in Recordings with its
   name: asked first, Cancel the default - on the phone and in TV mode as

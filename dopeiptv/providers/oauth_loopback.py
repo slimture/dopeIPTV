@@ -60,12 +60,12 @@ class _Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _taken(params: dict, want: str | None) -> bool:
-        """A code, with the state asked for (in constant time); or an
-        error - with that state too when it names one: a sign-in turned
-        down at the provider is said so, however its answer is written."""
+        """A code or an error, with the state asked for (in constant time):
+        another program on this computer that finds the port cannot end a
+        sign-in with an error of its own."""
         if "code" not in params and "error" not in params:
             return False
-        if want is None or ("code" not in params and "state" not in params):
+        if want is None:
             return True
         return hmac.compare_digest(params.get("state", "").encode("utf-8"),
                                    want.encode("utf-8"))

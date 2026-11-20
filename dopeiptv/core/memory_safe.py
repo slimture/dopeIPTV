@@ -120,8 +120,14 @@ def encrypted_block(name: str, sys_root: str = SYS, depth: int = 0) -> bool:
         return False
     block = os.path.join(sys_root, "class", "block", name)
     if name.startswith("zram"):
-        backing = (_read(os.path.join(block, "backing_dev"), 4096) or "none").strip()
-        return backing in ("", "none")
+        # No backing_dev at all: a kernel without zram writeback, so nothing
+        # of it can reach a disk. One that is there but cannot be read says
+        # nothing - not counted as safe.
+        path = os.path.join(block, "backing_dev")
+        if not os.path.lexists(path):
+            return True
+        backing = _read(path, 4096)
+        return backing is not None and backing.strip() in ("", "none")
     uuid = (_read(os.path.join(block, "dm", "uuid"), 4096) or "").strip()
     if uuid.startswith("CRYPT-"):
         return True

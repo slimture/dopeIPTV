@@ -223,7 +223,28 @@ was done:
 | Viewing metadata | Titles go to TMDB even with the provider's artwork (Trakt's ids, the watched marks) | low | 1.6.9: **Provider artwork, TMDB off** asks TMDB nothing at all - no resolver, no chart, no picture moved onto image.tmdb.org (`services/coverart.OFF`); a picture the provider itself keeps on TMDB's server still loads from there |
 | Player TLS, credentials on command lines, the OS keyring, default-encrypted backups | Known limits | kept | The maintainer's decision, each for what it would cost: checking certificates in the player stops a provider with a broken one from playing; a proxy in front of every recording and external player is one more thing to fail; the keyring differs on every desktop and is missing on some; a password chosen by default is a backup lost when it is forgotten. Each stays written down in docs/SECURITY.md as an honest limit |
 
-## The next round
+## November 2026 - seventh independent AI review of 1.6.9 (testing)
 
-Before 1.6.9 is released: the kit made again from `testing` with these
-fixes, given to an independent AI assistant; its scores and findings, here.
+The kit from `testing` (1ea3e89) and the website (4df5f39): **8/10**; 9 for
+updates, connections, sync and Watch together, 7 or 8 elsewhere. No
+critical weakness, no way found to run code or take a login from afar. It
+confirmed the sixth round's fixes - the cast watches and their lock, the
+in-flight check, the Apple TV bound to its first receiver, the short
+logins, the 14 dates - and what it found:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Private viewing, website statistics | zram whose `backing_dev` cannot be read counted as safe swap | medium | 1.6.9 and the website: missing (no writeback in the kernel) is safe, there but unreadable is not (`memory_safe.encrypted_block`, `stats_collect._block_encrypted`) |
+| Local servers | A sign-in's error callback without the state could end a Trakt sign-in | low | 1.6.9: an error too must carry the state asked for (`oauth_loopback._taken`) |
+| Viewing metadata | No switch that turns TMDB off | medium | Already in `testing` after the reviewed commit: **Provider artwork, TMDB off** (`services/coverart.OFF`) |
+| Casting, private viewing | The watch looks once a second; the private cap is a budget stopped when passed, not a hard ceiling | medium | Answered: a run on the disk is stopped within the second, a private run's work within its room's second; written down so in docs/SECURITY.md |
+| Server mode | A server set up before 1.6.9 keeps the tuner open to the home | medium | Answered: what it had, so Plex and the TVs it serves go on playing; Settings shows the choice |
+| Credentials, player TLS, keyring, backups, LAN casting, direct cast addresses, a home source's protocols, player redirects, the website's visit detail, reproducible builds | Known limits | kept | The maintainer's decision: each change would cost playback, recordings or a restore, or add a question; all written down in docs/SECURITY.md |
+
+## The end of the rounds for 1.6.9
+
+Seven rounds, from 7/10 to 8/10 overall with every confirmed defect fixed
+in code. What stays below 9 is what the project chose to keep - each
+written down in docs/SECURITY.md with its reason. 1.6.9 is released from
+here; the next round comes before a release that changes what the app
+sends, keeps or serves.

@@ -65,6 +65,20 @@ def test_a_block_device_is_encrypted_only_as_its_parts_are(tmp_path):
     assert not memory_safe.encrypted_block("", sys_root)
 
 
+def test_zram_whose_backing_cannot_be_read_is_not_safe(tmp_path, monkeypatch):
+    # A kernel without zram writeback has no backing_dev: nothing can reach a
+    # disk. One that is there but cannot be read says nothing - not safe.
+    root = _fake_sys(tmp_path, {"zram0": {}, "zram1": {"backing": "none"},
+                                "zram2": {"backing": "/dev/sdb2"}, "zram3": {"backing": "none"}})
+    assert memory_safe.encrypted_block("zram0", root), "no writeback in the kernel"
+    assert memory_safe.encrypted_block("zram1", root)
+    assert not memory_safe.encrypted_block("zram2", root)
+    real = memory_safe._read
+    monkeypatch.setattr(memory_safe, "_read",
+                        lambda path, limit=0: None if "zram3" in path else real(path, limit))
+    assert not memory_safe.encrypted_block("zram3", root), "unreadable: not counted as safe"
+
+
 def test_swap_is_safe_only_when_every_area_is(tmp_path, monkeypatch):
     sys_root = _fake_sys(tmp_path, {"dm-0": {"uuid": "CRYPT-plain-x"}, "sda2": {}, "zram0": {}})
     assert memory_safe.swap_list(NO_SWAP + "/dev/x\\040y partition 1 0 -2\n") == [("/dev/x y", "partition")]

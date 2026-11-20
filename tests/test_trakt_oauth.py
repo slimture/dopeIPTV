@@ -277,9 +277,14 @@ def test_loopback_says_a_sign_in_turned_down():
     th = threading.Thread(target=lambda: out.__setitem__(
         "params", capture_oauth_redirect(port, timeout=10, state="S")))
     th.start()
-    assert _ask(port, "/callback?error=access_denied")[0] == 200
+    # An error without the state asked for is no answer: another program
+    # that finds the port cannot end the sign-in.
+    assert _ask(port, "/callback?error=access_denied")[0] == 400
+    assert _ask(port, "/callback?error=access_denied&state=wrong")[0] == 400
+    assert th.is_alive()
+    assert _ask(port, "/callback?error=access_denied&state=S")[0] == 200
     th.join(5)
-    assert out["params"] == {"error": "access_denied"}
+    assert out["params"] == {"error": "access_denied", "state": "S"}
 
 
 def test_loopback_cancel_returns_none():

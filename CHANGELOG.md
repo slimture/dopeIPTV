@@ -7,6 +7,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.9] - 2026-11-20
+
 ### Fixed
 
 - The window could stop for good while pictures loaded - a macOS hang
@@ -56,6 +58,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   first other address that asks for a run's stream, anyone else refused.
 - A login of three characters or fewer is masked in the log as a word of
   its own.
+- zram whose backing cannot be read no longer counts as swap that keeps
+  nothing: private viewing then keeps no buffer in memory there.
+- Trakt's browser sign-in takes an error only with the state it asked
+  for, so another program cannot end a sign-in.
 - TMDB can be turned off altogether: **Provider artwork, TMDB off** under
   Settings → Posters & info asks it nothing - no titles, no searches, no
   ids for Trakt or Simkl, no chart of the week, no picture moved onto
