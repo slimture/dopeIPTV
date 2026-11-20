@@ -135,9 +135,7 @@ class DvrPlayerMixin:
         minutes = self._live_rewind_minutes()
         try:
             if self._dvr_pool is None:
-                from ..core.dvr_pool import DvrPool     # only when it is used
-                self._dvr_pool = DvrPool(dvr_base(), minutes * 60,
-                                         self._dvr_space_bytes(), memory=dvr_memory())
+                self._dvr_pool = self._dvr_new_pool(minutes * 60)
             self._dvr_pool.configure(minutes * 60, self._dvr_space_bytes())
             session = self._dvr_pool.open(url, key, source=self._dvr_source(),
                                           private=self._dvr_playing_private())
@@ -238,11 +236,19 @@ class DvrPlayerMixin:
         (made now, with the rewind buffer's space, when it has none), so a
         channel both watch has one connection."""
         if self._dvr_pool is None:
-            from ..core.dvr_pool import DvrPool
             minutes = self._live_rewind_minutes()
-            self._dvr_pool = DvrPool(dvr_base(), max(keep_seconds, minutes * 60),
-                                     self._dvr_space_bytes(), memory=dvr_memory())
+            self._dvr_pool = self._dvr_new_pool(max(keep_seconds, minutes * 60))
         return self._dvr_pool
+
+    def _dvr_new_pool(self, keep_seconds: float) -> "DvrPool":
+        from ..core.dvr_pool import DvrPool     # only when it is used
+        pool = DvrPool(dvr_base(), keep_seconds, self._dvr_space_bytes(), memory=dvr_memory())
+        # From the recording's or the cast's thread: a signal crosses to
+        # the window's thread by itself.
+        signal = getattr(self, "private_on_disk", None)
+        if signal is not None:
+            pool.on_private_disk = lambda _s: signal.emit()
+        return pool
 
     def _end_dvr(self) -> None:
         """Leave the session - its provider connection closes at once,

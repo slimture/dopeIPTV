@@ -313,6 +313,7 @@ def test_the_player_asks_for_memory_while_viewing_privately():
     import inspect
     from dopeiptv.media import dvr_player
     src = inspect.getsource(dvr_player.DvrPlayerMixin._dvr_start)
-    assert "private=self._dvr_playing_private()" in src and "memory=dvr_memory()" in src
-    assert "memory=dvr_memory()" in inspect.getsource(dvr_player.DvrPlayerMixin.dvr_pool_for_server)
+    assert "private=self._dvr_playing_private()" in src and "self._dvr_new_pool(" in src
+    assert "self._dvr_new_pool(" in inspect.getsource(dvr_player.DvrPlayerMixin.dvr_pool_for_server)
+    assert "memory=dvr_memory()" in inspect.getsource(dvr_player.DvrPlayerMixin._dvr_new_pool)
     assert "sweep_abandoned(memory)" in inspect.getsource(dvr_player.dvr_base)

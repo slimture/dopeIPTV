@@ -22,7 +22,8 @@ disagree, the code is what runs and the sentence is a bug: report it.
   settings files (`core/settings_files.py`), and out of the log
   (`core/log.py`: each value the app holds masked wherever it appears, one
   of three characters or fewer as a word of its own, so a short password
-  is masked without every "abc" in the log), error reports
+  is masked without every "abc" in the log; a line that could not be
+  masked is withheld, never written as it was), error reports
   (`core/report.py`) and any address that is logged.
 - **What a person watches.** History, resume points, watched marks and
   the viewing statistics stay on the computer (`core/viewing_stats.py`
@@ -705,7 +706,10 @@ is not made at all (`core/memory_safe.py`):
   rule (`_cast_private_on`); a send still on its way is looked at again
   as soon as it is done (`_cast_send`'s `_private_check`). A disk buffer a
   recording or a cast reads goes on: what it writes is written for them,
-  and a second connection is not opened beside it.
+  and a second connection is not opened beside it. As the last of them
+  lets go, the channel is opened again as when private viewing is turned
+  on - nothing more is written there for the private playback alone
+  (`dvr_pool.on_private_disk`, the player's `private_on_disk`).
 - **Within its room.** A private cast's work - a channel's segments, a
   film's, the archive's or the rewind buffer's pieces, the spool a pause
   is kept in - is measured once a second while it runs, and past its room

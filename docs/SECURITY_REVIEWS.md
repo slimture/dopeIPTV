@@ -248,3 +248,20 @@ in code. What stays below 9 is what the project chose to keep - each
 written down in docs/SECURITY.md with its reason. 1.6.9 is released from
 here; the next round comes before a release that changes what the app
 sends, keeps or serves.
+
+## November 2026 - the website's own copy, read by an up-to-date AI (after 1.6.9)
+
+The maintainer pasted what the Behind the scenes page's Copy everything
+button gives (its questions and code, from `v1.6.9`) into an up-to-date AI
+assistant. With only that, it saw neither the page's promises nor the
+limits each part names, nor parts 4 and 5, so much of what it raised the
+page already says (the jails' plain HTTP on one machine, the crit error
+logs, the honest limits). Checked against the code, what holds:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Logs | A line whose masking failed went out as it was | medium | After 1.6.9: withheld instead, a traceback too (`core/log.py`, `WITHHELD`) |
+| Private viewing | A channel recorded or cast while watched privately kept writing its buffer to the disk after the recording or cast ended, until it was left | medium | After 1.6.9: opened again as the last of them lets go, as when private viewing is turned on (`dvr_pool.on_private_disk`) |
+| The page | Its copy carried no promises or limits, parts 4 and 5 had no question, and several answers lacked their code | low | The website: each part's copy carries its promise, what we can know, its hosts and its limits with the rule for judging them; parts 4 and 5 have their questions; excerpts of `refuse_older` and `_get_https`, the settings file's question, the report sent on Send only, the relay's backlog left unread, private viewing turned on mid-play |
+| Feedback, Watch together | The page did not say that feedback carries `"supporter": "yes"`, nor that the relay cannot check signatures | low | The website: both said, in English and Swedish |
+| Updates, TMDB, the relay's clock, sync, the admin cookie, swap | Raised as unknown or open | answered | Already in the code: `selfupdate.refuse_older`, **Provider artwork, TMDB off**, the first answer's backlog left unread and the clock taken from it, the sync slot bound on its first write, the 600 a minute limit by address, the server's encrypted swap watched by `swap_state` |

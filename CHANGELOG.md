@@ -7,6 +7,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Security
+
+- A log line that could not be masked - a message whose arguments do not
+  fit it, a value whose text cannot be read, a fault in the masking
+  itself - is no longer written as it was: a line saying one was withheld
+  takes its place, and a traceback that could not be masked goes the same
+  way (`core/log.py`, `WITHHELD`).
+- A channel recorded or cast while it was watched privately kept its
+  rewind buffer on the disk after the recording or cast ended, until the
+  channel was left. The player now opens it again at that moment, its
+  buffer in memory out of a disk's reach or none, as it does when private
+  viewing is turned on (`core/dvr_pool.on_private_disk`).
+
 ## [1.6.9]
 
 ### Fixed

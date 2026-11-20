@@ -273,13 +273,22 @@ def _redact_arg(value: object) -> object:
     return value if clean == text else clean
 
 
+#: What is written in place of a log line, or its traceback, that could
+#: not be masked (_RedactFilter).
+WITHHELD = "log line withheld - it could not be masked"
+
+
 class _RedactFilter(logging.Filter):
     """The safety net: every record masked, whether or not the call site
     remembered to - the addresses in it (an ffmpeg or mpv line quoting a
     stream's address with its token or login, redact_text) and the
     registered values, in its message, its arguments and the traceback it
-    carries (exc_info). Failure here must lose nothing, so any error leaves
-    the record as it was."""
+    carries (exc_info). It fails closed: what could not be masked - a
+    message whose arguments do not fit it, a value whose str() raises, a
+    fault in the masking itself - is never written as it was, only a line
+    that says one was withheld (WITHHELD), with the logger and the level
+    still there; the record is kept, so a log still shows that something
+    happened."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
@@ -295,8 +304,8 @@ class _RedactFilter(logging.Filter):
                     text = str(msg)
                     msg = msg if _escaped(text) == text else text
                 record.msg = _escaped(msg) if isinstance(msg, str) else msg
-        except Exception:
-            pass
+        except Exception as e:
+            record.msg, record.args = f"{WITHHELD} ({type(e).__name__})", ()
         try:
             # Formatted here, once, masked: every handler's formatter uses
             # exc_text when it is there instead of formatting it again.
@@ -306,8 +315,12 @@ class _RedactFilter(logging.Filter):
                 record.exc_text = _escaped(redact_text(record.exc_text))
             if record.stack_info:
                 record.stack_info = _escaped(redact_text(record.stack_info))
-        except Exception:
-            pass
+        except Exception as e:
+            # Never the traceback as it was: a handler would format exc_info
+            # again, unmasked.
+            record.exc_info = None
+            record.exc_text = f"{WITHHELD} - its traceback ({type(e).__name__})"
+            record.stack_info = None
         return True
 
 
