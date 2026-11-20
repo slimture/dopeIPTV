@@ -698,9 +698,9 @@
         (files.length > 3 ? "; …" : "") + "). Tried again every run - delete by hand if it stays.");
     }
     if (swap && swap.why === "could not be asked") {
-      said.push("Whether swap is encrypted could not be asked of the system: check swapctl -l on the host (DEPLOY.md, encrypted swap).");
+      said.push("Whether swap is encrypted could not be asked of the system: check swapctl -l on the host (the server's runbook, encrypted swap).");
     } else if (swap) {
-      said.push("Swap is not encrypted (" + swap.path + "): what is kept in memory could reach the disk. See DEPLOY.md, encrypted swap.");
+      said.push("Swap is not encrypted (" + swap.path + "): what is kept in memory could reach the disk. See the server's runbook, encrypted swap.");
     }
     T.filter((t) => t.what === "check").forEach((t) => said.push("The statistics' own check failed (" + t.why + ")."));
     warn.textContent = said.join(" ");

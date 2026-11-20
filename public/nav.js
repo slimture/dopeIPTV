@@ -169,7 +169,7 @@ var iptvHit = (function () {
  * menu is expected to have, so losing it costs politeness, not navigation.
  *
  * An EXTERNAL file, like help.js: the site's CSP is `script-src 'self'` with
- * no 'unsafe-inline' (deploy/csp.snippet.txt), and an inline block would be
+ * no 'unsafe-inline' (the site's CSP), and an inline block would be
  * blocked without a word.
  */
 (function () {

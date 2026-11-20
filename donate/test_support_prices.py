@@ -188,17 +188,6 @@ def test_every_page_has_the_one_footer():
         assert "foot-nocontent" not in en
 
 
-def test_nginx_serves_every_legal_page():
-    # A page sync-releases.sh renders but nginx does not route is a 404 on
-    # the live site - which /payments/ was, its first hour.
-    pages = set(json.load(open(os.path.join(SITE, "legal.json"), encoding="utf-8"))["pages"])
-    conf = open(os.path.join(ROOT, "deploy", "content-iptv.dope.rs.conf"), encoding="utf-8").read()
-    routes = re.findall(r"location ~ \^/\(\?<iptv_legal(?:_bare)?>([a-z|]+)\)", conf)
-    assert len(routes) == 2
-    for r in routes:
-        assert set(r.split("|")) == pages
-
-
 def test_the_menu_has_a_computers_row_and_a_phones():
     # The narrow-window menu (render.jq, nav): rows with icons; Download for
     # a computer, "Send the link to your computer" for a phone (nav.js

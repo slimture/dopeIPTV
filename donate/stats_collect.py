@@ -3,7 +3,7 @@
 
 nginx hands each line - a page view, the page's /hit, a click on a
 download - to the donate service over a socket of its own (stats_inbox.py,
-deploy/content-iptv.dope.rs.conf), and the service's own thread counts them
+the content server's nginx file), and the service's own thread counts them
 every minute (donate.py), as does the admin page when it is opened. The
 lines wait in its memory alone until then: no log with a visitor's address
 is written, so none turns over, lingers or ends up in a backup. Counts per
@@ -96,7 +96,7 @@ file system kept in memory, tmpfs, so a restart of the service keeps them;
 a restart of the computer does not), a new one each month, forgotten two
 months on. What the system swaps out of memory reaches a disk only as the
 swap keeps it: the server's swap is encrypted with a key of its own that a
-restart forgets (DEPLOY.md), and swap_state asks the system - swap that
+restart forgets (the server's runbook), and swap_state asks the system - swap that
 keeps what it is given is said on the admin page and in the log. So a visitor is the same visitor
 within a month, and is told returning from the month before at the most.
 How many different visitors came over several days is kept in each day's
@@ -119,7 +119,7 @@ counts twice that month. Robots that say so, scripts and empty browser
 names are left out everywhere.
 
 Your own visits are left out three ways: a browser that has opened the
-admin page carries a cookie nginx does not log (deploy/content-...conf); an
+admin page carries a cookie nginx does not log (the content server's nginx file); an
 address that is not a public one (your own network, 192.168.x and the like)
 never counts; and STATS_IGNORE lists more - addresses, networks or host
 names (a dynamic-DNS name is looked up on every run), e.g.
@@ -129,11 +129,11 @@ Where the lines come from:
 
   STATS_SOCKET  unix:/var/run/iptv_donate/stats.sock: nginx's syslog
                 output, the iptv_stats and iptv_dl formats in
-                deploy/content-iptv.dope.rs.conf, a datagram a line
+                the content server's nginx file, a datagram a line
   STATS_DIR     <site>/stats, beside public/ - outside the web root
   GEO_DB        STATS_DIR/dbip-country-lite.mmdb
   STATS_LOG, DL_LOG  the log files of before; until they are deleted
-                (DEPLOY.md) what is left of them is read once, from where
+                (the server's runbook) what is left of them is read once, from where
                 the last run stopped
 
 Anyone can send the page's signal, as often as the web server lets them,
@@ -231,7 +231,7 @@ K_DAY = 5
 # to have come from, as often as the web server lets them. None of it may
 # grow what is kept without end or take the run's time:
 #: A browser's name as read: the longest real ones are half of this. The
-#: web server cuts it at the same place (deploy/content-...conf), so a line
+#: web server cuts it at the same place (the content server's nginx file), so a line
 #: fits one datagram.
 UA_MAX = 512
 #: A site's name is at most 253 characters.
@@ -1581,7 +1581,7 @@ def _visit_totals(stats: dict, visits: Visits, newest: dict) -> None:
 def _lines(path: str, state: dict, key: str) -> list:
     """What is left of a log file of before (STATS_LOG, DL_LOG): nginx hands
     the lines to this service now, but until the old files are deleted
-    (DEPLOY.md) their last lines are counted too - once, from where the
+    (the server's runbook) their last lines are counted too - once, from where the
     last run stopped."""
     return _read_new(path, state.setdefault("logs", {}).setdefault(key, {}))
 
@@ -2127,7 +2127,7 @@ def swap_state(now: float | None = None) -> dict:
     "none": no swap. "encrypted": every swap device keeps nothing readable
     once the computer restarts (FreeBSD's .eli with a one-time key, Linux's
     dm-crypt or zram). "plain": a swap device that keeps what it is given -
-    said on the admin page and in the log (DEPLOY.md: encrypted swap).
+    said on the admin page and in the log (the server's runbook: encrypted swap).
     "unknown": the system could not be asked."""
     now = time.time() if now is None else now
     if _SWAP and now - _SWAP.get("at", 0) < SWAP_TTL:
@@ -2198,7 +2198,7 @@ if __name__ == "__main__":
     os.umask(0o077)             # whatever a run makes is the service's alone to read
     if "--once" not in sys.argv[1:]:
         # The lines come to donate.py's memory now and its own thread counts
-        # them; a run here would know none of them (DEPLOY.md: no cron line).
+        # them; a run here would know none of them (the server's runbook: no cron line).
         print("[stats] counted by the donate service itself now - nothing to do here "
               "(--once runs one count in this process, for a test)", flush=True)
         raise SystemExit(0)

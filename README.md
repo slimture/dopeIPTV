@@ -1,7 +1,7 @@
 # dopeiptv.org — the dopeIPTV website
 
 The site's address since November 2026; the old one, iptv.dope.rs, sends
-every request on to the same path here (DEPLOY.md, "Moving to dopeiptv.org").
+every request on to the same path here.
 
 A single-page, responsive landing site (dark "broadcast console" theme) with a
 download list that auto-mirrors the latest GitHub release. Static files only:
@@ -41,8 +41,6 @@ website/
 │   ├── spots.json          where each feature picture shows its feature, per language (the same tool)
 │   └── render.jq           the renderer
 ├── sync-releases.sh        cron: latest release → files/ + releases.json + i18n/
-├── DEPLOY.md               moving the live site from the PHP version, step by step
-└── deploy/                 nginx + CSP config templates (two roles)
 ```
 
 ## One look everywhere
@@ -80,14 +78,12 @@ bug.
 - **Before it goes out**: look at it on a phone and a computer, in light and
   dark, and in one right-to-left language.
 
+
 ## Architecture
 
-Two nginx roles (adapt to your own setup):
-
-- a **TLS-front proxy** that terminates HTTPS for `dopeiptv.org` and reverse-
-  proxies to
-- a **content server** that serves the static site on an internal port
-  (`:8081` in the template) and runs the release-sync cron.
+nginx serves the files; how the servers are set up, and how the site goes
+out onto them, is not in this repository - it is kept privately with the
+maintainers. Ask if you need to know.
 
 What the PHP version worked out on every request is split in two:
 
@@ -99,11 +95,10 @@ What the PHP version worked out on every request is split in two:
   half as in the app's `dopeiptv/core/update_keys.py` - a new key goes in
   both), and only files on that list with its checksum; otherwise the
   release already here stays.
-- **Per request**, in `deploy/content-iptv.dope.rs.conf`: nginx picks the
-  language - `?lang=` (remembered in a cookie for a year), else the cookie,
-  else the first language in the browser's `Accept-Language` that the site
-  has, else English - and answers `/dl.php` (on to the file) and
-  `/trakt/callback/` (on to the app) itself.
+- **Per request**, nginx picks the language - `?lang=` (remembered in a
+  cookie for a year), else the cookie, else the first language in the
+  browser's `Accept-Language` that the site has, else English - and answers
+  `/dl.php` (on to the file) and `/trakt/callback/` (on to the app) itself.
 
 Nothing for this site talks to php-fpm. A tip is given in the tip dialog on
 the page (`public/nav.js`: Stripe's card form in Stripe's frames, Apple Pay,
@@ -115,7 +110,7 @@ is set the site invites to nothing. The one thing that is not static is a
 small service, `donate/donate.py` (standard-library Python on a Unix socket):
 the dialog's `/donate/` makes the PaymentIntent, and back from paying,
 `/donate/key` and `/support/key` ask Stripe whether the payment went through
-and give the supporter key for it. Setting it up: `DEPLOY.md`, "Support".
+and give the supporter key for it.
 
 The same service serves the admin page, `/admin/` for its admins only
 (`donate/admin.py`, `donate/admin/`; signing in with a passkey, or a password
@@ -130,172 +125,18 @@ charts and what visitors do on the pages (`public/events.js`,
 `donate/stats_events.py`). A
 page view counts when the page has opened in a real browser and told
 `/hit` so (`public/nav.js`, no cookie, no id); `donate/stats_collect.py`
-reads nginx's log of it - no address kept, robots left out, and the ones
+counts nginx's line for it in memory - no address kept, robots left out, and the ones
 that do run pages (a browser without a screen, or one years out of date,
 unless a pointer, touch or key said a person was there) kept and marked
 but not counted. Signed in once,
 a browser stays signed in (a cookie signed by the service), and a new
 tip comes as a notification on the devices that turned them on (the
-browser's own Web Push) and as a note on the site's own pages there. Setting it up: `DEPLOY.md`, "Statistics
-and the admin page" and "Signed in for good, and told of support".
+browser's own Web Push) and as a note on the site's own pages there.
 
-Config templates live in `deploy/` with role-based names —
-`proxy-iptv.dope.rs.conf` and `content-iptv.dope.rs.conf`. Replace the
-`CONTENT_HOST` placeholder and the web-root paths with your own; nothing in the
-repo hardcodes a real host or address.
+## Before a change goes out
 
-## Deploy
-
-Moving the live site from the PHP version: follow [DEPLOY.md](DEPLOY.md). A
-new install:
-
-1. **DNS** — point `dopeiptv.org` at the same public IP as your other sites.
-
-2. **Content server** — `pkg install jq`. Copy `public/` to your web root
-   (e.g. `/usr/local/www/iptv/public`), and `site/` and `sync-releases.sh` one
-   level above it (so they are *not* web-served). Give the tree to a user of
-   its own - not `www`, which php-fpm runs as for other sites - and install
-   `deploy/content-iptv.dope.rs.conf` into your nginx `conf.d/`:
-
-   ```sh
-   pw useradd iptv -c "dopeiptv.org sync" -d /nonexistent -s /usr/sbin/nologin
-   chown -R iptv:iptv /usr/local/www/iptv
-   ```
-
-   The content server's port answers only the TLS-front proxy: the file
-   includes `/usr/local/etc/nginx/iptv-only-from-proxy.conf`, which holds
-   the proxy's address and is never in git - `allow <the proxy's
-   address>;` and `deny all;` on two lines. nginx does not start without
-   it (DEPLOY.md, "Every log, and port 8081 closed").
-
-3. **TLS-front proxy** — install `deploy/proxy-iptv.dope.rs.conf`, set
-   `CONTENT_HOST` to the content server's internal address:port, add the CSP
-   row from `deploy/csp.snippet.txt` to your `map $server_name $csp_policy`
-   block, issue a cert and reload:
-
-   ```sh
-   certbot certonly --webroot -w /usr/local/www/letsencrypt -d dopeiptv.org
-   ```
-
-4. **Cron the release sync** on the content server (every 15 min, in
-   `/etc/crontab`):
-
-   ```
-   0,15,30,45 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh >> /var/log/iptv-sync.log 2>&1
-   ```
-
-   Run it once by hand before nginx serves the site - there are no pages
-   until it has run - and **as the user the cron line names**, or the files
-   land owned by root and the next scheduled run cannot write over them:
-
-   ```sh
-   cd /usr/local/www/iptv && su -m iptv -c 'sh sync-releases.sh'
-   ```
-
-   It only downloads assets that are missing or changed, checks each against
-   GitHub's SHA-256, does atomic swaps, prunes files no longer in the latest
-   release, and leaves every page exactly as it was (exit status 1) when
-   GitHub is unreachable or a download fails halfway - a half-built release
-   is never published with an installer silently missing.
-
-5. **Rotate the logs** with newsyslog, keeping the download and statistics
-   logs' `.0` uncompressed so the sync and the statistics can finish
-   reading them - the whole file, and what each log holds, how long and in
-   which mode, is in DEPLOY.md, "Every log on the server".
-
-## Where this actually runs
-
-Written down because it has cost time twice, and neither time was the
-setup's fault - it was not knowing the setup.
-
-**The site lives inside a Bastille thin jail of its own called `dopeiptv`,
-not on the host** (since 19 November 2026; before, in `pontusweb` beside
-other sites). It holds nginx, the service and the cron jobs, nothing else;
-the host's firewall lets in only the TLS-front proxy, on 8081, and out only
-DNS and https. Every path below is the jail's own view of the filesystem:
-
-| | |
-|---|---|
-| host | `slimfree` |
-| jail | `dopeiptv` |
-| jail root, from the host | `/usr/local/bastille/jails/dopeiptv/root` |
-| site, inside the jail | `/usr/local/www/iptv/` |
-| checkout, inside the jail | `/root/dopeiptv` - lower case; the host's is `~/dopeIPTV` |
-| nginx.conf, inside the jail | `/usr/local/etc/nginx/nginx.conf` - the jail's own, `deploy/nginx-dopeiptv-jail.conf` |
-
-So `/usr/local/www/iptv/` typed on the HOST is not the live site.
-Everything is run from the host with `jexec dopeiptv ...`, `service -j
-dopeiptv ...`, `sysrc -j dopeiptv ...` and `pkg -j dopeiptv ...` (the jail
-has no ssh); DEPLOY.md, "The dopeiptv jail".
-
-**The sync's cron line is in `/etc/crontab`, with a user field**, not in
-anybody's personal crontab:
-
-```
-0,15,30,45 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh >> /var/log/iptv-sync.log 2>&1
-```
-
-`crontab -l` therefore prints nothing for root AND nothing for iptv, which
-looks exactly like "there is no cron job" and is not. The sync runs as
-`iptv`, and nothing in `crontab -l` says so.
-
-## Updating the site
-
-Copy the code, never the live data, and render at once - from the host:
-
-```sh
-jexec dopeiptv sh -c 'cd /root/dopeiptv && git pull origin website && cp -R public/. /usr/local/www/iptv/public/ && cp -R site donate sync-releases.sh /usr/local/www/iptv/'
-service -j dopeiptv iptv_donate restart
-jexec -U iptv dopeiptv /bin/sh /usr/local/www/iptv/sync-releases.sh
-```
-
-The checkout is on `website` - the site is NOT on main or testing. The
-restart is needed only when `donate/` changed, and harmless otherwise.
-
-The last line puts a change on the pages now rather than at the next
-quarter-hour; its last words say how many pages changed
-(`pages: 12 of 244 updated`). Run by hand it waits for a sync already
-running (the cron's) and then renders with the files just copied; when
-GitHub does not answer it still renders, from the release already here. A
-new `style.css` or JS file reaches the pages only with them: the pages out
-keep linking the copy they were made with (below) until their replacements
-go out, in the same moment, so the order of the copies above does not matter.
-
-`public/.` with the trailing dot copies the CONTENTS. `cp -R public/ dest/`
-on FreeBSD puts the directory inside the target instead, giving you
-`public/public/`.
-
-(`chown iptv:iptv` typed on the host resolves `iptv` out of the HOST's
-passwd, which does not have it: `jexec dopeiptv chown ...`, inside the
-jail, cannot be wrong.)
-
-These are live data that the repo does not carry, and a deploy must leave
-them alone:
-
-| | where | why |
-|---|---|---|
-| `downloads.json` | one level **above** the web root | the download counts, kept by the sync from nginx's `/dl.php` log |
-| `.downloads-log.state` | next to it | how far the sync has read that log |
-| `public/releases.json` | written by the sync | git-ignored; a stale stub once replaced it and the page showed v0.7.0 |
-| `public/i18n/` | written by the sync | the pages themselves |
-| `public/files/` | the mirrored installers | the repo has only a `.gitignore` |
-
-**Do not use `cp -p`.** It preserves ownership and mode *from the checkout*,
-where everything belongs to root - which once silently took `public/files/`
-away from the user the cron sync runs as, and every asset then failed to
-mirror with "Permission denied". Plain `cp -R` overwrites file contents and
-leaves existing directories' ownership alone. If it has already happened:
-
-```sh
-jexec dopeiptv chown -R iptv:iptv /usr/local/www/iptv
-```
-
-`--delete` (rsync) is likewise never right here: the live data is absent from
-the source tree, so it would delete all of it.
-
-**Before a change to the pages or `style.css` goes out**, `python3 -m pytest
-donate` checks the stylesheet against the pages (`donate/test_site_layout.py`):
-every `#id` a rule names must be one a page or script makes - a renamed
+`python3 -m pytest donate` checks, among the rest, the stylesheet against
+the pages (`donate/test_site_layout.py`): every `#id` a rule names must be one a page or script makes - a renamed
 section once left three rules styling nothing - and "Built on" (`#built`)
 may be pulled up only right under the support band (`#support + #built`).
 The band is there only once a way to pay is set up; without it the pull put
@@ -346,13 +187,11 @@ content (`foot_nocontent`).
   whenever the content changes.
 - What the privacy policy says is what the code does: the statistics
   (`donate/stats_collect.py`), the reports (`donate/feedback.py`), sync,
-  the logs in `deploy/`, and in the app `core/report.py`, `core/updates.py`
+  the server's logs, and in the app `core/report.py`, `core/updates.py`
   and the services it calls. Change one, change the other.
 - Yellow `<mark class="todo">` boxes are details still to be filled in
   (the address, the payment provider, where the server is, log retention,
   the VAT number) - none should be left when the pages go live.
-- They need the content server's two `legal` locations
-  (`deploy/content-iptv.dope.rs.conf`): copy it and reload nginx once.
 - The support page's ways to pay come from `site/render.jq` (where the
   text says `<!--SUPPORT-OPTIONS-->`), with the links from the server.
 
@@ -393,13 +232,6 @@ copy from every page, so a changed file always gets a new address - and an
 address always the same bytes (a `?v=` on the live file could be cached with
 the next deploy's content). Copies no page has linked for two weeks are
 pruned. Anything linked without a hash would be stuck for a year.
-
-Server-side lines that belong with this, all in the templates in `deploy/`:
-
-- content server: `error_page 404 /404.html;` and the two cache rules;
-- TLS front: `http2 on;`, and the port-80 block that sends `http://` to
-  `https://` (skip that one if `nginx.conf` already redirects all port-80
-  traffic).
 
 ## Local preview
 

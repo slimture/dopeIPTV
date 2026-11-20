@@ -61,7 +61,7 @@ Standard library only (Python 3.9+). It listens on a Unix socket - no
 network, so nothing outside the machine can reach it and a jail's loopback
 does not matter; on the machine only nginx's workers (its group) and this
 service may connect - and nginx passes /donate/ to it
-(deploy/content-iptv.dope.rs.conf), with a rate limit in front.
+(the content server's nginx file), with a rate limit in front.
 
     python3 donate.py --check     asks the running service how it is set up
 
@@ -1209,7 +1209,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _session_headers(self, session: str | None) -> None:
         # This browser is the site's owner: nginx leaves it out of the
-        # statistics (deploy/content-iptv.dope.rs.conf, $iptv_count). 400
+        # statistics (the content server's nginx file, $iptv_count). 400
         # days is the longest a browser keeps a cookie; each visit renews it.
         self.send_header("Set-Cookie", "iptv_nostats=1; Max-Age=34560000; Path=/; "
                                        "Secure; HttpOnly; SameSite=Lax")
@@ -1441,7 +1441,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(409, {"error": "There is no admin in the new sign-in yet, so no name or "
                                                  "password works here. A browser still signed in makes "
                                                  "the first invite on the Account tab; on the server, "
-                                                 "admin_users.py invite <name> does (DEPLOY.md)."})
+                                                 "admin_users.py invite <name> does (the server's runbook)."})
             if action == "options":
                 return self._send(200, auth.login_options(addr))
             if action == "passkey":
@@ -2188,7 +2188,7 @@ def start_statistics() -> str:
         signal.signal(signal.SIGTERM, stop)
     swap = stats_collect.swap_state()
     swap_said = {"none": "no swap", "encrypted": "swap encrypted",
-                 "plain": "SWAP NOT ENCRYPTED (" + ", ".join(swap["plain"]) + ") - see DEPLOY.md",
+                 "plain": "SWAP NOT ENCRYPTED (" + ", ".join(swap["plain"]) + ") - see the server's runbook",
                  "unknown": "swap could not be asked"}[swap["state"]]
     asked = CONF.get("STATS_VISITS_DAYS", "14")
     cut = f" (STATS_VISITS_DAYS {asked} cut to {stats_collect.VISITS_DAYS_MAX})" \

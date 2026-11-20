@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import grp
 import os
-import re
 import socket
 import stat
 import subprocess
@@ -244,20 +243,14 @@ def test_without_the_group_the_service_does_not_start_and_says_why():
     assert not os.path.exists(path)
 
 
-def test_the_rc_file_makes_the_folder_the_services_and_nginxs_alone():
-    rc = open(os.path.join(ROOT, "deploy", "iptv_donate"), encoding="utf-8").read()
-    assert re.search(r"^: \$\{iptv_donate_socket_group:=www\}$", rc, re.M)
-    body = re.search(r"iptv_donate_precmd\(\)\n\{\n(.*?)\n\}", rc, re.S).group(1).strip()
-    assert body == 'install -d -o "${iptv_donate_user}" -g "${iptv_donate_socket_group}" -m 750 "${piddir}"'
-    # The socket is in that folder, by default and in nginx's file.
+def test_the_socket_is_the_services_and_nginxs_alone():
+    # The rc file that makes its folder, and nginx's file that names it, are
+    # the server's: its own repository checks them against these defaults.
     d = _donate()
     assert d.CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock") == "127.0.0.1:0"
     src = open(os.path.join(HERE, "donate.py"), encoding="utf-8").read()
     assert 'CONF.get("LISTEN", "unix:/var/run/iptv_donate/donate.sock")' in src
     assert 'CONF.get("SOCKET_GROUP", "www")' in src
-    nginx = open(os.path.join(ROOT, "deploy", "content-iptv.dope.rs.conf"), encoding="utf-8").read()
-    socks = set(re.findall(r"proxy_pass http://unix:([^:;\s]+)", nginx))
-    assert socks == {"/var/run/iptv_donate/donate.sock"}
     # main makes the socket 0660 from the start and leaves its mode to
     # open_to_nginx: never a chmod of its own.
     import ast

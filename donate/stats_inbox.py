@@ -2,7 +2,7 @@
 
 nginx hands each line of the statistics (a page view, the page's /hit, a
 click on a download) to this service over a socket of its own instead of
-writing a log (deploy/content-iptv.dope.rs.conf: access_log
+writing a log (the content server's nginx file: access_log
 syslog:server=unix:...). They wait here, in memory, until the next run of
 stats_collect.py takes them - a minute at most - and are gone with it: the
 visitor's address is never written anywhere, not for an hour, not in a log

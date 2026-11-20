@@ -320,7 +320,7 @@ def excerpt(root: str, ref: str, block: dict) -> list[dict]:
         spans = _merge(spans, lines)
     else:
         found = [i for i, ln in enumerate(lines, 1) if re.search(block["from"], ln)]
-        # The newest round's, where a file says the same in every round (DEPLOY.md).
+        # The newest round's, where a file says the same in every round (a runbook).
         start = (found[-1] if block.get("last") else found[0]) if found else None
         if start is None:
             raise SystemExit(f"{path}: nothing matches {block['from']!r}")

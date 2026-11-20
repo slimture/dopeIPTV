@@ -5,10 +5,10 @@
 # The site is static: there is no PHP anywhere in it. What index.php,
 # help/index.php, 404.php and sitemap.php did on every request is done here,
 # once per run, for every language (site/render.jq); nginx picks the
-# language per request (deploy/content-iptv.dope.rs.conf). What dl.php
+# language per request (the content server's nginx file). What dl.php
 # counted per request is read back from nginx's log of /dl.php here.
 #
-# From /etc/crontab, as the site's own user, every 15 minutes (DEPLOY.md):
+# From /etc/crontab, as the site's own user, every 15 minutes (the server's runbook):
 #   0,15,30,45 * * * * iptv /bin/sh /usr/local/www/iptv/sync-releases.sh >> /var/log/iptv-sync.log 2>&1
 # and, in between, only the newest test build (nightly.json), so the app's
 # Test builds channel has a new one within five minutes:
@@ -39,7 +39,7 @@ DL_LOG=${IPTV_DOWNLOAD_LOG:-/var/log/nginx/iptv.dope.rs-dl-counts.log}
 LOG_STATE=$BASE/.downloads-log.state
 REPO=slimture/dopeIPTV
 UA=dopeiptv-site-sync
-# The donation service's Python (deploy/iptv_donate), for the release check.
+# The donation service's Python (its rc script), for the release check.
 PY=${IPTV_PYTHON:-/usr/local/bin/python3}
 [ -x "$PY" ] || PY=python3
 TAB=$(printf '\t')
@@ -119,7 +119,7 @@ count_downloads() {
     : > "$TMP/log.new"
     if [ -n "$old_ino" ] && [ "$ino" != "$old_ino" ]; then
         # Rotated since the last run: first what was left of the old file,
-        # which newsyslog keeps uncompressed as .0 (the P flag, DEPLOY.md).
+        # which newsyslog keeps uncompressed as .0 (the P flag, the server's runbook).
         if [ -f "$DL_LOG.0" ] && [ "$(inode "$DL_LOG.0")" = "$old_ino" ]; then
             tail -c +$((old_off + 1)) "$DL_LOG.0" >> "$TMP/log.new"
         fi
@@ -220,7 +220,7 @@ fetch_signed() {
 # nightly.json, the same shape as releases.json, for the app's "Test builds"
 # channel: it asks the site and fetches through /dl.php like a release,
 # so its updates are counted too. Nothing is mirrored - nginx's /dl.php
-# sends a test build's file on to GitHub (deploy/content-iptv.dope.rs.conf)
+# sends a test build's file on to GitHub (the content server's nginx file)
 # - and no page links it. A failure here leaves the last one in place.
 # The newest is the highest version: GitHub's created_at is the date of the
 # commit a release was made from, the same for two builds of one commit.
@@ -562,7 +562,7 @@ done) | jq -R . | jq -cs .)
 # The support page's ways - the tip dialog (SUPPORT_TIPS=on) or a tip's
 # Payment Link, monthly support's Payment Link and GitHub Sponsors (all on
 # dopeIPTV's own Stripe account) - with the amounts the page names: the
-# server's, never git's, in /usr/local/etc/iptv-site.conf (DEPLOY.md,
+# server's, never git's, in /usr/local/etc/iptv-site.conf (the server's runbook,
 # "Support"). Lines KEY=value, read here, never run. Until one of them is
 # set the site invites to nothing (site/render.jq).
 SITE_CONF=${IPTV_SITE_CONF:-/usr/local/etc/iptv-site.conf}

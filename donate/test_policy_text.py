@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The privacy policy and the transparency page say what the code does
 (site/legal/*/privacy.html, site/transparency/*.html against
-stats_collect.py and DEPLOY.md's newest round): no sentence of how things
+stats_collect.py; the server's logs, against its own repository's
+newsyslog file, are checked there): no sentence of how things
 were before, and the numbers the code keeps.
 
 Plain Python: ``python3 donate/test_policy_text.py`` runs them all (pytest
@@ -68,16 +69,6 @@ def test_the_numbers_are_the_codes():
         policy = _pages(lang)["legal/" + lang + "/privacy.html"]
         for w in words:
             assert w in policy, (lang, w)
-    # A week at the most: DEPLOY.md's newest newsyslog file keeps six days
-    # of the content server's error log, the proxy's the same.
-    with open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8") as fh:
-        deploy = fh.read()
-    whole = re.findall(r"<<'LOGS'\n(.*?)\nLOGS\n", deploy, re.S)[-1]
-    proxy = re.findall(r"<<'PROXYLOGS'\n(.*?)\nPROXYLOGS\n", deploy, re.S)[-1]
-    for block in (whole, proxy):
-        (line,) = [x for x in block.splitlines() if x.startswith("/var/log/nginx/error.log ")]
-        assert line.split()[2:6] == ["600", "6", "*", "@T00"], line
-        assert line.split()[-2:] == ["/var/run/nginx.pid", "30"], "nginx reopens it"
 
 
 def test_the_key_is_said_to_be_in_memory_and_swap_encrypted():

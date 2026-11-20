@@ -138,15 +138,11 @@ def test_the_page_shows_no_servers_configuration():
 
 
 def test_every_log_on_the_server_is_named_on_the_page_and_in_the_policy():
-    # Each log the site's newsyslog file turns over (DEPLOY.md), and nginx's
-    # error log, in part 7 and the privacy policy of both languages - with
-    # what it holds and how long, beside it.
-    with open(os.path.join(ROOT, "DEPLOY.md"), encoding="utf-8") as fh:
-        deploy = fh.read()
-    # The newest round's file, whole: what the server writes now.
-    whole = re.findall(r"<<'LOGS'\n(.*?)\nLOGS\n", deploy, re.S)[-1]
-    names = {os.path.basename(line.split()[0]) for line in whole.splitlines()} | {"error.log"}
-    assert names == {"iptv.dope.rs-dl-counts.log", "iptv-sync.log", "iptv-donate.log", "error.log"}
+    # Each log on the server, in part 11 and the privacy policy of both
+    # languages - with what it holds and how long, beside it. That these are
+    # all the server writes, its own repository's tests check against its
+    # newsyslog file.
+    names = {"iptv.dope.rs-dl-counts.log", "iptv-sync.log", "iptv-donate.log", "error.log"}
     words = _words()
     for lang in ("en", "sv"):
         page = words[lang]

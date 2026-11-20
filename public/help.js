@@ -2,7 +2,7 @@
  * topics beside them marking where you are.
  *
  * An EXTERNAL file, not an inline <script>. The site's CSP is
- * `script-src 'self'` with no 'unsafe-inline' (deploy/csp.snippet.txt), so an
+ * `script-src 'self'` with no 'unsafe-inline' (the site's CSP), so an
  * inline block is silently blocked - which is exactly why the first version
  * of this search did nothing at all on the live site.
  *
