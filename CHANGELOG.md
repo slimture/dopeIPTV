@@ -29,6 +29,56 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Security
 
+- core/dest_guard.py: the app's own requests - guides, pictures, the
+  providers' and services' APIs, the rewind buffer, a cast's address - are
+  checked where they land. A name that is not this computer's never reaches
+  this computer, and one that is neither link-local nor a home name never
+  a link-local host (a router's address, a cloud's metadata service):
+  checked on the socket after it connects, before a byte is sent, so a DNS
+  answer that changes (rebinding) is caught. A redirect goes on only over
+  http(s), never from the internet into the home network, this computer or
+  a link-local host - by its target as written and as it resolves - for
+  requests' own redirects and the cast's by hand.
+- core/ytdlp.py, core/ytdlp_pin.py, tools/ytdlp_pin.py: the yt-dlp the app
+  may download is the release the build names. release.yml checks that
+  release's `SHA2-256SUMS` with gpgv against yt-dlp's own signing key and
+  writes its files' SHA-256s into the app; the app installs only those
+  bytes and runs only a copy it marked itself. A checksum list downloaded
+  beside the file is no longer trusted. A new yt-dlp comes with the app's
+  next release or test build.
+- tools/build_manifest.py, release.yml: the build jobs sign their file
+  list with the build key alone (`DOPEIPTV_BUILD_KEY`, `BUILD_KEYS`) -
+  never the update key, which now only the checksum step has. Without a
+  build key a build calls itself modified and a tag's build stops.
+- ui/mw_profiles.py: a kids profile is a boundary. Every playback goes
+  through one check, whoever asks (a list, the phone, the remote API, Home
+  Assistant, a link): never a file on this computer, a recording or an
+  address opened by hand, never a row without a category or of one the
+  source does not list. The phone remote lists no local files or
+  recordings for it. A kids profile is made only once a grown-up's PIN
+  exists, and is left for a grown-up's profile only with one; one made
+  before, in a household with no grown-up's PIN, is never locked in.
+- services/home_server.py: server mode's page and `api/` take a token of
+  their own (`nerd_server_admin_token`, never in a backup); the playlist's
+  token, which every TV and player holds, opens the playlist, the guide and
+  the streams and nothing else.
+- Private viewing: the remote API's status and the events no longer carry
+  the profile, the cast's device or a private playback's position and
+  length; a private stream's address in the log is `<private>`.
+- core/picture_files.py: a link inside a trusted picture folder is followed
+  only while it stays inside (or leads to the person's own file); a file is
+  looked at before it is opened, so a pipe or a device is never read, and
+  opened without following a link swapped in since.
+- Settings > General > Backup: a password has at least 10 characters, and a
+  backup without one - it holds every login - is made only after a warning,
+  Cancel the default.
+- core/together.py: Watch together takes only signed members and only
+  10-character codes. 1.6.7's codes of 8 and 1.6.8's unsigned members are
+  refused; an old code is said to be one. Everyone in a room needs this
+  version or later.
+- core/report.py: an address that only begins as the version does
+  (1.6.8.10) is scrubbed from a report; only exactly this build's own
+  four-part version is kept.
 - core/backup.py: a full backup may get a password (Settings > General >
   Backup, a field and its repeat). With one the file is encrypted -
   ChaCha20-Poly1305 under a key PBKDF2-HMAC-SHA256 makes of the password

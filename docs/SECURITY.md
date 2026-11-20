@@ -70,6 +70,7 @@ change a playlist file on its web server.
 | A channel address that is no stream: `av://lavfi` (a filter graph can write a file of the sender's choice), `edl://`, `memory://`, `gopher://` to a port of this computer, `fd`, a line that starts with `-` | `core/stream_address.py`: an address from the network plays only over a network media protocol (`NETWORK`), never one of `NEVER`, the `lavfi` device, an option or a control character; checked where a client hands its addresses out (`providers/client.py`, `providers/stalker.py`) and once more in the docked player and each multiview cell (`media/embedded.py`, `ui/multiview_cell.py`) |
 | From a source on the internet: an `smb://` address (on Windows a sign-in there with the person's account), raw `tcp://` or `tls://` to any service, ftp, WebDAV, a gateway - or an address on this computer or a link-local one (the printer's page, a local engine, a cloud's metadata service) | `core/stream_address.py`: a source whose own address is on the internet (`on_internet`, its backup addresses too) hands out only the media protocols (`MEDIA`), never a host on this computer or link-local in any spelling (`host_refusal`: 127.1, 2130706433, `::ffff:127.0.0.1`, localhost, this computer's name, 0.0.0.0, 169.254/16, fe80::/10); a private address of the home network stays. A home network's source and a playlist file as before; what the person's rewrite rules or udpxy make is theirs |
 | From a source on the internet: a logo or poster on this computer or a link-local host, so the app itself sends requests there | `providers/client._pictures_kept`: such a picture is taken out of that source's lists and pages by the same rule (`stream_address.picture_refusal`) |
+| A public name whose DNS answer is this computer or a link-local host (DNS rebinding), or a redirect from the internet to this computer, a link-local host or the home network - for the app's own requests (guides, pictures, the APIs, the rewind buffer, a cast's address) | `core/dest_guard.py`: every request through `core/_lazy_requests.py` and `core/net_adapter.py` is checked on its socket after it connects and before a byte is sent (`check_peer`: this computer only for a name that says so, link-local only for a link-local or home name, a cloud's metadata service only by its address); every redirect requests follows, and each one the cast follows by hand, judged by its target as written and as it resolves (`redirect_refusal`: http(s) only, never from the internet inward, the same host again allowed) |
 | A line read as an option of an external mpv or VLC, or of the recorder (`--log-file=`, `--include=`) | The address after `--`, and nothing but a stream's address or a file's path handed over (`media/players.py`, `core/recording.py`) |
 | ffmpeg reading `concat:`, `subfile:`, `unix:` or a local file behind an address | `core/player_exec.ffmpeg_protocols`: `-protocol_whitelist` with a stream's protocols wherever ffmpeg or ffprobe is started for a stream |
 | A picture that names a file: `/dev/zero`, or `\\host\share\x.png` (on Windows a login at that host) | `core/picture_files.py`: a file is read as a picture only inside the app's own picture folders, only a plain file, at most 64 MB |
@@ -85,7 +86,7 @@ change a playlist file on its web server.
 - The ceilings are far above any real answer, so a hostile source can still
   make the app read and work up to them.
 - A list chooses where its pictures come from: [below](#a-list-chooses-where-its-pictures-come-from).
-- A host is read as written, never looked up: [below](#a-host-is-read-as-written-never-looked-up).
+- The player and the recorder look names up themselves: [below](#the-player-and-the-recorder-look-names-up-themselves).
 - A provider on plain http: [below](#a-provider-on-plain-http).
 - A stream's own bytes are decoded by FFmpeg and libmpv: [below](#bugs-in-the-media-libraries-are-theirs).
 
@@ -225,8 +226,8 @@ is.
 - Read a sync copy or a room's messages: the keys come from codes it never
   sees (`core/sync.py`, `core/together.py`: HKDF, ChaCha20-Poly1305).
 - Change a copy or a message unnoticed: the tag refuses it; in a room every
-  message is signed by its member's own key (`core/ed25519.py`; a member
-  still on 1.6.8 aside), so no member speaks as another; an earlier copy is
+  message is signed by its member's own key (`core/ed25519.py`) and an
+  unsigned one is dropped, so no member speaks as another; an earlier copy is
   told to a computer that has
   seen a later one (`counter`, `RoundResult.older`); an old message out of
   its time is not acted on (`Room.receive`).
@@ -262,14 +263,16 @@ GitHub Action, a build runner, GitHub itself - or the release key.
 | A changed or added file in a package | The signed build manifest (`core/build_check.py`, `tools/build_manifest.py`): such a build calls itself modified and uses no service of the site |
 | A Mac app that is not ours as the next update | `core/macupdate.py`: Solecraft AB's Team ID and Apple's notarisation checked before anything is replaced |
 | A new dependency slipped in | AGENTS.md rule 10: a reason in its commit and a pinned version |
+| A changed yt-dlp download, or its checksum list swapped beside it | `tools/ytdlp_pin.py` in `release.yml`'s `ytdlp-pin` job: the release's `SHA2-256SUMS` checked with `gpgv` against yt-dlp's own key (`packaging/yt-dlp-signing-key.asc`, its fingerprint in `core/ytdlp_pin.py`), the SHA-256s written into the app's signed release; the app installs only those bytes and runs only a copy it marked itself (`core/ytdlp.py`: `install`, `own_copy`) |
+| The update key taken from a build job that ran a changed package or tool | The build jobs never get it: they sign their manifest with `DOPEIPTV_BUILD_KEY`, which signs nothing else (`tools/build_manifest.py`, `BUILD_KEYS`) |
 
 **What is left.**
 
 - [Builds are not yet reproducible](#builds-are-not-yet-reproducible).
 - [The Windows and Linux packages carry no code signature](#the-windows-and-linux-packages-carry-no-code-signature).
-- [The update key is not yet alone in its job](#the-update-key-is-not-yet-alone-in-its-job).
+- [The build key signs in jobs that run other people's code](#the-build-key-signs-in-jobs-that-run-other-peoples-code).
 - [Test builds carry every push](#test-builds-carry-every-push).
-- [yt-dlp is checked against its own release](#yt-dlp-is-checked-against-its-own-release).
+- [yt-dlp is trusted by its own signature](#yt-dlp-is-trusted-by-its-own-signature).
 - Still as package managers give them, with their own signatures and not
   pinned here: apt's packages (the AppImage's and the .deb's libmpv and
   FFmpeg),
@@ -318,7 +321,7 @@ plays, and play, pause and seek for everyone, within bounds
 (`MEMBERS_MAX`, `VER_JUMP`, never past a title's end). **The phone
 remote's address** is the remote for whoever is on the home network with
 it; New address shuts out every phone that had the old one. **Server
-mode's playlist** carries its token: [below](#server-mode-has-one-token-for-watching-and-for-its-settings).
+mode's playlist** carries its token, which watches but changes nothing: [below](#server-modes-playlist-token-lets-a-device-watch-all-it-serves).
 
 ## A backup's password
 
@@ -432,18 +435,17 @@ itself, which every phone's browser would warn about and ask the person to
 accept. What holds the remote is the home network, a 192-bit token, the
 lock-out and New address.
 
-### Server mode has one token for watching and for its settings
+### Server mode's playlist token lets a device watch all it serves
 
-Server mode's page and its `api/settings` take the same token as its
-playlist, guide and streams (`services/home_server.py`, `_authorized`).
-A device given the playlist - a TV app, Kodi, VLC - can therefore also
-change server mode's port, how many channels it serves at once, which
-sources and categories, and whether channels for adults go out
-(`changes_from_page`). It cannot read a login: the page shows none.
+Every TV, Kodi or VLC given server mode's playlist holds its token, which
+opens the playlist, the guide and every stream served
+(`services/home_server.py`, `_authorized`). Its page and its `api/` take a
+token of their own (`nerd_server_admin_token`), which only this computer's
+Settings opens the page with and which is never in a backup: a device with
+the playlist cannot change what is served.
 
-*Why:* server mode is for one household, and a playlist of its own per
-device is not built. A device that should not choose what is served
-should not be given the playlist.
+*Why:* a playlist of its own per device is not built; the playlist token
+is for watching only.
 
 ### The tuner endpoints of server mode take no token
 
@@ -534,19 +536,20 @@ drawn.
 *Why:* a box's picons and a media server's artwork are at home addresses,
 and a playlist on a server at home is common.
 
-### A host is read as written, never looked up
+### The player and the recorder look names up themselves
 
-What a source on the internet may send the player and the picture loader
-to is judged by the host as its address writes it
+The app's own requests are checked where they land (`core/dest_guard.py`).
+What mpv and FFmpeg open themselves - a stream, an HLS playlist's segments,
+a subtitle - is judged by its address as written
 (`core/stream_address.host_refusal`): a public name whose DNS answer is
-127.0.0.1, a server that redirects there, or an HLS playlist whose segments
-are there, is not seen; nor is this computer's own address on the home
-network, which counts as the home network's. mpv and requests resolve and
-follow them as they do.
+127.0.0.1, a redirect there inside the stream, or an HLS playlist whose
+segments are there, is theirs to follow. FFmpeg reads only a stream's
+protocols there (`ffmpeg_protocols`), so what such a request can reach is
+a web service on this computer or the home network, not a file.
 
-*Why:* looking each name up would ask DNS about every channel of a list,
-and its answer could change between the look and the connection; the
-written host covers what a list can say outright.
+*Why:* the libraries resolve and connect inside themselves; the app cannot
+see the socket. Routing every stream through the app's own proxy would put
+a copy of each stream through Python.
 
 ### A link to a channel plays without a question
 
@@ -624,16 +627,32 @@ whoever can change the file can take the PIN out of it.
 *Why:* a PIN keeps a family member out, not someone with the computer
 (`core/pins.py` says so); four digits are what a remote types.
 
+### A kids profile holds only with a grown-up's PIN
+
+A kids profile plays only what its lists show - never a file on this
+computer, a recording, an address opened by hand, or a row of a category
+the source does not list - however it is asked (`_start_playback`'s one
+door, `ui/mw_profiles._kids_may_play`), and is left for a grown-up's
+profile and opens Settings only with a grown-up's PIN. A new one is made
+only once a grown-up's PIN exists; one made before 1.6.9, in a household
+with no grown-up's PIN, is left freely so nobody is locked in, until a
+grown-up sets one. A provider that files a channel for adults under an
+ordinary category, unmarked, is not seen.
+
+*Why:* the app knows a category by its name and a row by what the
+provider says of it.
+
 ### A backup's password is as strong as the password
 
-A backup without a password holds every login as plain text. With one, a
-copy of the file can be tried offline as fast as PBKDF2's 600 000 rounds
-allow: a short or common password falls
+A backup without a password holds every login as plain text; it is made
+only after a warning that says so, Cancel the default
+(`ui/mw_settings._backup_save`). With one - at least `PASSWORD_MIN` (10)
+characters - a copy of the file can be tried offline as fast as PBKDF2's
+600 000 rounds allow: a common password falls
 ([A backup's password](#a-backups-password)).
 
-*Why:* the password is optional so that an everyday backup stays as it
-was, and the app does not judge one; the field's hint says what each
-choice means, and a memory-hard function is not in the standard library.
+*Why:* a memory-hard function is not in the standard library, and the app
+does not judge a password beyond its length.
 
 ### Home means any private address
 
@@ -651,10 +670,10 @@ computer, and an address cannot tell a home from an office.
 The relay sees the room id, a random id per member, the sizes and times of
 the sealed messages and the addresses they come from - so who is in a room
 with whom, and when. It keeps rooms in memory only and logs nothing
-(`donate/together.py`; the site's privacy policy). A room made with an
-8-character code from 1.6.7 is easier to guess, and the app says so
-(`together_old_code`); a member on 1.6.8 has no key of its own and can be
-spoken for by another member until it updates.
+(`donate/together.py`; the site's privacy policy). Whoever has the code is
+in the room: a code is 10 characters (about 50 bits, 600 000 PBKDF2 rounds
+before the relay could test a guess); 1.6.7's codes of 8 and 1.6.8's
+unsigned members are refused.
 
 *Why:* a relay has to know where to pass a message on.
 
@@ -686,17 +705,17 @@ signed checksum list on every system.
 
 *Why:* Windows code signing is open work (`docs/MAINTAINING.md`).
 
-### The update key is not yet alone in its job
+### The build key signs in jobs that run other people's code
 
-Every build job signs its build manifest after it has run PyInstaller,
-pip's packages and other people's tools, and until a build key of its own
-is set up (`BUILD_KEYS` in `core/update_keys.py` is empty) those jobs are
-handed the update key (`release.yml`). A key that leaks cannot be
-distrusted by a copy already installed before it updates; until then it is
-protected by where updates come from, not by the signature
+Every build job signs its build manifest with the build key after it has
+run PyInstaller, pip's packages and other people's tools. Whoever takes
+that key can make a modified build call itself official - not sign an
+update: the update key is used only by the checksum step
+(`release.yml`, `tools/sign_sums.py`). A leaked update key cannot be
+distrusted by a copy already installed before it updates
 (`docs/MAINTAINING.md`, "The release key", has the steps for both).
 
-*Why:* open work, the steps written down.
+*Why:* a build has to be signed where it is made.
 
 ### A modified build can be made to look official
 
@@ -715,12 +734,14 @@ to everyone on Settings > General > Update channel > Test builds
 
 *Why:* that is what the test channel is for; it is off unless chosen.
 
-### yt-dlp is checked against its own release
+### yt-dlp is trusted by its own signature
 
-The yt-dlp the app keeps is the official release binary from GitHub,
-checked against that release's `SHA2-256SUMS` - a broken or swapped
-download, not a release of yt-dlp's that is itself bad - and updated at most
-once a day while it is used (`core/ytdlp.py`). It runs as the person.
+The yt-dlp the app may download is the release the build pinned: its
+`SHA2-256SUMS` signed by yt-dlp's key, checked when the build is made, its
+SHA-256s in the app's signed release (`core/ytdlp_pin.py`). A release of
+yt-dlp's that is itself bad - its key or its build taken over - is not
+seen, and it runs as the person. A new yt-dlp comes only with the next
+release of the app.
 
 *Why:* an old yt-dlp is the usual reason a stream stops opening. The app's
 copy can be turned off (`ytdlp_managed`): then only the system's is used.
@@ -736,6 +757,18 @@ Windows builds a pinned mpv build, the Macs Homebrew's and conda-forge's
 (`.github/workflows/release.yml`, `packaging/flatpak/`).
 
 *Why:* a player cannot avoid a decoder.
+
+### A hostile source can make the app work up to its ceilings
+
+The ceilings (`RESPONSE_MAX` 256 MiB, a source's lists `LIST_MAX` 1 GiB, a
+guide 2 GiB unpacked, a picture `PICTURE_ALLOC_MIB`) are far above any
+real answer, so a source that sends that much makes the app read, unpack
+and index that much - memory, disk and time - before it is refused. The
+guide's index is built in a process of its own, so a guide cannot take the
+window with it.
+
+*Why:* a large provider's real lists and guides come close to tens of
+megabytes; a ceiling a real one could reach would break playback.
 
 ### What dopeiptv.org keeps is its word
 

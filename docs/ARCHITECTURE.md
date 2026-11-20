@@ -270,8 +270,11 @@ dopeiptv/
                        game controller (SDL2 if pysdl2 is there, else evdev)
     tv_nav.py          TV mode's focus moves (nearest element, grid step)
     ytdlp.py           yt-dlp for YouTube, Twitch and the like: the system's
-                       or the app's own copy (release binary, SHA2-256SUMS
-                       checked, updated at most once a day while used)
+                       or the app's own copy (only the release the build
+                       pinned, its SHA-256 checked; ytdlp_pin.py, written
+                       in the build after yt-dlp's signature is checked)
+    dest_guard.py      Where the app's own requests may land: checked on
+                       the socket (DNS rebinding) and on every redirect
     audiotags.py       Artist/album/title and cover art from music files
                        (header-only, no dependency)
     _alloc.py          Optional allocator preload for long sessions

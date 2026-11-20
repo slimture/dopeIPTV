@@ -194,7 +194,8 @@ Only names here - the values are with the owner.
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
 | GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
-| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`), and every build job its build manifest (`tools/build_manifest.py`, "Official builds" below); its public half is in `dopeiptv/core/update_keys.py`. Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned, the app will not install it, and it calls itself modified (its online services off) |
+| GitHub Actions secret `DOPEIPTV_UPDATE_KEY` | dopeIPTV's release signing key (Ed25519, base64): release.yml's `checksums` job and nightly.yml sign each release's `SHA256SUMS` with it (`tools/sign_sums.py`) - only there, never in a build job; its public half is in `dopeiptv/core/update_keys.py` (`UPDATE_KEYS`). Made once with `tools/make_update_key.py`; the only backup is the owner's password manager - see "The release key" below | a release fails at signing; a test build goes out unsigned and the app will not install it |
+| GitHub Actions secret `DOPEIPTV_BUILD_KEY` | the build manifest's own key (Ed25519, base64): every build job signs its list of the app's files with it (`tools/build_manifest.py`, "Official builds" below); its public half is in `BUILD_KEYS` in `dopeiptv/core/update_keys.py`. It signs nothing else - an update needs the update key | every build calls itself modified (its online services off), and a tag's build stops (`--require-key`) |
 
 A source checkout works without any of these. For local testing, set
 `DOPEIPTV_TMDB_KEY` / `DOPEIPTV_OPENSUBTITLES_KEY` / `DOPEIPTV_SIMKL_CLIENT_ID` in
@@ -221,23 +222,21 @@ or a checksum changed beside the file, gets nothing installed.
 - `tools/sign_sums.py` refuses a secret whose public half the app does not
   carry, so a wrong secret stops the build instead of shipping a release
   no app will install.
-- **A key of its own for the build jobs (not set up yet - do this).** Every
-  build job signs its build manifest ("Official builds" below) after it has
-  run PyInstaller, pip's packages and other people's tools - so today the
-  update key is in jobs that run code we did not write. The code is ready
-  for a second key that signs file lists and nothing else:
+- **The build jobs' own key (required since 1.6.9).** Every build job
+  signs its build manifest ("Official builds" below) after it has run
+  PyInstaller, pip's packages and other people's tools, so those jobs never
+  get the update key: they get `DOPEIPTV_BUILD_KEY`, which signs file lists
+  and nothing else. Set it up once, in this order:
   1. `python3 tools/make_update_key.py` on your own computer, as for the
      update key; keep the private half in the password manager.
   2. Put its PUBLIC half in `BUILD_KEYS` in `dopeiptv/core/update_keys.py`,
      commit and push `testing` first.
   3. Then add the private half as the Actions secret `DOPEIPTV_BUILD_KEY`.
-  From the next build on, the build jobs get only that key
-  (`release.yml` hands them `DOPEIPTV_UPDATE_KEY` only while
-  `DOPEIPTV_BUILD_KEY` is empty) and the update key stays with the
-  checksums step. In the other order (secret first) every build stops with
-  "the secret's public half is not one the app carries". If the build key
-  leaks, a modified build could call itself official - it could not sign an
-  update; replace it the same way and drop the old public half.
+  Until both are done every nightly calls itself modified and a tag's build
+  stops at the manifest step. In the other order (secret first) every build
+  stops with "the secret's public half is not one the app carries". If the
+  build key leaks, a modified build could call itself official - it could
+  not sign an update; replace it the same way and drop the old public half.
 - **If the update key leaks:** delete the secret, make a new key, add its
   public half beside the old one and release at once - signed with the OLD
   key, so the copies out there take it - then sign with the new key only and
@@ -287,6 +286,19 @@ Nothing a build runs or ships is "whatever is newest that day":
   the manifest) to the fixed version, or accept it for a while in
   `packaging/audit-allowlist.txt` with a reason and a date after which it
   fails again. A service that cannot be reached is a warning, not a failure.
+- **The yt-dlp the app may download** for web streams is named in the
+  build, not at the user's: `release.yml`'s first job, `ytdlp-pin`, runs
+  `tools/ytdlp_pin.py --or-none`, which takes the newest yt-dlp release,
+  checks its `SHA2-256SUMS.sig` with `gpgv` against yt-dlp's own key
+  (`packaging/yt-dlp-signing-key.asc`, fingerprint in
+  `core/ytdlp_pin.py`'s `KEY`) and writes that release's tag and the
+  SHA-256 of each file into `dopeiptv/core/ytdlp_pin.py`, which every build
+  job downloads in. The app installs only that release, only those bytes,
+  and runs only a copy it marked itself. A new yt-dlp reaches the users
+  with the next release or nightly. If the check fails the build pins
+  nothing (a warning in the job; the app then downloads no yt-dlp and uses
+  the system's). Should yt-dlp change its key: check the new one by its
+  own announcement, replace the `.asc` and `KEY` in one commit.
 - **Still as the package manager gives them** (their own signatures or
   checksums, not pinned here): apt's packages on Linux (libmpv and FFmpeg in
   the AppImage and .deb are Ubuntu's, with Ubuntu's security updates at
@@ -326,7 +338,7 @@ installer and zip are made, and on macOS before the app is signed, the list
 in `Contents/Resources` linked from `Contents/Frameworks`). The tool asks the
 bundle itself what it holds (`dopeiptv --build-files OUT`: its data files on
 disk, and its modules as its PyInstaller archive stores them - a bundle has
-no .py files), signs that with `DOPEIPTV_UPDATE_KEY`, writes
+no .py files), signs that with `DOPEIPTV_BUILD_KEY`, writes
 `_build_manifest.json` and `.sig` beside the package inside the bundle, and
 asks the bundle again: it must now say official, or the job fails. The
 macOS job asks the signed app on the mounted .dmg once more. The Flatpak
@@ -338,9 +350,9 @@ build is modified; a tag without the key fails at this step
 (`--require-key`). Both files are git-ignored: never commit them.
 
 To try it locally: build with PyInstaller, then
-`DOPEIPTV_UPDATE_KEY=<a test seed> python3 tools/build_manifest.py frozen
+`DOPEIPTV_BUILD_KEY=<a test seed> python3 tools/build_manifest.py frozen
 dist/dopeiptv/dopeiptv` - with a key of your own the tool refuses unless its
-public half is in `update_keys.py`, so put a test key there in a scratch
+public half is in `BUILD_KEYS`, so put a test key there in a scratch
 copy only (`tests/test_build_check.py` does the round trip with a test key).
 
 **The honest limit.** This stops the builds that do not bother: a changed
@@ -517,11 +529,6 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   route), and the phone remote from a phone on the guest network.
 - On the website, a few Serbian strings are in Cyrillic while the rest of
   the Serbian page is Latin.
-- **Watch together, 1.7.0**: 1.6.9 still takes 1.6.8's unsigned members
-  (16-hex ids, `OLD_ID_LEN`) for one release of overlap. In 1.7.0 refuse
-  them in `open_message` and drop the overlap's code
-  (`core/together.py` `UNSIGNED_UNTIL`); `tests/test_together.py` fails
-  from the version bump on until it is done. Say it in the release notes.
 - **Profiles**: built - one per person in the household, as Netflix and
   Plex have them (`core/profiles.py`, `ui/mw_profiles.py`,
   `ui/profiles_ui.py`; Settings > System > Profiles). What is a profile's

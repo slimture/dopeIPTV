@@ -268,8 +268,10 @@ while Nerd is on, and so are the link rows that lead to them.
   chosen on the server's page in a browser, which also changes the port, the
   tuners and channels for adults), `nerd_server_adult` (channels for adults
   in the lineup and the shared playlist; off); open the page, copy the tuner's and the playlist's
-  addresses, how it stands. Not shown: `nerd_server_token`,
-  `nerd_server_device_id` (made once, never in a backup)
+  addresses, how it stands. Not shown: `nerd_server_token` (the playlist's,
+  guide's and streams'), `nerd_server_admin_token` (the page's and its
+  `api/`, opened from here), `nerd_server_device_id` (made once, never in a
+  backup)
 - Webhooks: `nerd_hooks`, `nerd_hooks_urls`, `nerd_hooks_header`
 - MQTT: `nerd_mqtt`, `nerd_mqtt_host`, `nerd_mqtt_port`, `nerd_mqtt_tls`,
   `nerd_mqtt_user` + `nerd_mqtt_pass`, `nerd_mqtt_client`, `nerd_mqtt_prefix`,

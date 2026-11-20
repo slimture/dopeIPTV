@@ -87,7 +87,34 @@ assessment of each. The findings, and what came of them:
 | Settings files | A settings file on a drive without permissions stayed readable by others without a word | low | 1.6.9: said once, by name |
 | Overall | The parts reviewed are not the whole attack surface: parsers of provider data, logins at rest, the local servers, the programs the app starts, the build chain | info | 1.6.9 (in progress): five more reviews - local servers and processes, untrusted input and secrets, supply chain and platforms, the website's services - with their findings to be added here |
 
+## November 2026 - independent AI review of 1.6.9 (testing)
+
+The owner gave the review kit's `ALL.txt` from `testing` to an independent
+AI assistant, which scored each of its 18 parts and the whole against
+[docs/SECURITY.md](SECURITY.md): **6/10 overall**. The findings, and what
+came of them:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| The app's own requests | A public name could resolve to this computer or a link-local host (DNS rebinding), and requests followed a provider's redirect into this computer, the home network or a cloud's metadata service - `stream_address` judged only the address as written | high | 1.6.9: `core/dest_guard.py` - every request through the shared requests session and the route adapter checked on its socket after it connects, before a byte is sent; every redirect requests follows, and each one the cast follows by hand, judged by its target as written and as it resolves |
+| yt-dlp | The app trusted the `SHA2-256SUMS` downloaded beside the binary: whoever could replace one could replace both | high | 1.6.9: the build checks yt-dlp's PGP signature (`tools/ytdlp_pin.py`, `gpgv`, the key's fingerprint in the app) and writes the SHA-256s into the signed release (`core/ytdlp_pin.py`); the app installs only those bytes and runs only a copy it marked itself |
+| Build chain | Without a build key the build jobs - which run PyInstaller and other people's packages - were handed the update key | high | 1.6.9: never: the manifest is signed with `DOPEIPTV_BUILD_KEY` alone; without it a build calls itself modified and a tag's build stops. The owner makes the key (docs/MAINTAINING.md, "The release key") |
+| Profiles | A kids profile could play local files, recordings and addresses opened by hand, a row of no category or of one the source does not list, and from the phone; it was made without a grown-up's PIN and left for a grown-up's profile freely | high | 1.6.9: one door in `_start_playback` (`_kids_may_play`), no local files or recordings on the phone, a category must be one the source lists; made only once a grown-up's PIN exists, left for a grown-up's profile and Settings opened only with it (a kids profile from before, in a household with no such PIN, is never locked in) |
+| Server mode | The playlist's token, which every TV holds, also opened the server's page and settings | medium | 1.6.9: a token of its own for the page and `api/` (`nerd_server_admin_token`), never in a backup |
+| Private viewing | The remote API's status and the events still carried the profile, cast device, position and length of a private playback; a private stream's address in the log kept its server's name | medium | 1.6.9: nothing of them; `url_for_log` says `<private>` |
+| Error reports | An address that began as the version did (1.6.8.10) was left in a report as if it were the build's number | low | 1.6.9: only exactly this build's own four-part version |
+| Pictures | A link inside a trusted picture folder (a shared picon folder, a share) could point at any file; a pipe or device there made the read wait | medium | 1.6.9: links followed only while they stay inside, or are the person's own file; looked at before opening, opened without following a link swapped in since |
+| Backups | A backup without a password, holding every login, was made without a word; any password was taken | medium | 1.6.9: a warning first, Cancel the default; a password of at least 10 characters |
+| Watch together | 1.6.7's 8-character codes still joined, and 1.6.8's unsigned members were taken for a release of overlap | medium | 1.6.9: both refused; an old code is said to be one |
+| Website | `SOCKET_OPEN = yes` could open the service's socket to every user on the machine | low | website: gone; nothing opens it |
+| Server mode | The HDHomeRun endpoints take no token | medium | Answered: Plex and other HDHomeRun clients send none; this computer's own networks only, never a web page or a name not a home's, paced (docs/SECURITY.md) |
+| Links | `dopeiptv://channel/` plays without a question | low | Answered: only a channel the lists show, through the zap's own questions; a link with an address is asked about (docs/SECURITY.md) |
+| Feedback | Replies to an answer are tied together by the code's hash | info | Answered: that is what lets a reply reach its thread; the hash says nothing of who, and the person's code stays on their computer |
+| Player | mpv and FFmpeg resolve names and follow redirects inside themselves | medium | Written down: the app cannot see their sockets; FFmpeg is kept to a stream's protocols (docs/SECURITY.md, "The player and the recorder look names up themselves") |
+| Limits | The ceilings let a hostile source make the app read and unpack up to 256 MiB, 1 GiB and 2 GiB | low | Written down (docs/SECURITY.md, "A hostile source can make the app work up to its ceilings") |
+| Home network | Plain http on the home network, cast addresses with a login, a relay that sees who is in a room, a sync server that can hold a copy back, files without owners on some drives | info | Written down, each with its reason (docs/SECURITY.md, Honest limits) |
+
 ## The next round
 
-Before 1.6.9 is released: the review kit's `ALL.txt` from `testing`, given to
-at least one independent AI assistant; the findings and what was done, here.
+Before 1.6.9 is released: the kit made again from `testing` with these
+fixes, given to an independent AI assistant; its scores and findings, here.
