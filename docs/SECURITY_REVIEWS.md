@@ -145,7 +145,7 @@ to an independent AI assistant: **7/10 overall** against
 | Limits | 256 MiB for an answer and 1 GiB for a source's lists let a few requests at once take the memory | low | 1.6.9: 32 MiB and 512 MiB (`_lazy_requests.RESPONSE_MAX`, `LIST_MAX`) |
 | Media session | Any program on the session bus can drive the app | low | Answered: Settings > General turns the system's media controls off (docs/SECURITY.md, "Any program on the session bus can drive the app") |
 
-## November 2026 - third independent AI review of 1.6.9 (testing, in progress)
+## November 2026 - third independent AI review of 1.6.9 (testing)
 
 The kit from `testing` (a47e613) and the website (147f133), given to an
 independent AI assistant with the rule to review those commits alone:
@@ -158,6 +158,25 @@ independent AI assistant with the rule to review those commits alone:
 | Watch together | The note for an older, unsigned member never reached the person: such a frame was dropped before the room saw it | low | 1.6.9: the link says it once (`older_frame`, `Link`'s *on_older*), still taking nothing of it |
 | Casting | Without the receiver's address the converter fell back to its token alone | low | 1.6.9: the first address that asks for the run's own stream becomes the only one (`CastBridge.admits`) |
 | Phone remote | An attacker who can change the home network's traffic can change the page and read the key | medium (on-path, active) | Written down (docs/SECURITY.md, "The home network's servers speak plain http"): https needs a public name and a certificate service per computer; the remote reaches no login or file |
+
+## November 2026 - fourth independent AI review of 1.6.9 (testing)
+
+The kit from `testing` (d1e359c) and the website (b2b02c3): **7/10**; the
+website's statistics 5/10. It found no way for someone far away to steal
+a provider's login or slip in an update that is not signed. What it found,
+and what was done:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Website statistics | The days' sketches use the same two bits for a visitor all month: two quiet days side by side could show that someone came on both | medium | website: the sketches are kept only where the month's key is - in the service's memory or beside the key on a tmpfs - never on a disk or in a backup (`stats_collect.sketches_file`); the copy on the disk read into memory once and deleted |
+| Website statistics | Five visitor or device marks are not five people: the five-people promise of the anonymous months could not be proven | medium | website: no row of a visit is kept past its days any more - neither in detail nor as anonymous rows; after 14 days only the day's counts stay (per way in too, `funnel_of`). The anonymous rows of before were made those counts and deleted; the policy no longer promises a number of people |
+| Website statistics | A month summed the days' rarer names: one person on five days kept a rare site named | medium | website: a name is kept only from a day when five visitors brought it; nothing adds days up again under a name, and the months' lists of them are dropped (`fold_day`, `_old_rows_off`) |
+| Website statistics | Detailed visits and their timing for 30 days help a guess at who it was; the policy said it could not be done | medium | website: 14 days (was 30), the start to the half hour (was ten minutes), no device mark, keys kept two months (was three); the policy and the transparency page say plainly that it is much harder, not impossible |
+| Website server | DEPLOY.md still described a statistics log with addresses and a key file on disk | medium | website: those parts rewritten, the old sections marked superseded with a warning never to make that log again; a test fails if an `install` or `echo` step names it |
+| Website server | Whether only the front proxy reaches the content server cannot be seen in the repository | conditional | `deploy/check-live.sh` asks the content port from outside after every deploy; it answered nothing (run after the second round) |
+| Private viewing | The runtime folder was checked to be on tmpfs, the folder written into was not: a link or a disk mounted under it would put the buffer on disk | medium | 1.6.9: the buffer's own folder checked before a byte is written - no link, this user's own, 0700, in memory where it really is (`dvr_store.memory_folder`); else on disk, marked and deleted, said in the log, no second connection |
+| Phone remote | A web page that pointed its own name at this computer could make failed tries that shut the phone out for a while | low | 1.6.9: a Host that is no name of the home is refused (421) before anything is counted (`home_net.home_host`) |
+| Phone remote | An attacker who controls the home network's traffic can change the page | documented | Accepted as written down (docs/SECURITY.md, "The home network's servers speak plain http"); the remote is off until turned on |
 
 ## The next round
 

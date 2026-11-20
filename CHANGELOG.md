@@ -36,6 +36,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Security
 
+- A channel watched privately from its start keeps its rewind buffer in
+  memory only when the very folder it writes into is: no link, this user's
+  own, 0700, on a file system in memory by the mount table. A link or a
+  disk under the runtime folder sends it to the disk, marked and deleted as
+  everywhere else, and the log says so - no second connection for the try.
+- The phone remote refuses a Host that is no name of the home before it
+  counts anything, so a web page pointing its own name at this computer
+  cannot shut a phone out of its remote.
+
 - The phone remote's key no longer crosses the network: the code's address
   carries it after its `#`, which a browser never sends, and the phone keeps
   it. Every request is signed with it (HMAC-SHA256 over the method, the

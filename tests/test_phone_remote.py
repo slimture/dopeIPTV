@@ -252,6 +252,23 @@ def test_a_web_page_s_guesses_never_shut_the_phone_out(served):
     assert ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] == 429, "the phone's own guesses as before"
 
 
+def test_a_name_a_dns_rebinding_pointed_here_is_refused_and_never_counted(served):
+    """A web page whose own name was made to point at this computer asks
+    under that name: refused before anything is counted, so its tries -
+    without Origin or Fetch Metadata - never shut the phone out."""
+    srv = served(limiter=RateLimiter(fails=3))
+    for _ in range(6):
+        code = ask(srv.port, "GET", "/" + "g" * 32 + "/api/state",
+                   headers={"Host": "attacker.example:%d" % srv.port})[0]
+        assert code == 421, code
+        assert ask(srv.port, "POST", f"/{TOKEN}/api/stop", {},
+                   {"Host": "rebind.attacker.example"})[0] == 421
+    assert not srv.limiter.blocked("127.0.0.1")
+    for host in (f"127.0.0.1:{srv.port}", f"192.168.1.20:{srv.port}", "livingroom.local",
+                 "mypc", f"[::1]:{srv.port}"):
+        assert ask(srv.port, "GET", f"/{TOKEN}/api/state", headers={"Host": host})[0] == 200, host
+
+
 def test_a_flood_is_slowed(served):
     srv = served(limiter=RateLimiter(rate=0.5, burst=6))
     codes = [ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] for _ in range(10)]

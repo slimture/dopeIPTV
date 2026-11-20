@@ -555,6 +555,13 @@ def _make_handler(server: PhoneServer) -> type[BaseHTTPRequestHandler]:
             if not server.client_ok(str(who), _own(self)):
                 self._text(403, "forbidden")
                 return
+            # A Host that is no name of the home (a web page's own name a
+            # DNS rebinding pointed here): refused before anything is
+            # counted - its tries never shut the phone out of its remote.
+            host = self.headers.get("Host")
+            if host is not None and not home_net.home_host(host):
+                self._text(421, "misdirected")
+                return
             lim = server.limiter
             parts = urlsplit(self.path)
             path = parts.path

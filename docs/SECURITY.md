@@ -630,8 +630,15 @@ tokens (`core/log.py`), keeps a private playback's titles out
 it is left. A channel private from its start keeps its buffer in memory
 instead - Linux's `$XDG_RUNTIME_DIR` when it is this user's own tmpfs, with
 a budget of its own (`core/dvr_store.memory_base`, `memory_budget`) - so
-nothing of it reaches the disk; on macOS and Windows, or with too little
-room there, it is on disk, marked and deleted as before.
+nothing of it reaches the disk. The folder it writes into is checked
+itself before a byte is: a folder, not a link, this user's own, 0700, and
+in memory where it really is by the mount table - so a link under the
+runtime folder to a disk, or a disk mounted there, is found
+(`memory_folder`; `NotInMemory`, and no connection opened for the try).
+On macOS and Windows, with too little room, or where that check fails, it
+is on disk, marked and deleted as before - and the log says so. What runs
+as the same user can still read the buffer while it is being written, as
+it can read the screen.
 
 *Why:* on most current systems a home folder is closed to other accounts.
 Open work.

@@ -35,7 +35,8 @@ class DvrSession:
                  max_bytes: int, ingest: Ingest | None = None,
                  key: str | None = None,
                  ingest_factory: IngestFactory | None = None,
-                 source: str = "", min_free: int | None = None) -> None:
+                 source: str = "", min_free: int | None = None,
+                 memory: bool = False) -> None:
         self.url = url
         self.key = key or url
         #: The source (id) whose account its connection is on - what the
@@ -43,8 +44,11 @@ class DvrSession:
         #: the player moved on; "" when not known (it counts on every one).
         self.source = source
         self.token = secrets.token_hex(8)
+        # *memory*: its folder checked to be in memory before anything
+        # starts - dvr_store.NotInMemory, and no connection was opened.
         self.store = SegmentStore(session_dir(base, self.token),
-                                  keep_seconds, max_bytes, min_free=min_free)
+                                  keep_seconds, max_bytes, min_free=min_free,
+                                  memory=memory)
         #: In memory (dvr_store.memory_base) with this cap: a private
         #: session from its start. None: on disk.
         self.memory_cap: int | None = None

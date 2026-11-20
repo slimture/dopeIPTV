@@ -31,7 +31,7 @@ from pathlib import Path
 
 from .dvr_ingest import NotAStream
 from .dvr_session import DvrSession, IngestFactory
-from .dvr_store import MEMORY_MIN_FREE, SegmentStore, memory_budget
+from .dvr_store import MEMORY_MIN_FREE, NotInMemory, SegmentStore, memory_budget
 from .log import log
 from .privacy import url_for_log
 
@@ -115,14 +115,29 @@ class DvrPool:
         memory = self.memory if private else None
         budget = memory_budget(memory, self.max_bytes) if memory is not None else 0
         if memory is not None and budget:
-            s = DvrSession(url, memory, self.keep_seconds, budget, key=key,
-                           ingest_factory=self._factory, min_free=MEMORY_MIN_FREE)
+            try:
+                s = DvrSession(url, memory, self.keep_seconds, budget, key=key,
+                               ingest_factory=self._factory, min_free=MEMORY_MIN_FREE,
+                               memory=True)
+            except NotInMemory:
+                # Its folder was not in memory after all (a link, a disk
+                # mounted there): on disk, marked and deleted as a private
+                # buffer is everywhere else - and said.
+                log.warning("DVR pool: a private channel's buffer could not be kept in memory - "
+                            "on disk, marked private")
+                s = DvrSession(url, self.base, self.keep_seconds, self.max_bytes, key=key,
+                               ingest_factory=self._factory)
+                s.mark_private()
+                return s
             s.memory_cap = budget
             s.mark_private()
             log.info("DVR pool: a private channel's buffer kept in memory (%d MB)", budget >> 20)
             return s
-        return DvrSession(url, self.base, self.keep_seconds, self.max_bytes, key=key,
-                          ingest_factory=self._factory)
+        s = DvrSession(url, self.base, self.keep_seconds, self.max_bytes, key=key,
+                       ingest_factory=self._factory)
+        if private:
+            s.mark_private()
+        return s
 
     def release(self, s: DvrSession) -> None:
         """The player is done with *s*: frozen - unless a recording still

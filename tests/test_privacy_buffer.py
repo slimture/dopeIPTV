@@ -185,19 +185,85 @@ def test_a_budget_in_memory_takes_half_of_what_is_free_and_never_too_little(tmp_
     free = {"n": 4 << 30}
     monkeypatch.setattr(dvr_store.shutil, "disk_usage",
                         lambda p: SimpleNamespace(total=8 << 30, used=0, free=free["n"]))
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30) == dvr_store.MEMORY_MAX
-    assert dvr_store.memory_budget(tmp_path / "m", 200 << 20) == 200 << 20
+    mem = f"tmpfs {tmp_path} tmpfs rw 0 0\n"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem) == dvr_store.MEMORY_MAX
+    assert dvr_store.memory_budget(tmp_path / "m", 200 << 20, mem) == 200 << 20
     free["n"] = 600 << 20
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30) == (600 - 64) << 19
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem) == (600 - 64) << 19
     free["n"] = 100 << 20
-    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30) == 0, "too little: the disk, as before"
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, mem) == 0, "too little: the disk, as before"
+    free["n"] = 4 << 30
+    assert dvr_store.memory_budget(tmp_path / "m", 2 << 30, f"/dev/sda1 {tmp_path} ext4 rw 0 0\n") == 0, \
+        "the folder made is on disk: none in memory"
+
+
+def test_the_buffers_own_folder_is_checked_where_it_really_is(tmp_path, monkeypatch):
+    """The run folder may be this user's tmpfs while the folder under it is
+    a link to a disk, or a disk mounted there: the folder written into is
+    checked itself - a link refused, its file system by the mount table
+    where it really is - and a store meant for memory writes nothing
+    anywhere else."""
+    from dopeiptv.core import dvr_store
+    run = tmp_path / "run"
+    run.mkdir(mode=0o700)
+    mounts = f"tmpfs {run} tmpfs rw 0 0\n"
+    good = run / "dopeiptv-dvr"
+    good.mkdir(mode=0o700)
+    assert dvr_store.memory_folder(good, mounts)
+    os.chmod(good, 0o755)
+    assert dvr_store.memory_folder(good, mounts) and (os.stat(good).st_mode & 0o077) == 0, "narrowed"
+    disk = tmp_path / "disk"
+    disk.mkdir(mode=0o700)
+    link = run / "linked"
+    link.symlink_to(disk, target_is_directory=True)
+    assert not dvr_store.memory_folder(link, mounts), "a link to a disk folder"
+    assert not dvr_store.memory_folder(run / "missing", mounts)
+    sub = run / "mounted"
+    sub.mkdir(mode=0o700)
+    assert not dvr_store.memory_folder(sub, mounts + f"/dev/sdb1 {sub} ext4 rw 0 0\n"), \
+        "a disk mounted under the tmpfs"
+    # A store meant for memory: nothing written where the folder is not.
+    monkeypatch.setattr(dvr_store, "in_memory", lambda p, m=None: str(p).startswith(str(run)) and
+                        not str(os.path.realpath(p)).startswith(str(disk)))
+    import pytest
+    with pytest.raises(dvr_store.NotInMemory):
+        dvr_store.SegmentStore(link / "1-ab", 60.0, 10**8, memory=True)
+    assert not any(p.is_file() for p in disk.rglob("*")), "nothing written on the disk"
+    store = dvr_store.SegmentStore(good / "1-cd", 60.0, 10**8, memory=True)
+    assert store.root.is_dir()
+
+
+def test_a_private_buffer_whose_folder_is_not_in_memory_goes_on_disk_marked(tmp_path, monkeypatch):
+    from dopeiptv.core import dvr_pool as dp
+    from dopeiptv.core import dvr_store
+    from dopeiptv.core.dvr_pool import DvrPool
+    disk, memory = tmp_path / "disk", tmp_path / "memory"
+    monkeypatch.setattr(dp, "memory_budget", lambda base, cap: 300 << 20)
+    monkeypatch.setattr(dvr_store, "memory_folder", lambda p, mounts=None: False)
+    opened = []
+
+    class Counting(_Ingest):
+        def __init__(self, *a, **k):
+            opened.append(1)
+            super().__init__(*a, **k)
+    pool = DvrPool(disk, 600.0, 10**9, ingest_factory=Counting, min_free=0, memory=memory)
+    try:
+        s = pool.open("http://h/live/1.ts", "1", private=True)
+        assert s.store.root.parent == disk and s.memory_cap is None
+        assert s.private and (s.store.root / dvr_store.PRIVATE_MARK).exists()
+        assert opened == [1], "one connection: none opened for the folder refused"
+    finally:
+        pool.close_all(wait=5.0)
 
 
 def test_a_channel_private_from_its_start_never_touches_the_disk(tmp_path, monkeypatch):
     from dopeiptv.core import dvr_pool as dp
     from dopeiptv.core.dvr_pool import DvrPool
+    from dopeiptv.core import dvr_store
     disk, memory = tmp_path / "disk", tmp_path / "memory"
     monkeypatch.setattr(dp, "memory_budget", lambda base, cap: 300 << 20)
+    monkeypatch.setattr(dvr_store, "memory_folder",
+                        lambda p, mounts=None: str(p).startswith(str(memory)))
     pool = DvrPool(disk, 600.0, 10**9, ingest_factory=_Ingest, min_free=0, memory=memory)
     try:
         s = pool.open("http://h/live/1.ts", "1", private=True)
