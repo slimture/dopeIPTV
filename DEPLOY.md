@@ -1990,16 +1990,19 @@ grep -q 'zvol/zroot/swap' /etc/fstab \
   && sed -i '' 's|^/dev/zvol/zroot/swap[[:space:]]|/dev/zvol/zroot/swap.eli |' /etc/fstab \
   || echo '/dev/zvol/zroot/swap.eli none swap sw 0 0' >> /etc/fstab
 grep -n swap /etc/fstab
-swapoff /dev/zvol/zroot/swap
-dd if=/dev/zero of=/dev/zvol/zroot/swap bs=1m || true
-swapon /dev/zvol/zroot/swap.eli
+swapoff /dev/zvol/zroot/swap && { dd if=/dev/zero of=/dev/zvol/zroot/swap bs=1m; swapon /dev/zvol/zroot/swap.eli; }
 swapctl -l
 ```
 
-`swapctl -l` then lists `/dev/zvol/zroot/swap.eli`. `swapoff` refuses
-while what is swapped out does not fit in memory: then the two lines that
-change the property and `/etc/fstab`, and a reboot. `dd` ends with "end
-of device", which is expected.
+**Only after `swapoff` succeeded** may the volume be written over - the one
+line above makes sure: while it is still swap, what the running programs
+have swapped out is there, and writing over it breaks them. `swapctl -l`
+then lists `/dev/zvol/zroot/swap.eli`. `swapoff` refuses while what is
+swapped out does not fit in memory ("Cannot allocate memory"): then the
+property and `/etc/fstab` changed as above are enough, and a reboot
+attaches the encrypted swap. `dd` ends with "end of device", which is
+expected. `swapon` of the `.eli` refuses ("Invalid parameters") while the
+plain volume is still in use as swap.
 
 The files and the service:
 
