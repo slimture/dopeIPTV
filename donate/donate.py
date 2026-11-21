@@ -61,8 +61,7 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
                             /usr/local/etc/iptv-donate.key): a restricted key
                             with PaymentIntents: Write (the tip dialog, which
                             includes reading them: the admin page, the push
-                            notes) and Checkout Sessions: Read (the key back
-                            from monthly support's page), nothing else.
+                            notes), nothing else.
     STRIPE_PUBLISHABLE_KEY  pk_live_... (public; handed to the page)
     DONATE_CURRENCY         the currency when the page cannot tell (eur)
     DONATE_CURRENCIES       the ones offered, e.g. eur,sek,usd (default: all
