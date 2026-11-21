@@ -2669,11 +2669,15 @@ section.legal-main { padding: 18px 0 84px; }
 .legal .tp-overview td { vertical-align: top; padding: 12px 14px 12px 0; border-bottom: 1px solid var(--line); }
 .legal .tp-overview tbody tr { counter-increment: ov; }
 .legal .tp-overview td.tp-ov-q { width: 40%; font-weight: 600; }
-.legal .tp-overview td.tp-ov-q::before { content: counter(ov); display: inline-block; min-width: 24px; color: var(--faint); }
+.legal .tp-overview td.tp-ov-q { position: relative; padding-inline-start: 26px; }
+.legal .tp-overview td.tp-ov-q::before { content: counter(ov); position: absolute; inset-inline-start: 0; color: var(--faint); }
 .legal .tp-overview td.tp-ov-q a { color: var(--text); text-decoration: none; }
 .legal .tp-overview td.tp-ov-q a:hover { text-decoration: underline; }
 .legal .tp-overview td.tp-ov-a { color: var(--muted); }
-.legal .tp-verdict { display: inline-block; margin: 0 6px 3px 0; padding: 0 10px; border-radius: 999px; white-space: nowrap;
+.legal .tp-ov-a { display: flex; align-items: baseline; gap: 10px; }
+.legal .tp-ov-why { min-width: 0; }
+.legal .tp-ov-unit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.legal .tp-verdict { flex: none; display: inline-block; margin: 0; padding: 0 10px; border-radius: 999px; white-space: nowrap;
   font-size: 13.5px; font-weight: 700; line-height: 1.65; color: var(--text); background: var(--surface-2, var(--surface)); }
 .legal .tp-verdict.is-good { color: color-mix(in srgb, var(--ok) 78%, var(--text)); background: color-mix(in srgb, var(--ok) 16%, transparent); }
 .legal .tp-overview td.tp-ov-l { padding-inline-end: 0; white-space: nowrap; text-align: end; }
@@ -2685,7 +2689,12 @@ section.legal-main { padding: 18px 0 84px; }
     border-bottom: 1px solid var(--line); }
   .legal .tp-overview td { display: block; width: auto; padding: 0; border: 0; }
   .legal .tp-overview td.tp-ov-q { width: auto; }
-  .legal .tp-overview td.tp-ov-a { grid-column: 1 / -1; grid-row: 2; }
+  .legal .tp-overview td.tp-ov-q { padding-inline-start: 26px; }
+  .legal .tp-overview td.tp-ov-a { grid-column: 1 / -1; grid-row: 2; display: block; padding-inline-start: 26px; }
+  .legal .tp-ov-a .tp-verdict { margin: 4px 0 4px; }
+  .legal .tp-ov-why { display: block; }
+  .legal .tp-ov-unit { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .legal .tp-overview td.tp-ov-l a { font-size: 14px; font-weight: 600; }
 }
 .legal .tp-howto { margin: 0 0 30px; }
 

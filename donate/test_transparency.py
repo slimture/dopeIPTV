@@ -101,7 +101,7 @@ def test_the_overview_names_every_part_with_its_own_count_of_limits():
             assert fold, f"{lang}: {pid} names no limits of its own"
             n = fold.group(2).count("<li>")
             assert int(fold.group(1)) == n, f"{lang}: {pid}"
-            assert cell == f'<a href="#{pid}-limits">{n}</a>', f"{lang}: {pid}"
+            assert cell.startswith(f'<a href="#{pid}-limits">{n}<span class="tp-ov-unit"> '), f"{lang}: {pid}"
 
 
 def test_every_address_names_its_version():
