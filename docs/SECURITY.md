@@ -449,7 +449,10 @@ the phone, and a changed page can read the key the phone keeps: they can
 then drive the remote (play, stop, record, the volume) until New address,
 though never reach a login, a file or anything beyond what the remote does.
 Server mode's and the remote API's tokens are in their addresses, so such a
-reader can use them; a converted cast serves only its receiver's address -
+reader can use them - and the remote API's shared playlist hands each
+stream on as a redirect to the source's own address, an Xtream login in it
+(`core/remote_api._redirect_stream`), so its token reaches those logins
+too; server mode restreams instead and hands out none. A converted cast serves only its receiver's address -
 or, where that is not known, the first that asks for its own address -,
 which another device on the network could take.
 
@@ -696,7 +699,10 @@ is not made at all (`core/memory_safe.py`):
   that needs converting is refused with the reason (`cast_err_private_memory`
   - the converter of the stream before goes first), a subtitle reaches mpv
   as bytes in its address (`hex://`), no file. A copy of a subtitle without
-  stray right-to-left marks is not made.
+  stray right-to-left marks is not made. A subtitle search asks
+  OpenSubtitles by the words in its box - the title playing, filled in -
+  as the person opens it (it searches at once) and on each search after:
+  what the person asks for right then goes (rule 3), as any search does.
 - **Turned on midway.** Private viewing turned on while a channel plays
   from a buffer on the disk - the app's or mpv's - opens it again, in
   memory or with none, and the disk buffer goes (`private_reopen_needed`,
@@ -890,7 +896,11 @@ The yt-dlp the app may download is the release the build pinned: its
 SHA-256s in the app's signed release (`core/ytdlp_pin.py`). A release of
 yt-dlp's that is itself bad - its key or its build taken over - is not
 seen, and it runs as the person. A new yt-dlp comes only with the next
-release of the app.
+release of the app. The copy is checked against that SHA-256 when it is
+installed and then known by its mark - the SHA-256, its size and time
+(`ytdlp.own_copy`, a stat, no read) - in the user's own 0700 folder: whoever
+could put another file there with the same size and time could as well
+change the app itself.
 
 *Why:* an old yt-dlp is the usual reason a stream stops opening. The app's
 copy can be turned off (`ytdlp_managed`): then only the system's is used.

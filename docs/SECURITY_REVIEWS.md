@@ -286,3 +286,35 @@ CodeQL on `main`. Checked against the code, what holds:
 | CodeQL | yt-dlp's own copy and wrapper runnable by other users; SHA-1 for ids kept in memory | low | After 1.6.9: this user's alone (0700); SHA-256 |
 | CodeQL | 40 log lines "logging a password", a cache file "storing a secret", SHA-1 for the picture cache's file names, MD5 in NextPVR's login, three sockets on every interface | answered | False positives or by design: the stream address (which holds an Xtream login) taints every row that carries one, while each line logs `url_for_log`, `redact_url`, `address_scheme` or `for_log` of it; the cache's names are no secret; NextPVR's protocol is MD5; the HDHomeRun and mDNS answers and server mode must listen on the network |
 | CodeQL | 25 in the tests (fake servers, test regexes) | answered | The tests' own, not the app's |
+
+## November 2026 - an independent AI review of 1.6.10 (testing at ec467dd)
+
+The maintainer gave the review kit (`tools/review_kit.py`, 19 parts, the
+code at `ec467dd`) to ChatGPT, which read the excerpts and the linked
+files. It scored the whole 6/10 against docs/SECURITY.md, found no
+critical or unauthenticated takeover, and listed 46 weaknesses. Checked
+against the code and the threat model, none is a defect the code did not
+already mean: almost every one is a limit docs/SECURITY.md writes down
+with its reason, and three that it did not say were written down.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Network boundary | A public name that resolves to a home address is not refused for the app's own requests (pictures) nor for the player; "close this first" | medium | Written down: **A list chooses where its pictures come from**, and its reason (a media server's artwork and Plex's `plex.direct` names resolve to home addresses). Put to the maintainer as a choice for a later version: refuse it for an internet source's own requests, the source's own server and Plex's names left out |
+| Logins | Kept in the settings files, not a keyring; http providers send them in the clear; the player does not check certificates on old libraries | high | Written down: **Logins are in the settings files, not a keyring**, **A provider on plain http**, **The player checks certificates only as its libraries do** (the maintainer's decision: playback first) |
+| LAN servers | Plain http: a reader takes the tokens, a changer can change the phone remote's page | high | Written down: **The home network's servers speak plain http**. Added: the remote API's shared playlist redirects to the source's own address, an Xtream login in it, so its token reaches those logins (server mode restreams instead) |
+| Casting | A receiver gets the stream address, a device can take a name, the Apple TV bridge serves the first asker | high/medium | Written down: **A cast hands the TV the stream address**, the device table's "what is left", the bridge's `admits` |
+| Tuner | Endpoints without a token for the devices let in | medium | Written down: **The tuner without its token**; off by default since 1.6.9 |
+| Updates | The site can hold an update back or offer an older signed release still newer than the one running; the release key and the build are trusted | medium/high | Written down: **What dopeiptv.org keeps is its word**, **Builds are not yet reproducible**, **The build key signs in jobs that run other people's code**; the release key signs only after the maintainer approves (`release-signing`) |
+| Updates | The AppImage checked by its path, then moved by its path - a race in a folder another account can write to | medium, conditional | Answered: whoever can write that folder can replace the AppImage itself at any time; nothing new is opened |
+| yt-dlp | The app's copy known by its size and time after install, not hashed before each run | medium, conditional | Answered and written down under **yt-dlp is trusted by its own signature**: the folder is the user's own (0700); whoever can write there can change the app too |
+| Private viewing | Turned on midway: a converter's second, a request already sent; providers and TVs see what they serve | medium | Written down: **Private viewing writes nothing to a disk** (the second each converter is watched in, what it does not reach) |
+| Private viewing | A subtitle search sends the title | low | Written down: the search asks by the words in its box as the person opens it - what is asked right then goes (rule 3) |
+| Reports | Pattern cleaning cannot catch every name; the site sees the address and the time | medium/low | Written down: the report is shown whole before Send, and **What dopeiptv.org keeps is its word** |
+| Sync | The code is the whole key; the server can hold a copy back from a new computer; a slot only an older app wrote is unbound | high/medium | Written down: **The sync code is the whole key**, **The sync server can hold a copy back** (the older slot there too) |
+| Watch together | The relay sees who is in a room and when; a replay across a restart | medium | Written down: **The Watch together relay sees who is in a room**; the restart's limit in the round above |
+| Statistics | Visits kept 14 days could single someone out; swap is warned about, not enforced | medium | Written down on the transparency page (part 10) and in the round above |
+| Backups | An unencrypted export, a weak password, a restore staged decrypted, a restore that turns things on | medium | Written down: **A backup's password is as strong as the password**; the staged file is 0600 beside the settings that then hold the same logins; what a restore turns on is named before it is put back (`backup.RISKY_SOURCE`, `SIGN_INS`) |
+| Profiles | A short PIN offline; kids filtering by the provider's categories | medium | Written down: **A PIN can be short**, **A kids profile holds only with a grown-up's PIN** |
+| Links | A web page can play a named channel | low | Written down: **A link to a channel plays without a question** |
+| Third parties | TMDB sees the titles looked up; the built-in key can be read from the app | medium/low | Written down: **TMDB learns what is looked up**; Provider artwork, TMDB off asks it nothing; the key is public by nature |
+| Media libraries | mpv's and FFmpeg's parsers and their own requests | medium | Written down: **Bugs in the media libraries are theirs**, **The player and the recorder look names up themselves**, **A hostile source can make the app work up to its ceilings** |
