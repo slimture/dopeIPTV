@@ -62,10 +62,13 @@ def test_a_payment_is_counted_per_day_and_never_on_the_visit():
     stats, state = {"days": {}}, {}
     visits = sc.Visits({}, state)
     _hit(sc, stats, state, visits, "view", "2026-11-19T10:00:00+00:00")
-    _hit(sc, stats, state, visits, "donate", "2026-11-19T10:00:30+00:00")
-    _hit(sc, stats, state, visits, "donated", "2026-11-19T10:02:00+00:00")
+    _hit(sc, stats, state, visits, "support", "2026-11-19T10:00:30+00:00")
+    _hit(sc, stats, state, visits, "supported", "2026-11-19T10:02:00+00:00")
     day = stats["days"]["2026-11-19"]
     assert day["events"] == {"donate": 1, "donated": 1}
+    # A page cached from before November 2026 sends the stored names itself.
+    _hit(sc, stats, state, visits, "donated", "2026-11-19T10:03:00+00:00")
+    assert day["events"] == {"donate": 1, "donated": 2}
     (visit,) = visits.day("2026-11-19")
     assert [e[1] for e in visit["events"]] == ["donate"]
     assert "donated" not in json.dumps(visit)

@@ -108,9 +108,9 @@ GitHub Sponsors beside them. What is on is the server's
 (`/usr/local/etc/iptv-site.conf`, read by `sync-releases.sh`), and until one
 is set the site invites to nothing. The one thing that is not static is a
 small service, `donate/donate.py` (standard-library Python on a Unix socket):
-the dialog's `/donate/` makes the PaymentIntent, and back from paying,
-`/donate/key` and `/support/key` ask Stripe whether the payment went through
-and give the supporter key for it.
+the dialog's `/pay/` makes the PaymentIntent, and back from paying,
+`/support/key` asks Stripe whether the payment went through and gives the
+supporter key for it.
 
 The same service serves the admin page, `/admin/` for its admins only
 (`donate/admin.py`, `donate/admin/`; signing in with a passkey, or a password
@@ -170,8 +170,7 @@ curl -sI 'https://dopeiptv.org/trakt/callback/?code=x&state=y' | grep -i locatio
 `/privacy/`, `/terms/`, `/support/` and `/about/` - the privacy policy,
 the terms of use, support (a tip, monthly support, the supporter key,
 refunds and disputes), and the company details the Swedish E-Commerce Act
-asks for. Linked from a row at the foot of every page (`/donations/` sends
-visitors to `/support/`). Every footer names Solecraft AB with its
+asks for. Linked from a row at the foot of every page. Every footer names Solecraft AB with its
 organisation number, address and e-mail, and says in the reader's language
 that dopeIPTV does not contain, sell or link to any channels or other
 content (`foot_nocontent`).

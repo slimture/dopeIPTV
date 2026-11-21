@@ -238,12 +238,15 @@ def test_what_cannot_be_read_is_answered_and_a_fault_is_said_without_its_words()
     try:
         with contextlib.redirect_stderr(said):
             site = {"Origin": donate.ORIGIN}
+            status, body, _r = _call(srv, "POST", "/pay/session", b'{"amount": 1e999, "currency": "eur"}', site)
+            assert (status, body) == (400, {"error": "amount"})
+            # A page cached from before November 2026 asks under the old name.
             status, body, _r = _call(srv, "POST", "/donate/session", b'{"amount": 1e999, "currency": "eur"}', site)
             assert (status, body) == (400, {"error": "amount"})
             deep = ("[" * 3000 + "]" * 3000).encode()
             assert _call(srv, "POST", "/feedback/report", deep, {"X-Dopeiptv-Report": "1"})[0] == 400
             assert _call(srv, "POST", "/admin/auth/password", deep, site)[0] == 400
-            status, body, _r = _call(srv, "OPTIONS", "/donate/config")
+            status, body, _r = _call(srv, "OPTIONS", "/pay/config")
             assert (status, body) == (501, {"error": "method"})
             # A fault of the service's own: answered, said once by kind and place.
             donate.find_key = lambda data: 1 // 0

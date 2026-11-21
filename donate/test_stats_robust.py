@@ -200,7 +200,7 @@ def test_one_visit_stops_growing_however_much_is_sent_for_it():
     sc, root = _module()
     sc.MAX_VISIT_PAGES, sc.MAX_VISIT_EVENTS, sc.MAX_VISIT_DOWNLOADS = 5, 3, 2
     lines = [_view(at=NOW + timedelta(seconds=i)) for i in range(12)]
-    lines += [_line("/hit?p=%2F&ev=donate", at=NOW + timedelta(seconds=20 + i)) for i in range(8)]
+    lines += [_line("/hit?p=%2F&ev=support", at=NOW + timedelta(seconds=20 + i)) for i in range(8)]
     _write(root, "stats.log", lines)
     stamp = NOW.strftime("%d/%b/%Y:%H:%M:%S %z")
     _write(root, "dl.log", [f'10.0.1.3 - - [{stamp}] "GET /dl.php?f=dopeIPTV-1.6.8.{i}-x86_64.AppImage HTTP/1.0" 302 0 '

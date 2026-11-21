@@ -252,6 +252,11 @@ READ_MAX = 32 << 20
 #: has as many, and one that goes on being sent stops growing there.
 MAX_VISIT_PAGES = 1000
 MAX_VISIT_EVENTS = 200
+#: What a page sends for the tip dialog opened (or a way to support picked
+#: on the support page) and for a tip paid, kept under the names the
+#: statistics have always had. A page cached from before November 2026
+#: sends those names itself.
+SUPPORT_EVENTS = {"support": "donate", "supported": "donated"}
 MAX_VISIT_DOWNLOADS = 200
 
 PAGES = {"/": "/", "/help/": "/help/"}
@@ -1308,6 +1313,7 @@ def _page_line(stats: dict, state: dict, r: dict, db, visits: Visits) -> None:
     vid = _hash(state, day, ip, ua)
     d = _day(stats, day)
     ev = q.get("ev", "view")
+    ev = SUPPORT_EVENTS.get(ev, ev)
     visit = visits.open_visit(day, vid, t)
 
     if ev == "leave":                           # how long the page was looked at

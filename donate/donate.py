@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """donate.py - the one piece of the site that is not static.
 
-Support for dopeIPTV is a tip or monthly support, never a donation, on
-dopeIPTV's own Stripe account (Solecraft AB). A tip is paid in the tip
+Support for dopeIPTV is a tip or monthly support, on dopeIPTV's own
+Stripe account (Solecraft AB). A tip is paid in the tip
 dialog on the site itself (public/nav.js): Stripe's card form (the Payment
 Element) in Stripe's iframes, and Apple Pay / Google Pay in the wallet's own
 sheet. Both pay a PaymentIntent, and only a server holding the secret key
@@ -16,17 +16,18 @@ cookie, /admin-session) - and
 tells the owner's devices when someone has supported dopeIPTV: Web Push, turned on per
 device on the admin page (needs Python's cryptography package).
 
-    GET  /donate/config   {"publishableKey", "currency", "country", "name", "pmc",
+    GET  /pay/config      {"publishableKey", "currency", "country", "name", "pmc",
                            "currencies": {"sek": {"presets", "min", "max"}, ...}}
-    POST /donate/session  {"amount": 5000, "currency": "sek"}
+    POST /pay/session     {"amount": 5000, "currency": "sek"}
                           ->  {"clientSecret", "publishableKey"}
-    POST /donate/wallet   {"amount", "currency", "paymentMethod", "email", "name"}
+    POST /pay/wallet      {"amount", "currency", "paymentMethod", "email", "name"}
                           ->  {"ok": true, "key"?} | {"action": client_secret} | {"error"}
     POST /support/key     {"cs": client_secret} (the tip dialog, right after
                           paying) | {"t": receipt token} (a tip's receipt link)
                           | {"s": "cs_..."} (back from monthly support's page)
                           ->  {"key", "since"} | {"pending": true} (202) | {"error"}
-                          (/donate/key: the same, for a page cached from before)
+                          (OLD_PATHS: a page cached from before November 2026
+                          asks the same under its old names)
     GET  /support/status  {"stripe", "dialog", "keys"}: whether it is set up
                           (--check; nginx does not pass it on)
     GET/PUT/DELETE /sync/<slot>
@@ -54,13 +55,12 @@ The payer tips in their own currency: the page picks it from where the
 device says it is (nav.js), out of CURRENCIES below, and the amounts are
 round ones in that currency - 30/50/100/250 kr, not 3 euro. A currency or
 an amount outside that table is refused. The words are a tip's everywhere
-(the receipt's "Tip for dopeIPTV", the buttons): Stripe takes donations
-only for charities.
+(the receipt's "Tip for dopeIPTV", the buttons).
 
 Standard library only (Python 3.9+). It listens on a Unix socket - no
 network, so nothing outside the machine can reach it and a jail's loopback
 does not matter; on the machine only nginx's workers (its group) and this
-service may connect - and nginx passes /donate/ to it
+service may connect - and nginx passes /pay/ to it
 (the content server's nginx file), with a rate limit in front.
 
     python3 donate.py --check     asks the running service how it is set up
@@ -162,8 +162,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 STRIPE_PI = "https://api.stripe.com/v1/payment_intents"
 STRIPE_PM = "https://api.stripe.com/v1/payment_methods/"
 #: The wallets the tip dialog offers (nav.js turns Link and the browser's
-#: own saved cards off): what /donate/wallet takes, and nothing else.
+#: own saved cards off): what /pay/wallet takes, and nothing else.
 WALLETS = ("apple_pay", "google_pay")
+#: The tip dialog's addresses before November 2026, for a page a browser
+#: still holds from then: answered as the new ones. Out once no page that
+#: old can be cached any longer (nginx's location for them goes with it).
+OLD_PATHS = {"/donate/config": "/pay/config", "/donate/session": "/pay/session",
+             "/donate/wallet": "/pay/wallet", "/donate/key": "/support/key"}
 _PM = re.compile(r"^pm_[A-Za-z0-9]{8,200}$")
 STRIPE_CS = "https://api.stripe.com/v1/checkout/sessions"
 
@@ -545,7 +550,7 @@ def _public() -> bytes:
 
 
 def find_key(data: dict) -> tuple[int, dict]:
-    """POST /support/key (and the old /donate/key): the tip dialog right
+    """POST /support/key: the tip dialog right
     after paying ({"cs"}: the PaymentIntent's client secret), the link in a
     tip's receipt ({"t"}), or the support page back from monthly support's
     Stripe page ({"s"}: the Checkout Session). Stripe says whether the
@@ -956,7 +961,7 @@ def _vapid_auth(endpoint: str) -> str:
     return f"vapid t={head}.{_b64u(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}, k={push_key()}"
 
 
-def push(title: str, body: str, url: str = "/admin/#donations", tag: str = "") -> tuple:
+def push(title: str, body: str, url: str = "/admin/#payments", tag: str = "") -> tuple:
     """To every device that turned notifications on: (how many took it, why
     not, "" when all did). A device its push service no longer knows (404,
     410: notifications turned off, the browser reset) is forgotten."""
@@ -1873,7 +1878,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/support/status":       # --check, through the socket; nginx does not pass it on
             return self._send(200, {"stripe": bool(_secret()), "dialog": bool(PUBLISHABLE),
                                     "keys": _supporter_seed() is not None})
-        if path != "/donate/config":
+        if OLD_PATHS.get(path, path) != "/pay/config":
             return self._send(404, {"error": "not found"})
         if not PUBLISHABLE or not _secret():
             return self._send(503, {"error": "not configured"})
@@ -1909,9 +1914,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._feedback()
         if path == FEEDBACK_REPLIES:
             return self._feedback_replies()
-        if path in ("/support/key", "/donate/key"):
+        path = OLD_PATHS.get(path, path)
+        if path == "/support/key":
             return self._key()
-        if path not in ("/donate/session", "/donate/wallet"):
+        if path not in ("/pay/session", "/pay/wallet"):
             return self._send(404, {"error": "not found"})
         origin = (self.headers.get("Origin") or "").rstrip("/")
         if origin != ORIGIN:
@@ -1940,7 +1946,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "amount", "min": lo, "max": hi})
         if currency in WHOLE_UNITS and amount % 100:
             return self._send(400, {"error": "amount"})
-        if path == "/donate/session":
+        if path == "/pay/session":
             status, body = create_session(amount, currency)
             return self._send(status, body)
         method = str(data.get("paymentMethod") or "")

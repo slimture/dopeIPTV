@@ -1,4 +1,4 @@
-"""/donate/wallet charges only an Apple Pay or Google Pay card, as Stripe
+"""/pay/wallet charges only an Apple Pay or Google Pay card, as Stripe
 says the payment method is (donate.py, wallet_pay), and says a refusal only
 as one - never Stripe's reason - so it is no way to test stolen cards.
 Stripe is a stand-in here: nothing is sent anywhere."""

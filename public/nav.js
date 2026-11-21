@@ -198,8 +198,8 @@ var iptvHit = (function () {
 /* Support, around the tip dialog (the next part): a tip is given in the
  * dialog, monthly support through Stripe's own Payment Link on the support
  * page (/support/, render.jq's support options). What is here:
- * - links from elsewhere: dopeiptv.org/#donate (GitHub's Sponsor button,
- *   older apps, release notes) opens the tip dialog, the app's heart
+ * - links from elsewhere: the tip dialog's old link (apps up to 1.6.4,
+ *   older release notes) opens the tip dialog, the app's heart
  *   (#support) shows the band on the front page, an invitation; with the
  *   dialog off both land on /support/, a receipt's #key link too;
  * - back from monthly support's Payment Link (/support/?paid=<Checkout
@@ -241,7 +241,7 @@ var iptvHit = (function () {
   }
 
   // -- where a link from elsewhere lands ----------------------------------------
-  // The tip dialog takes #donate and a receipt's #key itself (the next part).
+  // The tip dialog takes its old link and a receipt's #key itself (the next part).
   // Without it - the dialog off, or a browser without <dialog> - the support
   // page has the ways to give, and its thank-you a receipt's key.
   var DIALOG = !!(document.getElementById("tip-i18n") && window.fetch && window.Promise &&
@@ -264,7 +264,7 @@ var iptvHit = (function () {
     if (band0) {
       requestAnimationFrame(function () {
         band0.scrollIntoView({ behavior: CALM ? "auto" : "smooth", block: "center" });
-        var btn = band0.querySelector(".donate-btn");
+        var btn = band0.querySelector(".supband-btn");
         if (btn && !CALM) {
           setTimeout(function () { btn.classList.add("invite"); }, 500);
           setTimeout(function () { btn.classList.remove("invite"); }, 3100);
@@ -274,7 +274,7 @@ var iptvHit = (function () {
   }
 
   // The band on the front page beats and drifts only while it is in view.
-  var band = document.querySelector(".donate");
+  var band = document.querySelector(".supband");
   if (band && "IntersectionObserver" in window) {
     new IntersectionObserver(function (seen) {
       seen.forEach(function (s) { band.classList.toggle("is-live", s.isIntersecting); });
@@ -283,7 +283,7 @@ var iptvHit = (function () {
   // A heart pressed beats once on its way to the support page (one that
   // opens the tip dialog beats there).
   document.addEventListener("click", function (e) {
-    var a = e.target.closest ? e.target.closest("a.navdonate, a.navheart, a.donate-btn") : null;
+    var a = e.target.closest ? e.target.closest("a.navsupport, a.navheart, a.supband-btn") : null;
     if (a && !(DIALOG && a.hasAttribute("data-tip-dialog"))) { thump(a.querySelector("svg") || a); }
   });
 
@@ -333,7 +333,7 @@ var iptvHit = (function () {
         .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
         .then(function (got) {
           if (got[0] === 200 && showKey(got[1].key)) {
-            if (typeof iptvHit === "function") { iptvHit("donated"); }
+            if (typeof iptvHit === "function") { iptvHit("supported"); }
             return;
           }
           if (got[0] === 202 && ++tries < 6) { say(T.keywait); setTimeout(function () { ask(what); }, 5000); return; }
@@ -412,7 +412,7 @@ var iptvHit = (function () {
       });
       if (rows.length > 3) { ul.append(mk("li", "owner-more", "and " + (rows.length - 3) + " more")); }
       var link = mk("a", "owner-link", "Open statistics");
-      link.href = "/admin/#donations";
+      link.href = "/admin/#payments";
       link.addEventListener("click", function () { away(rows); });
       body.append(ul, link);
       var shut = mk("button", "owner-close", "×");
@@ -684,11 +684,11 @@ var iptvCurrency = (function () {
  * <dialog>, a click simply goes there. Once the dialog is open it never leaves the
  * page: a failure is a sentence in the dialog and the reason in the
  * console. The page holds the dialog's words in #tip-i18n; amounts and the
- * publishable key come from /donate/config, the PaymentIntent from
- * /donate/session (donate/donate.py).
+ * publishable key come from /pay/config, the PaymentIntent from
+ * /pay/session (donate/donate.py).
  *
  * Apple Pay and Google Pay: where the device has one, the main button opens
- * the wallet's own sheet (Stripe's Payment Request) and /donate/wallet
+ * the wallet's own sheet (Stripe's Payment Request) and /pay/wallet
  * confirms the payment with what the wallet hands back; "Pay with card"
  * under it opens the card form.
  *
@@ -704,15 +704,15 @@ var iptvCurrency = (function () {
  * "Continue" steady for a browser Stripe said has no wallet.
  *
  * The visitor pays in their own currency: guessCurrency() picks it from
- * where the device says it is, out of the ones /donate/config offers, and a
+ * where the device says it is, out of the ones /pay/config offers, and a
  * small menu in the dialog's head changes it on either step - on the card
  * form's step the form follows at once (remembered on this device).
  *
  * A tip comes with a supporter key for the app (donate/supporter.py): the
  * thank-you shows it with a copy button and a dopeiptv:// link that hands
- * it to the app. It comes from /donate/key once Stripe says the payment
+ * it to the app. It comes from /support/key once Stripe says the payment
  * went through ({cs} right after paying, or back from a method that left
- * the page), in /donate/wallet's answer for Apple Pay and Google Pay, and
+ * the page), in /pay/wallet's answer for Apple Pay and Google Pay, and
  * from the link in Stripe's receipt (dopeiptv.org/support/#key=<token>,
  * {t}) - so it can be fetched again later. Remembered in this browser only,
  * where the dialog offers it again.
@@ -1006,12 +1006,12 @@ var iptvCurrency = (function () {
     }
     return stripeLoading;
   }
-  // /donate/config once, shared by the warm-up and the dialog.
+  // /pay/config once, shared by the warm-up and the dialog.
   function getConfig() {
     if (cfg) { return Promise.resolve(cfg); }
     if (!cfgLoading) {
-      cfgLoading = fetch("/donate/config", { credentials: "same-origin" })
-        .then(function (r) { if (!r.ok) { throw new Error("/donate/config answered " + r.status); } return r.json(); })
+      cfgLoading = fetch("/pay/config", { credentials: "same-origin" })
+        .then(function (r) { if (!r.ok) { throw new Error("/pay/config answered " + r.status); } return r.json(); })
         .then(function (c) { cfg = c; if (!offered(cur)) { cur = guessCurrency(); } return c; },
               function (err) { cfgLoading = null; throw err; });
     }
@@ -1268,7 +1268,7 @@ var iptvCurrency = (function () {
   function fetchKey(ask, quiet) {
     if (!T.key) { return; }
     if (!quiet) { keyState(T.loading); }
-    fetch("/donate/key", { method: "POST", credentials: "same-origin",
+    fetch("/support/key", { method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(ask) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
       .then(function (got) {
@@ -1401,7 +1401,7 @@ var iptvCurrency = (function () {
 
   function open(href, from) {
     if (!dlg) { build(); }
-    if (typeof iptvHit === "function") { iptvHit("donate"); }
+    if (typeof iptvHit === "function") { iptvHit("support"); }
     el.loading.textContent = T.loading;
     show(el.loading);
     dlg.showModal();
@@ -1415,7 +1415,7 @@ var iptvCurrency = (function () {
         currencies(); chips(); prepareWallet(); show(el.amounts);
       })
       .catch(function (err) {
-        warn("the donate service did not answer (donate.py, nginx /donate/):", err);
+        warn("the payment service did not answer (donate.py, nginx /pay/):", err);
         el.loading.textContent = T.failed;
       });
   }
@@ -1463,11 +1463,11 @@ var iptvCurrency = (function () {
     pr.update({ currency: code(), total: { label: cfg.name || T.title, amount: walletAmount } });
     pr.show();
   }
-  function donated() {
-    if (typeof iptvHit === "function") { iptvHit("donated"); }
+  function tipped() {
+    if (typeof iptvHit === "function") { iptvHit("supported"); }
   }
   function walletDone(res) {
-    donated(); show(el.done);
+    tipped(); show(el.done);
     if (res && res.key) { showKey(res.key); } else if (res && res.cs) { fetchKey({ cs: res.cs }, true); }
   }
   function walletFailed(msg) {
@@ -1475,7 +1475,7 @@ var iptvCurrency = (function () {
     el.err1.textContent = msg || T.failed; el.err1.hidden = false;
   }
   function walletPaid(ev) {
-    fetch("/donate/wallet", { method: "POST", credentials: "same-origin",
+    fetch("/pay/wallet", { method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: walletAmount, currency: code(), paymentMethod: ev.paymentMethod.id,
         email: ev.payerEmail || "", name: ev.payerName || "" }) })
@@ -1555,10 +1555,10 @@ var iptvCurrency = (function () {
     var elements = live.elements, amount = chosen, currency = code();
     elements.submit().then(function (r) {
       if (r && r.error) { throw { shown: r.error.message }; }
-      return fetch("/donate/session", { method: "POST", credentials: "same-origin",
+      return fetch("/pay/session", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amount, currency: currency }) })
         .then(function (res) {
-          if (!res.ok) { throw new Error("/donate/session answered " + res.status + " (the reason is in /var/log/iptv-donate.log)"); }
+          if (!res.ok) { throw new Error("/pay/session answered " + res.status + " (the reason is in /var/log/iptv-service.log)"); }
           return res.json();
         });
     }).then(function (sess) {
@@ -1576,7 +1576,7 @@ var iptvCurrency = (function () {
       if (r && r.error) { payAgain(r.error.message); return; }
       var state = r && r.paymentIntent && r.paymentIntent.status;
       if (state === "succeeded" || state === "processing") {
-        teardown(); busy = false; donated(); show(el.done);
+        teardown(); busy = false; tipped(); show(el.done);
         fetchKey({ cs: paidSecret }, state !== "succeeded");
         return;
       }
@@ -1614,11 +1614,11 @@ var iptvCurrency = (function () {
   // Back from a payment method that left the page (Klarna and the like).
   var back = /[?&]payment_intent_client_secret=([A-Za-z0-9_]+)/.exec(window.location.search);
   var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
-  if (/[?&](tipped|donated)=1(&|$)/.test(window.location.search)) {
+  if (/[?&]tipped=1(&|$)/.test(window.location.search)) {
     try {
       // Stripe's own return parameters go too: the secret is not for the history.
       history.replaceState(null, "", window.location.pathname +
-        window.location.search.replace(/([?&])(tipped|donated|payment_intent|payment_intent_client_secret|redirect_status)=[^&]*/g, "$1")
+        window.location.search.replace(/([?&])(tipped|payment_intent|payment_intent_client_secret|redirect_status)=[^&]*/g, "$1")
           .replace(/[?&]+$/, "").replace(/\?&+/, "?") +
         window.location.hash);
     } catch (e) { /* the address stays; harmless */ }
@@ -1629,8 +1629,8 @@ var iptvCurrency = (function () {
     keyOnly();
     fetchKey({ t: receipt[1] }, false);
   } else if (window.location.hash === "#donate") {
-    // A link from elsewhere - GitHub's Sponsor button in older releases, the
-    // README, the release notes: dopeiptv.org/#donate - opens the dialog.
+    // The dialog's old link from elsewhere - apps up to 1.6.4, older
+    // release notes - opens it.
     try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) { /* harmless */ }
     open();
   }
@@ -1694,7 +1694,7 @@ window.iptvCopyButtons = function (root) {
 };
 window.iptvCopyButtons(document);
 
-/* What dopeIPTV is built on, under the donate band: opened, the card
+/* What dopeIPTV is built on, under the support band: opened, the card
  * grows down, a small TV drops in and switches on, and the projects fly out
  * of it as its channels (style.css .built-more); closed, it folds back up. The page
  * follows the card down. Without motion, it simply opens and closes. */

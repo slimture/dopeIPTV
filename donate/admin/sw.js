@@ -9,7 +9,7 @@ self.addEventListener("push", (e) => {
     icon: "/apple-touch-icon.png",
     badge: "/favicon.png?v=2",
     tag: d.tag || undefined,
-    data: { url: d.url || "/admin/#donations" }
+    data: { url: d.url || "/admin/#payments" }
   }));
 });
 

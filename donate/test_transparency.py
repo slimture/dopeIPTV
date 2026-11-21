@@ -160,7 +160,7 @@ def test_every_log_on_the_server_is_named_on_the_page_and_in_the_policy():
     # languages - with what it holds and how long, beside it. That these are
     # all the server writes, its own repository's tests check against its
     # newsyslog file.
-    names = {"iptv.dope.rs-dl-counts.log", "iptv-sync.log", "iptv-donate.log", "error.log"}
+    names = {"iptv.dope.rs-dl-counts.log", "iptv-sync.log", "iptv-service.log", "error.log"}
     words = _words()
     for lang in ("en", "sv"):
         page = words[lang]

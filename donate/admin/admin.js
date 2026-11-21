@@ -775,10 +775,10 @@
   }
 
   function donations() {
-    const D = data.donations, box = $("donations");
+    const D = data.donations, box = $("payments");
     checkPush().then(notifyRow);
     notifyRow();
-    $("donations-all").textContent = D.error ? "" :
+    $("payments-all").textContent = D.error ? "" :
       "All time: " + num.format(D.count_all) + (D.count_all === 1 ? " payment" : " payments") +
       (D.count_all ? " · " + sums(D.sums_all) : "");
     if (D.error) {

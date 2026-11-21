@@ -323,7 +323,7 @@
   // Nor on Chromium: the rising cost it frames on a scroll (nav.js, .cr).
   var chromium = document.documentElement.classList.contains("cr");
   if ("IntersectionObserver" in window && !phone && !chromium) {
-    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .donate";
+    var sel = ".sec-head, .fxp, .shot, .dlx-card, .dl-phone, .supband";
     var fold = window.innerHeight * 0.92;
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {

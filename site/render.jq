@@ -195,7 +195,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "<link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\">\n";
   # The tip dialog's words (nav.js), on every page while it is on. The
   # amounts, the currencies and Stripe's publishable key come from the
-  # service (/donate/config).
+  # service (/pay/config).
   def tip_i18n:
     if $TIPS_ON | not then "" else
       "<div id=\"tip-i18n\" hidden"
@@ -204,7 +204,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["busy", "tip_busy"], ["lock", "support_stripe"], ["back", "tip_back"],
            ["thanks", "support_thanks"], ["receipt", "tip_receipt"], ["failed", "tip_failed"],
            ["emailmissing", "tip_email_missing"], ["range", "tip_range"],
-           ["close", "donate_close"], ["loading", "support_loading"],
+           ["close", "tip_close"], ["loading", "support_loading"],
            ["apple", "tip_apple"], ["google", "tip_google"], ["card", "tip_card"],
            ["key", "support_key"], ["keyhow", "support_key_how"], ["keycopy", "support_key_copy"],
            ["keycopied", "support_key_copied"], ["keyopen", "support_key_open"], ["keywait", "tip_key_wait"],
@@ -221,7 +221,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + ([[["title", "fbs_title"], ["intro", "fbs_intro"], ["topic", "fbs_topic"], ["bug", "fbs_t_bug"],
          ["idea", "fbs_t_idea"], ["like", "fbs_t_like"], ["question", "fbs_t_question"], ["where", "fbs_where"],
          ["app", "fbs_app"], ["site", "fbs_site"], ["ph", "fbs_ph"], ["send", "fbs_send"], ["sent", "fbs_sent"],
-         ["failed", "fbs_failed"], ["wait", "fbs_wait"], ["privacy", "fbs_privacy"], ["close", "donate_close"]][]
+         ["failed", "fbs_failed"], ["wait", "fbs_wait"], ["privacy", "fbs_privacy"], ["close", "tip_close"]][]
         | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
     + "></div>\n";
   def nav($current):
@@ -266,8 +266,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
             " data-send-link data-copied=\"\(t("dl_phone_copied") | h)\"")
      + mrow(mcur("help"); "/help/"; t("nav_help"); $ICON.help; macur("help"))) as $menuitems
     # Support: a quiet link beside the others, to the support page.
-    | "      <a class=\"navlink navdonate\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navdonate
-    | mrow(" navdonate" + mcur("support"); "/support/"; t("support_nav"); $ICON.heart; macur("support")) as $menudonate
+    | "      <a class=\"navlink navsupport\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navsupport
+    | mrow(" navsupport" + mcur("support"); "/support/"; t("support_nav"); $ICON.heart; macur("support")) as $menusupport
     # Under the rows, small: feedback and the rules, without scrolling to
     # the footer.
     | ("          <div class=\"navmenu-foot\"><a href=\"#feedback\" data-feedback>\(t("foot_feedback") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/privacy/\">\(t("foot_privacy") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/transparency/\">\(t("foot_transparency") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/terms/\">\(t("foot_terms") | h)</a></div>\n") as $menufoot
@@ -289,9 +289,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        else "" end) as $langpick
     | ($navtpl
        | expand({brand_href: (if $home then "#top" else "/" end), nav_base: $base};
-                {navlinks: ($navlinks + (if $SUPPORT_ON then $navdonate + $navheart else "" end)),
+                {navlinks: ($navlinks + (if $SUPPORT_ON then $navsupport + $navheart else "" end)),
                  langpick: $langpick,
-                 menuitems: ($menuitems + (if $SUPPORT_ON then $menudonate else "" end) + $menufoot)}))
+                 menuitems: ($menuitems + (if $SUPPORT_ON then $menusupport else "" end) + $menufoot)}))
       + tip_i18n + feedback_i18n;
   # Every page's footer, one for all: dopeIPTV and what it is, the links in
   # three small groups, and under a hairline who makes it, where to reach
@@ -488,11 +488,11 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   def support_band:
       "  <section id=\"support\" class=\"pt0\">\n"
       + "    <div class=\"wrap\">\n"
-      + "      <div class=\"donate donate-calm\">\n"
-      + "        <img class=\"donate-icon\" src=\"/supporter-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\" loading=\"lazy\">\n"
+      + "      <div class=\"supband supband-calm\">\n"
+      + "        <img class=\"supband-icon\" src=\"/supporter-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\" loading=\"lazy\">\n"
       + "        <h2>\(t("support_h2") | h)</h2>\n"
       + "        <p>\(t("support_p_short") | h)</p>\n"
-      + "        <a class=\"btn primary donate-btn\" href=\"/support/\"><svg class=\"donate-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
+      + "        <a class=\"btn primary supband-btn\" href=\"/support/\"><svg class=\"supband-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
       + "        <small>\(t("support_band_note") | h)</small>\n"
       + "      </div>\n"
       + "    </div>\n"
@@ -684,7 +684,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            + (if $notes == "" then "" else
                 " · <a class=\"wn-link\" href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\" data-wn>\(t("wn_h2") | h)</a>" end)),
          downloads: downloads($version; $reldate),
-         donate: (if $SUPPORT_ON then support_band else "" end),
+         support: (if $SUPPORT_ON then support_band else "" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
          # What's new: the notes in a <template>, opened in a dialog from the
          # link beside the version (app.js) - no section of their own.
@@ -697,8 +697,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   # Every language of the site, each in its own name - the answer to "which
   # languages?" lists them all ("%LANGS%" in its text), in i18n.json's order.
-  # "%DONATE%" in an answer is the donate link, which nav.js opens as the
-  # dialog, like the heart's.
+  # "%SUPPORT%" in an answer is the link to the support page.
   def langlist:
     "<ul class=\"langlist\">"
     + ([$S.names | to_entries[] | select(.key as $k | $avail | index($k) != null)
@@ -743,7 +742,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                  | hq($id) as $q
                  | "            <details class=\"help-item\" id=\"\($id | h)\">\n"
                    + "              <summary><h3>\($q | h)</h3></summary>\n"
-                   + "              <div class=\"help-a\">\(t(hkey($id) + "_a") | gsub("%LANGS%"; langlist) | gsub("%DONATE%"; "/support/"))"
+                   + "              <div class=\"help-a\">\(t(hkey($id) + "_a") | gsub("%LANGS%"; langlist) | gsub("%SUPPORT%"; "/support/"))"
                    # The settings page the answer is about, as the app shows
                    # it in the reader's language (tools/help_screenshots.py
                    # in the app's repository). Inside a closed <details>,
@@ -800,7 +799,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   def page_404: $tpl | expand(common; {nav: nav("")});
 
-# -- the legal pages: /privacy/, /terms/, /donations/, /about/ ----------------
+# -- the legal pages: /privacy/, /terms/, /payments/, /about/ -----------------
 # The text ($body, site/legal/<language>/<page>.html, which sync-releases.sh
 # picks by the same rule) is Swedish or English; a page in any other language
 # says so in the reader's language and points its canonical at the English.

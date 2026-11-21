@@ -80,14 +80,14 @@ header.bar { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(18
   background: color-mix(in srgb, var(--bar, var(--bg)) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .cr header.bar { -webkit-backdrop-filter: none; backdrop-filter: none;
   background: color-mix(in srgb, var(--bar, var(--bg)) 96%, transparent); }   /* nav.js: Chromium */
-/* Chromium: the donate band without its rounded clip - moving layers
+/* Chromium: the support band without its rounded clip - moving layers
    clipped to rounded corners cost it an offscreen pass every frame. What
    moves stays inside by itself: the big heart fits the band, the drifting
    hearts are faded out before they reach its top. */
-.cr .donate { overflow: visible; }
-.cr .donate-big { top: 9%; height: 82%; width: auto; aspect-ratio: 1 / 1; margin-top: 0; }
+.cr .supband { overflow: visible; }
+.cr .supband-big { top: 9%; height: 82%; width: auto; aspect-ratio: 1 / 1; margin-top: 0; }
 @media (max-width: 760px) {
-  .cr .donate-big { top: auto; right: 14px; bottom: 14px; width: 150px; height: 150px; }
+  .cr .supband-big { top: auto; right: 14px; bottom: 14px; width: 150px; height: 150px; }
 }
 .bar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
 .brand { display: flex; align-items: center; gap: 10px; }
@@ -370,44 +370,44 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
 /* Donate: one quiet card after the downloads, shown only when render.jq has
    an address. The link is Stripe's own page; nav.js opens the dialog below
    over it instead, and goes to that page if the dialog cannot open. */
-.donate { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center;
+.supband { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center;
   padding: 36px 40px; border-radius: var(--radius); position: relative; overflow: hidden; isolation: isolate;
   background: radial-gradient(55% 130% at 86% 50%, color-mix(in srgb, var(--heart) 24%, transparent), transparent 72%),
     var(--surface); }
 /* Behind the text: a big heart that beats, small ones drifting up past the
    button (.is-live, set by nav.js while the band is on screen). */
-.donate-fx { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-.donate-big { position: absolute; width: 300px; height: 300px; right: 5%; top: 50%; margin-top: -150px;
+.supband-fx { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.supband-big { position: absolute; width: 300px; height: 300px; right: 5%; top: 50%; margin-top: -150px;
   fill: var(--heart); opacity: .1; }
-.donate-fx i { position: absolute; bottom: -26px; width: 16px; height: 16px; background: var(--heart); opacity: 0;
+.supband-fx i { position: absolute; bottom: -26px; width: 16px; height: 16px; background: var(--heart); opacity: 0;
   -webkit-mask: url(/heart.svg) center / contain no-repeat; mask: url(/heart.svg) center / contain no-repeat; }
-.donate-fx i:nth-of-type(1) { left: 66%; width: 12px; height: 12px; animation-delay: 0s; }
-.donate-fx i:nth-of-type(2) { left: 74%; width: 18px; height: 18px; animation-delay: 1.3s; }
-.donate-fx i:nth-of-type(3) { left: 82%; width: 10px; height: 10px; animation-delay: 2.7s; }
-.donate-fx i:nth-of-type(4) { left: 90%; width: 15px; height: 15px; animation-delay: 4.1s; }
-.donate-fx i:nth-of-type(5) { left: 70%; width: 9px; height: 9px; animation-delay: 5.2s; }
-.donate-fx i:nth-of-type(6) { left: 86%; width: 20px; height: 20px; animation-delay: 6.4s; }
-.donate .donate-btn { position: relative; color: #fff; background: linear-gradient(135deg, #ff6b8b, #ff2d55 60%, #e8174a);
+.supband-fx i:nth-of-type(1) { left: 66%; width: 12px; height: 12px; animation-delay: 0s; }
+.supband-fx i:nth-of-type(2) { left: 74%; width: 18px; height: 18px; animation-delay: 1.3s; }
+.supband-fx i:nth-of-type(3) { left: 82%; width: 10px; height: 10px; animation-delay: 2.7s; }
+.supband-fx i:nth-of-type(4) { left: 90%; width: 15px; height: 15px; animation-delay: 4.1s; }
+.supband-fx i:nth-of-type(5) { left: 70%; width: 9px; height: 9px; animation-delay: 5.2s; }
+.supband-fx i:nth-of-type(6) { left: 86%; width: 20px; height: 20px; animation-delay: 6.4s; }
+.supband .supband-btn { position: relative; color: #fff; background: linear-gradient(135deg, #ff6b8b, #ff2d55 60%, #e8174a);
   box-shadow: 0 12px 30px -14px rgba(255, 45, 85, .8); }
-.donate .donate-btn::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+.supband .supband-btn::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
   background: rgba(255, 55, 95, .5); opacity: 0; pointer-events: none; }
-.donate .donate-btn:hover { background: linear-gradient(135deg, #ff7d99, #ff3b62 60%, #f01e52); }
-.donate-text h2 { font-size: clamp(1.35rem, 2.6vw, 1.7rem); margin: 10px 0 8px; }
-.donate-text p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 62ch; }
+.supband .supband-btn:hover { background: linear-gradient(135deg, #ff7d99, #ff3b62 60%, #f01e52); }
+.supband-text h2 { font-size: clamp(1.35rem, 2.6vw, 1.7rem); margin: 10px 0 8px; }
+.supband-text p { margin: 0; color: var(--muted); line-height: 1.65; max-width: 62ch; }
 /* On a phone the long reason gives way to one short sentence (below). */
-.donate-text .donate-short { display: none; }
-.donate-act { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-.donate-btn { padding: 13px 26px; font-size: 15px; }
-.donate-heart { width: 17px; height: 17px; fill: currentColor; }
-.donate-btn .donate-heart { color: #fff; }
-.donate-act small { color: var(--faint); font-size: 12px; max-width: 30ch; line-height: 1.5; }
+.supband-text .supband-short { display: none; }
+.supband-act { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.supband-btn { padding: 13px 26px; font-size: 15px; }
+.supband-heart { width: 17px; height: 17px; fill: currentColor; }
+.supband-btn .supband-heart { color: #fff; }
+.supband-act small { color: var(--faint); font-size: 12px; max-width: 30ch; line-height: 1.5; }
 @media (max-width: 760px) {
-  .donate { grid-template-columns: minmax(0, 1fr); padding: 22px; gap: 18px;
+  .supband { grid-template-columns: minmax(0, 1fr); padding: 22px; gap: 18px;
     background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
       var(--surface); }
-  .donate-big { width: 200px; height: 200px; right: -30px; top: auto; bottom: -40px; margin-top: 0; opacity: .08; }
-  .donate-act { align-items: stretch; }
-  .donate-btn { justify-content: center; }
+  .supband-big { width: 200px; height: 200px; right: -30px; top: auto; bottom: -40px; margin-top: 0; opacity: .08; }
+  .supband-act { align-items: stretch; }
+  .supband-btn { justify-content: center; }
 }
 .autonote { margin-top: 18px; font-size: 13px; color: var(--faint); line-height: 1.75; }
 .autonote code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--muted); overflow-wrap: anywhere; }
@@ -562,9 +562,9 @@ footer .foot-company a:hover { color: var(--accent); }
   background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .navmenu-item .mi-ico svg { width: 18px; height: 18px; fill: none; stroke: currentColor;
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.navmenu-item.navdonate .mi-ico { color: var(--heart);
+.navmenu-item.navsupport .mi-ico { color: var(--heart);
   background: color-mix(in srgb, var(--heart) 15%, transparent); }
-.navmenu-item.navdonate .mi-ico svg { fill: currentColor; stroke: none; }
+.navmenu-item.navsupport .mi-ico svg { fill: currentColor; stroke: none; }
 .navmenu-item:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .navmenu-item.is-current { color: var(--accent); font-weight: 600;
   background: color-mix(in srgb, var(--accent) 10%, transparent); }
@@ -1005,7 +1005,7 @@ body.searching .fl-group { margin-bottom: 30px; }
 [dir="rtl"] .fl-more a:hover .arr { transform: scaleX(-1) translateX(3px); }
 @media (prefers-reduced-motion: reduce) { .fl-more .arr { transition: none; } }
 
-/* ---- Legal pages: privacy, terms, donations, about ---------------------- */
+/* ---- Legal pages: privacy, terms, payments, about ----------------------- */
 /* Long text, so it reads like a document: one column of comfortable width,
    the body in the text colour rather than the muted grey of short answers,
    links underlined. The text is Swedish or English (render.jq page_legal),
@@ -1254,9 +1254,9 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
    Its link in the header, its ways to give - a tip and monthly support on
    Stripe's own pages, GitHub Sponsors - and the thank-you with the
    supporter key (nav.js) after paying. */
-nav.links .navdonate { color: var(--muted); }
-.navdonate .heart { width: 15px; height: 15px; flex: none; fill: var(--heart); }
-@media (min-width: 1001px) { nav.links a.navdonate { display: inline-flex; align-items: center; gap: 6px; } }
+nav.links .navsupport { color: var(--muted); }
+.navsupport .heart { width: 15px; height: 15px; flex: none; fill: var(--heart); }
+@media (min-width: 1001px) { nav.links a.navsupport { display: inline-flex; align-items: center; gap: 6px; } }
 /* The ways to give: three cards in a row (one under the other on a phone),
    the tip and the monthly support on the accent, GitHub quieter; a way not
    set up yet says "coming soon" on a button that is no link. */
@@ -1638,12 +1638,12 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 
   /* Fewer boxes: on a narrow screen the page reads as one column of text,
      and only the two swipe rows keep their cards. */
-  /* ...but the donate band keeps its card, its glow and its heart: on a
+  /* ...but the support band keeps its card, its glow and its heart: on a
      phone it is the one thing to do here, the app being for computers. */
-  .donate { text-align: center; gap: 20px; padding: 26px 20px 24px; }
-  .donate-text p { margin-inline: auto; }
-  .donate-act { align-items: center; }
-  .donate-btn { min-width: 220px; }
+  .supband { text-align: center; gap: 20px; padding: 26px 20px 24px; }
+  .supband-text p { margin-inline: auto; }
+  .supband-act { align-items: center; }
+  .supband-btn { min-width: 220px; }
 }
 .is-phone #download:not(.dl-open) .dlx,
 .is-phone #download:not(.dl-open) .dls,
@@ -1660,7 +1660,7 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 .is-phone .hero .cta-row { display: none; }
 /* The downloads go last on a phone: nothing there installs on it. What to
    do here - read, see, support - comes first. That swaps the last two bands
-   (a computer has downloads, then donate), so their colours swap with them
+   (a computer has downloads, then support), so their colours swap with them
    and the bands still take turns. */
 .is-phone main { display: flex; flex-direction: column; }
 /* Never the browser's scroll anchor: drawn last but first in the page's
@@ -1683,7 +1683,7 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 .is-phone .dlx-card.is-open { padding: 0 18px 18px; text-align: center; }
 .is-phone .dlx-card.is-open > h3 { margin: 0 -18px; }
 .is-phone .dlx-card .dlx-pick { align-self: center; }
-.is-phone #support .donate {
+.is-phone #support .supband {
   background: radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--heart) 22%, transparent), transparent 75%),
     var(--bg); }
 .is-phone .bar .btn, .handheld .bar .btn { display: none; }
@@ -1974,18 +1974,18 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
   .dlx-card { transition: transform .35s cubic-bezier(.2, .7, .2, 1), box-shadow .35s ease; }
   .dlx-card:hover { transform: translateY(-4px); box-shadow: 0 26px 50px -30px rgba(0, 0, 0, .5); }
   .dlx-card.is-mine:hover { box-shadow: inset 0 0 0 2px var(--accent), 0 26px 50px -30px rgba(0, 0, 0, .5); }
-  /* the donate band, while it is on screen */
+  /* the support band, while it is on screen */
   /* On a computer, calm: two soft beats and one drift of hearts each
      time it comes into view, then still. Pointed at, it beats on for as
      long as the pointer stays. */
-  .donate.is-live .donate-big { animation: heart-beat 2.8s ease-in-out 2; }
-  .donate.is-live .donate-fx i { animation: heart-drift 8s linear 1; }
-  .donate.is-live .donate-btn::after { animation: heart-glow 2.8s ease-out 2; }
-  .donate.is-live .donate-btn .donate-heart { animation: heart-beat 2.8s ease-in-out 2; }
+  .supband.is-live .supband-big { animation: heart-beat 2.8s ease-in-out 2; }
+  .supband.is-live .supband-fx i { animation: heart-drift 8s linear 1; }
+  .supband.is-live .supband-btn::after { animation: heart-glow 2.8s ease-out 2; }
+  .supband.is-live .supband-btn .supband-heart { animation: heart-beat 2.8s ease-in-out 2; }
   @media (hover: hover) {
-    .donate.is-live:hover .donate-big, .donate.is-live:hover .donate-btn::after,
-    .donate.is-live:hover .donate-btn .donate-heart,
-    .donate.is-live:hover .donate-fx i { animation-iteration-count: infinite; }
+    .supband.is-live:hover .supband-big, .supband.is-live:hover .supband-btn::after,
+    .supband.is-live:hover .supband-btn .supband-heart,
+    .supband.is-live:hover .supband-fx i { animation-iteration-count: infinite; }
   }
   @keyframes heart-beat { 0%, 36%, 100% { transform: scale(1); } 7% { transform: scale(1.08); }
     14% { transform: scale(.98); } 22% { transform: scale(1.04); } }
@@ -1997,11 +1997,11 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
   @keyframes heart-twice { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.3); } 30% { transform: scale(.95); }
     45% { transform: scale(1.18); } 60% { transform: scale(1); } }
   /* the heart beats when you mean it */
-  .donate-btn:hover .donate-heart, .navdonate:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
+  .supband-btn:hover .supband-heart, .navsupport:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
   @keyframes beat { 0%, 100% { transform: scale(1); } 20% { transform: scale(1.22); } 40% { transform: scale(.96); } 60% { transform: scale(1.12); } }
 }
 
-/* Less motion asked for: the hero fades in, the donate band's heart and
+/* Less motion asked for: the hero fades in, the support band's heart and
    button glow and a few hearts light up in place - nothing moves. */
 @media (prefers-reduced-motion: reduce) {
   @media (min-width: 721px) {
@@ -2010,17 +2010,17 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
     .hero h1 { animation-delay: .08s; } .hero .lede { animation-delay: .16s; }
     .hero .cta-row { animation-delay: .24s; } .hero .platnote, .hero .mock { animation-delay: .3s; }
   }
-  .donate .donate-btn::after { transform: scale(1.08, 1.45); }
-  .donate.is-live .donate-big { animation: calm-heart 3s ease-in-out 3; }
-  .donate.is-live .donate-btn::after { animation: calm-glow 3s ease-in-out 3; }
-  .donate-fx i { bottom: auto; }
-  .donate-fx i:nth-of-type(1) { top: 26%; } .donate-fx i:nth-of-type(2) { top: 58%; }
-  .donate-fx i:nth-of-type(3) { top: 16%; } .donate-fx i:nth-of-type(4) { top: 72%; }
-  .donate-fx i:nth-of-type(5) { top: 44%; } .donate-fx i:nth-of-type(6) { top: 30%; }
-  .donate.is-live .donate-fx i { animation: calm-twinkle 7.8s ease-in-out 1; }
+  .supband .supband-btn::after { transform: scale(1.08, 1.45); }
+  .supband.is-live .supband-big { animation: calm-heart 3s ease-in-out 3; }
+  .supband.is-live .supband-btn::after { animation: calm-glow 3s ease-in-out 3; }
+  .supband-fx i { bottom: auto; }
+  .supband-fx i:nth-of-type(1) { top: 26%; } .supband-fx i:nth-of-type(2) { top: 58%; }
+  .supband-fx i:nth-of-type(3) { top: 16%; } .supband-fx i:nth-of-type(4) { top: 72%; }
+  .supband-fx i:nth-of-type(5) { top: 44%; } .supband-fx i:nth-of-type(6) { top: 30%; }
+  .supband.is-live .supband-fx i { animation: calm-twinkle 7.8s ease-in-out 1; }
   @media (hover: hover) {
-    .donate.is-live:hover .donate-big, .donate.is-live:hover .donate-btn::after,
-    .donate.is-live:hover .donate-fx i { animation-iteration-count: infinite; }
+    .supband.is-live:hover .supband-big, .supband.is-live:hover .supband-btn::after,
+    .supband.is-live:hover .supband-fx i { animation-iteration-count: infinite; }
   }
   dialog.dn[open] .dn-titleheart { animation: calm-twice 1.3s .35s ease-in-out both; }
   .owner-note { animation: calm-fade .35s ease-out both; }
@@ -2033,16 +2033,16 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
   @keyframes calm-twice { 0%, 50%, 100% { opacity: 1; } 25%, 75% { opacity: .35; } }
 }
 
-/* On a phone, where nothing else moves, the donate band is alive while it
+/* On a phone, where nothing else moves, the support band is alive while it
    is on screen: the button's heart beats twice every few seconds and a few
    hearts drift up behind it, slowly. Only transform and opacity. */
 @media (prefers-reduced-motion: no-preference) and (max-width: 720px) {
-  .donate.is-live .donate-btn .donate-heart { animation: heart-beat-ph 4.2s ease-in-out 1s infinite; }
-  .donate.is-live .donate-big { animation: heart-beat-ph 4.2s ease-in-out 1s infinite; }
-  .donate.is-live .donate-fx i { animation: heart-drift-ph 9s linear infinite; }
-  .donate.is-live .donate-fx i:nth-of-type(n+4) { display: none; }
-  .donate-fx i:nth-of-type(1) { left: 62%; } .donate-fx i:nth-of-type(2) { left: 78%; animation-delay: 3s; }
-  .donate-fx i:nth-of-type(3) { left: 90%; animation-delay: 6s; }
+  .supband.is-live .supband-btn .supband-heart { animation: heart-beat-ph 4.2s ease-in-out 1s infinite; }
+  .supband.is-live .supband-big { animation: heart-beat-ph 4.2s ease-in-out 1s infinite; }
+  .supband.is-live .supband-fx i { animation: heart-drift-ph 9s linear infinite; }
+  .supband.is-live .supband-fx i:nth-of-type(n+4) { display: none; }
+  .supband-fx i:nth-of-type(1) { left: 62%; } .supband-fx i:nth-of-type(2) { left: 78%; animation-delay: 3s; }
+  .supband-fx i:nth-of-type(3) { left: 90%; animation-delay: 6s; }
   @keyframes heart-beat-ph { 0%, 30%, 100% { transform: scale(1); } 6% { transform: scale(1.14); }
     12% { transform: scale(.97); } 18% { transform: scale(1.08); } }
   @keyframes heart-drift-ph { 0% { transform: translate(0, 0) scale(.6) rotate(-10deg); opacity: 0; }
@@ -2053,13 +2053,13 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
    five seconds still - there, never busy. Only a transform (the GPU's),
    and pointed at it beats faster (above). Less motion asked for: it glows. */
 @media (prefers-reduced-motion: no-preference) {
-  nav.links a.navdonate .heart, nav.links .navheart svg { animation: nav-heart 6s ease-in-out 2s infinite; }
-  nav.links a.navdonate:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
+  nav.links a.navsupport .heart, nav.links .navheart svg { animation: nav-heart 6s ease-in-out 2s infinite; }
+  nav.links a.navsupport:hover .heart, nav.links .navheart:hover svg { animation: beat .9s ease-in-out infinite; }
   @keyframes nav-heart { 0%, 16%, 100% { transform: scale(1); } 4% { transform: scale(1.18); }
     8% { transform: scale(.96); } 12% { transform: scale(1.1); } }
 }
 @media (prefers-reduced-motion: reduce) {
-  nav.links a.navdonate .heart, nav.links .navheart svg { animation: nav-glow 6s ease-in-out 2s infinite; }
+  nav.links a.navsupport .heart, nav.links .navheart svg { animation: nav-glow 6s ease-in-out 2s infinite; }
   @keyframes nav-glow { 0%, 20%, 100% { opacity: 1; } 8% { opacity: .45; } }
 }
 
@@ -2068,17 +2068,17 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
    black and graphite in dark mode), so on a phone above all it is clear
    where one ends and the next begins. What sat on the grey before sits on
    the page colour inside a grey band. */
-/* hero, features, shots, downloads, donate - the donate card on the page
+/* hero, features, shots, downloads, support - the support card on the page
    colour's opposite, so it stays a card in its band. */
 #features, #download { background: var(--surface); }
 #features .fxp-tab.is-on { background: var(--bg); }
 #download .dlx-card { background: var(--bg); }
-#support .donate {
+#support .supband {
   background: radial-gradient(55% 130% at 86% 50%, color-mix(in srgb, var(--heart) 24%, transparent), transparent 72%),
     var(--surface); }
 #download .dlx-big.alt, #download .dlx.has-mine .dlx-card:not(.is-mine) .dlx-big { background: var(--surface); }
 footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0; }
-/* What dopeIPTV is built on, right under the donate band: a heading; opened, a card unfolds downwards and the projects drop into
+/* What dopeIPTV is built on, right under the support band: a heading; opened, a card unfolds downwards and the projects drop into
    place one after another, specks of the accent drifting down behind them
    (nav.js animates the height). */
 /* It stands on its own below the downloads, with room above it; right
@@ -2091,7 +2091,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
    band: room above the card, not on the line. */
 .is-phone #built, .is-phone #support + #built { background: var(--surface); padding-top: 32px; }
 @media (max-width: 720px) { #built, #support + #built { padding-bottom: 48px; margin-top: 4px; } }
-/* The heading in a card of its own, near square - the donate card's
+/* The heading in a card of its own, near square - the support card's
    corners and surface, a soft glow of the accent instead of its pink. */
 .built-more > summary { position: relative; border: 1px solid var(--line);
   background: radial-gradient(90% 90% at 50% 0, color-mix(in srgb, var(--accent) 6%, transparent), transparent), var(--surface);
@@ -2242,11 +2242,11 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
      not under it: sections are shorter on top here than on a computer. */
   html { scroll-padding-top: 64px; }
   .hero .cta-row .btn.primary { min-width: 62%; justify-content: center; }
-  #features .sec-head p, .donate-text p { display: none; }
-  .donate-text .donate-short { display: block; margin: 0 auto 4px; max-width: 34ch;
+  #features .sec-head p, .supband-text p { display: none; }
+  .supband-text .supband-short { display: block; margin: 0 auto 4px; max-width: 34ch;
     font-size: 15px; line-height: 1.5; }
   .sec-head { margin-bottom: 18px; }
-  .donate-act small { display: none; }
+  .supband-act small { display: none; }
   .dl-phone p { font-size: 15px; }
 }
 
@@ -2269,7 +2269,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 }
 
 
-/* ---- the owner's note (nav.js): new donations, for the signed-in admin ---- */
+/* ---- the owner's note (nav.js): new support, for the signed-in admin ---- */
 .owner-note { position: fixed; z-index: 60; right: 20px; bottom: 20px; width: min(360px, calc(100vw - 32px));
   display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 16px; border-radius: 18px;
   background: var(--surface-2); color: var(--text); border: 1px solid color-mix(in srgb, var(--heart) 35%, var(--line));
@@ -2298,11 +2298,11 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 
 /* The app's heart lands on the band (#support): the button breathes twice
    to say where to click - transform only. */
-.donate-btn.invite { animation: invite 1.3s ease-in-out 2; }
+.supband-btn.invite { animation: invite 1.3s ease-in-out 2; }
 @keyframes invite { 50% { transform: scale(1.07); } }
-@media (prefers-reduced-motion: reduce) { .donate-btn.invite { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .supband-btn.invite { animation: none; } }
 
-/* Feedback from the footer (nav.js): the donate dialog's look, its own
+/* Feedback from the footer (nav.js): the tip dialog's look, its own
    choices. */
 .fbs-label { margin: 0 0 -6px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .fbs-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2317,24 +2317,24 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
    the supporter's icon, why in a sentence, one button to the support page.
    A soft glow behind the icon and nothing drifting; the button's heart
    still beats while the band is in view (.is-live, above). */
-#support .donate.donate-calm { display: flex; flex-direction: column; align-items: center; gap: 0;
+#support .supband.supband-calm { display: flex; flex-direction: column; align-items: center; gap: 0;
   text-align: center; padding: 44px 28px 40px; overflow: hidden;
   background: radial-gradient(42% 70% at 50% 32%, color-mix(in srgb, var(--heart) 13%, transparent), transparent 100%),
     var(--surface); }
-.is-phone #support .donate.donate-calm {
+.is-phone #support .supband.supband-calm {
   background: radial-gradient(60% 55% at 50% 28%, color-mix(in srgb, var(--heart) 14%, transparent), transparent 100%),
     var(--bg); }
-.donate-calm .donate-icon { width: 64px; height: 64px; border-radius: 15px;
+.supband-calm .supband-icon { width: 64px; height: 64px; border-radius: 15px;
   box-shadow: 0 14px 32px -16px color-mix(in srgb, var(--heart) 75%, transparent); }
-.donate-calm h2 { font-size: clamp(1.35rem, 2.6vw, 1.75rem); line-height: 1.25; margin: 16px auto 8px;
+.supband-calm h2 { font-size: clamp(1.35rem, 2.6vw, 1.75rem); line-height: 1.25; margin: 16px auto 8px;
   max-width: 26ch; text-align: center; letter-spacing: -.02em; }
-.donate-calm p { margin: 0 auto 20px; max-width: 46ch; color: var(--muted); line-height: 1.6; }
-#support .donate-calm p { display: block; }
-.donate-calm .donate-btn { min-width: 220px; justify-content: center; }
-.donate-calm small { margin-top: 10px; color: var(--faint); font-size: 12.5px; line-height: 1.5; }
+.supband-calm p { margin: 0 auto 20px; max-width: 46ch; color: var(--muted); line-height: 1.6; }
+#support .supband-calm p { display: block; }
+.supband-calm .supband-btn { min-width: 220px; justify-content: center; }
+.supband-calm small { margin-top: 10px; color: var(--faint); font-size: 12.5px; line-height: 1.5; }
 @media (max-width: 760px) {
-  #support .donate.donate-calm { padding: 30px 20px 26px; }
-  .donate-calm small { display: block; }
+  #support .supband.supband-calm { padding: 30px 20px 26px; }
+  .supband-calm small { display: block; }
 }
 
 /* The legal pages (templates/legal.html), beside the support page's look:
