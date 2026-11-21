@@ -70,6 +70,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.10" date="2026-11-21">
+      <description>
+        <p>A tip is a plain thank-you now, every theme and the heart icon are for everyone, and updates, the log and private viewing are tightened further.</p>
+        <ul>
+          <li>Leave a tip replaces Support dopeIPTV: a tip gives nothing in return, and the app is the same for everyone</li>
+          <li>The Aurora and Dawn themes and the heart icon for the app are for everyone</li>
+          <li>An update is installed only when its signed file names the version offered</li>
+          <li>A log line the app cannot mask is left out, never written as it was</li>
+          <li>A channel recorded or cast while watched privately keeps nothing on the disk once the recording or cast ends</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.9" date="2026-11-20">
       <description>
         <p>Private viewing keeps nothing on a disk, TMDB can be turned off, and the phone remote, server mode and kids profiles are harder to get round.</p>
