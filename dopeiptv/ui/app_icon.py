@@ -1,7 +1,8 @@
-"""The app's own icon: the accent tile with its play triangle - or, for a
-supporter who keeps it on, the supporter's: the tile shaded from the accent
+"""The app's own icon: the accent tile with its play triangle - or, for
+anyone who switches it on, the heart icon: the tile shaded from the accent
 into the heart's colour and the triangle crowned with a heart, the same
-mark as their sidebar logo (widgets._SidebarLogo.set_supporter).
+mark as a supporter's sidebar logo (widgets._SidebarLogo.set_supporter).
+A supporter key's until November 2026; everyone's since.
 
 Drawn here, at every size a desktop asks for, rather than shipped as a
 file: a frozen build has nothing extra to bundle or to lose. It is the
@@ -50,7 +51,8 @@ ICON_SAFE_INSET = 0.098
 #: user picked - the packaged icons are this blue too.
 ICON_ACCENT = ACCENTS["blue"][1]
 
-#: The Settings switch (Settings > General > Support), on unless turned off.
+#: The Settings switch (Settings > General): off unless switched on - or,
+#: never switched, on for a supporter key from before, as it was for them.
 SETTING = "supporter_icon"
 
 _THEME_SIZES = (256, 128, 64, 48, 32)
@@ -132,21 +134,21 @@ def platform_icon(supporter: bool = False) -> QIcon:
         supporter=supporter)
 
 
-def switched_on(settings) -> bool:
-    """The Settings switch: on unless the supporter turned it off."""
-    try:
-        return str(settings.value(SETTING, "true")) != "false"
-    except Exception:
-        return True
-
-
 def wanted(settings) -> bool:
-    """Whether the supporter's icon is the one to show: a key that checks
-    out (core/supporter.py) and the switch left on."""
-    if not switched_on(settings):
+    """Whether the heart icon is the one to show: the switch on - or, never
+    switched, a supporter key that checks out (core/supporter.py), whose
+    icon it was by default until November 2026."""
+    try:
+        chosen = str(settings.value(SETTING, "") or "")
+    except Exception:
+        chosen = ""
+    if chosen in ("true", "false"):
+        return chosen == "true"
+    try:
+        from ..core import supporter
+        return supporter.is_supporter(settings)
+    except Exception:
         return False
-    from ..core import supporter
-    return supporter.is_supporter(settings)
 
 
 #: Which icon the app shows now (None: none set by this module yet).

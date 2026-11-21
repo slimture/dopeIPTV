@@ -178,6 +178,75 @@ def test_a_buffer_on_the_disk_is_let_go_as_its_channel_is_watched_privately(tmp_
         pool.close_all(wait=5.0)
 
 
+def test_a_private_channel_s_disk_buffer_is_opened_again_once_its_recording_or_cast_is_done(
+        tmp_path, monkeypatch):
+    """A recording or a cast keeps a channel's buffer on the disk while it
+    reads it - written there for it anyway. Watched privately meanwhile,
+    the player is told once nothing else reads it, so what follows is not
+    written there for the private playback alone."""
+    from dopeiptv.core import dvr_pool as dp
+    disk = tmp_path / "disk"
+    pool = dp.DvrPool(disk, 600.0, 10**9, ingest_factory=_Ingest, min_free=0, memory=None)
+    told = []
+    pool.on_private_disk = told.append
+    try:
+        # A recording of the channel, then private viewing turned on.
+        rec = pool.open("http://h/live/1.ts", "1")
+        recording = [True]
+        monkeypatch.setattr(type(rec), "recording", property(lambda self: recording[0]))
+        rec.mark_private()
+        assert not pool.on_disk_private(), "kept while the recording reads it"
+        pool._recording_done(rec)
+        assert told == [], "nothing said while the recording still reads it"
+        recording[0] = False
+        pool._recording_done(rec)                 # the recording ended
+        assert told == [rec] and pool.on_disk_private()
+        pool._recording_done(rec)
+        assert told == [rec], "told once"
+        monkeypatch.undo()
+        # A cast reads another channel; the pool's let_go and the session's
+        # own end both come to the same place - told once.
+        cast = pool.open("http://h/live/2.ts", "2")
+        cast.hold("cast")
+        cast.mark_private()
+        assert not pool.on_disk_private()
+        pool.let_go(cast, "cast")
+        assert told == [rec, cast]
+        # A channel not on screen, or not private: nothing.
+        other = pool.open("http://h/live/3.ts", "3")
+        other.hold("cast")
+        pool.let_go(other, "cast")
+        assert told == [rec, cast]
+    finally:
+        pool.close_all(wait=5.0)
+
+
+def test_the_window_opens_a_private_disk_buffered_channel_again_when_told():
+    from dopeiptv.media import dvr_player, embedded
+    from dopeiptv.ui import mw_build_detail, mw_privacy
+    assert "private_on_disk" in vars(embedded.EmbeddedPlayer)
+    src = inspect.getsource(dvr_player.DvrPlayerMixin._dvr_new_pool)
+    assert "pool.on_private_disk" in src and "signal.emit()" in src
+    assert "self._dvr_new_pool(" in inspect.getsource(dvr_player.DvrPlayerMixin._dvr_start)
+    assert "self._dvr_new_pool(" in inspect.getsource(dvr_player.DvrPlayerMixin.dvr_pool_for_server)
+    src = inspect.getsource(mw_build_detail)
+    assert "private_on_disk.connect(self._private_buffer_on_disk)" in src
+    src = inspect.getsource(mw_privacy._PrivacyMixin._private_reopen_if_on_disk)
+    assert "private_reopen_needed" in src and "self._retry_last_stream" in src
+    assert "_private_reopen_if_on_disk" in inspect.getsource(mw_privacy._PrivacyMixin._private_buffer_on_disk)
+    # A player that let go of the channel before the signal came: nothing
+    # is started again.
+    asked = []
+    window = SimpleNamespace(player=SimpleNamespace(_dvr=None, private_reopen_needed=lambda: True),
+                             _last_playback={"kind": "live"},
+                             _private_reopen_if_on_disk=asked.append)
+    mw_privacy._PrivacyMixin._private_buffer_on_disk(window)
+    assert asked == []
+    window.player._dvr = object()
+    mw_privacy._PrivacyMixin._private_buffer_on_disk(window)
+    assert len(asked) == 1
+
+
 def test_the_player_plays_a_private_channel_without_a_buffer_and_never_mpvs_on_disk():
     from dopeiptv.media import dvr_player, embedded
     src = inspect.getsource(dvr_player.DvrPlayerMixin._dvr_start)
@@ -195,7 +264,7 @@ def test_the_player_plays_a_private_channel_without_a_buffer_and_never_mpvs_on_d
 def test_private_viewing_turned_on_opens_a_disk_buffered_channel_again_and_resends_a_cast():
     from dopeiptv.ui import mw_privacy
     src = inspect.getsource(mw_privacy._PrivacyMixin.set_private_viewing)
-    assert "private_reopen_needed" in src and "self._retry_last_stream" in src
+    assert "_private_reopen_if_on_disk" in src
     assert "self._cast_private_on()" in src
     from dopeiptv.ui import mw_cast
     src = inspect.getsource(mw_cast._CastMixin._cast_private_on)
@@ -280,7 +349,9 @@ def test_private_viewing_begun_mid_cast_stops_a_run_on_the_disk_by_itself(tmp_pa
         bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip")
         assert bridge.on_disk() and str(bridge.hls_dir).startswith(str(disk))
         privacy.set_private(True)
-        assert _until(lambda: bridge._server is None), "stopped within its tick"
+        # Stopped and tidied: _stop() clears the server first, then removes
+        # the run's folder (_tmp None after it).
+        assert _until(lambda: bridge._server is None and bridge._tmp is None), "stopped within its tick"
         assert bridge.private_stopped and bridge.fatal == "private viewing began"
         assert not any(disk.iterdir()), "its work on the disk gone"
     finally:
@@ -306,7 +377,7 @@ def test_every_way_a_cast_is_sent_is_stopped_or_kept_in_memory_as_privacy_turns(
             bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip", **args)
         assert bridge.on_disk()
         privacy.set_private(True)
-        assert _until(lambda: bridge._server is None) and bridge.private_stopped
+        assert _until(lambda: bridge._server is None and bridge._tmp is None) and bridge.private_stopped
         assert not any(disk.iterdir())
         bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip", **args)
         assert bridge.private and not bridge.private_stopped

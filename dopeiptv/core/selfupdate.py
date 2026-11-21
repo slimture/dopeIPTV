@@ -178,6 +178,19 @@ def _github_file(tag: str, name: str) -> bytes:
     return bytes(out)
 
 
+def names_version(name: str, tag: str) -> bool:
+    """Whether the file *name* is one of the release *tag*'s: its version
+    in the name as the build writes it (dopeIPTV-1.6.9-x86_64.AppImage,
+    dopeiptv_1.6.9_amd64.deb, dopeIPTV-1.6.9.flatpak; a test build's
+    1.6.9.282), whole - 1.6.9 is not 1.6.9.5 nor 11.6.9. The name is on the
+    signed list, so this binds the version a site says to the bytes: an
+    older signed file offered as a newer release is not installed."""
+    ver = re.sub(r"^(?:nightly-|[vV])", "", str(tag or "").strip())
+    if not re.fullmatch(r"\d+(?:\.\d+){1,3}", ver):
+        return False
+    return re.search(r"(?<![\d.])" + re.escape(ver) + r"(?![\d]|\.\d)", str(name or "")) is not None
+
+
 def signed_asset(release: dict, asset: dict) -> dict:
     """*asset* with the SHA-256 the release's signed checksum list gives
     it - the list signed with dopeIPTV's own key (core/update_keys.py).
@@ -200,6 +213,13 @@ def signed_asset(release: dict, asset: dict) -> dict:
         raise UpdateError("upd_err_unsigned")
     tag = str(release.get("tag") or "")
     name = asset.get("name")
+    if not names_version(str(name or ""), tag):
+        # The signed list names files, not versions: a file of an older
+        # release, still on its own signed list, offered under a newer tag
+        # would pass refuse_older and the checksum both. Its name says its
+        # version, and that name is what the list signs.
+        log.error("update: %s is not a file of %s - not installed", name, tag or "(no version)")
+        raise UpdateError("upd_err_unsigned")
     # The site's copy first; GitHub's when that one is missing, stale or
     # does not check out - the signature, not where it came from, decides.
     for where in ("site", "GitHub"):
@@ -251,7 +271,11 @@ def download(asset: dict, dest: Path,
     h = hashlib.sha256()
     got = 0
     # A server that sends more than the file is stops being read there,
-    # not once the disk is full: it cannot match the signed checksum.
+    # not once the disk is full: it cannot match the signed checksum. The
+    # size a site says is never more than DOWNLOAD_MAX either.
+    if size > DOWNLOAD_MAX:
+        log.error("update: %s says it is %d bytes - more than any release file", asset.get("name"), size)
+        raise UpdateError("upd_err_checksum")
     limit = size or DOWNLOAD_MAX
     try:
         with _get_https(asset["url"], stream=True, timeout=30) as r:

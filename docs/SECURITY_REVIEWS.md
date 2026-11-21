@@ -135,7 +135,7 @@ to an independent AI assistant: **7/10 overall** against
 | Release chain | The signing job runs on what the workflow says, with no person in the way | high (conditional) | 1.6.9: release.yml's `checksums` in the environment `release-signing`, nightly's `publish` in `nightly-signing`; the owner sets a required reviewer and moves the key there (docs/MAINTAINING.md, "The release key") |
 | Website statistics | k=5 counted visits, not people; the numbers were kept long and could be tied back | medium | website: no address is written anywhere - the front server hands each request to the service's memory over a local socket, and the download counter has a log of its own without one; the month's key lives in memory only; a visit is kept with a visitor id of that day alone, its times in 10-minute steps, and sealed so only that day's key can tell two visits of one person apart; how many different people is a sketch per day (bits, no list, no ids); a day's lists keep no name fewer than five people saw once it is a month old, then the month's the same, so what is kept for years names nobody |
 | Feedback | A thread's code hash linked its reports for 12 months | low | website: gone after 120 quiet days (`forget_codes`) |
-| Website deployment | The CSP, the proxy-only include and port 8081 could not be seen in the repository | high (conditional) | website: `deploy/check-live.sh`, run from outside after every deploy |
+| Website deployment | The CSP and who may reach the content server could not be seen in the repository | high (conditional) | a check of the live site's answers, run from outside after every deploy (the server's own repository) |
 | Backups | A backup without a password, or a weak one | high (conditional) | Answered: a password of 10 characters or more, and without one a warning with Cancel the default (1.6.9); the hint now recommends one |
 | Phone remote, casts | Tokens in plain http on the home network | high (on-path) | 1.6.9: the phone remote's key never crosses the network - after the `#` of the code's address, kept on the phone - and every request is signed with it (HMAC-SHA256 over method, address, time, nonce and body; a minute's window, each nonce once), a picture's address signed for a quarter of an hour, an address of before a new key at once, the calendar a read-only key of its own; a converted cast serves only its receiver's address. What plays is still readable on the way: written down (docs/SECURITY.md, "The home network's servers speak plain http") |
 | Watch together, sync | The relay and the sync server see timing and sizes; they can drop or hold back | medium | Written down (docs/SECURITY.md, Honest limits); a rejoin in the same run still knows every message number taken (`together.remembered`), and a member of an older app is said, not silently left out |
@@ -172,8 +172,8 @@ and what was done:
 | Website statistics | Five visitor or device marks are not five people: the five-people promise of the anonymous months could not be proven | medium | website: no row of a visit is kept past its days any more - neither in detail nor as anonymous rows; after 14 days only the day's counts stay (per way in too, `funnel_of`). The anonymous rows of before were made those counts and deleted; the policy no longer promises a number of people |
 | Website statistics | A month summed the days' rarer names: one person on five days kept a rare site named | medium | website: a name is kept only from a day when five visitors brought it; nothing adds days up again under a name, and the months' lists of them are dropped (`fold_day`, `_old_rows_off`) |
 | Website statistics | Detailed visits and their timing for 30 days help a guess at who it was; the policy said it could not be done | medium | website: 14 days (was 30), the start to the half hour (was ten minutes), no device mark, keys kept two months (was three); the policy and the transparency page say plainly that it is much harder, not impossible |
-| Website server | DEPLOY.md still described a statistics log with addresses and a key file on disk | medium | website: those parts rewritten, the old sections marked superseded with a warning never to make that log again; a test fails if an `install` or `echo` step names it |
-| Website server | Whether only the front proxy reaches the content server cannot be seen in the repository | conditional | `deploy/check-live.sh` asks the content port from outside after every deploy; it answered nothing (run after the second round) |
+| Website server | The server's runbook still described a statistics log with addresses and a key file on disk | medium | the runbook: those parts rewritten, the old sections marked superseded with a warning never to make that log again; a test fails if an `install` or `echo` step names it |
+| Website server | Whether only the front proxy reaches the content server cannot be seen in the repository | conditional | the check from outside asks the content server's port after every deploy; it answered nothing (run after the second round) |
 | Private viewing | The runtime folder was checked to be on tmpfs, the folder written into was not: a link or a disk mounted under it would put the buffer on disk | medium | 1.6.9: the buffer's own folder checked before a byte is written - no link, this user's own, 0700, in memory where it really is (`dvr_store.memory_folder`); else on disk, marked and deleted, said in the log, no second connection |
 | Phone remote | A web page that pointed its own name at this computer could make failed tries that shut the phone out for a while | low | 1.6.9: a Host that is no name of the home is refused (421) before anything is counted (`home_net.home_host`) |
 | Phone remote | An attacker who controls the home network's traffic can change the page | documented | Accepted as written down (docs/SECURITY.md, "The home network's servers speak plain http"); the remote is off until turned on |
@@ -193,9 +193,9 @@ What it found, and what was done:
 | Private viewing | Recordings and other outputs were not asked | low | 1.6.9: a recording while viewing privately is asked first, Cancel the default (`_rec_private_ok`, the phone and TV mode too); a fetched subtitle in memory or as bytes in mpv's address, never a file; no copy of a subtitle in the cache |
 | Website statistics | `STATS_VISITS_DAYS` could keep visits past 14 days | low | website: never more than 14 (`VISITS_DAYS_MAX`), said at the start |
 | Website statistics | A failed deletion of what should be gone was silent | medium | website: every one through `_gone` - said once, tried again every run; after each run `left_behind` lists what should no longer exist and `sweep_left` deletes it; what stays is said at the top of the admin page |
-| Website statistics | The keys and sketches on a tmpfs could reach a disk through swap | medium | website: the server's swap encrypted with a one-time key (DEPLOY.md, `.eli`); `swap_state` asks the system, swap that keeps what it is given is said in the start line and on the admin page |
+| Website statistics | The keys and sketches on a tmpfs could reach a disk through swap | medium | website: the server's swap encrypted with a one-time key (the server's runbook); `swap_state` asks the system, swap that keeps what it is given is said in the start line and on the admin page |
 | Website statistics | The privacy policy said the key was never in a file, that a restart of the service forgets it, and named two statistics logs of before | medium | website: corrected in English and Swedish, the transparency page too; `test_policy_text.py` fails on the old sentences |
-| Website server | The error logs kept a line with an address until removed by hand | low | website: both jails' error logs turned over every night, six days kept (DEPLOY.md, newsyslog) |
+| Website server | The error logs kept a line with an address until removed by hand | low | website: both servers' error logs turned over every night, six days kept (the server's runbook) |
 | Supply chain | The dependency audit passed when it could not ask | medium | 1.6.9: an audit that did not finish fails (exit 2: no answer after three tries, a package left unchecked); the release runs it too and is not signed until it passed (`release.yml`, `needs.audit.result`) |
 | Media libraries, credentials on command lines, plain http at home, sync's first join, direct casting, parental denylist | Known limits | documented | As written down in docs/SECURITY.md; unchanged this round |
 
@@ -216,7 +216,7 @@ was done:
 | Website statistics | A day's visits could stay almost 15 days | low | website: the 14th day back is gone at the first run that day - 14 dates, never more (`_forget_old`, `left_behind`: `<=`) |
 | Website statistics | zram with a backing device counted as safe swap | medium, conditional | website: zram counts only without a disk behind it; dm-crypt followed through LVM and other mappings (`_block_encrypted`) |
 | Website statistics | Swap that could not be asked gave no warning | low | website: said on the admin page as well as plain swap (`trouble`: "could not be asked") |
-| Website server | The deployment's state cannot be read from the repository | documented | DEPLOY.md's checks after a deployment (nginx's configuration, the jails' logs and their turnover, the service's socket and swap) run on the server; the start line says the swap and how long visits are kept |
+| Website server | The deployment's state cannot be read from the repository | documented | the runbook's checks after a deployment (the web server's configuration, the logs and their turnover, the service and swap) run on the server; the start line says the swap and how long visits are kept |
 | Local servers | Server mode's tuner open to the whole home network | answered | Already off by default since 1.6.9 (`home_server.OPEN_OFF`): the tuner takes its token in its own address unless the person lets named devices or the home in |
 | Profiles | A four-digit PIN is weak | answered | 4 to 8 digits; PBKDF2 with 600 000 rounds and growing waits after two wrong tries (`core/pins.py`); a longer one is the person's choice |
 | Commands from outside | A link or the media keys change channel without asking | answered | A link that plays an address is asked first, the whole address shown; a channel change by `--channel` or the media keys comes from this user's own session (its socket and session bus), as a key pressed does |
@@ -248,3 +248,41 @@ in code. What stays below 9 is what the project chose to keep - each
 written down in docs/SECURITY.md with its reason. 1.6.9 is released from
 here; the next round comes before a release that changes what the app
 sends, keeps or serves.
+
+## November 2026 - the website's own copy, read by an up-to-date AI (after 1.6.9)
+
+The maintainer pasted what the Behind the scenes page's Copy everything
+button gives (its questions and code, from `v1.6.9`) into an up-to-date AI
+assistant. With only that, it saw neither the page's promises nor the
+limits each part names, nor parts 4 and 5, so much of what it raised the
+page already said (plain HTTP between the site's servers on one machine,
+the error logs, the honest limits). Checked against the code, what holds:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Logs | A line whose masking failed went out as it was | medium | After 1.6.9: withheld instead, a traceback too (`core/log.py`, `WITHHELD`) |
+| Private viewing | A channel recorded or cast while watched privately kept writing its buffer to the disk after the recording or cast ended, until it was left | medium | After 1.6.9: opened again as the last of them lets go, as when private viewing is turned on (`dvr_pool.on_private_disk`) |
+| The page | Its copy carried no promises or limits, parts 4 and 5 had no question, and several answers lacked their code | low | The website: each part's copy carries its promise, what we can know, its hosts and its limits with the rule for judging them; parts 4 and 5 have their questions; excerpts of `refuse_older` and `_get_https`, the settings file's question, the report sent on Send only, the relay's backlog left unread, private viewing turned on mid-play |
+| Feedback, Watch together | The page did not say that feedback carries `"supporter": "yes"`, nor that the relay cannot check signatures | low | The website: both said, in English and Swedish |
+| Updates, TMDB, the relay's clock, sync, the admin cookie, swap | Raised as unknown or open | answered | Already in the code: `selfupdate.refuse_older`, **Provider artwork, TMDB off**, the first answer's backlog left unread and the clock taken from it, the sync slot bound on its first write, the 600 a minute limit by address, the server's encrypted swap watched by `swap_state` |
+
+## November 2026 - the website's parts read one at a time, and a CodeQL scan (after 1.6.9)
+
+The maintainer gave each part of the Behind the scenes page, with its code
+from `v1.6.9`, to an up-to-date AI assistant on its own, and ran GitHub's
+CodeQL on `main`. Checked against the code, what holds:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Updates | The signature covers the file, not the tag: a site or mirror taken over could offer an older release's signed file under a newer tag - a step back to a version with a known fault | medium | After 1.6.9: the signed file must name the release offered (`selfupdate.names_version`); a size beyond any release file is not fetched |
+| Error reports | An IPv6 address ending in "::" (`2001:db8::`, `fe80::`) went through the cleaning, and `::ffff:192.0.2.7` left the IPv4's last three numbers | low | After 1.6.9: both go, in the app and in the site's second cleaning |
+| Error reports | The window said "exactly what is sent" while the version, the system, a supporter's mark and the answer code's hash went beside the text unseen | low | After 1.6.9: the window says each (`report.sent_beside`); the page says the version and system |
+| Error reports | Several reports' hashes are asked for in one request, and how long the limits hold an address was not said | info | The website: both said, the limits' windows and handlers in the excerpt |
+| Private viewing | "Nothing written to a disk" while encrypted swap counts as memory; a cast or server mode holding the buffer keeps it on the disk; it does not work backwards | info | The website: "nothing unencrypted", each written down as a limit |
+| Statistics | The page said nothing kept ties a visitor's days together, while a kept visit carries the visitor's mark sealed - opened by the service itself while the month's key is in memory | low | The website: who can link two kept visits (the running service, within the month) and who cannot (a copy of the disks) said; what a visit holds for its 14 days listed whole; the swap check warns but does not stop counting |
+| Sync | The cipher's excerpt was said to be whole without the stream cipher | info | The website: `chacha20`, `block` and their helpers in it, with the RFC 8439 / 5869 vector tests; the code's place on Windows and a slot only an older app wrote as limits |
+| Watch together | A restarted app does not know old running numbers and takes the relay's clock from the relay, so a lying relay could hand an old genuine message again; a ten-character code is for an evening's room | low | The website: both written down as limits; the padding and encryption (`_seal_text`, `_open_text`) and the tests in the excerpt |
+| CodeQL | 4 TLS contexts without an explicit least version (Python's default is TLS 1.2 already) | info | After 1.6.9: TLS 1.2 said where each is made (`cert_pin.at_least_tls12`) |
+| CodeQL | yt-dlp's own copy and wrapper runnable by other users; SHA-1 for ids kept in memory | low | After 1.6.9: this user's alone (0700); SHA-256 |
+| CodeQL | 40 log lines "logging a password", a cache file "storing a secret", SHA-1 for the picture cache's file names, MD5 in NextPVR's login, three sockets on every interface | answered | False positives or by design: the stream address (which holds an Xtream login) taints every row that carries one, while each line logs `url_for_log`, `redact_url`, `address_scheme` or `for_log` of it; the cache's names are no secret; NextPVR's protocol is MD5; the HDHomeRun and mDNS answers and server mode must listen on the network |
+| CodeQL | 25 in the tests (fake servers, test regexes) | answered | The tests' own, not the app's |

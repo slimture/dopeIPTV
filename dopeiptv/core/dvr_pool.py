@@ -77,6 +77,12 @@ class DvrPool:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        #: Called, on whatever thread let go, when the channel on screen is
+        #: watched privately with its buffer on the disk and the recording
+        #: or cast that kept it there is done (on_disk_private): the player
+        #: opens it again, in memory or with none.
+        self.on_private_disk: Callable[[DvrSession], None] | None = None
+        self._told_disk: DvrSession | None = None     # told once a session
 
     # -- the channel on screen -----------------------------------------------
 
@@ -268,6 +274,21 @@ class DvrPool:
                     and s.streaming:
                 s.freeze()
             self._enforce()
+            left = s is self.active and s is not self._told_disk and self.on_disk_private()
+            hook = self.on_private_disk
+            if left:
+                # The pool's let_go and the session's own end both come here.
+                self._told_disk = s
+        if left and hook is not None:
+            # Nothing else reads it now: what follows would be written to
+            # the disk for a private playback alone.
+            log.info("DVR pool: a private channel's buffer on the disk is read by nothing "
+                     "else now - opened again")
+            try:
+                hook(s)
+            except Exception:
+                log.warning("DVR pool: the player not told of a private buffer on the disk",
+                            exc_info=True)
 
     def configure(self, keep_seconds: float, max_bytes: int) -> None:
         """The rewind settings, which may change between channels."""

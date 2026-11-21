@@ -515,7 +515,8 @@ class _ReportMixin:
                 return
             answered = self._answered()
             fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()),
-                                answers=answered, all_answers=self.open_answers, copy_only=copy_only)
+                                answers=answered, all_answers=self.open_answers, copy_only=copy_only,
+                                supporter=self._supporter_now())
             if answered:                               # shown now: no longer new
                 self._answers_mark_seen()
             if not fd.exec():

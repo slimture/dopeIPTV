@@ -1025,10 +1025,8 @@ class _SettingsMixin:
                 chip.refresh()
 
         def supporter_window() -> None:
-            """The key's window, from the Support card or a supporter theme;
-            the page follows what it changed - the card's row, the locks,
-            and the palette if a supporter theme gave way."""
-            before = P.get("name")
+            """The key's window, from General's card; the page follows what
+            it changed - the card's row."""
             self.open_supporter()
             from .qt_i18n import format_month
             key_state["read"] = True
@@ -1043,13 +1041,6 @@ class _SettingsMixin:
                         tr("supporter_tip", date=format_month(mine["since"]))
                         if mine else tr("set_supporter_hint"))
                 support_card.refresh()
-            picked = shared.get("theme_locks")
-            if picked is not None:
-                sync_locks, themes = picked
-                sync_locks()
-                themes.set_value(self.settings.value("theme", "graphite"))
-            if P.get("name") != before:
-                restyle_dialog()
 
         # -- the sources: shared by Sources, General's backup and Nerd's boxes --
         store = self.playlist_store

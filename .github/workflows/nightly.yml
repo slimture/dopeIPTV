@@ -167,7 +167,10 @@ jobs:
       - name: Notes
         if: steps.gather.outputs.publish == 'true'
         run: |
-          LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          # The newest release by its version: its tag sits on main's merge
+          # commit, which testing does not hold, so git describe would
+          # find an older one. v1.6.9..HEAD is still exactly what came after it.
+          LAST=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
           {
             echo "## dopeIPTV ${V} (test build)"
             echo
@@ -201,14 +204,14 @@ jobs:
           gh release create "nightly-${V}" out/* --prerelease --latest=false \
             --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
             --notes-file notes.md
-      - name: Keep the newest seven
+      - name: Keep the newest three
         if: steps.gather.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             --jq '[.[] | select(.isPrerelease and (.tagName | startswith("nightly-")))]
-                  | sort_by(.createdAt) | reverse | .[7:] | .[].tagName' |
+                  | sort_by(.createdAt) | reverse | .[3:] | .[].tagName' |
           while read -r tag; do
             echo "removing ${tag}"
             gh release delete "${tag}" --yes --cleanup-tag

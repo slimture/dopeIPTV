@@ -656,7 +656,7 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
             return memo[1]
         ids = ",".join(str(f.get("stream_id")) for f in self._favorite_channels())
         raw = f"{pid}|{id(self.client)}|{active}|{locked}|{kids_ver}|{ids}"
-        stamp = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+        stamp = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
         self._phone_stamp_memo = (key, stamp)
         return stamp
 
@@ -955,7 +955,7 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         art = next((str(v) for v in (ctx.get("cover"), ctx.get("stream_icon"), item.get("stream_icon"))
                     if str(v or "").lower().startswith(("http://", "https://"))), "")
         img = self._pb()[1].put("img", art, {"cover": art}) if art else ""
-        version = hashlib.sha1(f"{sid}|{key}|{bucket}".encode()).hexdigest()[:10]
+        version = hashlib.sha256(f"{sid}|{key}|{bucket}".encode()).hexdigest()[:10]
         info = {"series": series, "sid": "" if sid is None else str(sid), "label": label,
                 "key": "" if key is None else str(key), "prev": prev, "next": nxt,
                 "v": version, "img": img}

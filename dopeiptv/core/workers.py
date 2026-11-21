@@ -658,7 +658,9 @@ class LogoLoader(QObject):
     def _disk_path(self, url: str) -> Path | None:
         if self.disk_dir is None:
             return None
-        h = hashlib.sha1(url.encode("utf-8")).hexdigest()
+        # A file's name, not a secret: the cache every copy has kept since
+        # its first start is named so.
+        h = hashlib.sha1(url.encode("utf-8"), usedforsecurity=False).hexdigest()
         return self.disk_dir / h[:2] / h[2:]
 
     def disk_file(self, url: str) -> Path | None:

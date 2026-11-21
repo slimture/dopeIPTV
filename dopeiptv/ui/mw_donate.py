@@ -1,7 +1,8 @@
-"""Support (a tip or monthly support), from inside the app - asked now and
-then, never in the way.
+"""A tip, from inside the app - asked now and then, never in the way. A
+tip gives nothing in return; a supporter key from before 22 November 2026
+still stops the asking.
 
-"Support dopeIPTV…" is always in the app menu and in About. Beyond that
+"Leave a tip…" is always in the app menu and in About. Beyond that
 the app asks in one rhythm (core/donate_rhythm.py): one week a month, once
 it is used for real - five hours watched in the last 30 days, two weeks
 after the first run - a small heart on the sidebar's logo. The first day of
@@ -12,7 +13,7 @@ next month.
 The heart (or its right-click menu) opens the support page on the website
 (with a ?ref= saying from where - the site's statistics read it)
 and ends the week; the right-click's "Hide for three months" puts it away
-for three months; "I've supported" for a year, taken at the person's word. A
+for three months; "I've left a tip" for a year, taken at the person's word. A
 supporter key: never asked. Settings, General can switch the asking off altogether. It is not
 drawn in full screen, in TV mode, in private viewing or for a kids
 profile - the week's days still count.
@@ -208,48 +209,25 @@ class _DonateMixin:
             logo.set_supporter(sup is not None, tr("supporter_tip", date=format_month(sup["since"]))
                                if sup is not None else "")
         self._donate_show(sup)
-        self._supporter_perks(sup)
+        self._app_icon_refresh()
 
     def _donate_minute(self) -> None:
         """Once a minute: a period begun or over, its first day gone, a
-        snooze run out - and the supporter key's perks kept in step."""
+        snooze run out - and the app's icon kept in step with the key."""
         self._donate_heart_refresh()
 
-    # -- what the key opens ----------------------------------------------------
-    def _supporter_perks(self, sup) -> None:
-        """What a supporter key opens, kept in step with it - here, after
-        the key's window, and once a minute: the supporter's app icon
-        (unless switched off in Settings) and the supporter themes. With
-        the key gone, a supporter theme in use gives way to the default,
-        quietly. The first call, while the window is being built, only
-        corrects the stored choice: the start already showed the default
-        (theme.effective_theme)."""
-        from .theme import THEMES, drop_locked_themes, effective_theme
-        first = not hasattr(self, "_perks_seen")
-        self._perks_seen = True
-        if sup is None and drop_locked_themes(self.settings):
-            log.info("supporter theme: no supporter key - back to the default")
-            if not first and P.get("name") != THEMES[effective_theme(self.settings)]["name"]:
-                self._apply_theme_now()
-        from . import app_icon
-        try:
-            app_icon.show(sup is not None and app_icon.switched_on(self.settings))
-        except Exception as e:
-            log.warning("supporter icon: %s", e)
-
     def _app_icon_refresh(self) -> None:
-        """The app's icon after the Settings switch: the supporter's or the
-        plain one, live."""
+        """The app's icon as Settings > General says: the heart icon or the
+        plain one, live (app_icon.wanted)."""
         from . import app_icon
         try:
-            app_icon.show(self._supporter() is not None
-                          and app_icon.switched_on(self.settings))
+            app_icon.show(app_icon.wanted(self.settings))
         except Exception as e:
-            log.warning("supporter icon: %s", e)
+            log.warning("app icon: %s", e)
 
     # -- the answers -------------------------------------------------------------
     def donated(self) -> None:
-        """"I've donated": not asked for a year."""
+        """"I've left a tip": not asked for a year."""
         rhythm.put_away(self.settings, self._donate_time(), rhythm.DONATED_S)
         self._donate_heart_refresh()
 

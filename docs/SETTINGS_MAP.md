@@ -182,8 +182,9 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - System: `desktop_entry` (Linux), `mpris` (the system's media controls)
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
-- Support dopeIPTV: feedback and its answers, `supporter_key` (its window),
-  `supporter_icon`, ask for support now and then (`donate_ask`; the
+- Feedback and tips: feedback and its answers, `supporter_key` (its window;
+  a key from before 22 November 2026), `supporter_icon` (the heart icon,
+  everyone's), ask for a tip now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About

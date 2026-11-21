@@ -246,6 +246,7 @@ def fetch(host: str, port: int, timeout: float = 8.0, route: Any = None) -> Cert
     from . import net_route
     sock = net_route.open_connection(route, host, port, timeout)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
     try:
@@ -258,14 +259,22 @@ def fetch(host: str, port: int, timeout: float = 8.0, route: Any = None) -> Cert
     return read(der)
 
 
+def at_least_tls12(ctx: ssl.SSLContext) -> ssl.SSLContext:
+    """*ctx* refusing anything older than TLS 1.2 - Python's default since
+    3.10, said where the app makes a context, so no build's OpenSSL
+    settings can lower it."""
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
 def trust_context(cafile: str | None = None) -> ssl.SSLContext:
     """What a certificate is checked against where the player would check
     it: this system's authorities and the list requests uses (certifi - a
     frozen build may not find the system's where it looks); *cafile* alone
     when it is given."""
     if cafile:
-        return ssl.create_default_context(cafile=cafile)
-    ctx = ssl.create_default_context()
+        return at_least_tls12(ssl.create_default_context(cafile=cafile))
+    ctx = at_least_tls12(ssl.create_default_context())
     try:
         import certifi
         ctx.load_verify_locations(cafile=certifi.where())
@@ -283,9 +292,9 @@ def system_trust(host: str, port: int, timeout: float = 8.0, route: Any = None,
     if ctx is None:
         try:
             import certifi
-            ctx = ssl.create_default_context(cafile=certifi.where())
+            ctx = at_least_tls12(ssl.create_default_context(cafile=certifi.where()))
         except ImportError:
-            ctx = ssl.create_default_context()
+            ctx = at_least_tls12(ssl.create_default_context())
     sock = net_route.open_connection(route, host, port, timeout)
     try:
         with ctx.wrap_socket(sock, server_hostname=host):

@@ -37,12 +37,14 @@ CRASH_FILE = "last-crash.txt"
 _URL = URL_IN_TEXT
 _IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 # IPv6 in full (six groups or more, so a time like 21:05:03 is left alone)
-# or shortened with "::" (fe80::1, ::1).
-_IPV6 = re.compile(r"(?<![\w:])(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
-                   r"|[0-9A-Fa-f:]{0,30}::[0-9A-Fa-f:]{0,30}[0-9A-Fa-f])(?![\w:])")
+# or shortened with "::" (fe80::1, ::1, 2001:db8:: and fe80:: too), an IPv4
+# at its end with it (::ffff:192.0.2.7). "::" alone names nothing.
+_IPV6 = re.compile(r"(?<![\w:])(?:(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
+                   r"|[0-9A-Fa-f:]{0,30}::[0-9A-Fa-f:]{0,30}[0-9A-Fa-f])(?:(?:\.\d{1,3}){3})?"
+                   r"|[0-9A-Fa-f:]{0,30}[0-9A-Fa-f]::)(?![\w:])")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
-# A supporter key pasted into a report would be the one thing that could tie it to a donation.
+# A supporter key pasted into a report would be the one thing that could tie it to a payment.
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A login written name=value or name: value - a quoted name or value too, as
 # JSON and config files write them ("password": "x y"); the quotes stay.
@@ -280,6 +282,14 @@ def _fit(text: str, room: int) -> str:
     """The text cut to ``room`` bytes of UTF-8, on a character boundary."""
     raw = text.encode("utf-8")
     return text if len(raw) <= room else raw[:max(0, room)].decode("utf-8", "ignore")
+
+
+def sent_beside() -> list[str]:
+    """What every report carries beside its text, as send_status() writes
+    it: the app's version and the system's name - so the window can show
+    them before Send, word for word."""
+    from .. import __version__
+    return [f"dopeIPTV {__version__}", platform.system() or "?"]
 
 
 def send(kind: str, text: str, *, personal: Iterable[str], timeout: float = 15.0,

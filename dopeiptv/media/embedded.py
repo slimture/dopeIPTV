@@ -348,6 +348,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
     contested = pyqtSignal()
     # LIVE in the DVR row with the buffer far behind the channel: open it again.
     reopen_live = pyqtSignal()
+    # The channel watched privately has its buffer on the disk and the
+    # recording or cast that kept it there is done (core/dvr_pool's
+    # on_private_disk, from any thread): the window opens it again.
+    private_on_disk = pyqtSignal()
     # The stream play() opened is playing, once per play(): how many seconds
     # it had already played when the poll saw it (stream health, Nerd).
     first_frame = pyqtSignal(float)

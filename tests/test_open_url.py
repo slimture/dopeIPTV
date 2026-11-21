@@ -109,8 +109,8 @@ def test_on_a_desktop_qt_opens_it_with_the_system_paths_for_the_moment(
 
     monkeypatch.setattr(xdg, "_qt_open", fake_qt_open)
     monkeypatch.setattr(xdg.shutil, "which", lambda n: None)
-    xdg.open_url("https://dopeiptv.org/?ref=app-heart#donate")
-    assert seen["url"] == "https://dopeiptv.org/?ref=app-heart#donate"
+    xdg.open_url("https://dopeiptv.org/?ref=app-heart#support")
+    assert seen["url"] == "https://dopeiptv.org/?ref=app-heart#support"
     assert seen["ld"] is None                       # stripped for the launch
     assert xdg.os.environ["LD_LIBRARY_PATH"] == "/opt/dopeiptv/lib"   # and back
 
@@ -142,11 +142,11 @@ def test_a_link_from_a_menu_waits_for_the_window_to_have_the_focus(monkeypatch):
     menu that was the popup, or no window, and the page opened behind the
     app; the link now waits until the window has the focus back."""
     timers, opened = _menu_case(monkeypatch, iter([False, False, False, True]))
-    assert xdg.open_url("https://dopeiptv.org/?ref=app-menu#donate") is True
+    assert xdg.open_url("https://dopeiptv.org/?ref=app-menu#support") is True
     assert opened == []                  # not yet: the popup has the focus
     while timers and not opened:
         timers.pop(0)[1]()
-    assert opened == ["https://dopeiptv.org/?ref=app-menu#donate"]
+    assert opened == ["https://dopeiptv.org/?ref=app-menu#support"]
     assert timers == []
 
 

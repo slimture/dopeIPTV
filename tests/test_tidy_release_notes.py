@@ -25,7 +25,34 @@ def test_the_latest_release_keeps_its_own_notes_only():
     got = tidy(_rel("v1.4.5", BODY), "v1.4.5")
     assert got.startswith("## dopeIPTV 1.4.5") and "**The big one.**" in got
     assert "1.4.4" not in got and "<details>" not in got
+    # ...and the way to every version under them, once.
+    assert got.rstrip().endswith(tidy_mod.FOOTER) and got.count(tidy_mod.FOOTER) == 1
     assert tidy(_rel("v1.4.5", got), "v1.4.5") is None
+
+
+def test_a_latest_release_tidied_before_gets_the_link():
+    # 1.6.9's notes were cut to its own section before the latest had a
+    # link: the next run adds it, and only it.
+    own = BODY.split("## dopeIPTV 1.4.4", 1)[0].strip() + "\n"
+    got = tidy(_rel("v1.4.5", own), "v1.4.5")
+    assert got == own.strip() + "\n\n" + tidy_mod.FOOTER + "\n"
+
+
+def test_the_latest_folds_once_a_newer_one_is_out():
+    # Its link does not count as folded: once a newer release is the
+    # latest, its notes fold like any older one's, with one link.
+    was_latest = tidy(_rel("v1.4.5", BODY), "v1.4.5")
+    got = tidy(_rel("v1.4.5", was_latest), "v1.4.6")
+    assert got.startswith("**The big one.**\n\n<details>\n<summary>What's new in 1.4.5</summary>")
+    assert got.count(tidy_mod.FOOTER) == 1 and got.rstrip().endswith(tidy_mod.FOOTER)
+    assert tidy(_rel("v1.4.5", got), "v1.4.6") is None
+
+
+def test_the_app_shows_the_latest_with_its_link():
+    from dopeiptv.ui.about import format_release_notes
+    got = tidy(_rel("v1.4.5", BODY), "v1.4.5")
+    shown = format_release_notes(got, "1.4.4", update=True)
+    assert "**The big one.**" in shown and shown.endswith(tidy_mod.FOOTER)
 
 
 def test_an_older_release_folds_its_notes_under_its_summary():
@@ -84,7 +111,7 @@ def test_wrapped_lines_are_joined_and_blocks_kept_apart():
 
 def test_a_release_already_short_still_gets_its_lines_joined():
     got = tidy(_rel("v1.4.5", "## dopeIPTV 1.4.5\n\nA line\nwrapped here.\n"), "v1.4.5")
-    assert got == "## dopeIPTV 1.4.5\n\nA line wrapped here.\n"
+    assert got == "## dopeIPTV 1.4.5\n\nA line wrapped here.\n\n" + tidy_mod.FOOTER + "\n"
     assert tidy(_rel("v1.4.5", got), "v1.4.5") is None
 
 

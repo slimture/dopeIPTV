@@ -10,6 +10,7 @@ understands URL shapes, and the value one that masks the account itself
 wherever it turns up.
 """
 import logging
+import sys
 
 import pytest
 
@@ -396,3 +397,37 @@ def test_sign_ins_codes_and_the_supporter_key_are_registered_where_they_are_read
     out = redact(" / ".join(gone))
     assert not [g for g in gone if g in out], out
     assert "1700000000" not in logmod._secrets
+
+
+def test_a_line_that_could_not_be_masked_is_withheld_not_written_as_it_was(monkeypatch):
+    """The filter fails closed: a fault in the masking, arguments that do
+    not fit the message, or a traceback that could not be masked never
+    reach a handler as they were - a line saying one was withheld does."""
+    logmod.register_secrets("hunter2pw")
+
+    def broken(_text):
+        raise RuntimeError("masking broke")
+
+    monkeypatch.setattr(logmod, "redact_text", broken)
+    rec = logging.LogRecord("dopeiptv", logging.WARNING, __file__, 1,
+                            "login %s", ("hunter2pw",), None)
+    assert _RedactFilter().filter(rec) is True
+    assert "hunter2pw" not in rec.getMessage()
+    assert rec.getMessage().startswith(logmod.WITHHELD)
+    try:
+        raise ValueError("boom hunter2pw")
+    except ValueError:
+        info = sys.exc_info()
+    rec = logging.LogRecord("dopeiptv", logging.ERROR, __file__, 1, "failed", None, info)
+    _RedactFilter().filter(rec)
+    out = logging.Formatter().format(rec)
+    assert "hunter2pw" not in out
+    assert logmod.WITHHELD in out
+    monkeypatch.undo()
+    # Arguments that do not fit: never the message and its arguments as
+    # logging's own error report would print them.
+    rec = logging.LogRecord("dopeiptv", logging.INFO, __file__, 1,
+                            "two %s %s", ("hunter2pw",), None)
+    _RedactFilter().filter(rec)
+    assert "hunter2pw" not in rec.getMessage()
+    assert rec.getMessage().startswith(logmod.WITHHELD)

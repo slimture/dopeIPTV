@@ -649,3 +649,43 @@ def test_a_download_that_runs_past_its_size_is_cut_off(env, monkeypatch):
     with pytest.raises(UpdateError) as e:
         selfupdate.download(asset, part)
     assert e.value.key == "upd_err_checksum" and not part.exists()
+
+
+def test_an_older_signed_file_offered_under_a_newer_tag_is_not_installed(monkeypatch):
+    # A site taken over has old releases' files and their signed lists:
+    # offered as "v9.9.9" (newer than the copy running, so refuse_older
+    # lets it by), the old file is on its own signed list - but its signed
+    # name says 1.4.5, and that is not 9.9.9.
+    monkeypatch.setattr(selfupdate, "UPDATE_KEYS", (TEST_KEY,))
+    _github_has(monkeypatch, None)
+    old_name = "dopeIPTV-1.4.5-x86_64.AppImage"
+    old = signed({"tag": "v1.4.5", "assets": [_asset(name=old_name)]})
+    assert selfupdate.signed_asset(old, _asset(name=old_name))["digest"].startswith("sha256:")
+    with pytest.raises(UpdateError, match="not signed"):
+        selfupdate.signed_asset(dict(old, tag="v9.9.9"), _asset(name=old_name))
+
+
+def test_a_file_names_its_release_whole():
+    ok = [("dopeIPTV-1.6.9-x86_64.AppImage", "v1.6.9"), ("dopeiptv_1.6.9_amd64.deb", "v1.6.9"),
+          ("dopeIPTV-1.6.9.flatpak", "v1.6.9"), ("dopeIPTV-1.6.9-macOS-arm64.dmg", "v1.6.9"),
+          ("dopeIPTV-1.6.9-windows-x64-setup.exe", "v1.6.9"),
+          ("dopeIPTV-1.6.9.282-x86_64.AppImage", "nightly-1.6.9.282"),
+          ("dopeIPTV-1.4.5.90-x86_64.AppImage", "v1.4.5.90")]
+    for name, tag in ok:
+        assert selfupdate.names_version(name, tag), (name, tag)
+    bad = [("dopeIPTV-1.6.9.5-x86_64.AppImage", "v1.6.9"), ("dopeIPTV-11.6.9-x86_64.AppImage", "v1.6.9"),
+           ("dopeIPTV-1.6.8-x86_64.AppImage", "v1.6.9"), ("dopeIPTV-1.6.9-x86_64.AppImage", ""),
+           ("dopeIPTV-1.6.9-x86_64.AppImage", "v1.6.9.282"), ("dopeIPTV-x86_64.AppImage", "v1.6.9"),
+           ("dopeIPTV-1.6.9-x86_64.AppImage", "v1.6.9; rm")]
+    for name, tag in bad:
+        assert not selfupdate.names_version(name, tag), (name, tag)
+
+
+def test_a_size_beyond_any_release_file_is_not_fetched(monkeypatch, tmp_path):
+    def get(*_a, **_k):
+        raise AssertionError("nothing may be fetched")
+    monkeypatch.setattr(selfupdate, "_get_https", get)
+    asset = dict(_asset(), size=selfupdate.DOWNLOAD_MAX + 1)
+    with pytest.raises(UpdateError) as e:
+        selfupdate.download(asset, tmp_path / "x.part")
+    assert e.value.key == "upd_err_checksum"

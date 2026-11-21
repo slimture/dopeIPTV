@@ -22,7 +22,8 @@ disagree, the code is what runs and the sentence is a bug: report it.
   settings files (`core/settings_files.py`), and out of the log
   (`core/log.py`: each value the app holds masked wherever it appears, one
   of three characters or fewer as a word of its own, so a short password
-  is masked without every "abc" in the log), error reports
+  is masked without every "abc" in the log; a line that could not be
+  masked is withheld, never written as it was), error reports
   (`core/report.py`) and any address that is logged.
 - **What a person watches.** History, resume points, watched marks and
   the viewing statistics stay on the computer (`core/viewing_stats.py`
@@ -52,8 +53,11 @@ disagree, the code is what runs and the sentence is a bug: report it.
   every request but server mode's tuner's, and do not let a web page or a
   stranger use them as a way in or out.
 - **The update path.** Only what dopeIPTV's release key signed is
-  installed, and never a version older than the one running
-  (`core/selfupdate.py`, `signed_asset`).
+  installed, only a signed file that names the release offered - an
+  older release's file under a newer tag is refused, since the
+  signature covers the file and not the tag - and never a version older
+  than the one running (`core/selfupdate.py`, `signed_asset`,
+  `names_version`).
 
 Outside the model: a program that runs as the person (it can read what
 they can), an administrator of the computer, someone at the unlocked
@@ -243,7 +247,8 @@ is.
   that is never on the web server (`core/update_keys.py`,
   `selfupdate.signed_asset`), and the site mirrors a release's files only
   once that signature holds (`donate/release_sums.py`). An older signed
-  release is refused too.
+  release is refused too, under its own tag or a newer one
+  (`selfupdate.names_version`).
 - Tell who someone is from what the app sends: no account, name, e-mail,
   supporter key or id the app makes up and keeps. A sync slot and its
   credential come from the sync code (`auth_of`); feedback's answers are
@@ -705,7 +710,10 @@ is not made at all (`core/memory_safe.py`):
   rule (`_cast_private_on`); a send still on its way is looked at again
   as soon as it is done (`_cast_send`'s `_private_check`). A disk buffer a
   recording or a cast reads goes on: what it writes is written for them,
-  and a second connection is not opened beside it.
+  and a second connection is not opened beside it. As the last of them
+  lets go, the channel is opened again as when private viewing is turned
+  on - nothing more is written there for the private playback alone
+  (`dvr_pool.on_private_disk`, the player's `private_on_disk`).
 - **Within its room.** A private cast's work - a channel's segments, a
   film's, the archive's or the rewind buffer's pieces, the spool a pause
   is kept in - is measured once a second while it runs, and past its room

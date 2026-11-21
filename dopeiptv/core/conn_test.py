@@ -338,6 +338,7 @@ class ConnTest:
                 if via is not None:
                     self._tunnel(sock, via, host, port)
                 ctx = ssl.create_default_context()
+                ctx.minimum_version = ssl.TLSVersion.TLSv1_2
                 tls = ctx.wrap_socket(sock, server_hostname=host)
                 self._hold(tls)
                 sock = tls

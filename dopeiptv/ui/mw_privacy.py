@@ -100,6 +100,28 @@ class _PrivacyMixin:
         # at this start, not at the first channel watched with the buffer.
         QTimer.singleShot(4000, self._privacy_sweep_buffers)
 
+    def _private_reopen_if_on_disk(self, why: str) -> None:
+        """The live channel playing privately opened again when its buffer
+        is on the disk (media/dvr_player.private_reopen_needed): in memory
+        out of a disk's reach, or with none."""
+        p = getattr(self, "player", None)
+        lp = getattr(self, "_last_playback", None) or {}
+        reopen = getattr(p, "private_reopen_needed", None)
+        if callable(reopen) and reopen() and lp.get("kind") == "live":
+            log.info("private viewing: %s - opened again", why)
+            QTimer.singleShot(0, self._retry_last_stream)
+
+    def _private_buffer_on_disk(self) -> None:
+        """The recording or cast that kept a private channel's buffer on the
+        disk is done (core/dvr_pool.on_private_disk): nothing more of it is
+        written there. The pool asks again whether it still is (the
+        session's own private mark) - and nothing is started again when
+        the player let go of the channel before this came."""
+        if getattr(getattr(self, "player", None), "_dvr", None) is None:
+            return
+        self._private_reopen_if_on_disk("the recording or cast that kept its buffer "
+                                        "on the disk is done")
+
     def _privacy_sweep_buffers(self) -> None:
         try:
             from ..media.dvr_player import dvr_base
@@ -161,10 +183,7 @@ class _PrivacyMixin:
                 # A buffer on the disk - the app's or mpv's own - holds
                 # nothing more of it: the channel opened again, its buffer
                 # in memory out of a disk's reach, or none (core/dvr_pool).
-                reopen = getattr(p, "private_reopen_needed", None)
-                if callable(reopen) and reopen() and lp.get("kind") == "live":
-                    log.info("private viewing: the channel's buffer is on the disk - opened again")
-                    QTimer.singleShot(0, self._retry_last_stream)
+                self._private_reopen_if_on_disk("the channel's buffer is on the disk")
             # A cast whose converter works on the disk: sent again, its work
             # in memory out of a disk's reach - or stopped and said so.
             if hasattr(self, "_cast_private_on"):

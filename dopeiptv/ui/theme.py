@@ -321,9 +321,10 @@ THEMES = {
         "muted4": "#627D98", "ok": "#1E7F3C", "warn": "#9A6200", "nerd": "#6D28D9", "error": "#C62828", "rec": "#D32F2F",
         "accent": ("#1E6FD9", "#3A85E3"), "light": True,
     },
-    # The supporters' two (SUPPORTER_THEMES): the supporter mark's shading,
-    # from the accent into the heart's colour, as a whole window - a night
-    # sky of indigo and violet with a rose accent, and a rose morning.
+    # The supporter mark's shading, from the accent into the heart's colour,
+    # as a whole window - a night sky of indigo and violet with a rose
+    # accent, and a rose morning. A supporter key's until November 2026;
+    # everyone's since.
     "aurora": {
         "name": "Aurora",
         "bg": "#15122E", "side": "#100D25", "pane": "#1A1636",
@@ -352,12 +353,6 @@ THEMES = {
 
 #: Order of the theme picker: dark ones first, then the light ones.
 THEME_ORDER = sorted(THEMES, key=lambda k: bool(THEMES[k].get("light")))
-
-#: Themes a supporter key opens (core/supporter.py) - a thank-you; every
-#: other theme is everyone's. Without a key the picker shows them with a
-#: heart and opens the supporter window instead, and one stored from before
-#: shows the default (effective_theme, drop_locked_themes).
-SUPPORTER_THEMES = frozenset({"aurora", "dawn"})
 
 # Corners: what every border-radius in the stylesheet is scaled by.
 CORNER_STYLES = {"sharp": 0.0, "rounded": 1.0, "round": 1.6}
@@ -410,38 +405,8 @@ def effective_theme(settings, system_dark: bool | None = None) -> str:
             theme = settings.value("theme_light", "light") or "light"
     if theme not in THEMES:
         return "graphite"
-    if theme in SUPPORTER_THEMES and not supporter_themes_open(settings):
-        # The key is gone, or no longer checks out: the default, quietly -
-        # the light one where a light theme was asked for.
-        return "light" if is_light(theme) else "graphite"
     return theme
 
-
-def supporter_themes_open(settings) -> bool:
-    """Whether SUPPORTER_THEMES can be picked: a supporter key that checks
-    out. Never raises - without a readable key they are simply closed."""
-    try:
-        from ..core import supporter
-        return supporter.is_supporter(settings)
-    except Exception:
-        return False
-
-
-def drop_locked_themes(settings) -> bool:
-    """A supporter theme stored by someone with no key now - removed, or
-    one that no longer checks out - goes back to the default in the
-    settings too, so Settings shows what the window does. True when one
-    did."""
-    dropped = False
-    for key, default in (("theme", "graphite"), ("theme_light", "light")):
-        try:
-            stored = str(settings.value(key, "") or "")
-        except Exception:
-            continue
-        if stored in SUPPORTER_THEMES and not supporter_themes_open(settings):
-            settings.setValue(key, default)
-            dropped = True
-    return dropped
 
 P: dict[str, str] = {}
 ACCENT: str = ACCENTS["blue"][1]
@@ -799,7 +764,7 @@ QPushButton#SideIcon {{
 QPushButton#SideIcon:hover {{ background: {p['hover']}; }}
 QPushButton#SideIcon:pressed {{ background: {p['sel']}; }}
 
-/* Support dopeIPTV: a small red heart beside the sidebar's logo, its
+/* Leave a tip: a small red heart beside the sidebar's logo, its
    words in the tooltip. No pill - only a soft round under the pointer. */
 QPushButton#DonateHeart {{
     background: transparent; border: none; border-radius: 15px; padding: 0;

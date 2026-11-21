@@ -41,6 +41,17 @@ def test_nothing_that_identifies_a_stream_or_a_person_is_left():
     assert "127.0.0.1:3673" in out
 
 
+def test_every_way_of_writing_an_ipv6_address_goes():
+    # An outside review found an address that ends with "::" went through,
+    # and ::ffff:192.0.2.7 left the IPv4's last three numbers behind.
+    for addr in ("2001:db8::", "fe80::", "::ffff:192.0.2.7", "0:0:0:0:0:ffff:192.0.2.7",
+                 "2001:db8::1234", "fe80::1", "::1", "2001:db8:85a3:0:0:8a2e:370:7334"):
+        assert report.scrub(f"connect to {addr} failed") == "connect to <ip> failed", addr
+    assert report.scrub("[2001:db8::]:8080 refused") == "[<ip>]:8080 refused"
+    for text in ("21:05:03 started", "std::thread::join", "QWidget::show", "a :: b", "16:9"):
+        assert report.scrub(text) == text, text
+
+
 def test_a_report_holds_versions_the_error_and_the_recent_log_scrubbed():
     log.warning("stream http://user:secret@h.example/live/u/p/1.ts did not start")
     text = report.build("error", trace="Traceback (most recent call last):\nValueError: boom",

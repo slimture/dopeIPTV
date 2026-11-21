@@ -166,7 +166,7 @@ class Refs:
 
     def put(self, kind: str, ident: Any, value: Any) -> str:
         raw = f"{kind}\x00{ident}".encode("utf-8", "replace")
-        ref = kind[:1].lower() + hashlib.sha1(raw).hexdigest()[:15]
+        ref = kind[:1].lower() + hashlib.sha256(raw).hexdigest()[:15]
         with self._lock:
             self._ids.pop(ref, None)
             self._ids[ref] = (kind, value)

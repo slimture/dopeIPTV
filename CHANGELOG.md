@@ -7,6 +7,53 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.10]
+
+### Changed
+
+- Supporting dopeIPTV is a tip and nothing else: once, any amount, and
+  nothing given for it - the app is the same for everyone. The heart, the
+  menu, About and Settings say "Leave a tip" in all 27 languages ("I've
+  left a tip", "Ask for a tip now and then"), and Settings > General's card
+  is Feedback and tips.
+- The two themes and the app icon a supporter key opened are everyone's:
+  Aurora and Dawn are picked like any theme, and the heart icon is a switch
+  on Settings > General for anyone (off unless switched on; a supporter key
+  from before keeps it on, as it was). A supporter key from a tip or
+  monthly support before 22 November 2026 goes on working - the mark on
+  the logo and in About, and no more asking.
+
+### Security
+
+- A log line that could not be masked - a message whose arguments do not
+  fit it, a value whose text cannot be read, a fault in the masking
+  itself - is no longer written as it was: a line saying one was withheld
+  takes its place, and a traceback that could not be masked goes the same
+  way (`core/log.py`, `WITHHELD`).
+- A channel recorded or cast while it was watched privately kept its
+  rewind buffer on the disk after the recording or cast ended, until the
+  channel was left. The player now opens it again at that moment, its
+  buffer in memory out of a disk's reach or none, as it does when private
+  viewing is turned on (`core/dvr_pool.on_private_disk`).
+- An update is installed only when its signed file names the release
+  offered. A site or a mirror taken over could have offered an older
+  release's signed file under a newer tag - a step back to a version with a
+  known fault - since the signature covers the file, not the tag
+  (`core/selfupdate.names_version`). A size beyond any release file is not
+  fetched at all.
+- An error report's cleaning missed an IPv6 address that ends in "::"
+  (`2001:db8::`, `fe80::`) and left an IPv4's last three numbers after
+  `::ffff:`; both go now, here and in the site's second cleaning.
+- The report and feedback windows say what goes beside the text - the
+  app's version, the system, what was picked, a supporter's mark, the hash
+  of a code for answers - where they said "exactly what is sent" of the
+  text alone.
+- From a CodeQL scan: every TLS connection the app makes itself says
+  TLS 1.2 as its least (Python's default already; now no build's OpenSSL
+  settings can lower it), the app's own yt-dlp and its wrapper are this
+  user's alone to run, and the ids and stamps kept in memory are SHA-256
+  rather than SHA-1.
+
 ## [1.6.9]
 
 ### Fixed

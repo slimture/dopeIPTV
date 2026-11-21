@@ -142,6 +142,7 @@ class _BuildDetailMixin:
             self.player.stalled.connect(self._on_player_stalled)
             self.player.contested.connect(self._on_stream_contested)
             self.player.reopen_live.connect(self._reopen_live_edge)
+            self.player.private_on_disk.connect(self._private_buffer_on_disk)
             self.player.first_frame.connect(self._health_frame)
             self.player.stream_info_changed.connect(self._remember_stream_info)
             # A box's signal in the stream stats, polled only while they show.

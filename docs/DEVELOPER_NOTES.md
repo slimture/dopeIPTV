@@ -319,8 +319,8 @@ in the background.  Cache files live in the platform's cache directory.
 
 ## Theme system
 
-`THEMES` in `ui/theme.py` (27 today: 25 for everyone, five of them light,
-and the two a supporter key opens, `SUPPORTER_THEMES`) and `ACCENTS`
+`THEMES` in `ui/theme.py` (27 today, six of them light, every one for
+everyone) and `ACCENTS`
 (ten, plus the theme's own and any custom colour).  The active theme
 populates a global palette dict `P`; `build_style()` generates the full
 QSS from it.  Theme changes take effect immediately without restarting

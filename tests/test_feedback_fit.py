@@ -119,3 +119,36 @@ def test_feedback_and_a_report_link_to_the_privacy_policy(monkeypatch):
         links[0].click()
     assert opened == [dialogs.PRIVACY_URL] * len(windows)
     assert dialogs.PRIVACY_URL.startswith("https://dopeiptv.org/privacy/")
+
+
+def test_the_windows_say_what_goes_beside_the_text(monkeypatch):
+    # An outside review: the window said "exactly what is sent" while the
+    # version, the system, a supporter's mark and the answer code's hash
+    # went beside the text unseen. Each is said now, as send_status writes it.
+    app = _qapp()
+    import json
+    import platform
+
+    from dopeiptv import __version__
+    from dopeiptv.core import build_check, report
+    from dopeiptv.ui import dialogs
+    fb = dialogs.FeedbackDialog(None, lambda opts: "", supporter=True)
+    _settle(app)
+    line = fb.beside.text()
+    assert f"dopeIPTV {__version__}" in line and platform.system() in line
+    for key in ("report_item_picked", "report_item_supporter", "report_item_code"):
+        assert dialogs.tr(key) in line, key
+    fb.answers.setChecked(False)
+    assert dialogs.tr("report_item_code") not in fb.beside.text()
+    plain = dialogs.FeedbackDialog(None, lambda opts: "")
+    assert dialogs.tr("report_item_supporter") not in plain.beside.text()
+    rd = dialogs.ReportDialog(None, "error", "trace")
+    assert rd.beside is not None and f"dopeIPTV {__version__}" in rd.beside.text()
+    assert dialogs.ReportDialog(None, "error", "trace", copy_only=True).beside is None
+    # What send_status sends beside the text is exactly what the line names.
+    sent = {}
+    monkeypatch.setattr(build_check, "allowed", lambda: True)
+    monkeypatch.setattr(report, "_post", lambda url, body, timeout: (sent.update(json.loads(body)), (200, b""))[1])
+    report.send_status("error", "x", personal=())
+    assert set(sent) == {"kind", "version", "os", "text"}
+    assert [f"dopeIPTV {sent['version']}", sent["os"]] == report.sent_beside()
