@@ -90,7 +90,15 @@ CODE: dict[str, list[dict]] = {
          "names": ["_URL", "_IPV4", "_IPV6", "_EMAIL", "_MAC", "_KEYVAL", "_AUTH_LINE", "_BEARER",
                    "_HOST_PATH", "_hide_value", "_SUPPORTER", "scrub", "accept"]},
         {"id": "limits", "repo": "site", "path": "donate/donate.py",
-         "names": ["_forget_quiet", "_forget_loop", "_allowed"]},
+         "names": ["_forget_quiet", "_forget_loop", "_allowed"],
+         # Which window a report's and an answer's ask is held for: the
+         # constants, and the two handlers' own lines.
+         "with": [{"repo": "site", "path": "donate/donate.py",
+                   "from": r"^WINDOW, PER_WINDOW = ", "to": r"^FEEDBACK_PER_WINDOW = "},
+                  {"repo": "site", "path": "donate/donate.py",
+                   "from": r"^        if not _allowed\(\"fb:\" \+ addr", "to": r"^            return self\._send\(429"},
+                  {"repo": "site", "path": "donate/donate.py",
+                   "from": r"^        if not _allowed\(\"rp:\" \+ addr", "to": r"^            return self\._send\(429"}]},
     ],
     "sync": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/sync.py",

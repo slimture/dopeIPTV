@@ -23,10 +23,16 @@ import feedback  # noqa: E402
 
 def test_ipv6_addresses_go_in_full_and_shortened():
     for addr in ("2001:db8:85a3:0:0:8a2e:370:7334", "2a02:1406:3:4f::1b", "fe80::1",
-                 "::1", "FE80::A00:27FF:FE4E:66A1"):
+                 "::1", "FE80::A00:27FF:FE4E:66A1",
+                 # Ending with "::" and with an IPv4 at the end: an outside
+                 # review found these went through (an IPv4's last three
+                 # numbers were left after ::ffff:).
+                 "2001:db8::", "fe80::", "::ffff:192.0.2.7", "0:0:0:0:0:ffff:192.0.2.7"):
         out = feedback.scrub(f"connect to {addr} failed")
         assert out == "connect to <ip> failed", (addr, out)
     assert feedback.scrub("[2001:db8::7]:8080 refused") == "[<ip>]:8080 refused"
+    assert feedback.scrub("[2001:db8::]:8080 refused") == "[<ip>]:8080 refused"
+    assert feedback.scrub("a :: b and :: alone") == "a :: b and :: alone"
 
 
 def test_what_only_looks_like_an_address_stays():

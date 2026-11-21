@@ -333,20 +333,21 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 
 <section class="tp-part tp-i-private">
 <h2 id="private">6. Kan appen låta bli att spara något om vad jag tittar på?</h2>
-<p class="tp-promise tp-promise-ico">Medan privat läge är på sparas inget av det du spelar, ingenting berättas för någon och inget av det skrivs till en disk – tills du stänger appen.</p>
+<p class="tp-promise tp-promise-ico">Medan privat läge är på sparas inget av det du spelar, ingenting berättas för någon och inget av det skrivs okrypterat till en disk – tills du stänger appen.</p>
 <p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> ingenting om det. Privat läge handlar om vad din egen dator sparar och berättar; vi får ingenting om vad du tittar på i vilket fall (<a href="#watching">del 2</a>).</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>En enda brytare</b> i appens minne – sparas aldrig, så den är av igen när appen startar.</li>
 <li><b>Varje ställe som sparar något</b> – tittarhistoriken, var du slutade – frågar själv brytaren innan det skriver.</li>
 <li><b>Varje ställe som berättar</b> – Trakt, Simkl, Discord, din mediaserver, statistiken, loggen – frågar den också.</li>
-<li><b>Det som måste skrivas medan det spelas</b> – bakåtspolningsbufferten, en cast som appen konverterar åt tv:n, en undertext du hämtar – hamnar bara i minne som inte kan nå en disk, eller görs inte alls.</li>
+<li><b>Det som måste skrivas medan det spelas</b> – bakåtspolningsbufferten, en cast som appen konverterar åt tv:n, en undertext du hämtar – hamnar bara i minne som inte kan nå en disk okrypterat, eller görs inte alls.</li>
 </ol>
 <details class="tp-more">
 <summary>Läs mer</summary>
 <div class="tp-more-body">
 <p>Kontrollen sitter i själva lagringen, inte i knapparna som spelar något. Därför kan ingen del av appen glömma den: hur du än startar en film vägrar historiken att skriva in den. En uppspelning som började privat förblir privat till slutet – även om strömmen kopplar upp igen efter att du har stängt av privat läge: den sparas inte, räknas inte och berättas inte för Trakt, Simkl, Discord eller din mediaserver.</p>
-<p>Minne räknas bara när det verkligen är minne: på Linux en egen mapp på ett filsystem i minnet (tmpfs), och bara när det systemet flyttar ut ur minnet inte kan läsas från en disk efteråt – ingen swap, krypterad swap eller zram utan disk bakom. Där det inte finns sådant minne – på macOS och Windows, eller med swap på en vanlig disk – spelas en privat kanal utan bufferten, appen säger varför en cast som behöver konverteras inte går, och en undertext når spelaren utan att bli en fil. Slår du på privat läge medan en kanal spelas från en buffert på disken öppnas den igen på det privata sättet; en cast som konverteras på disken stannar inom en sekund och skickas igen. Innan en inspelning startar i privat läge frågar appen först.</p>
+<p>Minne räknas bara när det verkligen är minne: på Linux en egen mapp på ett filsystem i minnet (tmpfs), och bara när det systemet flyttar ut ur minnet inte kan läsas från en disk efteråt – ingen swap, zram utan disk bakom, eller krypterad swap. Med krypterad swap kan systemet alltså flytta bufferten till disken, men bara krypterad. Där det inte finns sådant minne – på macOS och Windows, eller med swap på en vanlig disk – spelas en privat kanal utan bufferten, appen säger varför en cast som behöver konverteras inte går, och en undertext når spelaren utan att bli en fil. Slår du på privat läge medan en kanal spelas från en buffert på disken öppnas den igen på det privata sättet – i samma stund som appen hinner, efter det som redan pågår i fönstret; en cast som konverteras på disken stannar inom en sekund och skickas igen. Innan en inspelning startar i privat läge frågar appen först.</p>
+<p>Privat läge gäller från att du slår på det. En scrobble som redan har börjat hos Trakt eller Simkl släpps utan att avslutas, så hur långt du kom rapporteras inte och den hamnar inte i historiken där; din mediaserver får veta var du var när du slog på det, och sedan inget mer. Händelser som ännu inte har gått iväg till Home Assistant eller en webhook och som namnger det som spelas tas tillbaka.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -379,7 +380,9 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Din tv-leverantör ser fortfarande vad du spelar – den skickar strömmen till dig – och det kan alla som ser din nätverkstrafik också. Privat läge handlar om vad din egen dator sparar och berättar, inte om att vara osynlig.</li>
-<li>En inspelning är fortfarande en fil – appen frågar först, och sparar den om du säger ja.</li>
+<li>En inspelning är fortfarande en fil – appen frågar först, och sparar den om du säger ja. Läser en inspelning, en cast eller en annan enhet genom servermoden redan kanalens buffert på disken när du slår på privat läge, fortsätter den att skrivas där tills den sista av dem släpper den; sedan öppnas kanalen igen på det privata sättet.</li>
+<li>Med krypterad swap kan bufferten flyttas till disken, krypterad. Får swapen en ny nyckel vid varje start går den inte att läsa efteråt; följer nyckeln med diskens egen kryptering kan den läsas av den som kan låsa upp disken.</li>
+<li>Privat läge verkar inte bakåt i tiden: det som sparades eller berättades innan du slog på det – en scrobble som redan har börjat, en rad i historiken – finns kvar. Rensa senaste historiken tar bort det som finns på datorn, men inte det en tjänst redan har fått.</li>
 <li>Spelarens eget minne – bilden den avkodar, det den läser i förväg – är programmets minne, som systemet kan flytta till swap som allt annat: det är bara så skyddat som din swap är.</li>
 <li>En cast som konverteras på disken när du slår på privat läge fortsätter i upp till en sekund innan den stannar; det den skrev raderas då.</li>
 <li>På macOS och Windows finns inget sådant minne för appen: där har en privat kanal ingen buffert, och en cast som behöver konverteras konverteras inte.</li>
@@ -389,8 +392,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 
 <section class="tp-part tp-i-reports">
 <h2 id="reports">7. Vad står i en felrapport?</h2>
-<p class="tp-promise tp-promise-ico">En felrapport rensas på din dator från det appen känner igen som ditt eller som det du tittar på, du läser hela först – och ingenting lämnar den alls förrän du trycker på Skicka.</p>
-<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> det du väljer att skicka – rapporten efter rensningen, som du läser först – och var ett svar hör hemma, genom en kod som bara din dator har. Aldrig din IP-adress i det vi sparar.</p>
+<p class="tp-promise tp-promise-ico">En felrapport rensas på din dator från det appen känner igen som ditt eller som det du tittar på, du läser hela texten först – och ingenting lämnar den alls förrän du trycker på Skicka.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> det du väljer att skicka – rapporten efter rensningen, som du läser först, med appens version och ditt system (Linux, Windows eller macOS) – och var ett svar hör hemma, genom en kod som bara din dator har. Aldrig din IP-adress i det vi sparar.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Appen</b> skriver rapporten och rensar den på din dator.</li>
@@ -401,7 +404,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <summary>Läs mer</summary>
 <div class="tp-more-body">
 <p>Rensningen sker på två sätt. Först letar den efter <em>mönster</em>: allt som ser ut som en webbadress – med eller utan <code>http://</code> före –, en IP- eller MAC-adress, en e-postadress, ett telefonnummer, ett lösenord, en nyckel eller en inloggning skriven som <code>namn=värde</code>, inom citattecken, som JSON eller i en mening som ”lösenord: …”, en nyckel som står ensam (en JWT, en nyckel som börjar med en tjänsts prefix, en lång slumpad sträng), och en inloggningsrubrik eller kaka. Sedan tar den bort <em>det appen vet är ditt</em>: dina källors namn, servrar och inloggningar, dina kanalnamn, titlarna du har tittat på, ditt användarnamn och varje kontos hemkatalog. Allt ersätts med en platshållare som <code>&lt;private&gt;</code>, så att rapporten fortfarande säger oss något utan att säga vem du är. Den del som skickar kör mönstren en gång till på exakt det som går iväg, vilken väg texten än kom, och skickar den bara över HTTPS till vår egen adress – aldrig efter en omdirigering någon annanstans.</p>
-<p>Ber du om svar gör appen en slumpad kod som stannar på din dator och skickar bara en hashsumma av den – ett envägsfingeravtryck som vi inte kan göra om till koden. Senare frågar appen om den hashsumman har fått ett svar. Hashsumman är densamma varje gång appen frågar, så vår server kan se att frågorna hör ihop, men inte vem som frågar. Ett svar du skriver på ett av våra svar rensas på samma sätt som rapporten.</p>
+<p>Ber du om svar gör appen en slumpad kod som stannar på din dator och skickar bara en hashsumma av den – ett envägsfingeravtryck som vi inte kan göra om till koden. Senare frågar appen om den hashsumman har fått ett svar. Hashsumman är densamma varje gång appen frågar, så vår server kan se att frågorna hör ihop, men inte vem som frågar. Väntar flera av dina rapporter på svar frågar appen om alla deras hashsummor i samma anrop – så servern kan se att de kommer från samma dator; den sparar inget om frågan. Frågorna går bara medan du har bett om svar, i 30 dagar, och aldrig med själva rapporten. Ett svar du skriver på ett av våra svar rensas på samma sätt som rapporten.</p>
 <p>Vår server sparar en rapport i 12 månader och tar sedan bort den av sig själv – med varje svar vi skrev på den och varje svar du skickade på ett av dem. Ett svar vi skriver på ett helt problem på en gång (”rättat i 1.5.1”, till alla som rapporterade det) innehåller bara våra egna ord och finns kvar tills vi tar bort det.</p>
 <p>Feedback har med sig det du väljer i den – ämnet, vilken del av appen och hur ofta det händer – och, om appen har en supporternyckel, fältet <code>"supporter": "yes"</code>, så att vi läser den först. Aldrig nyckeln.</p>
 </div>
@@ -426,7 +429,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code reports answers-->
 <p>På vår server: den andra rensningen och det som sparas – titta efter det som <em>inte</em> finns där: ingen IP-adress, inga uppgifter om webbläsaren.</p>
 <!--tp:code reports server-->
-<p>Och den enda användningen av din IP-adress: i minnet, för att begränsa hur många anrop en adress gör – glömd inom en minut när gränsen inte längre behöver den. Samma gränser skyddar synken och Titta tillsammans.</p>
+<p>Och den enda användningen av din IP-adress: i minnet, för att begränsa hur många anrop en adress gör – för en rapport och för en fråga om svar i tio minuter efter adressens senaste anrop, och sedan glömd inom en minut. Samma gränser skyddar synken och Titta tillsammans; bara gränsen för nya synkplatser minns en adress ett dygn.</p>
 <!--tp:code reports limits-->
 <p>Och testerna som kontrollerar allt det här varje gång appen byggs. En ändring som släppte igenom något skulle göra att de misslyckas:</p>
 <!--tp:tests reports-->
