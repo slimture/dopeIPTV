@@ -7,6 +7,20 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Changed
+
+- Supporting dopeIPTV is a tip and nothing else: once, any amount, and
+  nothing given for it - the app is the same for everyone. The heart, the
+  menu, About and Settings say "Leave a tip" in all 27 languages ("I've
+  left a tip", "Ask for a tip now and then"), and Settings > General's card
+  is Feedback and tips.
+- The two themes and the app icon a supporter key opened are everyone's:
+  Aurora and Dawn are picked like any theme, and the heart icon is a switch
+  on Settings > General for anyone (off unless switched on; a supporter key
+  from before keeps it on, as it was). A supporter key from a tip or
+  monthly support before 22 November 2026 goes on working - the mark on
+  the logo and in About, and no more asking.
+
 ### Security
 
 - A log line that could not be masked - a message whose arguments do not

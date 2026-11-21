@@ -189,8 +189,8 @@ Only names here - the values are with the owner.
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | Trakt sign-in fails: there is no Settings row for a client id of one's own - only a build with `DEFAULT_CLIENT_ID` empty asks for one on Connect (`_trakt_creds_dialog` in `ui/mw_trakt.py`) |
 | The web server | runs the site and its cron sync (website branch: `README.md`; how the server is set up: the private repository `slimture/dopeiptv-server`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
-| Stripe (dopeIPTV's own account, under Solecraft AB) - the tip dialog and a Payment Link | a tip (any amount, once) in the site's tip dialog, paid through `donate/donate.py` (or a Payment Link of its own, `SUPPORT_TIP_URL`, while `SUPPORT_TIPS` is not on), and monthly support (a fixed price) as a Payment Link returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; the settings are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIPS`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`, ...), read by `sync-releases.sh` (the server's runbook, `slimture/dopeiptv-server`, "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
-| Stripe key for the supporter key | a restricted key, read-only (Checkout Sessions: Read, PaymentIntents: Read), on the web server in `/usr/local/etc/iptv-donate.key`, read by `donate/donate.py` | the thank-you after paying shows no supporter key |
+| Stripe (dopeIPTV's own account, under Solecraft AB) - the tip dialog | a tip and nothing else: once, any amount, nothing given for it (no key, no perk, no monthly support - from 22 November 2026; Stripe's rule for a tip is that it thanks for something already provided, and a reward would make it fundraising), in the site's tip dialog, paid through `donate/donate.py` (or a Payment Link of its own, `SUPPORT_TIP_URL`, while `SUPPORT_TIPS` is not on); the settings are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIPS`, `SUPPORT_TIP_URL`, `SUPPORT_TIP_HINT`), read by `sync-releases.sh` (the server's runbook, `slimture/dopeiptv-server`, "A tip alone"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Leave a tip" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
+| Stripe key for the tip dialog and the keys from before | a restricted key (Checkout Sessions: Read, PaymentIntents: Write), on the web server in `/usr/local/etc/iptv-donate.key`, read by `donate/donate.py`; a supporter key is made only for a payment before 22 November 2026 (`KEYS_UNTIL`), for a receipt's link from then | no tip can be paid in the dialog; an old receipt's link shows no key |
 | The admin page's sign-in | each admin's passkey, or a name and password (and an authenticator code if turned on); the admins in a file of the service's on the web server, a new one by an invite from another (the server's runbook, "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
@@ -459,11 +459,12 @@ private `slimture/dopeiptv-server`. In short:
 - The one non-static piece is `donate/donate.py`, a standard-library
   service behind `/pay/` and `/support/key` that makes the Stripe payments for the tip
   dialog (card form, Apple Pay, Google Pay on the page itself), in the
-  payer's own currency, and hands out supporter keys. For the app it
+  payer's own currency, and shows the supporter key of a payment from
+  before 22 November 2026 again (a tip since gives none). For the app it
   serves feedback and its answers (`/feedback/`), settings sync (`/sync/`)
   and Watch together (`/together/`). And `/admin/`, for its admins only
-  (a passkey, or a password): visitors, downloads, and tips and monthly
-  support by day, week, month and year, the visits counted in memory by
+  (a passkey, or a password): visitors, downloads, and tips (monthly
+  support too, until November 2026) by day, week, month and year, the visits counted in memory by
   `donate/stats_collect.py` from the lines nginx hands it - no cookie, no
   address kept (the transparency page, part 10, says how).
 - The look is deliberately quiet: black or white, greys and the app

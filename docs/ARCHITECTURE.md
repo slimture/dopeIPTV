@@ -145,7 +145,7 @@ dopeiptv/
                        manifest checked once at start; X-dopeIPTV-Build
     supporter.py       The supporter key: signed by dopeiptv.org, checked
                        offline
-    donate_rhythm.py   When the app asks for support (the sidebar's heart one
+    donate_rhythm.py   When the app asks for a tip (the sidebar's heart one
                        week a month), pure logic
     report.py          Error reports and feedback: scrubbed, shown in full,
                        sent only on Send; the answers to feedback
@@ -483,7 +483,7 @@ dopeiptv/
     mw_calendar.py     Reminders and recordings as a calendar (file, served)
     mw_report.py       Send feedback, the offer of a report after an error, the
                        answers to feedback and replies
-    mw_donate.py       Supporting from the app: About's link, the heart one
+    mw_donate.py       A tip from the app: About's link, the heart one
                        week a month
     mw_privacy.py      Private viewing and Clear recent history in the window
     mw_commands.py     Commands from outside carried out: an address, a channel
@@ -591,9 +591,9 @@ dopeiptv/
     shortcuts.py       The Keyboard shortcuts card (its own page under System)
     tmdb_match.py      Manual TMDB match dialog
     subtitle_search.py OpenSubtitles search dialog
-    theme.py           THEMES (27, two of them a supporter's) x ACCENTS
+    theme.py           THEMES (27, six of them light) x ACCENTS
                        (10 + custom), palette dict P, QSS generator
-    app_icon.py        The app's icon, plain or the supporter's: drawn,
+    app_icon.py        The app's icon, plain or with the heart: drawn,
                        set for every window, written to the icon theme
 ```
 

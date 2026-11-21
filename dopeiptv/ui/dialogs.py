@@ -866,14 +866,12 @@ class SupporterDialog(QDialog):
             self.sub.setText(tr("supporter_since", date=date))
             self.state.setText("✓ " + tr("supporter_ok", date=date))
             self.state.setStyleSheet(f"font-size:12px; color:{P.get('ok', P['text2'])};")
-            self.donate_btn.setText(tr("supporter_again") + "…")
+            self.donate_btn.setText(tr("donate_support") + "…")
         else:
             if not text:
                 self._settings.remove("supporter_key")
             self.head.setText(tr("supporter_title"))
-            # What the key opens, too: someone who picked a supporter theme
-            # lands here and should read why.
-            self.sub.setText(tr("supporter_intro") + "\n\n" + tr("supporter_perks"))
+            self.sub.setText(tr("supporter_intro"))
             self.state.setText(tr("supporter_bad") if text else "")
             self.state.setStyleSheet(f"font-size:12px; color:{P['error']};")
             self.donate_btn.setText(tr("donate_support") + "…")

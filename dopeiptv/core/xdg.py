@@ -137,7 +137,7 @@ def _open_with_qt(url: str) -> bool:
     BEHIND the app, and GNOME's launch spinner turned until it gave up.
 
     Qt asks for the token on behalf of the window that has the focus. A
-    link chosen from a menu ("Support dopeIPTV…" in the app menu, the
+    link chosen from a menu ("Leave a tip…" in the app menu, the
     heart's right-click menu) had the menu's popup there - or, as it
     closed, no window at all - and the page opened behind the app all the
     same. On Wayland the link waits, a beat, for the window to have the

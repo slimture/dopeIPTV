@@ -358,14 +358,14 @@ non-English strings started as machine translation — **corrections in your
 language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
 (no coding required).
 
-## Support dopeIPTV
+## Leave a tip
 
-dopeIPTV is free, with no ads, no tracking and no paid version. Developing
-it, running the website and serving the downloads comes with some costs. If
-the app works well for you,
-**[a tip or monthly support](https://dopeiptv.org/support/?ref=github)**
-helps keep it going.
-Reporting bugs and fixing a translation in your language help just as much.
+dopeIPTV is free, with no ads, no tracking and no paid version. If you use
+it and like it, you can say thanks with
+**[a tip](https://dopeiptv.org/support/?ref=github)** - once, any amount you
+choose. It is voluntary and gives nothing in return: the app is the same for
+everyone. Reporting bugs and fixing a translation in your language help just
+as much.
 
 ## Contributing and maintaining
 

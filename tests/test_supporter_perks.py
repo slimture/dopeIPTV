@@ -1,8 +1,8 @@
-"""What a supporter key opens: the supporter's app icon (unless switched
-off) and two themes of their own - and what happens without one: the
-themes shown with a heart that opens the supporter window, and a supporter
-theme stored from before giving way to the default, quietly. Sync between
-computers is not among them any more: it is for everyone."""
+"""What a supporter key used to open, everyone's now: the two themes of the
+supporter mark's shading and the heart icon for the app. A tip gives
+nothing in return (dopeiptv.org/support/), so no theme or icon is locked;
+a key from before keeps the icon it had, unless switched off. Sync between
+computers was never left among them: it is for everyone."""
 from __future__ import annotations
 
 import os
@@ -13,9 +13,12 @@ import pytest
 
 from dopeiptv.core import supporter
 from dopeiptv.ui import theme
-from dopeiptv.ui.theme import SUPPORTER_THEMES, THEMES, effective_theme, is_light
+from dopeiptv.ui.theme import THEMES, effective_theme, is_light
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+#: The two themes a supporter key opened until November 2026.
+FORMER = ("aurora", "dawn")
 
 
 class _Settings(dict):
@@ -34,67 +37,50 @@ def key(monkeypatch):
     return supporter.make(seed)
 
 
-def test_one_dark_and_one_light_theme_of_their_own():
-    assert SUPPORTER_THEMES <= set(THEMES)
-    assert sorted(is_light(k) for k in SUPPORTER_THEMES) == [False, True]
-    others = [t for k, t in THEMES.items() if k not in SUPPORTER_THEMES]
-    for k in SUPPORTER_THEMES:
+def test_the_two_themes_are_still_their_own():
+    assert set(FORMER) <= set(THEMES)
+    assert sorted(is_light(k) for k in FORMER) == [False, True]
+    others = [t for k, t in THEMES.items() if k not in FORMER]
+    for k in FORMER:
         t = THEMES[k]
         assert "accent" in t, k
-        # Not a copy of a theme everyone has: no other one shares its page,
-        # sidebar or accent.
         for o in others:
             assert (t["bg"], t["side"]) != (o["bg"], o["side"]), (k, o["name"])
             assert t["accent"][0] != o.get("accent", ("",))[0], (k, o["name"])
 
 
-def test_without_a_key_a_stored_supporter_theme_shows_the_default():
+def test_nothing_locks_a_theme_any_more():
+    for name in ("SUPPORTER_THEMES", "supporter_themes_open", "drop_locked_themes"):
+        assert not hasattr(theme, name), name
     s = _Settings(theme="aurora", theme_light="dawn")
-    assert effective_theme(s, system_dark=True) == "graphite"
-    s["theme_follow_system"] = "true"
-    assert effective_theme(s, system_dark=False) == "light"
-    # A key that does not check out (another site's, or damaged) is none.
-    s["supporter_key"] = "DS1-not-a-key"
-    assert effective_theme(s, system_dark=False) == "light"
-
-
-def test_with_a_key_they_are_picked_like_any_theme(key):
-    s = _Settings(theme="aurora", theme_light="dawn", supporter_key=key)
     assert effective_theme(s, system_dark=True) == "aurora"
     s["theme_follow_system"] = "true"
     assert effective_theme(s, system_dark=False) == "dawn"
-    assert theme.drop_locked_themes(s) is False
-    assert s["theme"] == "aurora" and s["theme_light"] == "dawn"
+    s["supporter_key"] = "DS1-not-a-key"
+    assert effective_theme(s, system_dark=False) == "dawn"
 
 
-def test_the_key_gone_puts_the_stored_choice_back_to_the_default(key):
-    s = _Settings(theme="aurora", theme_light="dawn", supporter_key=key)
-    del s["supporter_key"]
-    assert theme.drop_locked_themes(s) is True
-    assert s["theme"] == "graphite" and s["theme_light"] == "light"
-    assert theme.drop_locked_themes(s) is False          # once
-    # Everyone else's themes are never touched.
-    s2 = _Settings(theme="nord", theme_light="sky")
-    assert theme.drop_locked_themes(s2) is False
-    assert s2 == {"theme": "nord", "theme_light": "sky"}
+def test_the_heart_icon_is_everyones_switch(key):
+    from dopeiptv.ui import app_icon
+    s = _Settings()
+    assert not app_icon.wanted(s)                    # off by default
+    s["supporter_icon"] = "true"
+    assert app_icon.wanted(s)                        # anyone may switch it on
+    s = _Settings(supporter_key=key)
+    assert app_icon.wanted(s)                        # a key from before: as it was
+    s["supporter_icon"] = "false"
+    assert not app_icon.wanted(s)
 
-
-def test_settings_that_cannot_be_read_close_the_themes_without_raising():
     class Broken:
         def value(self, *_a, **_k):
             raise RuntimeError("unreadable")
+    assert app_icon.wanted(Broken()) is False
 
-    assert theme.supporter_themes_open(Broken()) is False
 
-
-def test_the_icon_switch_is_on_unless_turned_off(key):
-    from dopeiptv.ui import app_icon
-    s = _Settings()
-    assert app_icon.switched_on(s) and not app_icon.wanted(s)
-    s["supporter_key"] = key
-    assert app_icon.wanted(s)
-    s["supporter_icon"] = "false"
-    assert not app_icon.switched_on(s) and not app_icon.wanted(s)
+def test_the_strings_of_the_perks_are_gone():
+    from dopeiptv.i18n import _STRINGS
+    for k in ("theme_supporter_tip", "supporter_perks", "supporter_again"):
+        assert k not in _STRINGS, k
 
 
 _ICON = r"""
@@ -188,18 +174,13 @@ def page_of(widget):
     return widget
 
 s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
-# Chosen while a supporter, the key since gone: the start shows the default.
+# A former supporter theme, no key: it stays as chosen.
 s.setValue("theme", "aurora")
 theme.apply_theme(s)
-assert theme.P["name"] == theme.THEMES["graphite"]["name"]
+assert theme.P["name"] == theme.THEMES["aurora"]["name"]
 w = MainWindow(DemoClient(), s, PlaylistStore(s))
-assert s.value("theme") == "graphite"           # and Settings says so
-assert app_icon._shown is False
-
-# -- the picker without a key: a heart, a word, the supporter window --------
-opened = []
-real_open = w.open_supporter
-w.open_supporter = lambda key="": opened.append(1)
+assert s.value("theme") == "aurora"
+assert app_icon._shown is False                  # the heart icon is off by default
 
 def in_settings(check):
     def run(self):
@@ -214,67 +195,57 @@ def in_settings(check):
     finally:
         QDialog.exec = saved
 
-def locked(d):
+def icon_switch(d):
+    return [sw for sw in d.findChildren(ToggleSwitch)
+            if sw.accessibleName() == tr("set_supporter_icon")][0]
+
+# -- every theme picked like any other, no key ------------------------------
+def open_to_all(d):
     tiles = {t.key: t for t in d.findChildren(ThemeTile)}
-    for k in theme.SUPPORTER_THEMES:
-        assert tiles[k].locked and tr("theme_supporter_tip") in tiles[k].toolTip(), k
-    assert not tiles["nord"].locked and tiles["nord"].toolTip() == tr("theme_nord")
+    assert not hasattr(tiles["aurora"], "locked")
+    assert tiles["aurora"].toolTip() == tr("theme_aurora")
+    tiles["nord"].click()
+    assert s.value("theme") == "nord"
     tiles["aurora"].click()
-    assert opened == [1]                         # the supporter window instead
-    assert s.value("theme") == "graphite" and not tiles["aurora"].isChecked()
-    assert tiles["graphite"].isChecked()
-    icon_sw = [sw for sw in d.findChildren(ToggleSwitch)
-               if sw.accessibleName() == tr("set_supporter_icon")][0]
-    assert not icon_sw.parentWidget().isVisibleTo(page_of(icon_sw))   # a supporter's switch
+    assert s.value("theme") == "aurora" and tiles["aurora"].isChecked()
+    assert theme.P["name"] == theme.THEMES["aurora"]["name"]
     from PyQt6.QtWidgets import QComboBox
     lights = [b for b in d.findChildren(QComboBox) if b.findData("light") >= 0]
-    assert lights and all(b.findData("dawn") < 0 for b in lights)
-in_settings(locked)
+    assert lights and all(b.findData("dawn") >= 0 for b in lights)
+    sw = icon_switch(d)
+    assert sw.parentWidget().isVisibleTo(page_of(sw)) and not sw.isChecked()
+in_settings(open_to_all)
 
-# A key entered from that window: the theme picked comes on at once.
-def enter_key(key=""):
-    s.setValue("supporter_key", KEY)
-    w._donate_heart_refresh()
-w.open_supporter = enter_key
-
-def unlocks(d):
-    tiles = {t.key: t for t in d.findChildren(ThemeTile)}
-    tiles["aurora"].click()
-    assert not tiles["aurora"].locked and tiles["aurora"].isChecked()
-    assert s.value("theme") == "aurora"
-    assert theme.P["name"] == theme.THEMES["aurora"]["name"]
-    icon_sw = [sw for sw in d.findChildren(ToggleSwitch)
-               if sw.accessibleName() == tr("set_supporter_icon")][0]
-    assert icon_sw.parentWidget().isVisibleTo(page_of(icon_sw)) and icon_sw.isChecked()
-in_settings(unlocks)
-assert app_icon._shown is True                   # the key brought the icon
-
-# -- the icon switch, live ---------------------------------------------------
-def icon_off(d):
-    sw = [x for x in d.findChildren(ToggleSwitch)
-          if x.accessibleName() == tr("set_supporter_icon")][0]
-    sw.setChecked(False)
-in_settings(icon_off)
-assert s.value("supporter_icon") == "false" and app_icon._shown is False
-w._donate_heart_refresh()                        # the minute's tick keeps it off
-assert app_icon._shown is False
-s.setValue("supporter_icon", "true")
-w._app_icon_refresh()
+# -- the heart icon, switched on and off live, with no key -------------------
+def icon_on(d):
+    icon_switch(d).setChecked(True)
+in_settings(icon_on)
+assert s.value("supporter_icon") == "true" and app_icon._shown is True
+w._donate_heart_refresh()                        # the minute's tick keeps it
 assert app_icon._shown is True
 
-# -- the key removed while a supporter theme is on: the default, quietly -----
+def icon_off(d):
+    icon_switch(d).setChecked(False)
+in_settings(icon_off)
+assert s.value("supporter_icon") == "false" and app_icon._shown is False
+
+# -- a key from before, never switched: its icon as it had ------------------
+s.remove("supporter_icon")
+s.setValue("supporter_key", KEY)
+w._donate_heart_refresh()
+assert app_icon._shown is True
+def keyed(d):
+    assert icon_switch(d).isChecked()
+in_settings(keyed)
 s.remove("supporter_key")
 w._donate_heart_refresh()
-assert s.value("theme") == "graphite"
-assert theme.P["name"] == theme.THEMES["graphite"]["name"]
 assert app_icon._shown is False
-w._donate_heart_refresh()                        # and nothing more after that
-assert s.value("theme") == "graphite"
+assert s.value("theme") == "aurora"              # the theme never goes with it
 print("PERKS_OK")
 """
 
 
-def test_the_window_opens_and_closes_the_perks_with_the_key():
+def test_the_window_has_no_perks_to_open():
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     out = subprocess.run([sys.executable, "-c", _WINDOW], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)
@@ -292,6 +263,5 @@ def test_sync_is_for_everyone_not_a_perk(key):
     assert set(remote.headers) == {"User-Agent", "Content-Type", build_check.HEADER}
     assert key not in " ".join(remote.headers.values())
     set_language("en")
-    assert "sync" not in tr("supporter_perks").lower()
     for k in ("set_page_sync_sub", "sync_off_hint", "sync_privacy"):
         assert "supporter" not in tr(k).lower(), k

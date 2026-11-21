@@ -34,7 +34,7 @@ from .settings_ui import (
     Chip, ChipGroups, ChoicePicker, ColorDot, ThemeTile, after_shown, hbox,
 )
 from .theme import (
-    ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, SUPPORTER_THEMES, THEME_ORDER,
+    ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, THEME_ORDER,
     UI_SCALES, effective_theme, is_light,
 )
 
@@ -48,7 +48,7 @@ def build_general(ctx: SettingsContext) -> None:
     About."""
     win, d, general = ctx.win, ctx.dialog, ctx.pages["general"]
     shell, is_on, flag, nerd_switch = ctx.shell, ctx.is_on, ctx.flag, ctx.nerd_switch
-    link_cards, shared, key_state = ctx.link_cards, ctx.shared, ctx.key_state
+    link_cards, shared = ctx.link_cards, ctx.shared
     supporter_key, supporter_window = ctx.supporter_key, ctx.supporter_window
     store, export_playlists = ctx.store, ctx.export_playlists
     import_playlists = ctx.import_playlists
@@ -182,10 +182,10 @@ def build_general(ctx: SettingsContext) -> None:
     tv_found.setWordWrap(True)
     c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
           search="lirc gamepad controller joystick cec remote evdev sdl")
-    # Supporting the app: feedback, the supporter key, and - last and
-    # quiet - whether the app asks for support now and then.
-    c = support_card = general.card(tr("donate_support"))
-    icon_box = None
+    # Feedback, a tip: feedback and its answers, a supporter key from
+    # before, the heart icon, and - last and quiet - whether the app asks
+    # for a tip now and then.
+    c = support_card = general.card(tr("set_feedback_tip_card"))
     if hasattr(win, "open_answers"):
         # Feedback, and the answers to it (their own window, over
         # this one).
@@ -214,14 +214,13 @@ def build_general(ctx: SettingsContext) -> None:
         key_btn.clicked.connect(lambda _c=False: supporter_window())
         key_row = c.row(tr("supporter_menu"), key_btn,
                         tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
-                        search="supporter key tip monthly support donation code nyckel")
+                        search="supporter key tip code nyckel")
         shared["supporter_row"] = (key_btn, key_row, support_card)
-        # The supporter's app icon - for a supporter only, on unless
-        # turned off; applied as it is switched (commit below).
-        icon_box = c.toggle(tr("set_supporter_icon"),
-                            is_on("supporter_icon", "true"),
-                            tr("set_supporter_icon_hint"))
-        c.shown_if(c.rows[-1][0], lambda: key_state["mine"] is not None)
+    # The heart icon, for everyone: applied as it is switched (commit
+    # below).
+    from . import app_icon
+    icon_box = c.toggle(tr("set_supporter_icon"), app_icon.wanted(win.settings),
+                        tr("set_supporter_icon_hint"))
     # Asking for a donation now and then (mw_donate): the
     # household's, off for good until switched on again.
     from ..core import donate_rhythm
@@ -262,7 +261,7 @@ def build_general(ctx: SettingsContext) -> None:
             win._donate_heart_refresh()
         # Written once switched (on is the default): an untouched
         # window stores nothing.
-        if icon_box is not None and icon_box.isChecked() != is_on("supporter_icon", "true"):
+        if icon_box.isChecked() != app_icon.wanted(win.settings):
             put("supporter_icon", flag(icon_box))
             win._app_icon_refresh()
         if channel_box.currentData() != win._update_channel():
@@ -298,8 +297,7 @@ def build_appearance(ctx: SettingsContext) -> None:
     win, d, look = ctx.win, ctx.dialog, ctx.pages["appearance"]
     meta = ctx.pages["metadata"]
     shell, rtl, flag, own, shared = ctx.shell, ctx.rtl, ctx.flag, ctx.own, ctx.shared
-    key_state, supporter_key = ctx.key_state, ctx.supporter_key
-    restyle_dialog, supporter_window = ctx.restyle_dialog, ctx.supporter_window
+    restyle_dialog = ctx.restyle_dialog
     themes = ChoicePicker(
         [ThemeTile(key, tr(f"theme_{key}")) for key in THEME_ORDER],
         win.settings.value("theme", "graphite"),
@@ -318,9 +316,7 @@ def build_appearance(ctx: SettingsContext) -> None:
     # One row of dots where the page is wide enough; they wrap if not.
     accents.setMinimumWidth(min(len(accent_keys) * (ColorDot.D + 6), 440))
     light_box = win._combo(
-        [(key, tr(f"theme_{key}")) for key in THEME_ORDER
-         if is_light(key) and (key not in SUPPORTER_THEMES
-                               or supporter_key() is not None)],
+        [(key, tr(f"theme_{key}")) for key in THEME_ORDER if is_light(key)],
         win.settings.value("theme_light", "light"))
     corner_box = win._combo(
         [("sharp", tr("option_corners_sharp")),
@@ -347,42 +343,10 @@ def build_appearance(ctx: SettingsContext) -> None:
         win._apply_theme_now()
         restyle_dialog()
 
-    def sync_locks() -> None:
-        """The supporter themes: a heart and a word on them without a
-        key; in the light-theme list only with one."""
-        closed = supporter_key() is None
-        for tile in themes.tiles:
-            tile.set_locked(closed and tile.key in SUPPORTER_THEMES,
-                            tr("theme_supporter_tip"))
-        light_box.blockSignals(True)
-        for key in THEME_ORDER:
-            if key not in SUPPORTER_THEMES or not is_light(key):
-                continue
-            at = light_box.findData(key)
-            if not closed and at < 0:
-                light_box.addItem(tr(f"theme_{key}"), key)
-            elif closed and at >= 0:
-                light_box.removeItem(at)
-        at = light_box.findData(win.settings.value("theme_light", "light"))
-        light_box.setCurrentIndex(max(at, 0))
-        light_box.blockSignals(False)
-
     shared["sync_pickers"] = sync_pickers
-    shared["theme_locks"] = (sync_locks, themes)
     sync_pickers()
-    sync_locks()
 
     def pick_theme(key: str) -> None:
-        if key in SUPPORTER_THEMES and supporter_key() is None:
-            # Not open yet: the supporter window says what opens it,
-            # and the theme comes on as soon as a key does.
-            themes.set_value(win.settings.value("theme", "graphite"))
-            if not hasattr(win, "open_supporter"):
-                return
-            supporter_window()
-            if key_state["mine"] is None:
-                return
-            themes.set_value(key)
         win.settings.setValue("theme", key)
         restyle()
 

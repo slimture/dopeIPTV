@@ -1,4 +1,4 @@
-"""When the app asks for support: one week a month, once it is used for
+"""When the app asks for a tip: one week a month, once it is used for
 real - and not again for a while once it has been answered.
 
 A *period* is ``PERIOD_DAYS`` days. One begins the first time the app runs
@@ -11,7 +11,7 @@ in a calendar month while all of this holds:
 - no period began this month, nor in the last ``GAP_DAYS`` days (one that
   began late in a month does not run into the next one);
 - nothing put it away: "Not right now" and "Hide for three months"
-  (``LATER_S``), "I've supported" (``DONATED_S``, taken at the person's word -
+  (``LATER_S``), "I've left a tip" (``DONATED_S``, taken at the person's word -
   the app has no way to know, and does not try).
 
 The window checks the rest: asking is switched on (Settings, General;
@@ -50,7 +50,7 @@ GAP_DAYS = 21
 BRIGHT_S = DAY
 #: "Not right now" / "Hide for three months".
 LATER_S = 90 * DAY
-#: "I've supported".
+#: "I've left a tip".
 DONATED_S = 365 * DAY
 
 #: Asking switched off in Settings ("false"); on when not stored.
@@ -159,7 +159,7 @@ def step(settings: Settings, now: float, watched: Callable[[], float],
 
 
 def put_away(settings: Settings, now: float, secs: float) -> None:
-    """Not asked again for *secs* ("Not right now", "I've supported"): the
+    """Not asked again for *secs* ("Not right now", "I've left a tip"): the
     heart and Home's card alike."""
     settings.setValue(K_UNTIL, now + secs)
 
