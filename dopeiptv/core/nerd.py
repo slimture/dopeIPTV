@@ -479,7 +479,32 @@ class Nerd:
         elif start == "instant":
             out += [("demuxer-lavf-analyzeduration", "0.5"), ("demuxer-lavf-probesize", "500000")]
         out += _hls.mpv_options(self.hls_cap(), picker)
+        if self.strict_tls() and not any(k == "tls-verify" for k, _v in out):
+            out += strict_tls_mpv()
         return out
+
+    def strict_tls(self) -> bool:
+        """Nerd's "Check every stream's certificate" (STRICT_TLS): mpv and
+        the recorder check an https stream's certificate against the
+        authorities requests trusts (certifi) - off by default, since many
+        providers' certificates do not check out. Only while Nerd is on."""
+        return self.on and self.flag(STRICT_TLS)
+
+    def typed_tls(self) -> bool:
+        """Whether the person's own mpv options or mpv.conf set tls-verify:
+        theirs, left alone - Nerd's strict check and a pinned stream's alike."""
+        if not self.on:
+            return False
+        typed = parse_mpv_options(self.get("nerd_mpv_options"))
+        conf = self.get("nerd_mpv_config_dir").strip()
+        if conf:
+            try:
+                with open(os.path.join(os.path.expanduser(conf), "mpv.conf"),
+                          encoding="utf-8", errors="replace") as fh:
+                    typed += parse_mpv_options(fh.read())
+            except OSError:
+                pass
+        return any(k == "tls-verify" for k, _v in typed)
 
     def hls_cap(self) -> _hls.Cap:
         """The highest quality adaptive streams play at (core/hls_cap.py):
@@ -762,8 +787,45 @@ def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = ""
         except Exception as e:
             log.debug("nerd: %s not set: %s", key, e)
     pinned = n.player_route(source, url, opened)[1]
-    _trust_pin(mpv, pinned and "tls-verify" not in dict(n.core_options()))
+    _trust_pin(mpv, pinned and not n.typed_tls())
     return n.on
+
+
+#: Nerd: check every https stream's certificate in the player and the
+#: recorder (the setting; off by default).
+STRICT_TLS = "nerd_tls_strict"
+
+
+def ca_file() -> str:
+    """The authorities the app's own requests trust (certifi's bundle, the
+    frozen builds carry it), for mpv and FFmpeg to check against; "" when
+    it cannot be found - then the libraries' own default."""
+    try:
+        import certifi
+        path = certifi.where()
+    except Exception:
+        return ""
+    return path if path and os.path.isfile(path) else ""
+
+
+def strict_tls_mpv() -> list[tuple[str, str]]:
+    """mpv's options for a checked certificate."""
+    ca = ca_file()
+    return [("tls-verify", "yes"), *([("tls-ca-file", ca)] if ca else [])]
+
+
+def strict_tls_recorder(kind: str, url: str = "") -> list[str]:
+    """The recorder's (ffmpeg or mpv) arguments for a checked certificate
+    while Nerd's strict check is on; [] otherwise - and for ffmpeg only for
+    an https address (an input option no protocol takes stops ffmpeg)."""
+    if not current().strict_tls():
+        return []
+    if kind == "ffmpeg" and not str(url or "").lower().startswith("https://"):
+        return []
+    ca = ca_file()
+    if kind == "ffmpeg":
+        return ["-tls_verify", "1", *(["-ca_file", ca] if ca else [])]
+    return ["--tls-verify=yes", *([f"--tls-ca-file={ca}"] if ca else [])]
 
 
 # What tls-verify each core had before a stream to a pinned host turned it off.

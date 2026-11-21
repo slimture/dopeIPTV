@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Un canale senza guida: clic destro nell'elenco e scegli a mano il suo canale della guida.",
   "nerd_card_start": "Avvio del canale e buffer",
   "nerd_applies_stream": "Ha effetto dal prossimo canale che avvii.",
-  "nerd_applies_conn": "Versione IP: subito per le richieste dell'app. Timeout e riconnessione: dal prossimo canale.",
+  "nerd_applies_conn": "Versione IP: subito per le richieste dell'app. Timeout, riconnessione e verifica del certificato: dal prossimo canale.",
   "nerd_applies_vpn": "Controllato a ogni avvio di un flusso.",
   "nerd_applies_reload": "L'elenco dei canali viene ricostruito quando chiudi le Impostazioni.",
   "nerd_applies_now": "Ha effetto subito, in ciò che è in riproduzione.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Usa una password di almeno {n} caratteri: il backup contiene tutti gli accessi e il codice di sincronizzazione.",
   "backup_no_pw_warn": "Il backup contiene tutti gli accessi, i token e il codice di sincronizzazione. Senza password, chiunque ottenga il file può leggerli. Salvare comunque senza password?",
   "backup_no_pw_go": "Salva senza password",
-  "set_feedback_tip_card": "Feedback e mance"
+  "set_feedback_tip_card": "Feedback e mance",
+  "nerd_tls_strict": "Verifica il certificato di ogni stream",
+  "nerd_tls_strict_hint": "Il player e le registrazioni verificano il certificato di uno stream https, come fanno sempre le richieste dell'app. Un provider il cui certificato non supera la verifica – scaduto, autofirmato o emesso per un altro nome – non riproduce nulla: disattiva l'opzione o considera attendibile quel certificato nella pagina della sua sorgente.",
+  "playlist_http_note": "http non cifrato: l'accesso passa in chiaro in ogni indirizzo e chiunque lungo il percorso può leggerlo. Usa https se il provider lo offre.",
+  "subs_private_ask": "Questo è in riproduzione privata, quindi a OpenSubtitles non si chiede nulla finché non premi Cerca: allora le parole nel campo vengono inviate."
 }

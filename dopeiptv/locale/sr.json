@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Kanal bez vodiča: klikni desnim tasterom na njega u listi i ručno izaberi njegov kanal vodiča.",
   "nerd_card_start": "Pokretanje kanala i bafer",
   "nerd_applies_stream": "Važi od sledećeg kanala koji pokreneš.",
-  "nerd_applies_conn": "Verzija IP-a: odmah za zahteve aplikacije. Vremensko ograničenje i ponovno povezivanje: od sledećeg kanala.",
+  "nerd_applies_conn": "Verzija IP-a: odmah za zahteve aplikacije. Vremensko ograničenje, ponovno povezivanje i provera sertifikata: od sledećeg kanala.",
   "nerd_applies_vpn": "Proverava se pri svakom pokretanju strima.",
   "nerd_applies_reload": "Lista kanala se ponovo pravi kada zatvoriš Podešavanja.",
   "nerd_applies_now": "Važi odmah, u onome što se sada pušta.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Koristite lozinku od najmanje {n} znakova – rezervna kopija sadrži sve prijave i kod za sinhronizaciju.",
   "backup_no_pw_warn": "Rezervna kopija sadrži sve prijave, tokene i kod za sinhronizaciju. Bez lozinke svako ko dođe do datoteke može da ih pročita. Ipak sačuvati bez lozinke?",
   "backup_no_pw_go": "Sačuvaj bez lozinke",
-  "set_feedback_tip_card": "Povratne informacije i napojnice"
+  "set_feedback_tip_card": "Povratne informacije i napojnice",
+  "nerd_tls_strict": "Proveravaj sertifikat svakog strima",
+  "nerd_tls_strict_hint": "Plejer i snimci proveravaju sertifikat https strima, kao što to uvek rade zahtevi aplikacije. Provajder čiji sertifikat ne prolazi proveru – istekao, samopotpisan ili izdat za drugo ime – tada ništa ne reprodukuje: ponovo isključite ovo ili verujte tom sertifikatu na stranici njegovog izvora.",
+  "playlist_http_note": "Običan http: prijava ide nešifrovana u svakoj adresi i svako usput može da je pročita. Koristite https ako ga provajder nudi.",
+  "subs_private_ask": "Ovo se reprodukuje privatno, pa se OpenSubtitles ništa ne pita dok ne pritisnete Pretraga – tada mu idu reči iz polja."
 }

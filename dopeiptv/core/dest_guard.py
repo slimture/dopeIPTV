@@ -10,7 +10,12 @@ should not go:
   after it connects and before a byte is sent (``peer_refusal``,
   ``check_peer``) - so a name whose DNS answer changes between a check and
   the connection (DNS rebinding) is caught at the connection. Through a
-  proxy the proxy connects; there the name is not checked here.
+  proxy the proxy connects; there the name is not checked here. A public
+  name a source on the internet named for the app to fetch itself - a
+  picture of its lists, its playlist's guide (``note_outside``) - never
+  reaches the home network either, unless the person gave that name
+  themselves: a source's own server, its backup addresses (``note_own``),
+  or Plex's own names (``.plex.direct``, a server at home by design).
 * **The redirect.** A redirect goes on only over http(s), never from the
   internet into the home network, and never to this computer or a
   link-local host unless the address it came from was that very kind
@@ -24,8 +29,10 @@ redirects are theirs - docs/SECURITY.md says so.
 """
 from __future__ import annotations
 
+import functools
 import ipaddress
 import socket
+import threading
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -41,6 +48,84 @@ _METADATA = frozenset({*stream_address._METADATA_IPS,
                        *map(ipaddress.ip_address, ("169.254.169.254", "169.254.170.2"))})
 #: The most addresses one name's answer is looked through for a redirect.
 _ANSWERS_MAX = 16
+
+#: Public names a source on the internet named for the app to fetch itself
+#: (its lists' pictures, its playlist's guide): such a name never leads to
+#: the home network (``note_outside``). The newest kept, at most this many.
+OUTSIDE_MAX = 8192
+#: Names the person gave themselves - a source's own server and its backup
+#: addresses (``note_own``): theirs to resolve as they like, a server at
+#: home by its public name among them.
+_OUTSIDE: dict[str, None] = {}
+_OWN: set[str] = set()
+_NAMES_LOCK = threading.Lock()
+#: Plex's names for a server's own addresses ("192-168-1-5.<id>.plex.direct"
+#: answers 192.168.1.5): a server at home, by design.
+_HOME_BY_DESIGN = (".plex.direct",)
+
+
+def _name_of(address_or_host: str) -> str:
+    """The host of an address (or a bare host), lower case, without its
+    port, its login or a trailing dot; "" when there is none."""
+    text = str(address_or_host or "").strip()
+    if "://" in text:
+        try:
+            return (urlsplit(text).hostname or "").rstrip(".").lower()
+        except ValueError:
+            return ""
+    return text.strip("[]").rstrip(".").lower()
+
+
+@functools.lru_cache(maxsize=4096)
+def _public_name(head: str) -> str:
+    """The public name in an address's head ("https://host:port"), or ""
+    for an address, a home name or none - read once per head."""
+    name = _name_of(head)
+    return name if name and named_kind(name) == "" else ""
+
+
+def note_outside(address: str) -> None:
+    """*address* (or its host) was named by a source on the internet for
+    the app to fetch itself: a public name of it may not lead home. Asked
+    for every picture of a list, so read once per scheme and host part."""
+    text = str(address or "")
+    start = text.find("://")
+    if start >= 0:
+        ends = [i for i in (text.find("/", start + 3), text.find("?", start + 3)) if i >= 0]
+        text = text[:min(ends)] if ends else text
+    name = _public_name(text)
+    if not name:
+        return
+    with _NAMES_LOCK:
+        if name in _OUTSIDE:
+            return
+        _OUTSIDE[name] = None
+        while len(_OUTSIDE) > OUTSIDE_MAX:
+            del _OUTSIDE[next(iter(_OUTSIDE))]
+
+
+def note_own(address: str) -> None:
+    """*address* (or its host) is one the person gave: a source's own
+    server or backup address. Never refused for leading home."""
+    name = _name_of(address)
+    if name:
+        with _NAMES_LOCK:
+            _OWN.add(name)
+
+
+def _outside_name(host: str) -> bool:
+    name = _name_of(host)
+    if not name or name.endswith(_HOME_BY_DESIGN):
+        return False
+    with _NAMES_LOCK:
+        return name in _OUTSIDE and name not in _OWN
+
+
+def forget_names() -> None:
+    """Every name noted (the tests)."""
+    with _NAMES_LOCK:
+        _OUTSIDE.clear()
+        _OWN.clear()
 
 
 def ip_kind(address: str) -> str:
@@ -80,8 +165,10 @@ def peer_refusal(host: str, peer: str) -> str:
     """Why a connection to *host* that reached *peer* may not be used: it
     is this computer while the name is not this computer's, or link-local
     while the name is neither link-local nor a home name (a device at home
-    without a router's address answers its .local name from 169.254/16).
-    "" when it may."""
+    without a router's address answers its .local name from 169.254/16),
+    or the home network while the name is a public one a source on the
+    internet named (``note_outside``) and the person did not give
+    (``note_own``). "" when it may."""
     kind = ip_kind(peer)
     said = named_kind(host)
     if kind == THIS_COMPUTER and said != THIS_COMPUTER:
@@ -90,6 +177,8 @@ def peer_refusal(host: str, peer: str) -> str:
         return LINK_LOCAL
     if kind == LINK_LOCAL and stream_address._ip(peer) in _METADATA and said != LINK_LOCAL:
         return LINK_LOCAL           # a cloud's metadata service, never by a home name
+    if kind == HOME and said == "" and _outside_name(host):
+        return HOME
     return ""
 
 

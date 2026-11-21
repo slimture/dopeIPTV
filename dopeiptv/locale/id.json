@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Saluran tanpa panduan: klik kanan di daftar dan pilih saluran panduannya secara manual.",
   "nerd_card_start": "Mulai saluran dan buffer",
   "nerd_applies_stream": "Berlaku mulai saluran berikutnya yang kamu putar.",
-  "nerd_applies_conn": "Versi IP: langsung untuk permintaan aplikasi. Batas waktu dan sambung ulang: mulai saluran berikutnya.",
+  "nerd_applies_conn": "Versi IP: langsung untuk permintaan aplikasi. Batas waktu, sambung ulang, dan pemeriksaan sertifikat: mulai saluran berikutnya.",
   "nerd_applies_vpn": "Diperiksa setiap kali siaran dimulai.",
   "nerd_applies_reload": "Daftar saluran dibangun ulang saat kamu menutup Pengaturan.",
   "nerd_applies_now": "Langsung berlaku, pada yang sedang diputar.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Gunakan kata sandi minimal {n} karakter - cadangan berisi semua info masuk dan kode sinkronisasi.",
   "backup_no_pw_warn": "Cadangan berisi semua info masuk, token, dan kode sinkronisasi. Tanpa kata sandi, siapa pun yang mendapatkan berkasnya bisa membacanya. Tetap simpan tanpa kata sandi?",
   "backup_no_pw_go": "Simpan tanpa kata sandi",
-  "set_feedback_tip_card": "Masukan dan tip"
+  "set_feedback_tip_card": "Masukan dan tip",
+  "nerd_tls_strict": "Periksa sertifikat setiap stream",
+  "nerd_tls_strict_hint": "Pemutar dan rekaman memeriksa sertifikat stream https, seperti yang selalu dilakukan permintaan aplikasi sendiri. Penyedia yang sertifikatnya tidak lolos pemeriksaan – kedaluwarsa, ditandatangani sendiri, atau dibuat untuk nama lain – lalu tidak memutar apa pun: matikan lagi opsi ini, atau percayai sertifikat itu di halaman sumbernya.",
+  "playlist_http_note": "http biasa: login dikirim tanpa enkripsi di setiap alamat dan bisa dibaca siapa pun di sepanjang jalan. Gunakan https jika penyedia menyediakannya.",
+  "subs_private_ask": "Ini diputar secara pribadi, jadi OpenSubtitles tidak ditanya apa pun sampai Anda menekan Cari – lalu kata-kata di kotak dikirim ke sana."
 }

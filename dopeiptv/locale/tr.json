@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Rehberi olmayan bir kanal: listede sağ tıkla ve rehber kanalını elle seç.",
   "nerd_card_start": "Kanal başlatma ve arabellek",
   "nerd_applies_stream": "Başlatacağın bir sonraki kanaldan itibaren geçerli.",
-  "nerd_applies_conn": "IP sürümü: uygulamanın kendi istekleri için hemen. Zaman aşımı ve yeniden bağlanma: bir sonraki kanaldan.",
+  "nerd_applies_conn": "IP sürümü: uygulamanın kendi istekleri için hemen. Zaman aşımı, yeniden bağlanma ve sertifika denetimi: bir sonraki kanaldan.",
   "nerd_applies_vpn": "Her yayın başladığında denetlenir.",
   "nerd_applies_reload": "Ayarları kapattığında kanal listesi yeniden oluşturulur.",
   "nerd_applies_now": "Hemen, şu an oynayan içerikte geçerli.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "En az {n} karakterlik bir parola kullanın - yedek tüm oturum açma bilgilerini ve eşitleme kodunu içerir.",
   "backup_no_pw_warn": "Yedek tüm oturum açma bilgilerini, belirteçleri ve eşitleme kodunu içerir. Parola olmadan dosyayı ele geçiren herkes bunları okuyabilir. Yine de parolasız kaydedilsin mi?",
   "backup_no_pw_go": "Parolasız kaydet",
-  "set_feedback_tip_card": "Geri bildirim ve bahşiş"
+  "set_feedback_tip_card": "Geri bildirim ve bahşiş",
+  "nerd_tls_strict": "Her yayının sertifikasını denetle",
+  "nerd_tls_strict_hint": "Oynatıcı ve kayıtlar, uygulamanın kendi istekleri hep yaptığı gibi bir https yayınının sertifikasını denetler. Sertifikası denetimden geçmeyen – süresi dolmuş, kendinden imzalı ya da başka bir ad için verilmiş – bir sağlayıcı o zaman hiçbir şey oynatmaz: bunu yeniden kapatın ya da o sertifikaya kaynağının sayfasında güvenin.",
+  "playlist_http_note": "Düz http: giriş bilgileri her adreste şifrelenmeden gider ve yoldaki herkes okuyabilir. Sağlayıcı sunuyorsa https kullanın.",
+  "subs_private_ask": "Bu gizli olarak oynatılıyor, bu yüzden siz Ara'ya basana kadar OpenSubtitles'a hiçbir şey sorulmaz – o zaman kutudaki sözcükler ona gider."
 }

@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Chaneli isiyo na mwongozo: bofya kulia kwenye orodha na uchague chaneli yake ya mwongozo mwenyewe.",
   "nerd_card_start": "Kuanza kwa chaneli na bafa",
   "nerd_applies_stream": "Inaanza kufanya kazi kuanzia chaneli inayofuata utakayoanzisha.",
-  "nerd_applies_conn": "Toleo la IP: papo hapo kwa maombi ya programu. Muda wa kusubiri na kuunganisha upya: kuanzia chaneli inayofuata.",
+  "nerd_applies_conn": "Toleo la IP: papo hapo kwa maombi ya programu. Muda wa kusubiri, kuunganisha upya na ukaguzi wa cheti: kuanzia chaneli inayofuata.",
   "nerd_applies_vpn": "Hukaguliwa kila mtiririko unapoanza.",
   "nerd_applies_reload": "Orodha ya chaneli hujengwa upya unapofunga Mipangilio.",
   "nerd_applies_now": "Inafanya kazi papo hapo, kwa kinachocheza sasa.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Tumia nenosiri la angalau herufi {n} - nakala rudufu ina maelezo yote ya kuingia na nambari ya kusawazisha.",
   "backup_no_pw_warn": "Nakala rudufu ina maelezo yote ya kuingia, tokeni na nambari ya kusawazisha. Bila nenosiri, yeyote atakayepata faili ataweza kuyasoma. Ihifadhi bila nenosiri hata hivyo?",
   "backup_no_pw_go": "Hifadhi bila nenosiri",
-  "set_feedback_tip_card": "Maoni na bakshishi"
+  "set_feedback_tip_card": "Maoni na bakshishi",
+  "nerd_tls_strict": "Kagua cheti cha kila mtiririko",
+  "nerd_tls_strict_hint": "Kicheza na rekodi hukagua cheti cha mtiririko wa https, kama maombi ya programu yenyewe yanavyofanya kila mara. Mtoa huduma ambaye cheti chake hakipiti ukaguzi – kimeisha muda, kimejitia sahihi chenyewe au kimetolewa kwa jina jingine – hapo hachezi chochote: zima hili tena, au amini cheti hicho kwenye ukurasa wa chanzo chake.",
+  "playlist_http_note": "http ya kawaida: kuingia kunapita bila usimbaji katika kila anwani, na yeyote njiani anaweza kukusoma. Tumia https kama mtoa huduma anaitoa.",
+  "subs_private_ask": "Hiki kinachezwa kwa faragha, kwa hiyo OpenSubtitles haiulizwi chochote hadi ubonyeze Tafuta – kisha maneno yaliyo kwenye kisanduku yanatumwa kwake."
 }

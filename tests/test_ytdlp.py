@@ -170,11 +170,17 @@ def test_the_apps_copy_first_while_it_is_on_else_the_systems(tmp_path):
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)  # not runnable
     own.chmod(0o755)
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)  # not the app's own
-    ytdlp._mark(tmp_path, "2099.01.02", "0" * 64)
+    import hashlib
+    good_sum = hashlib.sha256(GOOD).hexdigest()
+    ytdlp._mark(tmp_path, "2099.01.02", good_sum)
     assert ytdlp.find(True, tmp_path, which) == Found(str(own), True)
     own.write_bytes(GOOD + b"# changed since\n")
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
-    ytdlp._mark(tmp_path, "2099.01.02", "0" * 64)
+    # Marked anew but not the pinned bytes: hashed, and not run.
+    ytdlp._mark(tmp_path, "2099.01.02", good_sum)
+    assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
+    own.write_bytes(GOOD)
+    ytdlp._mark(tmp_path, "2099.01.02", good_sum)
     # Off: the system's only, the app's copy is not used.
     assert ytdlp.find(False, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
     assert ytdlp.find(False, tmp_path, none) is None

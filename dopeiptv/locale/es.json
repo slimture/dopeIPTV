@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Un canal sin guía: haz clic derecho en él en la lista y elige su canal de guía a mano.",
   "nerd_card_start": "Inicio de canal y búfer",
   "nerd_applies_stream": "Surte efecto desde el próximo canal que inicies.",
-  "nerd_applies_conn": "Versión de IP: al instante para las peticiones de la app. Tiempo de espera y reconexión: desde el próximo canal.",
+  "nerd_applies_conn": "Versión de IP: al instante para las peticiones de la app. Tiempo de espera, reconexión y comprobación del certificado: desde el próximo canal.",
   "nerd_applies_vpn": "Se comprueba cada vez que empieza una emisión.",
   "nerd_applies_reload": "La lista de canales se reconstruye al cerrar Ajustes.",
   "nerd_applies_now": "Surte efecto al instante, en lo que se está reproduciendo.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Usa una contraseña de al menos {n} caracteres: la copia de seguridad contiene todos los inicios de sesión y el código de sincronización.",
   "backup_no_pw_warn": "La copia de seguridad contiene todos los inicios de sesión, tokens y el código de sincronización. Sin contraseña, cualquiera que consiga el archivo puede leerlos. ¿Guardar igualmente sin contraseña?",
   "backup_no_pw_go": "Guardar sin contraseña",
-  "set_feedback_tip_card": "Comentarios y propinas"
+  "set_feedback_tip_card": "Comentarios y propinas",
+  "nerd_tls_strict": "Comprobar el certificado de cada stream",
+  "nerd_tls_strict_hint": "El reproductor y las grabaciones comprueban el certificado de un stream https, como siempre hacen las peticiones de la app. Un proveedor cuyo certificado no pasa la comprobación – caducado, autofirmado o emitido para otro nombre – no reproduce nada: desactiva esta opción o confía en ese certificado en la página de su fuente.",
+  "playlist_http_note": "http sin cifrar: el inicio de sesión va sin cifrar en cada dirección y cualquiera puede leerlo por el camino. Usa https si el proveedor lo ofrece.",
+  "subs_private_ask": "Esto se reproduce en privado, así que no se pregunta nada a OpenSubtitles hasta que pulses Buscar; entonces se le envían las palabras del cuadro."
 }

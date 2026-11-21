@@ -183,8 +183,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
 - Feedback and tips: feedback and its answers, `supporter_key` (its window;
-  a key from before 22 November 2026), `supporter_icon` (the heart icon,
-  everyone's), ask for a tip now and then (`donate_ask`; the
+  a key from before 22 November 2026), `heart_icon` (the heart icon,
+  everyone's; never switched, 1.6.9's `supporter_icon` with a key decides), ask for a tip now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About
@@ -241,7 +241,8 @@ while Nerd is on, and so are the link rows that lead to them.
 **Network** (`nerd_net`)
 - Who the app says it is: `nerd_user_agent`, `nerd_referer`, `nerd_headers`
 - Proxy: `nerd_proxy`, `nerd_proxy_player`
-- Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`
+- Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`,
+  `nerd_tls_strict` (check every https stream's certificate in the player and recordings)
 - Own DNS: `nerd_dns`, `nerd_dns_url`, `nerd_dns_fallback`
 - VPN guard: `nerd_vpn_guard`, `nerd_vpn_iface`, `nerd_vpn_lan`
 - Other networks (VLANs): `nerd_other_networks` (the parts of a split home

@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "没有节目单的频道：在列表中右键点击它，手动选择它的节目单频道。",
   "nerd_card_start": "频道启动和缓冲",
   "nerd_applies_stream": "从你打开的下一个频道开始生效。",
-  "nerd_applies_conn": "IP 版本：应用自身的请求立即生效。超时和重连：从下一个频道开始。",
+  "nerd_applies_conn": "IP 版本：应用自身的请求立即生效。超时、重连和证书检查：从下一个频道开始。",
   "nerd_applies_vpn": "每次开始播放流时检查。",
   "nerd_applies_reload": "关闭设置时会重新生成频道列表。",
   "nerd_applies_now": "立即生效，作用于正在播放的内容。",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "请使用至少 {n} 个字符的密码——备份中包含所有登录信息和同步代码。",
   "backup_no_pw_warn": "备份中包含所有登录信息、令牌和同步代码。没有密码的话，任何拿到该文件的人都能读取它们。仍然不设密码保存吗？",
   "backup_no_pw_go": "不设密码保存",
-  "set_feedback_tip_card": "反馈与打赏"
+  "set_feedback_tip_card": "反馈与打赏",
+  "nerd_tls_strict": "检查每个流的证书",
+  "nerd_tls_strict_hint": "播放器和录制会检查 https 流的证书，就像应用自身的请求一直做的那样。证书未通过检查的提供商（已过期、自签名或为其他名称签发）将无法播放任何内容：请重新关闭此选项，或在其来源页面上信任该证书。",
+  "playlist_http_note": "未加密的 http：登录信息以明文出现在每个地址中，途中任何人都能读取。如果提供商支持，请使用 https。",
+  "subs_private_ask": "当前为私密播放，因此在你按下“搜索”之前不会向 OpenSubtitles 发出任何请求——按下后，框中的文字才会发送过去。"
 }

@@ -862,7 +862,13 @@ class RecordingManager(QObject):
         secs = (max(1, int(j["stop"] - time.time()))
                 if j.get("stop") else None)
         from .net_bridge import recorder_options
-        through = recorder_options(kind, *self._bridge(j))
+        bridge, pinned = self._bridge(j)
+        through = recorder_options(kind, bridge, pinned)
+        if not pinned:
+            # Nerd's strict certificate check (a pinned stream is checked by
+            # the bridge instead).
+            from .nerd import strict_tls_recorder
+            through += strict_tls_recorder(kind, str(j.get("url") or ""))
         through = [*self._rtsp_options(j, kind), *through]
         if kind == "ffmpeg":
             # ffmpeg_protocols: what the address leads to (a redirect, a

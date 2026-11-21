@@ -516,8 +516,8 @@ the app says which device a name stands for (`casting.where`).
 
 ### The player checks certificates only as its libraries do
 
-The app does not set the certificate check of mpv and FFmpeg for a stream
-(`tls-verify`, `tls_verify`): it is their own default. Older versions -
+By default the app does not set the certificate check of mpv and FFmpeg
+for a stream (`tls-verify`, `tls_verify`): it is their own default. Older versions -
 such as Ubuntu's, which the AppImage and the .deb carry - check nothing;
 newer ones check against the system's authorities (`core/net_bridge.py`,
 `docs/DEVELOPER_NOTES.md`). Where they check nothing, someone on the
@@ -530,6 +530,18 @@ checked.
 do not check out (expired, self-signed, made for another name), and a
 check turned on everywhere would stop their channels. Kept as it is: the
 maintainer's decision - playback first.
+
+**Nerd's strict check (since 1.6.11).** Nerd > Network, "Check every
+stream's certificate" (`nerd_tls_strict`, off by default): the player is
+given `tls-verify=yes` with certifi's authorities (`nerd.strict_tls_mpv`,
+in the core's options while it is on), the recorder FFmpeg's `-tls_verify 1
+-ca_file` for an https address - only https, since an option no protocol
+reads can stop FFmpeg - or mpv's options (`nerd.strict_tls_recorder`). A
+source with a trusted certificate keeps its pin's check instead (the
+bridge's); a `tls-verify` the person typed into mpv's options or mpv.conf
+wins (`Nerd.typed_tls`). Its limits: only while Nerd is on; https only; a
+provider whose certificate does not check out then plays nothing, and the
+switch's hint says so.
 
 **What Nerd's trusted certificate does.** For one source and one server
 (host and port), the person sees the certificate first and pins exactly
@@ -553,7 +565,10 @@ first (`ui/mw_cast._cast_pin_ok`).
 A provider whose address is http sends its lists and streams in the clear,
 and an Xtream login travels in every address (`player_api.php?username=…`,
 `/live/<user>/<pass>/…`). Test connection says so ("Plain http - nothing is
-encrypted", `core/conn_test.py`).
+encrypted", `core/conn_test.py`), and since 1.6.11 so does the address
+field itself while an Xtream server or a portal on the internet is typed
+at http:// or with no scheme (`SourceFields.plain_http`,
+`playlist_http_note`) - a note, nothing refused.
 
 *Why:* it is the provider's choice; the app can only use what it offers.
 
@@ -569,8 +584,16 @@ their own, on the internet, of their boxes). The one shape still taken is a
 multicast group through a relay at home (udpxy: `/udp/<group>`), which an
 operator's list names. A source of the home network's, or a playlist file,
 names what it likes. A public name that resolves to a home address is not
-caught for the player (mpv looks names up itself); the app's own requests
-are caught for this computer and link-local hosts only (`dest_guard`).
+caught for the player (mpv looks names up itself). The app's own requests
+are caught for this computer and link-local hosts whatever the name
+(`dest_guard`), and since 1.6.11 a name a source on the internet named for
+its pictures or its guide (`dest_guard.note_outside`, from
+`client._pictures_kept` and `M3UClient._guide_ok`) never reaches a home
+address either, checked on the socket after it connects: the source's own
+server names (`note_own`, from `make_client`: its server, list, guide,
+portal and backup addresses - split-horizon DNS for one's own server is
+common) and Plex's `*.plex.direct` (a home address by design) excepted. At
+most `OUTSIDE_MAX` names are kept, the oldest let go.
 
 *Why:* a box's picons and a media server's artwork are at home addresses,
 and a playlist on a server at home is common - those are home sources.
@@ -699,10 +722,12 @@ is not made at all (`core/memory_safe.py`):
   that needs converting is refused with the reason (`cast_err_private_memory`
   - the converter of the stream before goes first), a subtitle reaches mpv
   as bytes in its address (`hex://`), no file. A copy of a subtitle without
-  stray right-to-left marks is not made. A subtitle search asks
-  OpenSubtitles by the words in its box - the title playing, filled in -
-  as the person opens it (it searches at once) and on each search after:
-  what the person asks for right then goes (rule 3), as any search does.
+  stray right-to-left marks is not made. A subtitle search opened while
+  what plays is private asks nothing as it opens: the words in its box -
+  the title playing, filled in - go to OpenSubtitles only when the person
+  presses Search, and on each search after (`ui/subtitle_search.py`,
+  `subs_private_ask`): what the person asks for right then goes (rule 3).
+  Otherwise it searches at once, as it always did.
 - **Turned on midway.** Private viewing turned on while a channel plays
   from a buffer on the disk - the app's or mpv's - opens it again, in
   memory or with none, and the disk buffer goes (`private_reopen_needed`,
@@ -897,10 +922,12 @@ SHA-256s in the app's signed release (`core/ytdlp_pin.py`). A release of
 yt-dlp's that is itself bad - its key or its build taken over - is not
 seen, and it runs as the person. A new yt-dlp comes only with the next
 release of the app. The copy is checked against that SHA-256 when it is
-installed and then known by its mark - the SHA-256, its size and time
-(`ytdlp.own_copy`, a stat, no read) - in the user's own 0700 folder: whoever
-could put another file there with the same size and time could as well
-change the app itself.
+installed and then known by its mark - the SHA-256, its size and time - in
+the user's own 0700 folder; since 1.6.11 the file is also hashed again
+once a run before it is first used, and again whenever its size or time
+moves (`ytdlp.own_copy`, `_HASHED`): a copy whose bytes no longer match is
+not run, and the log says so. Whoever could change the file between that
+check and its run could as well change the app itself.
 
 *Why:* an old yt-dlp is the usual reason a stream stops opening. The app's
 copy can be turned off (`ytdlp_managed`): then only the system's is used.

@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Ein Sender ohne Guide: Rechtsklick in der Liste und den Guide-Sender von Hand wählen.",
   "nerd_card_start": "Senderstart und Puffer",
   "nerd_applies_stream": "Wirkt ab dem nächsten Sender, den du startest.",
-  "nerd_applies_conn": "IP-Version: sofort für die eigenen Anfragen der App. Timeout und Wiederverbinden: ab dem nächsten Sender.",
+  "nerd_applies_conn": "IP-Version: sofort für die eigenen Anfragen der App. Timeout, Wiederverbinden und die Zertifikatsprüfung: ab dem nächsten Sender.",
   "nerd_applies_vpn": "Wird bei jedem Streamstart geprüft.",
   "nerd_applies_reload": "Die Senderliste wird neu aufgebaut, wenn du die Einstellungen schließt.",
   "nerd_applies_now": "Wirkt sofort, in dem, was gerade läuft.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Verwende ein Passwort mit mindestens {n} Zeichen – die Sicherung enthält alle Anmeldungen und den Sync-Code.",
   "backup_no_pw_warn": "Die Sicherung enthält alle Anmeldungen, Tokens und den Sync-Code. Ohne Passwort kann jeder, der die Datei bekommt, sie lesen. Trotzdem ohne Passwort speichern?",
   "backup_no_pw_go": "Ohne Passwort speichern",
-  "set_feedback_tip_card": "Feedback und Trinkgeld"
+  "set_feedback_tip_card": "Feedback und Trinkgeld",
+  "nerd_tls_strict": "Zertifikat jedes Streams prüfen",
+  "nerd_tls_strict_hint": "Der Player und Aufnahmen prüfen das Zertifikat eines https-Streams, so wie es die eigenen Anfragen der App immer tun. Ein Anbieter, dessen Zertifikat die Prüfung nicht besteht – abgelaufen, selbst signiert oder für einen anderen Namen ausgestellt –, spielt dann nichts ab: Schalten Sie dies wieder aus oder vertrauen Sie diesem Zertifikat auf der Seite der Quelle.",
+  "playlist_http_note": "Unverschlüsseltes http: Die Anmeldung steht unverschlüsselt in jeder Adresse und kann unterwegs von jedem gelesen werden. Nutzen Sie https, wenn der Anbieter es anbietet.",
+  "subs_private_ask": "Dies wird privat abgespielt, daher wird OpenSubtitles erst gefragt, wenn Sie auf Suchen drücken – dann gehen die Wörter im Feld dorthin."
 }

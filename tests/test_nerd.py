@@ -473,3 +473,35 @@ def test_settings_changed_while_playing_reach_the_player_and_go_back(tmp_path):
     finally:
         nerd.install(None)
         m.terminate()
+
+
+# -- the strict certificate check (Nerd > Network) --------------------------------
+
+def test_strict_tls_is_off_unless_switched_on_and_nerd_on():
+    assert not on().strict_tls()
+    assert not Nerd(S(nerd_tls_strict="true")).strict_tls()          # Nerd off: nothing
+    n = on(nerd_tls_strict="true")
+    assert n.strict_tls()
+    opts = dict(n.core_options())
+    assert opts["tls-verify"] == "yes"
+    ca = nerd.ca_file()
+    assert ca == "" or opts["tls-ca-file"] == ca
+
+
+def test_strict_tls_leaves_the_persons_own_tls_verify():
+    n = on(nerd_tls_strict="true", nerd_mpv_options="tls-verify=no")
+    assert [v for k, v in n.core_options() if k == "tls-verify"] == ["no"]
+    assert n.typed_tls()
+    assert not on(nerd_tls_strict="true").typed_tls()
+
+
+def test_strict_tls_for_the_recorder(monkeypatch):
+    monkeypatch.setattr(nerd, "current", lambda: on(nerd_tls_strict="true"))
+    ff = nerd.strict_tls_recorder("ffmpeg", "https://p.example/live/1.ts")
+    assert ff[:2] == ["-tls_verify", "1"]
+    # an option no protocol reads would stop ffmpeg: only for https
+    assert nerd.strict_tls_recorder("ffmpeg", "http://p.example/live/1.ts") == []
+    assert nerd.strict_tls_recorder("ffmpeg", "rtsp://box/1") == []
+    assert nerd.strict_tls_recorder("mpv", "http://p.example/1")[0] == "--tls-verify=yes"
+    monkeypatch.setattr(nerd, "current", lambda: on())
+    assert nerd.strict_tls_recorder("ffmpeg", "https://p.example/1") == []

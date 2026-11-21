@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "En kanal utan guide: högerklicka på den i listan och välj dess guidekanal för hand.",
   "nerd_card_start": "Kanalstart och buffert",
   "nerd_applies_stream": "Gäller från nästa kanal du startar.",
-  "nerd_applies_conn": "IP-version: direkt för appens egna förfrågningar. Tidsgräns och återanslutning: från nästa kanal.",
+  "nerd_applies_conn": "IP-version: direkt för appens egna förfrågningar. Tidsgräns, återanslutning och certifikatkontrollen: från nästa kanal.",
   "nerd_applies_vpn": "Kollas varje gång en ström startar.",
   "nerd_applies_reload": "Kanallistan byggs om när du stänger Inställningar.",
   "nerd_applies_now": "Gäller direkt, i det som spelas nu.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Använd ett lösenord på minst {n} tecken – säkerhetskopian innehåller alla inloggningar och synkkoden.",
   "backup_no_pw_warn": "Säkerhetskopian innehåller alla inloggningar, token och synkkoden. Utan lösenord kan vem som helst som får tag på filen läsa dem. Spara ändå utan lösenord?",
   "backup_no_pw_go": "Spara utan lösenord",
-  "set_feedback_tip_card": "Feedback och dricks"
+  "set_feedback_tip_card": "Feedback och dricks",
+  "nerd_tls_strict": "Kontrollera varje ströms certifikat",
+  "nerd_tls_strict_hint": "Spelaren och inspelningarna kontrollerar en https-ströms certifikat, som appens egna förfrågningar alltid gör. En leverantör vars certifikat inte håller – utgånget, självsignerat eller utfärdat för ett annat namn – spelar då ingenting: stäng av det här igen, eller lita på certifikatet på källans sida.",
+  "playlist_http_note": "Vanlig http: inloggningen går okrypterad i varje adress och kan läsas av vem som helst på vägen. Använd https om leverantören erbjuder det.",
+  "subs_private_ask": "Det här spelas privat, så ingenting frågas av OpenSubtitles förrän du trycker på Sök – då skickas orden i rutan dit."
 }

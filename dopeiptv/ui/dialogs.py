@@ -168,6 +168,13 @@ class SourceFields:
         # entry is unaffected. textEdited fires on paste (but not on our own
         # setText), so the credentials fill the moment the link is pasted.
         self.server.textEdited.connect(lambda _t: self._maybe_autodetect_link())
+        # Plain http to a provider on the internet: its login travels in
+        # every address, readable on the way (docs/SECURITY.md, "A provider
+        # on plain http") - said under the address, nothing refused.
+        self.http_note = QLabel(tr("playlist_http_note"))
+        self.http_note.setWordWrap(True)
+        self.http_note.setTextFormat(Qt.TextFormat.PlainText)
+        self.http_note.setStyleSheet(f"color:{P.get('warn', P['muted'])}; font-size:12px;")
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
@@ -194,6 +201,22 @@ class SourceFields:
         self._kind_own = KindOwnFields(
             self.kind, {"server": self.server, "user": self.user, "pw": self.pw,
                         "mac": self.mac}, self.signin)
+
+    def plain_http(self) -> bool:
+        """Whether the address typed sends a login over plain http to the
+        internet: an Xtream server or a portal at http:// - or with no
+        scheme, which the Xtream client takes as http - on a host outside
+        the home network."""
+        if self.kind.currentData() not in ("xtream", "stalker"):
+            return False
+        text = self.server.text().strip()
+        low = text.lower()
+        if not text or low.startswith("https://"):
+            return False
+        if "://" in low and not low.startswith("http://"):
+            return False
+        from ..core import stream_address
+        return stream_address.on_internet(text)
 
     def _build_satip(self, options: dict) -> None:
         """A SAT>IP server's fields: its channel lists (M3U, a file or an
@@ -474,6 +497,8 @@ class PlaylistDialog(SourceFields, QDialog):
             self.presets = PresetButton(self._preset_picked, self)
             form.addRow("", self.presets)
         form.addRow(self._server_lbl, self.server)
+        form.addRow("", self.http_note)
+        self.server.textChanged.connect(lambda _t: self.http_note.setVisible(self.plain_http()))
         form.addRow("", self.finder.row)
         form.addRow(self._user_lbl, self.user)
         form.addRow(self._pw_lbl, self.pw)
@@ -510,6 +535,7 @@ class PlaylistDialog(SourceFields, QDialog):
         self._server_lbl.setText(shown["server_label"])
         for w in (self._server_lbl, self.server):
             w.setVisible(shown["server"])
+        self.http_note.setVisible(shown["server"] and self.plain_http())
         for w in (self._user_lbl, self.user):
             w.setVisible(shown["login"] and shown["user"])
         for w in (self._pw_lbl, self.pw):

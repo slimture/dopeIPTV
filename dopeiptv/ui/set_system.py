@@ -262,7 +262,7 @@ def build_general(ctx: SettingsContext) -> None:
         # Written once switched (on is the default): an untouched
         # window stores nothing.
         if icon_box.isChecked() != app_icon.wanted(win.settings):
-            put("supporter_icon", flag(icon_box))
+            put(app_icon.SETTING, flag(icon_box))
             win._app_icon_refresh()
         if channel_box.currentData() != win._update_channel():
             put("update_channel", channel_box.currentData())

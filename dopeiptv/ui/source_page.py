@@ -433,6 +433,9 @@ class SourcePage(SourceFields, QScrollArea):
         c.row(tr("playlist_kind"), self.kind)
         self.server_row = c.row(tr("login_server"), self.server)
         c.shown_if(self.server_row, lambda: self._parts.get("server", True))
+        note = c.widget(self.http_note)
+        c.shown_if(note, lambda: self._parts.get("server", True) and self.plain_http())
+        self.server.textChanged.connect(lambda _t, c=c: c.refresh())
         finder = c.widget(self.finder.row)
         c.shown_if(finder, lambda: self._parts.get("finder", False))
         c.shown_if(c.row(tr("login_username"), self.user),

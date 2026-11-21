@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Une chaîne sans guide : clic droit dessus dans la liste, puis choisis sa chaîne de guide à la main.",
   "nerd_card_start": "Démarrage de chaîne et tampon",
   "nerd_applies_stream": "Prend effet à partir de la prochaine chaîne lancée.",
-  "nerd_applies_conn": "Version IP : tout de suite pour les requêtes de l'app. Délai et reconnexion : à partir de la prochaine chaîne.",
+  "nerd_applies_conn": "Version IP : tout de suite pour les requêtes de l'app. Délai, reconnexion et vérification du certificat : à partir de la prochaine chaîne.",
   "nerd_applies_vpn": "Vérifié à chaque démarrage d'un flux.",
   "nerd_applies_reload": "La liste des chaînes est reconstruite à la fermeture des Réglages.",
   "nerd_applies_now": "Prend effet tout de suite, dans ce qui est en cours de lecture.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Utilisez un mot de passe d'au moins {n} caractères : la sauvegarde contient tous les identifiants et le code de synchronisation.",
   "backup_no_pw_warn": "La sauvegarde contient tous les identifiants, les jetons et le code de synchronisation. Sans mot de passe, quiconque obtient le fichier peut les lire. Enregistrer quand même sans mot de passe ?",
   "backup_no_pw_go": "Enregistrer sans mot de passe",
-  "set_feedback_tip_card": "Avis et pourboires"
+  "set_feedback_tip_card": "Avis et pourboires",
+  "nerd_tls_strict": "Vérifier le certificat de chaque flux",
+  "nerd_tls_strict_hint": "Le lecteur et les enregistrements vérifient le certificat d'un flux https, comme le font toujours les requêtes de l'app. Un fournisseur dont le certificat ne passe pas – expiré, auto-signé ou émis pour un autre nom – ne lit alors plus rien : désactivez cette option, ou faites confiance à ce certificat sur la page de sa source.",
+  "playlist_http_note": "http simple : l'identifiant passe en clair dans chaque adresse, lisible par n'importe qui en chemin. Utilisez https si le fournisseur le propose.",
+  "subs_private_ask": "Ceci est lu en privé : rien n'est demandé à OpenSubtitles tant que vous n'appuyez pas sur Rechercher – les mots du champ lui sont alors envoyés."
 }

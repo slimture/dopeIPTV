@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Um canal sem guia: clique com o botão direito nele na lista e escolha o canal do guia à mão.",
   "nerd_card_start": "Início do canal e buffer",
   "nerd_applies_stream": "Vale a partir do próximo canal que você abrir.",
-  "nerd_applies_conn": "Versão de IP: na hora para as requisições do app. Tempo limite e reconexão: a partir do próximo canal.",
+  "nerd_applies_conn": "Versão de IP: na hora para as requisições do app. Tempo limite, reconexão e verificação do certificado: a partir do próximo canal.",
   "nerd_applies_vpn": "Verificado toda vez que uma transmissão começa.",
   "nerd_applies_reload": "A lista de canais é refeita quando você fecha as Configurações.",
   "nerd_applies_now": "Vale na hora, no que está tocando agora.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Use uma senha de pelo menos {n} caracteres - o backup contém todos os logins e o código de sincronização.",
   "backup_no_pw_warn": "O backup contém todos os logins, tokens e o código de sincronização. Sem senha, qualquer pessoa que pegar o arquivo pode lê-los. Salvar mesmo assim sem senha?",
   "backup_no_pw_go": "Salvar sem senha",
-  "set_feedback_tip_card": "Feedback e gorjetas"
+  "set_feedback_tip_card": "Feedback e gorjetas",
+  "nerd_tls_strict": "Verificar o certificado de cada stream",
+  "nerd_tls_strict_hint": "O player e as gravações verificam o certificado de um stream https, como as requisições do app sempre fazem. Um provedor cujo certificado não passa na verificação – expirado, autoassinado ou emitido para outro nome – não reproduz nada: desligue esta opção ou confie nesse certificado na página da fonte.",
+  "playlist_http_note": "http sem criptografia: o login vai sem criptografia em cada endereço, e qualquer um no caminho pode lê-lo. Use https se o provedor oferecer.",
+  "subs_private_ask": "Isto está tocando no modo privado, então nada é pedido ao OpenSubtitles até você tocar em Pesquisar – aí as palavras da caixa vão para ele."
 }

@@ -7,6 +7,33 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Security
+
+- A picture or guide address an internet source names can no longer reach
+  the home network through a public name that resolves to a home address:
+  the app's own requests to such a name are refused on the socket, after
+  the name is looked up and before a byte is sent. The source's own server
+  names (its server, list, guide, portal and backup addresses) and Plex's
+  `*.plex.direct` are left alone (`core/dest_guard.note_outside`).
+- Nerd > Network has "Check every stream's certificate" (off by default):
+  the player and recordings check an https stream's certificate against the
+  usual authorities. A source with a trusted certificate keeps its own
+  check, and a `tls-verify` typed into mpv's options wins.
+- The app's own yt-dlp is hashed again once a run, and whenever its file
+  changes, before it is run; a copy whose bytes no longer match is not run.
+- The subtitle search opened while viewing privately waits for Search
+  before it asks OpenSubtitles anything.
+- The add-a-source form and a source's page say so under the address when
+  an Xtream server or a portal on the internet is on plain http: the login
+  travels unencrypted in every address.
+
+### Fixed
+
+- Updating to 1.6.10 could change the app's icon: a heart-icon switch left
+  on from before, without a supporter key, now showed the heart. The switch
+  everyone has since 1.6.10 is a setting of its own (`heart_icon`); never
+  switched, the icon is what 1.6.9 showed.
+
 ## [1.6.10]
 
 ### Changed

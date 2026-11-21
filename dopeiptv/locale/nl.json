@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Een zender zonder gids: klik er met rechts op in de lijst en kies zelf de gidszender.",
   "nerd_card_start": "Zenderstart en buffer",
   "nerd_applies_stream": "Gaat in vanaf de volgende zender die je start.",
-  "nerd_applies_conn": "IP-versie: meteen voor de eigen verzoeken van de app. Time-out en opnieuw verbinden: vanaf de volgende zender.",
+  "nerd_applies_conn": "IP-versie: meteen voor de eigen verzoeken van de app. Time-out, opnieuw verbinden en de certificaatcontrole: vanaf de volgende zender.",
   "nerd_applies_vpn": "Gecontroleerd bij elke start van een stream.",
   "nerd_applies_reload": "De zenderlijst wordt opnieuw opgebouwd als je Instellingen sluit.",
   "nerd_applies_now": "Gaat meteen in, in wat er nu speelt.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Gebruik een wachtwoord van minstens {n} tekens - de back-up bevat alle aanmeldingen en de synccode.",
   "backup_no_pw_warn": "De back-up bevat alle aanmeldingen, tokens en de synccode. Zonder wachtwoord kan iedereen die het bestand krijgt ze lezen. Toch zonder wachtwoord opslaan?",
   "backup_no_pw_go": "Opslaan zonder wachtwoord",
-  "set_feedback_tip_card": "Feedback en fooien"
+  "set_feedback_tip_card": "Feedback en fooien",
+  "nerd_tls_strict": "Certificaat van elke stream controleren",
+  "nerd_tls_strict_hint": "De speler en opnames controleren het certificaat van een https-stream, zoals de eigen verzoeken van de app altijd doen. Een aanbieder van wie het certificaat niet klopt – verlopen, zelf ondertekend of voor een andere naam uitgegeven – speelt dan niets af: zet dit weer uit, of vertrouw dat certificaat op de pagina van de bron.",
+  "playlist_http_note": "Gewone http: de inlog gaat onversleuteld mee in elk adres en is onderweg voor iedereen leesbaar. Gebruik https als de aanbieder dat biedt.",
+  "subs_private_ask": "Dit speelt privé af, dus er wordt niets aan OpenSubtitles gevraagd tot je op Zoeken drukt – dan gaan de woorden in het vak ernaartoe."
 }

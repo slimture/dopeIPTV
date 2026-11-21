@@ -51,9 +51,14 @@ ICON_SAFE_INSET = 0.098
 #: user picked - the packaged icons are this blue too.
 ICON_ACCENT = ACCENTS["blue"][1]
 
-#: The Settings switch (Settings > General): off unless switched on - or,
-#: never switched, on for a supporter key from before, as it was for them.
-SETTING = "supporter_icon"
+#: The Settings switch (Settings > General), everyone's since 1.6.10: off
+#: unless switched on - or, never switched, as it was before (`LEGACY`).
+SETTING = "heart_icon"
+#: The supporter's own switch up to 1.6.9, read only while `SETTING` was
+#: never switched: on (its default) together with a supporter key. A
+#: "true" left there without a key - one tried and taken away - never
+#: shows the heart icon by itself, so an update changes nobody's icon.
+LEGACY = "supporter_icon"
 
 _THEME_SIZES = (256, 128, 64, 48, 32)
 
@@ -136,15 +141,14 @@ def platform_icon(supporter: bool = False) -> QIcon:
 
 def wanted(settings) -> bool:
     """Whether the heart icon is the one to show: the switch on - or, never
-    switched, a supporter key that checks out (core/supporter.py), whose
-    icon it was by default until November 2026."""
+    switched, what 1.6.9 showed: a supporter key that checks out
+    (core/supporter.py) with its own switch (`LEGACY`) not turned off."""
     try:
         chosen = str(settings.value(SETTING, "") or "")
-    except Exception:
-        chosen = ""
-    if chosen in ("true", "false"):
-        return chosen == "true"
-    try:
+        if chosen in ("true", "false"):
+            return chosen == "true"
+        if str(settings.value(LEGACY, "true") or "true") == "false":
+            return False
         from ..core import supporter
         return supporter.is_supporter(settings)
     except Exception:

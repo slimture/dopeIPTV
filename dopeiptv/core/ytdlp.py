@@ -249,14 +249,37 @@ def _mark(base: str | Path | None, tag: str, sha256: str) -> None:
                                      encoding="utf-8")
 
 
+#: The copies whose bytes were hashed against their mark this run, by
+#: path: the size and time they had then.
+_HASHED: dict[str, str] = {}
+
+
+def _sha256_of(p: Path) -> str:
+    digest = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def own_copy(base: str | Path | None = None) -> bool:
     """Whether the managed copy is one install() put there and checked: its
-    mark says so, and its size and time are what they were (a stat, no
-    read)."""
+    mark says so, its size and time are what they were, and - once a run,
+    or again after its size or time changed - its bytes still hash to the
+    SHA-256 the mark keeps (the pinned release's)."""
     p = managed_path(base)
     try:
         mark = (managed_dir(base) / _MARK_FILE).read_text(encoding="utf-8").split()
-        return _runnable(p) and len(mark) == 4 and " ".join(mark[2:]) == _mark_of(p)
+        now = _mark_of(p)
+        if not (_runnable(p) and len(mark) == 4 and " ".join(mark[2:]) == now):
+            return False
+        if _HASHED.get(str(p)) == now:
+            return True
+        if _sha256_of(p) != mark[1].lower():
+            log.warning("yt-dlp: the app's copy no longer matches its checksum - not run")
+            return False
+        _HASHED[str(p)] = now
+        return True
     except OSError:
         return False
 

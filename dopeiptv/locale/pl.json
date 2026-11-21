@@ -1375,7 +1375,7 @@
   "nerd_epg_map_note": "Kanał bez przewodnika: kliknij go prawym przyciskiem na liście i wybierz ręcznie kanał przewodnika.",
   "nerd_card_start": "Start kanału i bufor",
   "nerd_applies_stream": "Działa od następnego kanału, który włączysz.",
-  "nerd_applies_conn": "Wersja IP: od razu dla zapytań aplikacji. Limit czasu i ponowne łączenie: od następnego kanału.",
+  "nerd_applies_conn": "Wersja IP: od razu dla zapytań aplikacji. Limit czasu, ponowne łączenie i sprawdzanie certyfikatu: od następnego kanału.",
   "nerd_applies_vpn": "Sprawdzane przy każdym starcie strumienia.",
   "nerd_applies_reload": "Lista kanałów buduje się od nowa po zamknięciu Ustawień.",
   "nerd_applies_now": "Działa od razu, w tym, co teraz leci.",
@@ -3150,5 +3150,9 @@
   "backup_pw_short": "Użyj hasła o długości co najmniej {n} znaków – kopia zapasowa zawiera wszystkie dane logowania i kod synchronizacji.",
   "backup_no_pw_warn": "Kopia zapasowa zawiera wszystkie dane logowania, tokeny i kod synchronizacji. Bez hasła każdy, kto zdobędzie plik, może je odczytać. Zapisać mimo to bez hasła?",
   "backup_no_pw_go": "Zapisz bez hasła",
-  "set_feedback_tip_card": "Opinie i napiwki"
+  "set_feedback_tip_card": "Opinie i napiwki",
+  "nerd_tls_strict": "Sprawdzaj certyfikat każdego strumienia",
+  "nerd_tls_strict_hint": "Odtwarzacz i nagrania sprawdzają certyfikat strumienia https, tak jak zawsze robią to zapytania aplikacji. Dostawca, którego certyfikat nie przechodzi kontroli – wygasły, samopodpisany albo wystawiony na inną nazwę – nic wtedy nie odtwarza: wyłącz to z powrotem albo zaufaj temu certyfikatowi na stronie jego źródła.",
+  "playlist_http_note": "Zwykłe http: dane logowania idą niezaszyfrowane w każdym adresie i każdy po drodze może je odczytać. Użyj https, jeśli dostawca je oferuje.",
+  "subs_private_ask": "To jest odtwarzane prywatnie, więc OpenSubtitles nie dostaje żadnego zapytania, dopóki nie naciśniesz Szukaj – wtedy trafiają tam słowa z pola."
 }

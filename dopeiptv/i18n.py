@@ -787,6 +787,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "nerd_timeout_hint": {"en": "How long a stream may stay silent before the player gives up and reconnects."},
     "nerd_reconnect": {"en": "Longest wait between reconnects (s)"},
     "nerd_reconnect_hint": {"en": "When a stream drops, it is tried again, waiting longer each time, up to this."},
+    "nerd_tls_strict": {"en": "Check every stream's certificate"},
+    "nerd_tls_strict_hint": {"en": "The player and recordings check an https stream's certificate, as the app's own requests always do. A provider whose certificate does not check out - expired, self-signed or made for another name - then plays nothing: turn this off again, or trust that certificate on its source's page."},
     "nerd_card_vpn": {"en": "VPN guard"},
     "nerd_vpn_guard": {"en": "Only stream with a VPN up"},
     "nerd_vpn_guard_hint": {"en": "WireGuard, OpenVPN, Tailscale… If the VPN drops, nothing starts until it is back."},
@@ -1167,6 +1169,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "playlist_msg_title": {"en": "Playlist"},
     "playlist_name_placeholder": {"en": "e.g. My provider"},
     "playlist_epg_placeholder": {"en": "optional - overrides the provider's xmltv.php"},
+    "playlist_http_note": {"en": "Plain http: the login goes unencrypted in every address, readable by anyone on the way. Use https if the provider offers it."},
 
     # ── Content manager dialog ────────────────────────────────────────────
     "cm_title": {"en": "Manage categories"},
@@ -1995,7 +1998,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "nerd_epg_map_note": {"en": "A channel without a guide: right-click it in the list and choose its guide channel by hand."},
     "nerd_card_start": {"en": "Channel start and buffer"},
     "nerd_applies_stream": {"en": "Takes effect from the next channel you start."},
-    "nerd_applies_conn": {"en": "IP version: at once for the app's own requests. Timeout and reconnect: from the next channel."},
+    "nerd_applies_conn": {"en": "IP version: at once for the app's own requests. Timeout, reconnect and the certificate check: from the next channel."},
     "nerd_applies_vpn": {"en": "Checked each time a stream starts."},
     "nerd_applies_reload": {"en": "The channel list is built again when you close Settings."},
     "nerd_applies_now": {"en": "Takes effect at once, in what is playing now."},
@@ -2341,6 +2344,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "subs_remaining": {"en": "downloads left today: {n}"},
     "subs_need_key": {"en": "OpenSubtitles needs a free API key: sign in at {url}, create one and enter it in Settings."},
     "subs_credit": {"en": "Subtitles from OpenSubtitles.com"},
+    "subs_private_ask": {"en": "This plays privately, so nothing is asked of OpenSubtitles until you press Search - then the words in the box go to it."},
     "subs_flag_match": {"en": "Made for this exact file"},
     "subs_flag_trusted": {"en": "From a trusted uploader"},
     "subs_flag_hi": {"en": "For the deaf and hard of hearing"},

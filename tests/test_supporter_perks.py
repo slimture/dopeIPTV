@@ -64,12 +64,24 @@ def test_the_heart_icon_is_everyones_switch(key):
     from dopeiptv.ui import app_icon
     s = _Settings()
     assert not app_icon.wanted(s)                    # off by default
-    s["supporter_icon"] = "true"
+    s["heart_icon"] = "true"
     assert app_icon.wanted(s)                        # anyone may switch it on
     s = _Settings(supporter_key=key)
     assert app_icon.wanted(s)                        # a key from before: as it was
     s["supporter_icon"] = "false"
+    assert not app_icon.wanted(s)                    # ... and its own switch off too
+    s["heart_icon"] = "true"
+    assert app_icon.wanted(s)                        # the new switch decides once used
+    s["heart_icon"] = "false"
     assert not app_icon.wanted(s)
+
+
+def test_an_update_changes_nobodys_icon():
+    """1.6.9's switch left on without a key (a key tried, then taken away)
+    showed the plain icon then and shows it now."""
+    from dopeiptv.ui import app_icon
+    assert not app_icon.wanted(_Settings(supporter_icon="true"))
+    assert not app_icon.wanted(_Settings(supporter_icon="true", supporter_key="DS1-not-a-key"))
 
     class Broken:
         def value(self, *_a, **_k):
@@ -220,17 +232,17 @@ in_settings(open_to_all)
 def icon_on(d):
     icon_switch(d).setChecked(True)
 in_settings(icon_on)
-assert s.value("supporter_icon") == "true" and app_icon._shown is True
+assert s.value("heart_icon") == "true" and app_icon._shown is True
 w._donate_heart_refresh()                        # the minute's tick keeps it
 assert app_icon._shown is True
 
 def icon_off(d):
     icon_switch(d).setChecked(False)
 in_settings(icon_off)
-assert s.value("supporter_icon") == "false" and app_icon._shown is False
+assert s.value("heart_icon") == "false" and app_icon._shown is False
 
 # -- a key from before, never switched: its icon as it had ------------------
-s.remove("supporter_icon")
+s.remove("heart_icon")
 s.setValue("supporter_key", KEY)
 w._donate_heart_refresh()
 assert app_icon._shown is True

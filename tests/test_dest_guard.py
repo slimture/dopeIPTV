@@ -168,3 +168,73 @@ def test_the_casts_own_redirects_are_judged_hop_by_hop(monkeypatch):
     asked.clear()
     url, served = chromecast._resolve_redirects("http://iptv.example.com/live/1")
     assert url == "http://cdn.example.net/x.ts" and served == "video/mp2t"
+
+
+# -- a public name an internet source named never leads home ---------------------
+
+def test_a_picture_host_of_an_internet_source_never_reaches_the_home_network():
+    """The review's first point: a provider's picture name that its DNS
+    answers with a router's or a NAS's address. Noted as the source's
+    (note_outside), the connection is refused there; anywhere public it
+    goes on, and a name nobody noted is as before."""
+    g.forget_names()
+    try:
+        g.note_outside("https://img.provider.example/logo/1.png")
+        assert g.peer_refusal("img.provider.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("img.provider.example", "10.0.0.2") == g.HOME
+        assert g.peer_refusal("IMG.provider.example.", "fd00::5") == g.HOME
+        assert g.peer_refusal("img.provider.example", "93.184.216.34") == ""
+        assert g.peer_refusal("cdn.elsewhere.example", "192.168.1.1") == ""
+    finally:
+        g.forget_names()
+
+
+def test_the_persons_own_names_and_plex_stay_reachable_at_home():
+    """A server at home by its public name (split DNS), a source's backup
+    address, and Plex's own names answering a home address."""
+    g.forget_names()
+    try:
+        for host in ("media.myhome.example", "1-2-3-4.abc123.plex.direct"):
+            g.note_outside(f"https://{host}:32400/photo/x.jpg")
+        g.note_own("https://media.myhome.example:8920")
+        assert g.peer_refusal("media.myhome.example", "192.168.1.5") == ""
+        assert g.peer_refusal("1-2-3-4.abc123.plex.direct", "192.168.1.5") == ""
+        # Home names and addresses as written are never noted.
+        g.note_outside("http://192.168.1.9/picon.png")
+        g.note_outside("http://vuplus.local/picon.png")
+        assert g.peer_refusal("192.168.1.9", "192.168.1.9") == ""
+        assert g.peer_refusal("vuplus.local", "192.168.1.9") == ""
+    finally:
+        g.forget_names()
+
+
+def test_the_noted_names_are_bounded():
+    g.forget_names()
+    try:
+        for i in range(g.OUTSIDE_MAX + 50):
+            g.note_outside(f"https://h{i}.example/p.png")
+        assert len(g._OUTSIDE) == g.OUTSIDE_MAX
+        assert g.peer_refusal("h0.example", "192.168.1.1") == ""         # the oldest let go
+        assert g.peer_refusal(f"h{g.OUTSIDE_MAX + 49}.example", "192.168.1.1") == g.HOME
+    finally:
+        g.forget_names()
+
+
+def test_an_internet_sources_lists_note_their_pictures_and_its_server_is_its_own():
+    """make_client: a source on the internet's rows note their pictures;
+    the source's own server is the person's."""
+    from dopeiptv.providers import client as c
+    g.forget_names()
+    try:
+        rows = [{"stream_icon": "https://img.provider.example/a.png"},
+                {"stream_icon": "https://iptv.provider.example/b.png"}]
+        c._note_own_names({"kind": "xtream", "server": "https://iptv.provider.example"})
+        c._pictures_kept(rows, home=True)
+        assert g.peer_refusal("img.provider.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("iptv.provider.example", "192.168.1.1") == ""
+        # A source the person let into the home network (home=False): nothing noted.
+        g.forget_names()
+        c._pictures_kept([{"stream_icon": "https://img2.provider.example/a.png"}], home=False)
+        assert g.peer_refusal("img2.provider.example", "192.168.1.1") == ""
+    finally:
+        g.forget_names()

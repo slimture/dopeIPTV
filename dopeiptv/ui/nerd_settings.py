@@ -75,7 +75,7 @@ PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
             "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback",
-            "nerd_other_networks"),
+            "nerd_other_networks", "nerd_tls_strict"),
     "boxes": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
@@ -341,6 +341,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_timeout"), timeout, tr("nerd_timeout_hint"))
     recon = Stepper(lo=1, hi=60, value=n.num("nerd_reconnect_max", 5) or 5, width=130)
     c.row(tr("nerd_reconnect"), recon, tr("nerd_reconnect_hint"))
+    # The player's and the recorder's own certificate check (core/nerd.py,
+    # STRICT_TLS): off by default - many providers' certificates do not
+    # check out, and mpv's default is the library's.
+    tls_strict = c.toggle(tr("nerd_tls_strict"), n.flag("nerd_tls_strict"), tr("nerd_tls_strict_hint"))
     c.note(tr("nerd_applies_conn"))
 
     # -- network: own DNS (ui/net_advanced.py) ----------------------------------------------
@@ -894,6 +898,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_ip_family", ip_box.currentData())
         put("nerd_net_timeout", str(timeout.value()))
         put("nerd_reconnect_max", str(recon.value()))
+        put("nerd_tls_strict", "true" if tls_strict.isChecked() else "false")
         put("nerd_vpn_guard", "true" if guard.isChecked() else "false")
         put("nerd_vpn_iface", iface.text().strip())
         put("nerd_vpn_lan", "true" if vpn_lan.isChecked() else "false")
