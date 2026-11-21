@@ -170,7 +170,7 @@
 <!--tp:ex updates lines-->
 <p class="fine">Framtaget genom att köra appens egen kod, där anropet till The Movie Database fångades innan det skickades.</p>
 <h3>Koden</h3>
-<p>Anropet till The Movie Database – över HTTPS, titeln och året, och inget annat om dig –, nyckeln som alla kopior delar, och uppslaget som frågar en gång per titel och aldrig om det som spelas privat:</p>
+<p>Anropet till The Movie Database – över HTTPS, titeln och året, och inget annat om dig –, nyckeln som alla kopior delar, titeln rensad från leverantörens märkningar innan den skickas, och uppslaget som frågar en gång per titel och aldrig om det som spelas privat:</p>
 <!--tp:code watching tmdb-->
 <h3>Kontrollera det själv</h3>
 <blockquote class="tp-ask" data-for="watching"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – anropet den gör till The Movie Database för att hitta en affisch. Förklara på enkel svenska vad den skickar. Granska den sedan kritiskt: säger något i den vem personen är, eller mer än titeln hen tittar på? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
@@ -188,8 +188,8 @@
 
 <section class="tp-part tp-i-updates">
 <h2 id="updates">3. Vet ni vem jag är?</h2>
-<p class="tp-promise tp-promise-ico">Appen har inget konto och inget eget id: när den letar efter en uppdatering säger den vilken app och version den är, på vilket system – och inget annat.</p>
-<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering – inte från vilken adress, och inte vem du är.</p>
+<p class="tp-promise tp-promise-ico">Appen har inget konto och inget eget id: när den letar efter en uppdatering säger den vilken app och version den är, på vilket system och vilken processor, och om det är en officiell version – och inget annat.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att en kopia av dopeIPTV i den här versionen, på den här sortens system, letade efter en uppdatering. Din adress når servern, som med vilken webbplats som helst, men sparas aldrig – och inget i kontrollen säger vem du är.</p>
 <details class="tp-more">
 <summary>Läs mer</summary>
 <div class="tp-more-body">
@@ -215,6 +215,7 @@
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Kontrollen kommer från din IP-adress, som servrarna inte skriver ned någonstans (<a href="#webservers">del 11</a>). Vi räknar en uppdatering du laddar ner – versionen den kom från, system och processor, land, på timmen och i 30 dagar – aldrig med adressen.</li>
+<li>Om dopeiptv.org inte svarar frågar appen GitHub i stället, och en uppdatering kan laddas ner därifrån: GitHub ser din adress som vilken tjänst som helst, och sparar det GitHub sparar.</li>
 <li>Du kan stänga av kontrollen i appen: <em>Sök efter uppdateringar vid start</em>.</li>
 </ul>
 </div>

@@ -68,7 +68,8 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "app", "path": "dopeiptv/providers/metadata.py", "names": ["bundled_tmdb_key"]},
                   {"repo": "app", "path": "dopeiptv/providers/metadata.py",
                    "from": r"^class TmdbClient:", "to": r"^    BASE = "},
-                  {"repo": "app", "path": "dopeiptv/providers/metadata.py", "names": ["PosterResolver.get_full"]}]},
+                  {"repo": "app", "path": "dopeiptv/providers/metadata.py",
+                   "names": ["PosterResolver.clean_title", "PosterResolver._ensure_fetch", "PosterResolver.get_full"]}]},
     ],
     "reports": [
         {"id": "scrub", "repo": "app", "path": "dopeiptv/core/report.py",

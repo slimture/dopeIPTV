@@ -170,7 +170,7 @@
 <!--tp:ex updates lines-->
 <p class="fine">Made by running the app's own code, the request to The Movie Database caught before it was sent.</p>
 <h3>The code</h3>
-<p>The request to The Movie Database – over HTTPS, the title and the year, and nothing else of yours –, the key every copy shares, and the lookup that asks once per title and never about what plays privately:</p>
+<p>The request to The Movie Database – over HTTPS, the title and the year, and nothing else of yours –, the key every copy shares, the title cleaned of the provider's tags before it is sent, and the lookup that asks once per title and never about what plays privately:</p>
 <!--tp:code watching tmdb-->
 <h3>Check it yourself</h3>
 <blockquote class="tp-ask" data-for="watching"><p>Below is code from dopeIPTV, an open-source TV player – the request it makes to The Movie Database to find a poster. Explain in plain English what it sends. Then review it critically: does anything in it say who the person is or more than the title they look at? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
@@ -188,8 +188,8 @@
 
 <section class="tp-part tp-i-updates">
 <h2 id="updates">3. Do you know who I am?</h2>
-<p class="tp-promise tp-promise-ico">The app has no account and no ID of its own: when it looks for an update it says which app and version it is, on which system – and nothing else.</p>
-<p class="tp-know tp-know-ico"><b>What we can know:</b> that a copy of dopeIPTV of this version, on this kind of system, looked for an update – not from which address, and not who you are.</p>
+<p class="tp-promise tp-promise-ico">The app has no account and no ID of its own: when it looks for an update it says which app and version it is, on which system and processor, and whether it is an official build – and nothing else.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that a copy of dopeIPTV of this version, on this kind of system, looked for an update. Your address reaches the server, as with any website, but is never kept – and nothing in the check says who you are.</p>
 <details class="tp-more">
 <summary>Read more</summary>
 <div class="tp-more-body">
@@ -215,6 +215,7 @@
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>The check arrives from your IP address, which the servers write down nowhere (<a href="#webservers">part 11</a>). We count an update you download – the version it came from, the system and processor, the country, at its hour and for 30 days – never with the address.</li>
+<li>If dopeiptv.org does not answer, the app asks GitHub instead, and an update may be downloaded from there: GitHub sees your address like any service, and keeps what it keeps.</li>
 <li>You can turn the check off in the app: <em>Check for updates on startup</em>.</li>
 </ul>
 </div>
