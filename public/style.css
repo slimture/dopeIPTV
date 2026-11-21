@@ -1380,8 +1380,8 @@ nav.links .navsupport { color: var(--muted); }
 .dn-x:hover { background: var(--surface-2); color: var(--text); }
 .dn-body { padding: 16px 22px 22px; }
 .dn-step { display: flex; flex-direction: column; gap: 14px; }
-/* Three suggestions, one row; any other amount under them. */
-.dn-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+/* Four suggestions, one row; any other amount under them. */
+.dn-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .dn-chip { font: inherit; font-weight: 700; font-size: 15px; padding: 12px 4px; cursor: pointer;
   border-radius: 12px; border: 1px solid var(--line-2); background: var(--ink); color: var(--text);
   transition: border-color .15s ease, background .15s ease; }
@@ -1452,7 +1452,7 @@ nav.links .navsupport { color: var(--muted); }
 .dn-own .dn-input--sm:focus + .dn-ico { display: none; }
 dialog.dn { overflow-x: hidden; }
 @media (max-width: 560px) {
-  .dn-chips.dn-chips--sm { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dn-chips.dn-chips--sm { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .dn-back { font: inherit; font-size: 14px; cursor: pointer; border: 0; background: none;
   color: var(--muted); padding: 4px 0; }
