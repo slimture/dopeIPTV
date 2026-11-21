@@ -76,6 +76,7 @@ CODE: dict[str, list[dict]] = {
          "names": ["_IPV4", "_IPV6", "_MAC", "_EMAIL", "_KEYVAL", "_AUTH_LINE",
                    "_BEARER", "_HOST_PATH", "_SAID", "_JWT", "_PREFIXED", "_LONG", "_HOME_DIR",
                    "_PHONE", "_hide_value", "_not_an_address", "scrub", "personal_values"],
+         # From the 1.6.11 tag on, add "Secret" and "_own_value" (not in v1.6.10).
          "with": [{"repo": "app", "path": "dopeiptv/core/log.py", "names": ["URL_IN_TEXT"]}]},
         {"id": "send", "repo": "app", "path": "dopeiptv/core/report.py",
          "names": ["ENDPOINT", "_over_https", "_post", "send_status"],
