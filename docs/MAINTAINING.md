@@ -166,7 +166,8 @@ Platform notes that are easy to forget:
 4. Watch `release.yml`. Re-run a failed leg if it was a download hiccup.
    Its last job signs the checksum list and tidies the release notes
    (`tools/tidy_release_notes.py`): the new release keeps only its own
-   section of `RELEASE_NOTES.md`, the one before it is folded. Every
+   section of `RELEASE_NOTES.md`, with a link to `CHANGELOG.md` under it,
+   and the one before it is folded. Every
    nightly run does the same, so the releases page stays short and the
    downloads near the top; nothing is lost - each tag's
    `RELEASE_NOTES.md` and `CHANGELOG.md` have it all.
@@ -188,9 +189,9 @@ Only names here - the values are with the owner.
 | Trakt app registration | its client id is `DEFAULT_CLIENT_ID` in `providers/trakt.py`; the redirect goes through the website (see its README) | Trakt sign-in fails: there is no Settings row for a client id of one's own - only a build with `DEFAULT_CLIENT_ID` empty asks for one on Connect (`_trakt_creds_dialog` in `ui/mw_trakt.py`) |
 | The web server | runs the site and its cron sync (website branch: `README.md`; how the server is set up: the private repository `slimture/dopeiptv-server`) | the site stops updating; the app is unaffected |
 | GitHub repository settings | releases, Actions, the Security tab for private reports | - |
-| Stripe (dopeIPTV's own account, under Solecraft AB) - the tip dialog and a Payment Link | a tip (any amount, once) in the site's tip dialog, paid through `donate/donate.py` (or a Payment Link of its own, `SUPPORT_TIP_URL`, while `SUPPORT_TIPS` is not on), and monthly support (a fixed price) as a Payment Link returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; the settings are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIPS`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`, ...), read by `sync-releases.sh` (website branch, `DEPLOY.md` "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
+| Stripe (dopeIPTV's own account, under Solecraft AB) - the tip dialog and a Payment Link | a tip (any amount, once) in the site's tip dialog, paid through `donate/donate.py` (or a Payment Link of its own, `SUPPORT_TIP_URL`, while `SUPPORT_TIPS` is not on), and monthly support (a fixed price) as a Payment Link returning to `https://dopeiptv.org/support/?paid={CHECKOUT_SESSION_ID}`; the settings are the web server's, in `/usr/local/etc/iptv-site.conf` (`SUPPORT_TIPS`, `SUPPORT_MONTHLY_URL`, `SUPPORT_SPONSORS_URL`, ...), read by `sync-releases.sh` (the server's runbook, `slimture/dopeiptv-server`, "Support"). `.github/FUNDING.yml` (the Sponsor button, shown with Settings → Features → Sponsorships ticked), the README's "Support dopeIPTV" and the app's heart point at `dopeiptv.org/support/` | the site invites to no payment (the support page says "coming soon"); the app's heart still opens the support page |
 | Stripe key for the supporter key | a restricted key, read-only (Checkout Sessions: Read, PaymentIntents: Read), on the web server in `/usr/local/etc/iptv-donate.key`, read by `donate/donate.py` | the thank-you after paying shows no supporter key |
-| The admin page's sign-in | each admin's passkey, or a name and password (and an authenticator code if turned on); the admins in `/usr/local/www/iptv/stats/admin-users.json` on the web server, a new one by an invite from another (website branch, `DEPLOY.md` "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
+| The admin page's sign-in | each admin's passkey, or a name and password (and an authenticator code if turned on); the admins in a file of the service's on the web server, a new one by an invite from another (the server's runbook, "Statistics and the admin page") | `/admin/` cannot be opened; the site is unaffected |
 | Apple Developer Program (Solecraft AB, team `6QR76TBT4J`) | the macOS builds' signature and notarisation - see "macOS signing" below | the .dmg is signed ad hoc and users allow the first start under Privacy & Security |
 | GitHub Actions secrets `MACOS_CERT_P12`, `MACOS_CERT_PASSWORD` | the Developer ID Application certificate with its private key (base64 of the exported .p12) and the export password | as above |
 | GitHub Actions secrets `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID` | an App Store Connect API team key (Developer access) for `notarytool` | a release fails at notarising - the certificate alone signs but is not enough |
@@ -453,7 +454,7 @@ private `slimture/dopeiptv-server`. In short:
   binds `a and b as $x` differently than 1.7.
 - Strict Content-Security-Policy: no inline scripts or styles, nothing
   from other origins but Stripe's script and frames for the tip dialog
-  (`deploy/csp.snippet.txt`). The download section and the FAQ work
+  (the server's configuration). The download section and the FAQ work
   without JavaScript.
 - The one non-static piece is `donate/donate.py`, a standard-library
   service behind `/donate/` that makes the Stripe payments for the tip
@@ -462,9 +463,9 @@ private `slimture/dopeiptv-server`. In short:
   serves feedback and its answers (`/feedback/`), settings sync (`/sync/`)
   and Watch together (`/together/`). And `/admin/`, for its admins only
   (a passkey, or a password): visitors, downloads, and tips and monthly
-  support by day, week, month and year, the visits counted from nginx's
-  own log of page views by `donate/stats_collect.py` (cron) - no script or
-  cookie on the site, no address kept.
+  support by day, week, month and year, the visits counted in memory by
+  `donate/stats_collect.py` from the lines nginx hands it - no cookie, no
+  address kept (the transparency page, part 10, says how).
 - The look is deliberately quiet: black or white, greys and the app
   icon's blue (`#4C8DFF`); San Francisco on Apple devices, self-hosted
   Inter elsewhere. On a phone the downloads fold away behind "Send the
@@ -479,7 +480,8 @@ private `slimture/dopeiptv-server`. In short:
   A new link gets its own short `ref`.
 - Render every language locally before pushing (the README's "Local
   preview"), then look at the pages in a browser. Deploying is a manual
-  step on the server (copy `public/` and `site/`, run the sync once).
+  step on the server, written down in the server's own repository (its
+  README, "Updating the site").
 
 ## A copy outside GitHub
 
@@ -545,8 +547,9 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   unicast M-SEARCH there, a cast's converter or file share reached from
   the other part (it is served at this computer's address on its default
   route), and the phone remote from a phone on the guest network.
-- On the website, a few Serbian strings are in Cyrillic while the rest of
-  the Serbian page is Latin.
+- On the website, the month names in Serbian dates are Cyrillic
+  (`site/formats.json`, as ICU writes `sr`) while the Serbian pages are
+  Latin.
 - **Profiles**: built - one per person in the household, as Netflix and
   Plex have them (`core/profiles.py`, `ui/mw_profiles.py`,
   `ui/profiles_ui.py`; Settings > System > Profiles). What is a profile's
@@ -564,10 +567,10 @@ tests check that placeholders line up and that every `tr("…")` key exists.
   profile as a list in its discovery (a `profile` command and state field
   for now), and a cast going on through a switch (the TV keeps playing).
 
-### Planned: Enigma2 for those with boxes at home
+### Enigma2 from the app: built, to be seen on a real box
 
-After the account-connection count (the Nerd network tools) is in, so it
-builds on that count instead of a second one:
+Built on the account-connection count (the Nerd network tools), not a
+second one:
 
 - **Transponder check.** Built, on the connection count
   (`core/tuners.py`, `ui/mw_connections.py`): channels on one transponder
@@ -601,7 +604,7 @@ builds on that count instead of a second one:
   file, else its stream), and stream health; failover then tries another
   source.
 
-Then the rest of what an Enigma2 box can do from a computer:
+And the rest of what an Enigma2 box can do from a computer, built too:
 
 - **Bouquet editor**: built, through OpenWebif's own bouquet editor
   (`providers/bouquets.py`, `ui/bouquet_editor.py`; "Edit the box's
@@ -720,9 +723,10 @@ and the loopback only):
   recordings without the window, SSDP announcing (only the HDHomeRun UDP
   discovery), and a Docker image.
 
-### Ideas to talk through before anything is built
+### Ideas, and what came of them
 
-Not decided: each needs a word with the maintainer first.
+What is marked built or in is in the app; the rest is not decided - each
+needs a word with the maintainer first.
 
 **Reception and the stream itself**
 
@@ -850,10 +854,11 @@ server:
   playlist and guide, the remote API and the HDHomeRun emulation let apps
   on the TV use dopeIPTV as their source.
 
-### For the help, when this batch is done
+### For the help
 
-Written once, when everything in the batch is in (GitHub's CHANGELOG,
-FEATURES and README; the website's help in every language):
+The first is written (the README's Troubleshooting, FEATURES and the
+website's help); the second is still to go into the website's help in
+every language:
 
 - **Devices on another part of the network (VLANs).** A search does not
   cross from one VLAN to another unless the router passes it on: an mDNS
