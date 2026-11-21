@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Keep the GitHub releases page short, so the downloads are near the top.
 
-A release's body comes from RELEASE_NOTES.md, which carries every version
-before it - by 1.4.5 a release was 360 lines before its files. This leaves
-each release with its own notes only:
+A release's body comes from RELEASE_NOTES.md, which holds the newest
+version alone (from 1.6.10; before that it carried every version, and by
+1.4.5 a release was 360 lines before its files - and while a release was
+built, until this ran, it showed all of them). This leaves each release
+with its own notes only:
 
   the latest release   its own section, as it is (the site's What's new and
                        the app's update dialog read it), and a link to
