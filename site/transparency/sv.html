@@ -451,7 +451,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <section class="tp-part tp-i-sync">
 <h2 id="sync">8. Kan ni läsa det jag synkar?</h2>
 <p class="tp-promise tp-promise-ico">Det du synkar låses på din dator innan det skickas, med en nyckel vi aldrig ser – vi förvarar det, men vi kan inte läsa det eller se vems det är.</p>
-<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att en låst kopia finns, hur stor den är och när den ändras – inte vad som står i den, och inte vems den är.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att en låst kopia finns, hur stor den är och när den hämtas eller ändras – och, som alla servrar, från vilken IP-adress – inte vad som står i den, och inget som säger vem du är.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Din dator</b> gör en slumpad synkkod – 256 bitar, visad som 13 grupper om fyra tecken.</li>
@@ -481,6 +481,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code sync key-->
 <p>Själva krypteringen, ChaCha20-Poly1305 (RFC 8439), utskriven i sin helhet: en kopia vars tagg inte stämmer – ändrad med en enda bit, eller låst för en annan plats – avvisas innan något av den läses. Appens tester kontrollerar den mot RFC:ns egna testvektorer.</p>
 <!--tp:code sync aead-->
+<p>Testerna som prövar den mot RFC 8439:s och RFC 5869:s egna testvektorer, och att platsen och nyckeln bara kommer ur koden:</p>
+<!--tp:tests sync-->
 <p>Var koden sparas på din dator: i appens inställningsfil, som bara ditt eget användarkonto kan läsa (på Linux och macOS har filen läget 0600 och mappen 0700):</p>
 <!--tp:code sync stored-->
 <p>Räknaren i varje kopia, och hur en synkrunda märker en tidigare kopia och lägger tillbaka sin egen:</p>
@@ -501,6 +503,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Vår server ser hur stor din kopia är och när den ändras, men inte vad den innehåller.</li>
 <li>Vår server skulle kunna fortsätta visa dina datorer den nyaste kopian som en av dem har sett och hålla inne det som en annan skickar senare. Räknaren fångar en kopia som är äldre än en din dator har sett, inte en som bara slutar ändras – och en dator som går med för första gången har inte sett något än.</li>
 <li>Din IP-adress når vår server med varje anrop. Den används bara i minnet, för gränserna – ungefär tio minuter, ett dygn när en ny kopia skapas – och skrivs aldrig ned.</li>
+<li>Synkkoden ligger i appens inställningsfil på din dator. På Linux och macOS kan bara ditt konto läsa den, och appen frågar innan den fortsätter om filen inte går att göra privat; på Windows skyddas den av din användarprofils egna behörigheter, som appen inte ändrar. Ett program som körs som du kan läsa den, som allt annat du har.</li>
+<li>En plats som hittills bara en app före 1.6.9 har skrivit har inget lösen än – det binds första gången en nyare app skriver den. Fram till dess skulle den som redan kände till platsen kunna hinna före; platsen går bara att få fram ur synkkoden, eller ur det en äldre app har skickat till vår server.</li>
 </ul>
 </div>
 </section>
@@ -541,6 +545,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code together backlog-->
 <p>På vår server: ett meddelande tas emot som byte och skickas vidare – inget öppnar det, inget skrivs till disk – och anropet, där adressen bara används för gränserna:</p>
 <!--tp:code together server-->
+<p>Och testerna som kontrollerar att ett meddelande utan signatur inte talar för någon, att ett gammalt inte används igen och att en gammal kod inte kommer in:</p>
+<!--tp:tests together-->
 <h3>Kontrollera det själv</h3>
 <blockquote class="tp-ask" data-for="together"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – den del som låter vänner titta i takt via en server hos utvecklaren. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: vad kan servern, eller någon som ser trafiken, få veta om vem som tittar på vad, och med vem – och skulle den kunna spela upp meddelanden igen, ändra eller förfalska dem? Är rummets kod tillräckligt stark, och används krypteringen och utfyllnaden rätt? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
 <!--tp:copy together-->
@@ -553,6 +559,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>De som är i rummet ser namnet du väljer och vad du tittar på – det är det som är meningen.</li>
 <li>Vår server ser rumsnamnet, ett id för var och en – hashen av en nyckel som gjorts för det rummet –, hur stora meddelandena är och när de skickas – och, som alla servrar, IP-adressen de kommer från, som den bara använder i minnet, för gränserna. Den skulle också kunna hålla inne meddelanden eller skicka dem vidare sent; den kan inte läsa, ändra eller förfalska dem, eller tala som någon av er. Titta tillsammans går inte att använda medan privat läge är på.</li>
 <li>Den som har koden är med i rummet, så långt appen kan se: appen kan inte skilja en vän från någon som koden har skickats vidare till.</li>
+<li>Löpnumren minns appen bara medan den körs, och serverns tid tar den från servern. Efter en omstart skulle därför en server som ljuger om sin klocka kunna skicka ett äldre, äkta meddelande från rummet igen – att något spelades, pausades eller spolades – och appen skulle följa det. Den kan inte göra ett nytt meddelande eller ändra ett.</li>
+<li>Rummets kod räcker för ett rum en kväll, inte för en hemlighet som ska hålla i åratal: en server som i stället sparade de låsta meddelandena och lät tusen grafikkort gissa koden i ungefär ett år skulle kunna öppna dem.</li>
 <li>Vår server kan inte kontrollera signaturerna – de ligger inne i det krypterade, och servern har inte nyckeln. Den som känner till rummets id – vår server, eller den som har koden – kan därför lägga meddelanden i rummet som medlemmarnas appar sedan slänger, inom gränserna för hur många och hur stora: det kan störa ett rum, men inte tala i det.</li>
 </ul>
 </div>
@@ -561,19 +569,19 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <section class="tp-part tp-i-website">
 <h2 id="website">10. Spårar den här webbplatsen mig?</h2>
 <p class="tp-promise tp-promise-ico">Vi räknar besök utan kakor, utan externa tjänster – och utan att din IP-adress någonsin skrivs ned, inte ens i en logg.</p>
-<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att någon besökte sidan, från vilket land och vilka sidor – i 14 dagar som ett besök bara den dagen, därefter bara som antal. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att någon besökte sidan – från vilket land, med vilken webbläsare och vilket system, vilka sidor och hur länge, vad som laddades ned och vilken webbplats som länkade hit – i 14 dagar som ett besök, därefter bara som antal. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
 <h3>Så fungerar det</h3>
 <ol class="tp-flow">
 <li><b>Webbservern</b> skriver ingenting: den lämnar varje sidvisning direkt till en liten tjänst – med IP-adressen, och av adressen du bad om bara sidan, aldrig det en länk lade till.</li>
 <li><b>Inom en minut</b> räknar tjänsten den, i sitt minne: adressen blir ett land (uppslaget på vår egen server) och ett besökarmärke, och glöms. Ingen logg, ingen fil och ingen säkerhetskopia innehåller den någonsin.</li>
-<li><b>Det som skrivs</b> är besöket utan adressen och utan märket: besökaren namngiven bara för den dagen, tiden på en halvtimme när, vilken sorts skärm, aldrig dess storlek.</li>
+<li><b>Det som skrivs</b> är besöket utan adressen och med märket bara förseglat: besökaren namngiven för den dagen, tiden på en halvtimme när, vilken sorts skärm, aldrig dess storlek.</li>
 <li><b>Efter 14 dagar</b> – aldrig längre – raderas dagens besök, vartenda ett, och tjänsten kontrollerar att de verkligen är borta. Det som finns kvar är antal: hur många besök, sidor och nedladdningar, och listor som inte nämner något land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen – resten är "övrigt", och ingen lista lägger ihop dagar igen under ett namn.</li>
 </ol>
 <details class="tp-more">
 <summary>Läs mer</summary>
 <div class="tp-more-body">
-<p>Besökarmärket är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel för månaden. Nyckeln finns bara i minnet, aldrig på en disk eller i en säkerhetskopia, och glöms efter två månader. Inom en månad får samma besökare samma märke, så att vi kan räkna unika och återkommande besökare – men själva märket skrivs aldrig ned, och inget som sparas knyter ihop en besökares besök från två dagar.</p>
-<p>Hur länge varje del sparas: din IP-adress – aldrig; i högst en minut i minnet. Varje besök i detalj – bara den dagen, tiden på en halvtimme när, webbläsarens huvudversion, vilken sorts skärm, sidans språk och webbläsarens utan sitt land, webbplatsen som länkade under sitt registrerade namn – 14 dagar, sedan raderat; ingen rad av ett besök sparas efter det, inte ens en anonym. Räkningen av olika besökare – skisser utan något märke, bara i minnet – tills månaden efter är slut, sedan bara antalet olika besökare den månaden och dess veckor. Dagens summor för alltid – per väg in (sök, sociala medier…) också hur många besök som läste vidare, laddade ned eller öppnade stödrutan – utan land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen. En betalning noteras aldrig på ett besök – dricks räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
+<p>Besökarmärket är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel för månaden. Nyckeln finns bara i minnet, aldrig på en disk eller i en säkerhetskopia, och glöms efter två månader. Inom en månad får samma besökare samma märke, så att vi kan räkna unika och återkommande besökare. Ett sparat besök har märket med sig bara förseglat med månadens nyckel: för den som har en kopia av diskarna är det slumpade tecken, och inget annat i besöket knyter ihop två dagar. Men tjänsten själv kan öppna det medan nyckeln finns – så räknar den en besökare som kommer tillbaka – och kan alltså se att två av de sparade besöken var samma besökares. När nyckeln är glömd, efter två månader, kan ingen det längre.</p>
+<p>Hur länge varje del sparas: din IP-adress – aldrig; i högst en minut i minnet. Varje besök i detalj – landet, webbläsaren och dess huvudversion, systemet och sortens enhet och skärm, sidans språk och webbläsarens utan sitt land, sidorna och tiden på dem, nedladdningar och det som klickades, webbplatsen som länkade under sitt registrerade namn, tiden på en halvtimme när och det som hände på tio sekunder när – 14 dagar, sedan raderat; ingen rad av ett besök sparas efter det, inte ens en anonym. Räkningen av olika besökare – skisser utan något märke, bara i minnet – tills månaden efter är slut, sedan bara antalet olika besökare den månaden och dess veckor. Dagens summor för alltid – per väg in (sök, sociala medier…) också hur många besök som läste vidare, laddade ned eller öppnade stödrutan – utan land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen. En betalning noteras aldrig på ett besök – dricks räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -610,8 +618,9 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <div class="tp-limits-box tp-limits-ico">
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
-<li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
+<li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden, och att webbservern och dess loggar är inställda så som del 11 säger – den inställningen visar vi inte här. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
 <li>Medan tjänsten körs passerar din adress dess minne, och månadens nyckel finns där. Den som tog över den körande servern skulle kunna se anropen när de kommer, som på vilken webbserver som helst – det som finns på dess diskar, nu eller i en säkerhetskopia, leder inte tillbaka till dig.</li>
+<li>Månadens nyckel finns bara i minnet. Flyttade servern ut minne till swap på en okrypterad disk skulle nyckeln kunna hamna där. Vår swap är krypterad med en nyckel som glöms vid omstart, och tjänsten kontrollerar det och varnar oss om det inte stämmer – men slutar inte räkna.</li>
 <li>Ett besök som sparas i 14 dagar säger vad som gjordes under det, på en halvtimme när. Den som redan visste att du besökte sidan ungefär då – och vad du gjorde – skulle kunna plocka ut det besöket bland dagens, och en lugn dag säger även summorna att en besökare kom från ett visst land. Det gör det mycket svårare, inte omöjligt, att veta vem som besökte sidan; mer än så lovar vi inte.</li>
 </ul>
 </div>

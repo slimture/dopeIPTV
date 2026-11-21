@@ -451,7 +451,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <section class="tp-part tp-i-sync">
 <h2 id="sync">8. Can you read what I sync?</h2>
 <p class="tp-promise tp-promise-ico">What you sync is locked on your computer before it is sent, with a key we never see – we keep it, but we cannot read it or tell whose it is.</p>
-<p class="tp-know tp-know-ico"><b>What we can know:</b> that a locked copy exists, how big it is and when it changes – not what is in it, nor whose it is.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that a locked copy exists, how big it is and when it is fetched or changed – and, as any server does, from which IP address – not what is in it, and nothing that says who you are.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>Your computer</b> makes a random sync code – 256 bits, shown as 13 groups of four.</li>
@@ -481,6 +481,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code sync key-->
 <p>The encryption itself, ChaCha20-Poly1305 (RFC 8439), written out in full: a copy whose tag does not match – changed by one bit, or sealed for another slot – is refused before anything of it is read. The app's tests check it against the RFC's own test vectors.</p>
 <!--tp:code sync aead-->
+<p>The tests that try it against RFC 8439's and RFC 5869's own test vectors, and that the slot and the key come from the code alone:</p>
+<!--tp:tests sync-->
 <p>Where the code is kept on your computer: in the app's settings file, which only your own user account can read (on Linux and macOS the file is 0600 and its folder 0700):</p>
 <!--tp:code sync stored-->
 <p>The counter in every copy, and how a round notices an earlier copy and puts its own back:</p>
@@ -501,6 +503,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Our server sees how big your copy is and when it changes, though not what is in it.</li>
 <li>Our server could keep showing your computers the newest copy one of them has seen and hold back what another sends later. The counter catches a copy older than one your computer has seen, not one that simply stops changing – and a computer that joins for the first time has seen nothing yet.</li>
 <li>Your IP address reaches our server with each request. It is used only in memory, for the limits – about ten minutes, a day when a new copy is made – and is never written down.</li>
+<li>The sync code is in the app's settings file on your computer. On Linux and macOS only your account can read it, and the app asks before it goes on if the file cannot be made private; on Windows it is guarded by your user profile's own permissions, which the app does not change. A program that runs as you can read it, as it can everything else of yours.</li>
+<li>A slot that so far only an app before 1.6.9 has written has no password yet – it is bound the first time a newer app writes it. Until then, whoever already knew the slot could get there first; the slot can only be had from the sync code, or from what an older app sent our server.</li>
 </ul>
 </div>
 </section>
@@ -541,6 +545,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code together backlog-->
 <p>On our server: a message is taken as bytes and passed on – nothing opens it, nothing is written to disk – and the request, where the address is used only for the limits:</p>
 <!--tp:code together server-->
+<p>And the tests that check a message without a signature speaks for no one, an old one is not used again and an old code joins nothing:</p>
+<!--tp:tests together-->
 <h3>Check it yourself</h3>
 <blockquote class="tp-ask" data-for="together"><p>Below is code from dopeIPTV, an open-source TV player – the part that lets friends watch in step through a relay on the developer's server. Explain in plain English, step by step, what it does. Then review it critically: what can the relay, or someone who watches the traffic, learn about who watches what, and with whom – and could it replay, change or forge messages? Is the room code strong enough, and are the cryptography and the padding used correctly? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
 <!--tp:copy together-->
@@ -553,6 +559,8 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>The people in the room see the name you choose and what you watch – that is the point of it.</li>
 <li>Our server sees the room name, an id for each person – the hash of a key made for that room –, how big the messages are and when they are sent – and, like every server, the IP address they come from, which it uses only in memory, for the limits. It could also hold messages back or pass them on late; it cannot read, change or forge them, or speak as one of you. Watch together cannot be used while private viewing is on.</li>
 <li>Whoever has the code is in the room, as far as the app can tell: the app cannot tell a friend from someone the code was passed on to.</li>
+<li>The app remembers the running numbers only while it runs, and takes the server's time from the server. After a restart, then, a server that lies about its clock could hand an older, genuine message from the room again – that something played, paused or was sought – and the app would follow it. It cannot make a new message or change one.</li>
+<li>The room code is enough for a room for an evening, not for a secret that must hold for years: a server that kept the locked messages instead, and set a thousand graphics cards guessing the code for about a year, could open them.</li>
 <li>Our server cannot check the signatures – they are inside what is encrypted, and it has no key. Whoever knows the room's id – our server, or someone with the code – can therefore put messages in the room that the members' apps then drop, within the limits on how many and how large: that can disturb a room, but not speak in it.</li>
 </ul>
 </div>
@@ -561,19 +569,19 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <section class="tp-part tp-i-website">
 <h2 id="website">10. Does this website track me?</h2>
 <p class="tp-promise tp-promise-ico">We count visits without cookies, without outside services – and without your IP address ever being written down, not even in a log.</p>
-<p class="tp-know tp-know-ico"><b>What we can know:</b> that someone visited, from which country and which pages – for 14 days as a visit of that day alone, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that someone visited – from which country, with which browser and system, which pages and for how long, what was downloaded and which site linked here – for 14 days as a visit, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
 <h3>How it works</h3>
 <ol class="tp-flow">
 <li><b>The web server</b> writes nothing: it hands each page view straight to a small service – with the IP address, and of the address you asked for only the page, never what a link added to it.</li>
 <li><b>Within a minute</b> the service counts it, in its memory: the address becomes a country (looked up on our own server) and a visitor mark, and is forgotten. No log, no file and no backup ever holds it.</li>
-<li><b>What is written</b> is the visit without the address and without the mark: its visitor named for that day alone, its time to the half hour, the kind of screen, never its size.</li>
+<li><b>What is written</b> is the visit without the address and with the mark only sealed: its visitor named for that day, its time to the half hour, the kind of screen, never its size.</li>
 <li><b>After 14 days</b> – never more – the day's visits are deleted, every one, and the service checks that they really are gone. What stays is counts: how many visits, pages and downloads, and lists that name no country, language, version, site or tag fewer than five visitors had that day – the rest is "other", and no list adds days up again under a name.</li>
 </ol>
 <details class="tp-more">
 <summary>Read more</summary>
 <div class="tp-more-body">
-<p>The visitor mark is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key for the month. The key is only in memory, never on a disk or in a backup, and is forgotten after two months. Within a month the same visitor gets the same mark, so we can count unique and returning visitors – but the mark itself is never written down, and nothing kept ties one visitor's visits on two days together.</p>
-<p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – of that day alone, its time to the half hour, the browser's main version, the kind of screen, the page's language and the browser's without its country, the site that linked by its registered name – 14 days, then deleted; no row of a visit is kept after that, not even an anonymous one. The count of different visitors – sketches that hold no mark, in memory alone – until the month after has ended, then only the number of different visitors in that month and its weeks. The day's counts for good – per way in (search, social…) how many visits read on, downloaded or opened the support dialog, too – with no country, language, version, site or tag fewer than five visitors had that day. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
+<p>The visitor mark is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key for the month. The key is only in memory, never on a disk or in a backup, and is forgotten after two months. Within a month the same visitor gets the same mark, so we can count unique and returning visitors. A visit kept carries the mark only sealed with the month's key: to someone with a copy of the disks it is random characters, and nothing else in the visit ties two days together. But the service itself can open it while the key is there – that is how it counts a visitor who comes back – and so can tell that two of the visits kept were one visitor's. Once the key is forgotten, after two months, no one can.</p>
+<p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – the country, the browser and its main version, the system and the kind of device and screen, the page's language and the browser's without its country, the pages and the time on them, downloads and what was clicked, the site that linked by its registered name, its time to the half hour and what happened in it to ten seconds – 14 days, then deleted; no row of a visit is kept after that, not even an anonymous one. The count of different visitors – sketches that hold no mark, in memory alone – until the month after has ended, then only the number of different visitors in that month and its weeks. The day's counts for good – per way in (search, social…) how many visits read on, downloaded or opened the support dialog, too – with no country, language, version, site or tag fewer than five visitors had that day. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -610,8 +618,9 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <div class="tp-limits-box tp-limits-ico">
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
-<li>Unlike the app, our server is not something you can inspect: you have to trust that it runs this code. What you can check yourself is what your browser loads and keeps.</li>
+<li>Unlike the app, our server is not something you can inspect: you have to trust that it runs this code, and that the web server and its logs are set up as part 11 says – that setup we do not show here. What you can check yourself is what your browser loads and keeps.</li>
 <li>While the service runs, your address passes its memory and the month's key is there. Someone who took over the running server could watch requests as they come, as on any web server – what is on its disks, now or in a backup, does not lead back to you.</li>
+<li>The month's key is only in memory. Were the server to move memory out to swap on an unencrypted disk, the key could land there. Our swap is encrypted with a key that a restart forgets, and the service checks this and warns us if it is not so – but does not stop counting.</li>
 <li>A visit kept for 14 days says what was done in it, to the half hour. Someone who already knew that you visited at about that time – and what you did – could pick that visit out among the day's, and on a quiet day the counts too say that one visitor came from a country. That makes it much harder, not impossible, to tell who visited; we do not claim more.</li>
 </ul>
 </div>

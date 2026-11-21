@@ -104,7 +104,8 @@ CODE: dict[str, list[dict]] = {
         {"id": "key", "repo": "app", "path": "dopeiptv/core/sync.py",
          "names": ["format_code", "new_code", "hkdf", "derive", "auth_of", "seal", "unseal"]},
         {"id": "aead", "repo": "app", "path": "dopeiptv/core/chacha20poly1305.py",
-         "names": ["poly1305", "_pad16", "_tag", "encrypt", "decrypt"]},
+         "names": ["_SIGMA", "_LANES", "_ONES", "_IOTA", "_CLAMP", "_quarter", "_keystream", "chacha20", "block",
+                   "poly1305", "_pad16", "_tag", "encrypt", "decrypt"]},
         {"id": "stored", "repo": "app", "path": "dopeiptv/core/sync.py", "names": ["K_CODE", "code_of"],
          "with": [{"repo": "app", "path": "dopeiptv/core/settings_files.py",
                    "names": ["keep_private", "protect"]}]},
@@ -120,7 +121,8 @@ CODE: dict[str, list[dict]] = {
     "together": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/together.py",
          "names": ["ALPHABET", "CODE_LEN", "OLD_LEN", "STRETCH", "_PAD", "new_code", "is_old_code",
-                   "derive", "seal", "open_frame"]},
+                   "derive", "FORMAT", "_AAD", "MIN_FRAME", "MAX_FRAME", "seal", "_seal_text", "_open_text",
+                   "open_frame"]},
         {"id": "signed", "repo": "app", "path": "dopeiptv/core/together.py",
          "names": ["Identity", "member_of", "new_identity", "_signed", "encode",
                    "_signature_holds", "open_message"]},
@@ -199,6 +201,18 @@ TESTS: dict[str, list[tuple[str, str]]] = {
         "test_only_the_short_answers_go_with_feedback",
         "test_a_supporter_key_never_goes_in_a_report",
         "test_asking_for_answers_sends_only_hashes")],
+    # The cipher against RFC 8439's and HKDF against RFC 5869's own vectors.
+    "sync": [("tests/test_sync.py", n) for n in (
+        "test_rfc_8439_chacha20_block_and_encryption",
+        "test_rfc_8439_poly1305_and_its_key",
+        "test_rfc_8439_aead",
+        "test_hkdf_rfc_5869_case_1",
+        "test_slot_and_key_come_from_the_code_alone_and_apart",
+        "test_a_sealed_snapshot_opens_with_its_key_only")],
+    "together": [("tests/test_together.py", n) for n in (
+        "test_an_unsigned_message_never_speaks_for_anyone",
+        "test_an_old_frame_handed_again_after_a_rejoin_is_ignored",
+        "test_an_old_code_of_eight_joins_nothing")],
 }
 
 # Every host the app's code names - what the page's two searches find
