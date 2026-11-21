@@ -23,8 +23,8 @@
 <tr><td class="tp-ov-q"><a href="#logins">Can you see my login to my TV provider?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">No</strong> It stays on your computer and goes only to your provider.</td><td class="tp-ov-l"><a href="#logins-limits">4</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#watching">Can you see what I watch?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">No</strong> Nothing the app sends us says what you play.</td><td class="tp-ov-l"><a href="#watching-limits">2</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#updates">Do you know who I am?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">No</strong> No account with us and no ID in the app.</td><td class="tp-ov-l"><a href="#updates-limits">3</a></td></tr>
-<tr><td class="tp-ov-q"><a href="#hosts">What does the app connect to?</a></td><td class="tp-ov-a"><strong class="tp-verdict">3 on its own</strong> Your provider, the update check and posters from The Movie Database. The rest only when you use it.</td><td class="tp-ov-l"><a class="tp-ov-part" href="#hosts">in the part</a></td></tr>
-<tr><td class="tp-ov-q"><a href="#builds">Could someone get a harmful update into my app?</a></td><td class="tp-ov-a"><strong class="tp-verdict">Not without our key</strong> The app installs only what a list signed with our release key names.</td><td class="tp-ov-l"><a class="tp-ov-part" href="#builds">in the part</a></td></tr>
+<tr><td class="tp-ov-q"><a href="#hosts">What does the app connect to?</a></td><td class="tp-ov-a"><strong class="tp-verdict">3 on its own</strong> Your provider, the update check and posters from The Movie Database. The rest only when you use it.</td><td class="tp-ov-l"><a href="#hosts-limits">4</a></td></tr>
+<tr><td class="tp-ov-q"><a href="#builds">Could someone get a harmful update into my app?</a></td><td class="tp-ov-a"><strong class="tp-verdict">Not without our key</strong> The app installs only what a list signed with our release key names.</td><td class="tp-ov-l"><a href="#builds-limits">2</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#private">Can the app keep nothing of what I watch?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">Yes</strong> With private viewing on, nothing you play is kept or told.</td><td class="tp-ov-l"><a href="#private-limits">7</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#reports">What is in an error report?</a></td><td class="tp-ov-a"><strong class="tp-verdict">What you see</strong> Cleaned on your computer, and you read all of it before you press Send.</td><td class="tp-ov-l"><a href="#reports-limits">3</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#sync">Can you read what I sync?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">No</strong> Locked on your computer with a key we never see.</td><td class="tp-ov-l"><a href="#sync-limits">6</a></td></tr>
@@ -218,7 +218,7 @@
 <summary><span class="tp-fold-t">Every address, and when the app uses it</span></summary>
 <div class="tp-fold-body">
 <p>The list is made by searching the app's code for every host name in it – the same search you can run yourself. The app also talks to what you add yourself: your sources, and the boxes, TVs and servers on your network – and to the addresses their own lists name, such as channel logos and guides on other servers, and, through yt-dlp, the site of an address you open. Those come from your data, not from the code, so they are not in the lists below.</p>
-<p>The list is what the app's own code names. It is not a guarantee that no other connection can happen: the libraries it is built on, the video player inside it (mpv and FFmpeg), yt-dlp and your operating system can make connections of their own, and an address put together while the app runs is not written out in the code. What you can do is read the linked code and watch the app's traffic yourself – both below.</p>
+<p>What you can do is read the linked code and watch the app's traffic yourself – both below.</p>
 <h3>Addresses the app connects to</h3>
 <table class="tp-hosts">
 <thead><tr><th>Address</th><th>What for, and when</th></tr></thead>
@@ -279,6 +279,17 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <!--tp:copy hosts-->
 </div>
 </details>
+<details class="tp-fold tp-lim" id="hosts-limits">
+<summary><span class="tp-fold-t">What the list does not cover</span> <span class="tp-n">4</span></summary>
+<div class="tp-fold-body">
+<ul class="tp-limits">
+<li>The list is what the app's own code names, found by a search – not a promise of every connection.</li>
+<li>The libraries the app is built on, the video player inside it (mpv and FFmpeg), yt-dlp and your operating system can make connections of their own.</li>
+<li>An address put together while the app runs is not written out in the code.</li>
+<li>What you add yourself – your sources, and the boxes, TVs and servers on your network – and the addresses their own lists name are not in the list.</li>
+</ul>
+</div>
+</details>
 </section>
 
 <section class="tp-part tp-i-builds">
@@ -292,9 +303,7 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <li><strong>Built in public.</strong> Every release is built by GitHub Actions from the version's tag in the code – not on our computers. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">The build's recipe</a> is in the code, and <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">the log of every build</a> is open to anyone.</li>
 <li><strong>Signed.</strong> The release's files are listed with their checksums, and the list is signed with our release key. The app checks an update against it, and this website checks every file it hands out against it too, before it hands it out (below).</li>
 <li><strong>Checked before it is signed.</strong> Every package a release ships is looked up against the known vulnerabilities first; an audit that finds one, or cannot finish, stops the release before it is signed. And yt-dlp, which the app can download for YouTube and the like, is only the release whose checksums the build checked against yt-dlp's own signature.</li>
-<li><strong>Not yet reproducible.</strong> The build's log and the signature show what was built, from which tag and where. They are not a byte-for-byte proof: the builds are not reproducible yet, so you cannot build the same bytes yourself and compare. Until they are, the open log and recipe are what you can check.</li>
 <li><strong>It checks itself.</strong> The app carries a signed list of its own files and checks them when it starts. A changed copy knows it is changed, and does not use our services: it looks for no updates here and sends no reports to us. Run straight from the code, it says so, and works as an official build.</li>
-<li><strong>A courtesy, not a lock.</strong> The check is made by the app itself, and what kind of build it is the app says about itself. A copy changed on purpose can change the check too, and anyone can write a request by hand. So none of the protection on this page rests on it – that is the encryption and the cleaning above. What it gives you is an app that knows when it is not ours, and says so.</li>
 </ul>
 </div>
 </details>
@@ -317,6 +326,15 @@ python3 -m pip install -r requirements.txt pytest
 QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <blockquote class="tp-ask" data-for="builds"><p>Below is how dopeIPTV, an open-source TV player, checks an update before it installs it – the signed list of checksums, the file against it, that a release must be newer than the one running and that a download follows redirects only over https –, how the app knows whether it has itself been changed, and how the website checks a release's files before it hands them out. Explain in plain English, step by step, what the code does. Then review it as an attacker would: could someone who takes over the website or the GitHub account, or who stands between you and the server, get in a file that is not signed, an older release with faults fixed since, or a file not on the list? What does the app's check of itself not protect against? Do not guess: say so where something depends on code that is not included – the install steps for Windows and macOS, for example.</p></blockquote>
 <!--tp:copy builds-->
+</div>
+</details>
+<details class="tp-fold tp-lim" id="builds-limits">
+<summary><span class="tp-fold-t">What it does not protect against</span> <span class="tp-n">2</span></summary>
+<div class="tp-fold-body">
+<ul class="tp-limits">
+<li><strong>Not yet reproducible.</strong> The build's log and the signature show what was built, from which tag and where. They are not a byte-for-byte proof: the builds are not reproducible yet, so you cannot build the same bytes yourself and compare. Until they are, the open log and recipe are what you can check.</li>
+<li><strong>A courtesy, not a lock.</strong> The check is made by the app itself, and what kind of build it is the app says about itself. A copy changed on purpose can change the check too, and anyone can write a request by hand. So none of the protection on this page rests on it – that is the encryption and the cleaning above. What it gives you is an app that knows when it is not ours, and says so.</li>
+</ul>
 </div>
 </details>
 </section>

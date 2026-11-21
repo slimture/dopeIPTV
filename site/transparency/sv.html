@@ -23,8 +23,8 @@
 <tr><td class="tp-ov-q"><a href="#logins">Kan ni se min inloggning hos min tv-leverantör?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">Nej</strong> Den stannar på din dator och går bara till din leverantör.</td><td class="tp-ov-l"><a href="#logins-limits">4</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#watching">Kan ni se vad jag tittar på?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">Nej</strong> Inget som appen skickar till oss säger vad du spelar.</td><td class="tp-ov-l"><a href="#watching-limits">2</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#updates">Vet ni vem jag är?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">Nej</strong> Inget konto hos oss och inget id i appen.</td><td class="tp-ov-l"><a href="#updates-limits">3</a></td></tr>
-<tr><td class="tp-ov-q"><a href="#hosts">Vart ansluter appen?</a></td><td class="tp-ov-a"><strong class="tp-verdict">3 av sig själv</strong> Din leverantör, uppdateringskontrollen och affischer från The Movie Database. Resten bara när du använder det.</td><td class="tp-ov-l"><a class="tp-ov-part" href="#hosts">i delen</a></td></tr>
-<tr><td class="tp-ov-q"><a href="#builds">Kan någon få in en skadlig uppdatering i min app?</a></td><td class="tp-ov-a"><strong class="tp-verdict">Inte utan vår nyckel</strong> Appen installerar bara det som står på en lista signerad med vår releasenyckel.</td><td class="tp-ov-l"><a class="tp-ov-part" href="#builds">i delen</a></td></tr>
+<tr><td class="tp-ov-q"><a href="#hosts">Vart ansluter appen?</a></td><td class="tp-ov-a"><strong class="tp-verdict">3 av sig själv</strong> Din leverantör, uppdateringskontrollen och affischer från The Movie Database. Resten bara när du använder det.</td><td class="tp-ov-l"><a href="#hosts-limits">4</a></td></tr>
+<tr><td class="tp-ov-q"><a href="#builds">Kan någon få in en skadlig uppdatering i min app?</a></td><td class="tp-ov-a"><strong class="tp-verdict">Inte utan vår nyckel</strong> Appen installerar bara det som står på en lista signerad med vår releasenyckel.</td><td class="tp-ov-l"><a href="#builds-limits">2</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#private">Kan appen låta bli att spara något om vad jag tittar på?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">Ja</strong> Med privat läge på sparas och berättas ingenting om det du spelar.</td><td class="tp-ov-l"><a href="#private-limits">7</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#reports">Vad står i en felrapport?</a></td><td class="tp-ov-a"><strong class="tp-verdict">Det du ser</strong> Rensad på din dator, och du läser hela texten innan du trycker på Skicka.</td><td class="tp-ov-l"><a href="#reports-limits">3</a></td></tr>
 <tr><td class="tp-ov-q"><a href="#sync">Kan ni läsa det jag synkar?</a></td><td class="tp-ov-a"><strong class="tp-verdict is-good">Nej</strong> Låst på din dator med en nyckel som vi aldrig ser.</td><td class="tp-ov-l"><a href="#sync-limits">6</a></td></tr>
@@ -218,7 +218,7 @@
 <summary><span class="tp-fold-t">Varje adress, och när appen använder den</span></summary>
 <div class="tp-fold-body">
 <p>Listan är framtagen genom att söka igenom appens kod efter varje värdnamn i den – samma sökning som du kan göra själv. Appen pratar också med det du själv lägger till: dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och med adresserna som deras egna listor anger, som kanallogotyper och tv-guider på andra servrar, och, genom yt-dlp, webbplatsen för en adress du öppnar. De kommer från dina uppgifter, inte från koden, så de finns inte i listorna nedan.</p>
-<p>Listan är det som appens egen kod namnger. Den är ingen garanti för att ingen annan anslutning kan ske: biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar, och en adress som sätts ihop medan appen kör står inte utskriven i koden. Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
+<p>Det du kan göra är att läsa den länkade koden och själv se appens trafik – båda nedan.</p>
 <h3>Adresser som appen ansluter till</h3>
 <table class="tp-hosts">
 <thead><tr><th>Adress</th><th>Till vad, och när</th></tr></thead>
@@ -279,6 +279,17 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <!--tp:copy hosts-->
 </div>
 </details>
+<details class="tp-fold tp-lim" id="hosts-limits">
+<summary><span class="tp-fold-t">Det här täcker listan inte</span> <span class="tp-n">4</span></summary>
+<div class="tp-fold-body">
+<ul class="tp-limits">
+<li>Listan är det som appens egen kod namnger, framtagen genom en sökning – inget löfte om varenda anslutning.</li>
+<li>Biblioteken appen är byggd på, videospelaren i den (mpv och FFmpeg), yt-dlp och ditt operativsystem kan göra egna anslutningar.</li>
+<li>En adress som sätts ihop medan appen kör står inte utskriven i koden.</li>
+<li>Det du själv lägger till – dina källor, och boxarna, tv-apparaterna och servrarna i ditt nätverk – och adresserna som deras egna listor anger finns inte i listan.</li>
+</ul>
+</div>
+</details>
 </section>
 
 <section class="tp-part tp-i-builds">
@@ -292,9 +303,7 @@ grep -rnoE --include='*.py' "[\"'][a-z0-9.-]+\.(org|com|net|info|tv|io|dev|se|ap
 <li><strong>Byggd öppet.</strong> Varje version byggs av GitHub Actions från versionens tagg i koden – inte på våra datorer. <a href="https://github.com/slimture/dopeIPTV/blob/%REF%/.github/workflows/release.yml" rel="noopener">Byggets recept</a> finns i koden, och <a href="https://github.com/slimture/dopeIPTV/actions/workflows/release.yml" rel="noopener">loggen från varje bygge</a> är öppen för alla.</li>
 <li><strong>Signerad.</strong> Versionens filer listas med sina kontrollsummor, och listan är signerad med vår releasenyckel. Appen kontrollerar en uppdatering mot den, och den här webbplatsen kontrollerar också varje fil mot den innan den lämnas ut (nedan).</li>
 <li><strong>Kontrollerad innan den signeras.</strong> Varje paket som följer med en version slås först upp mot kända sårbarheter; en granskning som hittar en, eller inte kan slutföras, stoppar versionen innan den signeras. Och yt-dlp, som appen kan ladda ner för YouTube och liknande, är bara den version vars kontrollsummor bygget har kontrollerat mot yt-dlp:s egen signatur.</li>
-<li><strong>Ännu inte reproducerbar.</strong> Byggets logg och signaturen visar vad som byggdes, från vilken tagg och var. De är inget bevis byte för byte: byggena är inte reproducerbara ännu, så du kan inte bygga samma bytes själv och jämföra. Till dess är den öppna loggen och receptet det du kan kontrollera.</li>
 <li><strong>Den kontrollerar sig själv.</strong> Appen har med sig en signerad lista över sina egna filer och kontrollerar dem när den startar. En ändrad kopia vet att den är ändrad, och använder inte våra tjänster: den letar inte efter uppdateringar här och skickar inga rapporter till oss. Körd direkt från koden säger den det, och fungerar som en officiell version.</li>
-<li><strong>En artighet, inte ett lås.</strong> Kontrollen görs av appen själv, och vilken sorts version den är säger appen om sig själv. En kopia som har ändrats med flit kan ändra kontrollen också, och vem som helst kan skriva ett anrop för hand. Därför vilar inget av skyddet på den här sidan på den – det gör krypteringen och rensningen ovan. Det den ger dig är en app som vet när den inte är vår, och säger det.</li>
 </ul>
 </div>
 </details>
@@ -317,6 +326,15 @@ python3 -m pip install -r requirements.txt pytest
 QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <blockquote class="tp-ask" data-for="builds"><p>Här nedan finns hur dopeIPTV, en tv-spelare med öppen källkod, kontrollerar en uppdatering innan den installeras – den signerade listan med kontrollsummor, filen mot den, att en version måste vara nyare än den som körs och att en nedladdning bara följer omdirigeringar över https –, hur appen vet om den själv har ändrats, och hur webbplatsen kontrollerar en versions filer innan den lämnar ut dem. Förklara på enkel svenska, steg för steg, vad koden gör. Granska den sedan som en angripare skulle: kan någon som tar över webbplatsen eller GitHub-kontot, eller som står mellan dig och servern, få in en fil som inte är signerad, en äldre version med fel som har rättats sedan, eller en fil som inte står på listan? Vad skyddar appens kontroll av sig själv inte mot? Gissa inte: säg till där något beror på kod som inte är med – installationsstegen för Windows och macOS, till exempel.</p></blockquote>
 <!--tp:copy builds-->
+</div>
+</details>
+<details class="tp-fold tp-lim" id="builds-limits">
+<summary><span class="tp-fold-t">Det här skyddar det inte mot</span> <span class="tp-n">2</span></summary>
+<div class="tp-fold-body">
+<ul class="tp-limits">
+<li><strong>Ännu inte reproducerbar.</strong> Byggets logg och signaturen visar vad som byggdes, från vilken tagg och var. De är inget bevis byte för byte: byggena är inte reproducerbara ännu, så du kan inte bygga samma bytes själv och jämföra. Till dess är den öppna loggen och receptet det du kan kontrollera.</li>
+<li><strong>En artighet, inte ett lås.</strong> Kontrollen görs av appen själv, och vilken sorts version den är säger appen om sig själv. En kopia som har ändrats med flit kan ändra kontrollen också, och vem som helst kan skriva ett anrop för hand. Därför vilar inget av skyddet på den här sidan på den – det gör krypteringen och rensningen ovan. Det den ger dig är en app som vet när den inte är vår, och säger det.</li>
+</ul>
 </div>
 </details>
 </section>

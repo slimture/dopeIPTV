@@ -7,7 +7,7 @@ against the code they show (site/transparency.json, tools/transparency.py).
   leaves out a proof;
 - each part's copy button has its question, and its proof is folded;
 - the overview at the top names every part, in order, with the number of
-  limits the part itself lists;
+  limits the part itself lists - and every part lists its own;
 - every address on the page points at the version it names - a tag or a
   commit, never a branch that moves;
 - what the page shows of this site's own files is still there to be shown
@@ -98,9 +98,7 @@ def test_the_overview_names_every_part_with_its_own_count_of_limits():
         for pid, cell in rows:
             fold = re.search(r'<details class="tp-fold tp-lim" id="%s-limits">.*?<span class="tp-n">(\d+)</span>'
                              r'.*?(<ul class="tp-limits">.*?</ul>)' % pid, text, re.S)
-            if fold is None:
-                assert cell == f'<a class="tp-ov-part" href="#{pid}">' + cell.split(">", 1)[1], f"{lang}: {pid}"
-                continue
+            assert fold, f"{lang}: {pid} names no limits of its own"
             n = fold.group(2).count("<li>")
             assert int(fold.group(1)) == n, f"{lang}: {pid}"
             assert cell == f'<a href="#{pid}-limits">{n}</a>', f"{lang}: {pid}"

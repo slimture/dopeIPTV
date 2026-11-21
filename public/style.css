@@ -2678,7 +2678,6 @@ section.legal-main { padding: 18px 0 84px; }
 .legal .tp-verdict.is-good { color: color-mix(in srgb, var(--ok) 78%, var(--text)); background: color-mix(in srgb, var(--ok) 16%, transparent); }
 .legal .tp-overview td.tp-ov-l { padding-inline-end: 0; white-space: nowrap; text-align: end; }
 .legal .tp-overview td.tp-ov-l a { color: color-mix(in srgb, var(--warn) 85%, var(--text)); font-weight: 700; text-decoration: none; }
-.legal .tp-overview td.tp-ov-l a.tp-ov-part { color: var(--muted); font-weight: 500; font-size: 14px; }
 .legal .tp-overview td.tp-ov-l a:hover { text-decoration: underline; }
 @media (max-width: 700px) {
   .legal .tp-overview thead { display: none; }
