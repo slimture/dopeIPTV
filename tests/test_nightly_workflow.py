@@ -95,3 +95,14 @@ def test_a_macos_rebuild_replaces_only_the_dmg_of_the_same_app():
     # The .dmg, and the checksum list signed again after it (checksums job).
     assert RELEASE.count('gh release upload "$TAG"') == 2
     assert 'if [ "$TAG" != "v${V}" ]; then' in RELEASE
+
+
+def test_a_test_build_lists_its_changes_since_the_newest_release():
+    # A release's tag sits on main's merge commit, which testing never
+    # holds: git describe on testing found v1.6.4 long after 1.6.9 was out,
+    # and every test build listed sixty changes from months before.
+    notes = NIGHTLY[NIGHTLY.index("- name: Notes"):]
+    notes = notes[:notes.index("\n      - name:", 1) if "\n      - name:" in notes[1:] else len(notes)]
+    assert "$(git describe" not in notes
+    assert "git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1" in notes
+    assert "${LAST:+$LAST..HEAD}" in notes
