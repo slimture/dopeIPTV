@@ -80,7 +80,7 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   a release does (it calls `release.yml` with `nightly_version`) and
   publishes them as a **pre-release** `nightly-<version>.<run>`. Users on
   Settings → General → Update channel → Test builds get these. Only the
-  newest few are kept; pre-releases never count as "latest", so the
+  newest three are kept; pre-releases never count as "latest", so the
   website and the Releases channel never see them.
 - **`release.yml`** - on a `v*` tag: builds and attaches every package -
   sdist + wheel, AppImage + .deb (x86_64 and aarch64), macOS .dmg (arm64

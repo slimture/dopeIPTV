@@ -204,14 +204,14 @@ jobs:
           gh release create "nightly-${V}" out/* --prerelease --latest=false \
             --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
             --notes-file notes.md
-      - name: Keep the newest seven
+      - name: Keep the newest three
         if: steps.gather.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             --jq '[.[] | select(.isPrerelease and (.tagName | startswith("nightly-")))]
-                  | sort_by(.createdAt) | reverse | .[7:] | .[].tagName' |
+                  | sort_by(.createdAt) | reverse | .[3:] | .[].tagName' |
           while read -r tag; do
             echo "removing ${tag}"
             gh release delete "${tag}" --yes --cleanup-tag

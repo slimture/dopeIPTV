@@ -64,7 +64,7 @@ def test_a_test_build_publishes_what_built_and_a_release_fails_loud():
     # What did not build is named in the notes; no AppImage, no nightly.
     assert "missing.txt" in NIGHTLY and "Not in this build" in NIGHTLY
     # Gather's publish guard on the signed checksums, the notes, the
-    # pre-release and keeping the newest seven.
+    # pre-release and keeping the newest three.
     assert NIGHTLY.count("if: steps.gather.outputs.publish == 'true'") == 4
 
 
@@ -106,3 +106,9 @@ def test_a_test_build_lists_its_changes_since_the_newest_release():
     assert "$(git describe" not in notes
     assert "git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1" in notes
     assert "${LAST:+$LAST..HEAD}" in notes
+
+
+def test_three_test_builds_are_kept():
+    # The newest release stays near the top of the releases page.
+    assert "- name: Keep the newest three" in NIGHTLY
+    assert "| sort_by(.createdAt) | reverse | .[3:] | .[].tagName'" in NIGHTLY
