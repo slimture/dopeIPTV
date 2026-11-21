@@ -547,11 +547,30 @@ var iptvCurrency = (function () {
   box.addEventListener("click", function (e) {
     if (e.target.closest("a") && narrow && narrow.matches) { box.open = false; }
   });
+  // On a phone one bar, not two: the contents move into the tabs' bar, a
+  // button at its end (style.css); back beside the text on a wider window.
+  var side = box.parentNode, bar = document.querySelector(".legal-tabbar .wrap");
+  var phone = window.matchMedia && window.matchMedia("(max-width: 760px)");
+  function place() {
+    var there = phone.matches && bar ? bar : side;
+    if (box.parentNode === there) { return; }
+    there.appendChild(box);
+    side.classList.toggle("is-moved", there === bar);
+    box.open = !narrow.matches;
+  }
+  if (phone && bar) {
+    place();
+    if (phone.addEventListener) { phone.addEventListener("change", place); } else { phone.addListener(place); }
+  }
+  // A tap outside the open list on a narrow window folds it.
+  document.addEventListener("click", function (e) {
+    if (box.open && narrow && narrow.matches && !box.contains(e.target)) { box.open = false; }
+  });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && box.open && narrow && narrow.matches) { box.open = false; }
   });
-  // On a phone the folded contents is a bar that stays under the site's
-  // own: it says the part you are in, in that part's colour (style.css).
+  // On a tablet the folded contents is a bar that stays under the tabs: it
+  // says the part you are in (style.css); on a phone a button in their bar.
   var summary = box.querySelector("summary"), now = null, said = "";
   if (summary) {
     var label = document.createElement("span");

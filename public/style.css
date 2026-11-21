@@ -2531,7 +2531,7 @@ section.legal-main { padding: 18px 0 84px; }
    on one row, an overview of every question with its answer and the number
    of its limits, then each part's question and answer, the rest on rows
    that fold (transparency.js opens the one a link points to). */
-.legal-top, .legal-main {
+.legal-tabbar, .legal-top, .legal-main {
   --ok: #2fb36d; --warn: #e8a33d; --proof: #9a6bff; --glow-1: #4c8dff; --glow-2: #9a6bff;
   --hue: var(--btn);
   --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.7 2.7L16 9.8'/%3E%3C/svg%3E");
@@ -2683,18 +2683,24 @@ section.legal-main { padding: 18px 0 84px; }
 .legal .tp-overview td.tp-ov-l { padding-inline-end: 0; white-space: nowrap; text-align: end; }
 .legal .tp-overview td.tp-ov-l a { color: color-mix(in srgb, var(--warn) 85%, var(--text)); font-weight: 700; text-decoration: none; }
 .legal .tp-overview td.tp-ov-l a:hover { text-decoration: underline; }
+/* On a phone three quiet lines a question: the question, the answer led by
+   its word, the limits small under it. */
 @media (max-width: 700px) {
   .legal .tp-overview thead { display: none; }
-  .legal .tp-overview tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 0;
-    border-bottom: 1px solid var(--line); }
+  .legal .tp-overview tr { display: block; padding: 14px 0; border-bottom: 1px solid var(--line); }
   .legal .tp-overview td { display: block; width: auto; padding: 0; border: 0; }
-  .legal .tp-overview td.tp-ov-q { width: auto; }
-  .legal .tp-overview td.tp-ov-q { padding-inline-start: 26px; }
-  .legal .tp-overview td.tp-ov-a { grid-column: 1 / -1; grid-row: 2; display: block; padding-inline-start: 26px; }
-  .legal .tp-ov-a .tp-verdict { margin: 4px 0 4px; }
-  .legal .tp-ov-why { display: block; }
+  .legal .tp-overview td.tp-ov-q { width: auto; padding-inline-start: 26px; }
+  .legal .tp-overview td.tp-ov-a { display: block; margin-top: 3px; padding-inline-start: 26px; }
+  .legal .tp-ov-a .tp-verdict { display: inline; margin: 0; padding: 0; border-radius: 0; background: none;
+    font-size: inherit; line-height: inherit; font-weight: 700; white-space: normal; color: var(--text); }
+  .legal .tp-ov-a .tp-verdict.is-good { background: none; color: color-mix(in srgb, var(--ok) 80%, var(--text)); }
+  .legal .tp-ov-a .tp-verdict::after { content: "."; }
+  .legal .tp-ov-why { display: inline; }
+  .legal .tp-overview td.tp-ov-l { margin-top: 4px; padding-inline-start: 26px; text-align: start; }
   .legal .tp-ov-unit { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
-  .legal .tp-overview td.tp-ov-l a { font-size: 14px; font-weight: 600; }
+  .legal .tp-overview td.tp-ov-l a { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; }
+  .legal .tp-overview td.tp-ov-l a::before { content: ""; width: 14px; height: 14px; background: currentColor;
+    -webkit-mask: var(--i-warn) center / contain no-repeat; mask: var(--i-warn) center / contain no-repeat; }
 }
 .legal .tp-howto { margin: 0 0 30px; }
 
@@ -2791,14 +2797,21 @@ section.legal-main { padding: 18px 0 84px; }
   .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 84px); }
 }
 @media (prefers-reduced-motion: reduce) { .legal-tabbar { transition: none; } }
-/* A phone: the tabs one row that scrolls sideways, the page you are on
-   brought into view (nav.js), its edges fading; the contents bar under it. */
+/* The legal pages say where a heading lands themselves (below the bars
+   above it), so the site's own allowance for its bar is not added twice. */
+html:has(.legal-tabbar) { scroll-padding-top: 0; }
+/* A phone: one bar under the site's own - the tabs, one row that scrolls
+   sideways with the page you are on brought into view and its edges
+   fading, and at its end the contents behind a button that opens the list
+   under the bar (nav.js moves them there; without the script they stay a
+   bar of their own under the tabs). */
 @media (max-width: 760px) {
-  .legal-main, .legal-top { --tabbar-h: 50px; }
+  .legal-tabbar, .legal-main, .legal-top { --tabbar-h: 50px; }
   .legal-tabbar { padding: 7px 0; text-align: start; }
-  .legal-tabbar .wrap { padding: 0; }
-  .legal-tabbar .legal-tabs { display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 2px; margin: 0; padding: 0 16px; box-shadow: none;
-    border-radius: 0; background: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+  .legal-tabbar .wrap { padding: 0; display: flex; align-items: center; }
+  .legal-tabbar .legal-tabs { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; justify-content: flex-start;
+    gap: 2px; margin: 0; padding: 0 16px; box-shadow: none; border-radius: 0; background: none; overflow-x: auto;
+    overscroll-behavior-x: contain; scrollbar-width: none;
     -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 30px), transparent);
     mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 30px), transparent); }
   .legal-tabbar .legal-tabs::-webkit-scrollbar { display: none; }
@@ -2807,11 +2820,29 @@ section.legal-main { padding: 18px 0 84px; }
     background: color-mix(in srgb, var(--text) 9%, transparent); }
   .legal-top { padding-top: calc(var(--tabbar-h) + 22px); padding-bottom: 12px; }
   .legal-side { top: calc(57px + var(--tabbar-h)); padding-top: 6px; padding-bottom: 6px; }
+  .legal-side.is-moved { display: none; }
+  .legal-tabbar .wrap > .legal-tocbox { flex: none; margin-inline: 4px 12px; border-radius: 0; background: none; box-shadow: none; }
+  .legal-tabbar .wrap > .legal-tocbox > summary { display: grid; place-items: center; width: 38px; height: 36px; padding: 0;
+    border-radius: 12px; background: color-mix(in srgb, var(--text) 8%, transparent); cursor: pointer; }
+  .legal-tabbar .wrap > .legal-tocbox > summary::after { display: none; }
+  .legal-tabbar .wrap > .legal-tocbox > summary::before { content: ""; width: 19px; height: 19px; background: var(--text);
+    -webkit-mask: var(--i-list) center / contain no-repeat; mask: var(--i-list) center / contain no-repeat; }
+  .legal-tabbar .wrap > .legal-tocbox > summary > .legal-now,
+  .legal-tabbar .wrap > .legal-tocbox > summary > .legal-toc-label { position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .legal-tabbar .wrap > .legal-tocbox[open] > summary { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .legal-tabbar .wrap > .legal-tocbox[open] > summary::before { background: var(--accent); }
+  .legal-tabbar .wrap > .legal-tocbox .legal-toc { position: absolute; left: 0; right: 0; top: 100%; margin: 0;
+    padding: 8px 12px 14px; background: var(--bg); border-bottom: 1px solid var(--line);
+    box-shadow: 0 18px 32px -20px rgba(0, 0, 0, .45); text-align: start; }
+  .legal-tabbar .wrap > .legal-tocbox[open] .legal-toc { max-height: min(65vh, 520px); overflow-y: auto; overscroll-behavior: contain; }
+  .legal-tocbox > summary { padding-top: 8px; padding-bottom: 8px; }
+  .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 72px); }
+  .legal-main:has(.legal-side.is-moved) :is(.legal h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof) {
+    scroll-margin-top: calc(57px + var(--tabbar-h) + 18px); }
 }
 /* The page's gutter is 18px from 720px down: the contents bar reaches the
    screen's edges by as much, never past them. */
 @media (max-width: 720px) {
   .legal-side { margin-left: -18px; margin-right: -18px; padding-left: 18px; padding-right: 18px; }
-  .legal-tocbox > summary { padding-top: 8px; padding-bottom: 8px; }
-  .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 72px); }
 }
