@@ -124,7 +124,6 @@ _BEARER = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
 _HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}"
                         r"(?::\d{1,5})?/[^\s'\"<>()\[\]]*", re.IGNORECASE)
 _VERSION = re.compile(r"^[0-9A-Za-z.+_-]{1,40}$")
-_SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A home folder's name is the person's account name: /home/<x>/, /Users/<x>/,
 # C:\Users\<x>\ (a backslash doubled, as Python and JSON write it, too; a
 # name of a few words where a folder follows it). The app writes ~ and
@@ -143,7 +142,6 @@ def _hide_value(m: re.Match) -> str:
 def scrub(text: str) -> str:
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
     out = _HOME.sub(lambda m: f"{m.group(1)}<user>", out)
-    out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
     out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
@@ -279,10 +277,6 @@ def accept(stats_dir: str, body: dict, build: str = "unknown") -> tuple[int, dic
            "sig": "" if thread else signature(kind, text), "text": text}
     if not thread and _HASH.match(str(body.get("reply") or "")):
         row["reply"] = str(body["reply"])
-    if body.get("supporter") == "yes":
-        # From someone whose app holds a supporter key: read first. Only the
-        # word comes, never the key, so it names nobody.
-        row["sup"] = 1
     if kind == "feedback" and not thread:
         row.update({k: str(body.get(k)) for k, allowed in CHOICES.items() if body.get(k) in allowed})
         if site:
@@ -929,7 +923,7 @@ def summary(stats_dir: str, days: int) -> dict:
                       "open": bool(_open_to(answers, fl)),
                       # They replied to the latest answer: the admin's turn.
                       "waiting": bool(fl and latest and fl[-1].get("to") == latest),
-                      **{k: r[k] for k in (*CHOICES, "from", "sup") if r.get(k)}})
+                      **{k: r[k] for k in (*CHOICES, "from") if r.get(k)}})
     items = sorted(items, key=lambda i: -i["last"])[:300]
     open_groups = sum(1 for g in group_list if g["state"] != "fixed" and not g["archived"])
     return {"rev": rev, "total": len(rows), "kinds": kinds, "open_groups": open_groups, "topics": topics,
@@ -1014,8 +1008,6 @@ def plain(row: dict, answers: list[dict] | None = None, follows: list[dict] | No
              f"System: {row.get('os') or '?'}",
              f"Build: {_build(row)}",
              "From: " + ("the website" if row.get("from") == "site" else "the app")]
-    if row.get("sup"):
-        lines.append("Supporter: yes")
     for key, label in (("topic", "Topic"), ("area", "Area"), ("often", "How often")):
         if row.get(key):
             lines.append(f"{label}: " + _WORDS.get(key, {}).get(row[key], str(row[key])))

@@ -462,15 +462,15 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
         + "        <p class=\"dlx-gh\"><a href=\"\($REPO | h)/releases/latest\" rel=\"nofollow\">\(t("dl_all_name") | h)</a></p>\n"
         + "      </div>\n"
       end;
-  # The band on the front page: the support page's top, small - the
-  # supporter's icon, why in a sentence, and one button to the support page,
-  # where both ways are. A soft glow behind it; the button's heart beats
+  # The band on the front page: the support page's top, small - the heart
+  # icon, why in a sentence, and one button to the support page, where the
+  # tip is. A soft glow behind it; the button's heart beats
   # while the band is in view (nav.js .is-live).
   def support_band:
       "  <section id=\"support\" class=\"pt0\">\n"
       + "    <div class=\"wrap\">\n"
       + "      <div class=\"supband supband-calm\">\n"
-      + "        <img class=\"supband-icon\" src=\"/supporter-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\" loading=\"lazy\">\n"
+      + "        <img class=\"supband-icon\" src=\"/heart-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\" loading=\"lazy\">\n"
       + "        <h2>\(t("support_h2") | h)</h2>\n"
       + "        <p>\(t("support_p_short") | h)</p>\n"
       + "        <a class=\"btn primary supband-btn\" href=\"/support/\"><svg class=\"supband-heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_btn") | h)</a>\n"
@@ -478,9 +478,8 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "      </div>\n"
       + "    </div>\n"
       + "  </section>\n\n";
-  # The support page's tip, the thank-you nav.js fills in for a receipt's
-  # link from before November 22, 2026 (its supporter key), and the
-  # company. Without its address the tip says "coming soon". With the
+  # The support page's tip, the thank-you nav.js fills in after a tip's
+  # Payment Link, and the company. Without its address the tip says "coming soon". With the
   # dialog on it opens it (data-tip-dialog), and without nav.js goes to the
   # tip's Payment Link if there is one, else stays on this page.
   def support_way($cls; $title; $text; $href; $btn):
@@ -513,11 +512,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "        <li class=\"sp-trust-terms\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h4\"/></svg><a href=\"/payments/\">\(t("foot_payments") | h)</a></li>\n"
     + "      </ul>\n"
     + "      <div id=\"support-thanks\" class=\"support-thanks\" hidden"
-    + ([[["thanks", "support_thanks"], ["again", "support_again"], ["key", "support_key"],
-         ["keyhow", "support_key_how"], ["keycopy", "support_key_copy"], ["keycopied", "support_key_copied"],
-         ["keyopen", "support_key_open"], ["keywait", "support_key_wait"], ["keynone", "support_key_none"],
-         ["loading", "support_loading"]][]
-        | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
+    + " data-thanks=\"\(t("support_thanks") | h)\""
     + "></div>\n";
   # The app's own pictures (tools/site_screenshots.py in its repository):
   # public/screenshots/<lang>/<name>.webp, in the reader's language or else

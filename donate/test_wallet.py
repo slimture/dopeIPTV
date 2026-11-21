@@ -83,16 +83,14 @@ def test_the_page_says_its_own_words_for_any_refusal():
 
 
 def test_a_tip_is_for_the_app_and_gives_nothing():
-    # Neither way to pay asks for a receipt link to a key, and a wallet's
-    # answer carries none - whatever the server can sign.
+    # Neither way to pay carries anything beside the tip.
     donate = _donate()
-    donate._supporter_seed = lambda: b"\x07" * 32
     forms = []
     donate.PUBLISHABLE = "pk_test_stand_in"
 
     def intent_(form, key):
         forms.append(form)
-        return 200, {"status": "succeeded", "id": "pi_1QabcdEFGHijklMN", "created": donate.KEYS_UNTIL + 60,
+        return 200, {"status": "succeeded", "id": "pi_1QabcdEFGHijklMN", "created": 1795305660,
                      "client_secret": "pi_1QabcdEFGHijklMN_secret_x"}
     donate._post = lambda url, form, key: (200, {"type": "card", "card": {"wallet": {"type": "apple_pay"}}})
     donate._intent = intent_
@@ -100,14 +98,4 @@ def test_a_tip_is_for_the_app_and_gives_nothing():
     assert donate.create_session(500, "eur")[0] == 200
     for form in forms:
         assert form["description"] == donate.NAME and not [k for k in form if "supporter" in k]
-
-
-def test_a_supporter_key_only_for_a_payment_from_before():
-    donate = _donate()
-    donate._supporter_seed = lambda: b"\x07" * 32
-    before = donate.key_for("pi_1QabcdEFGHijklMN", donate.KEYS_UNTIL - 60, "receipt")
-    assert before and before["key"].startswith("DS1-")
-    assert donate.key_for("pi_1QabcdEFGHijklMN", donate.KEYS_UNTIL, "receipt") is None
-    assert donate.key_for_intent({"status": "succeeded", "id": "pi_1QabcdEFGHijklMN",
-                                  "created": donate.KEYS_UNTIL + 1}, "receipt") is None
-    assert donate.key_for_intent({"status": "succeeded", "id": "pi_1QabcdEFGHijklMN"}, "receipt") is None
+    assert not hasattr(donate, "key_for") and not hasattr(donate, "find_key")

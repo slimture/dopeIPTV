@@ -6,9 +6,8 @@ their computers know, and sends the result here under a "slot": 64 hex
 characters, another hash of that same code. This service cannot read a
 byte of it, and cannot tell from the slot whose it is.
 
-A request carries nothing about the person: no account, no name, no key
-(an older app still sends its supporter key in X-Dopeiptv-Supporter; it is
-not read). It does carry the slot's credential (X-Sync-Auth, 64 hex,
+A request carries nothing about the person: no account, no name, no key.
+It does carry the slot's credential (X-Sync-Auth, 64 hex,
 another value from the same code): the first write with one binds the
 slot to its SHA-256, which is all that is kept of it, and from then on a
 request without it - GET, PUT or DELETE - is answered 403. A slot alone

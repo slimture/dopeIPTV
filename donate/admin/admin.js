@@ -735,45 +735,6 @@
     $("refused-by").textContent = REFUSED_BY.map(([k, t]) => t + " " + num.format((R.by || {})[k] || 0)).join(" · ") +
       " · " + num.format(R.all || 0) + " since counting began";
   }
-  // Supporter keys (donate/supporter.py): one again for a payment (the same
-  // key its supporter got), or one by hand; and how many have been handed out.
-  let skWired = false;
-  function supporterKeys() {
-    const out = $("sk-out"), count = $("sk-count");
-    if (!out) { return; }
-    const say = (n) => { count.textContent = n == null ? "" : num.format(n) + " handed out"; };
-    const shown = (ok, j) => {
-      if (!ok) { out.replaceChildren(mk("p", "error", j.error || "Could not make a key.")); return; }
-      say(j.handed_out);
-      const code = mk("code", "sk-key", j.key);
-      const copy = mk("button", "btn", "Copy");
-      copy.type = "button";
-      copy.addEventListener("click", () => navigator.clipboard.writeText(j.key)
-        .then(() => { copy.textContent = "Copied ✓"; }, () => { copy.textContent = "Select it and copy"; }));
-      out.replaceChildren(code, mk("p", "muted", "Supporter since " + j.since + "."), copy);
-    };
-    if (!skWired) {
-      skWired = true;
-      $("sk-again").addEventListener("click", () => {
-        // A tip's payment (pi_…) or monthly support's Checkout Session (cs_…).
-        const id = $("sk-pi").value.trim();
-        const ask = /^pi_[A-Za-z0-9]{8,200}$/.test(id) ? { pi: id }
-          : /^cs_(live|test)_[A-Za-z0-9]{8,200}$/.test(id) ? { cs: id } : null;
-        if (!ask) { out.replaceChildren(mk("p", "error", "That is not a payment id (pi_…) or a Checkout Session id (cs_live_…).")); return; }
-        out.replaceChildren(mk("p", "muted", "Asking Stripe…"));
-        post("/admin/supporter-key", ask).then(([ok, j]) => shown(ok, j))
-          .catch((e) => out.replaceChildren(mk("p", "error", String(e))));
-      });
-      $("sk-hand").addEventListener("click", () => {
-        post("/admin/supporter-key", {}).then(([ok, j]) => shown(ok, j))
-          .catch((e) => out.replaceChildren(mk("p", "error", String(e))));
-      });
-    }
-    post("/admin/supporter-key", { count: true }).then(([ok, j]) => {
-      if (ok) { say(j.handed_out); } else { out.replaceChildren(mk("p", "muted", j.error || "")); }
-    }).catch(() => {});
-  }
-
   function donations() {
     const D = data.donations, box = $("payments");
     checkPush().then(notifyRow);
@@ -1503,7 +1464,7 @@
     const S = data.series, best = S.reduce((a, d, i) => (d.downloads > (S[a] || {}).downloads ? i : a), 0);
     $("n-downloads").textContent = num.format(T.downloads) + (T.downloads === 1 ? " download" : " downloads") +
       (T.downloads && S[best] ? " · most on " + pointLabel(S[best].date, best) : "");
-    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); supporterKeys(); syncSpace(); statsTrouble(); refusedBuilds();
+    summary(); tiles(); funnel(); visitsChart(); downloadsChart(); visitsTable(); lists(); byChannel(); years(); donations(); syncSpace(); statsTrouble(); refusedBuilds();
     $("updated").textContent = data.updated ? "Counts updated " + stamp.format(new Date(data.updated)) + "." : "";
     $("kept").textContent = keptFor();
   }

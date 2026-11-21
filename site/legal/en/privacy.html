@@ -95,7 +95,6 @@
 <li>the kind of report (error, crash or feedback), the app version and the name of the operating system;</li>
 <li>the text, which also names the versions of the app, the operating system, Python, Qt and mpv, and how video is drawn;</li>
 <li>for feedback, the topic, area and how often you chose;</li>
-<li>whether the app holds a supporter key (only “yes” – never the key);</li>
 <li>whether the app is an official build or runs from the source code;</li>
 <li>if you asked for an answer, a hash of a random code that only your computer knows.</li>
 </ul>
@@ -103,7 +102,7 @@
 
 <h4>Settings sync</h4>
 <p>For everyone, only if you turn it on. What you choose to sync – favourites, settings and, if you turn them on, playlists with their logins and watch history – is encrypted on your computer, before anything is sent, with a key made from a sync code that only your computers know.</p>
-<p>Our server stores only the encrypted data, under a random-looking number that is also made from that code, with a version number and the time it was written. We cannot read it and cannot tell whose it is: sync needs no account, no e-mail address, no name and no supporter key, and nothing that identifies you is sent. Sync requests are not logged.</p>
+<p>Our server stores only the encrypted data, under a random-looking number that is also made from that code, with a version number and the time it was written. We cannot read it and cannot tell whose it is: sync needs no account, no e-mail address and no name, and nothing that identifies you is sent. Sync requests are not logged.</p>
 <p>The number alone opens nothing: every request also carries a credential made from the same code, of which the server keeps only a one-way hash. Once a computer with dopeIPTV 1.6.9 or later has synced, the server refuses to read, replace or delete the data for anyone who does not have it.</p>
 <ul>
 <li><strong>Space:</strong> one synced copy can be at most 2 MB and all copies together at most 5 GB. When that space is full, a new copy has to wait, while copies already stored can still be updated.</li>
@@ -122,7 +121,6 @@
 <h4>Official builds only</h4>
 <p>When the app looks for updates, sends an error report or feedback, syncs or watches together, it also says whether it is an official build from us, runs from the source code or has been modified.</p>
 <p>A modified build does not use those services – it looks for no updates here, and a problem in it is reported to whoever made it. We only count how many requests are refused per day and service, without an IP address or anything else that shows who it was.</p>
-<p><strong>The supporter key</strong> is checked inside the app, offline. Nothing is sent to check it.</p>
 
 <p>Legal basis: our legitimate interest in delivering updates and knowing how many are installed, and in fixing the problems you report (Article 6(1)(f) GDPR); for settings sync and watch together, providing the service you have asked for (Article 6(1)(b)).</p>
 
@@ -154,7 +152,7 @@
 <ul>
 <li>The front server, which handles the encrypted connection, keeps no log of the requests to dopeiptv.org, and writes an error down only when something stops it working (below). Settings sync and watch together requests are never logged anywhere.</li>
 <li>Nothing else is logged: the server behind it writes no log of other requests, and none that holds your IP address. For the statistics below it hands each page view, the pages' view signal and each download click straight to our own service over a socket on the same machine – with IP address, time, the page asked for (only the page – never what a link added to its address), status, browser and language –, which counts it in memory within a minute and writes no IP address anywhere (below). For the public download counter it keeps one small log of download clicks: the file's name, the answer and whether a browser, the app or a robot asked – no IP address, no time, no browser. It is turned over every night and only the day before is kept – two days at the most –, then removed automatically.</li>
-<li>The services behind the website – tips, a supporter key for a payment from before 22 November 2026, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
+<li>The services behind the website – tips, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
 </ul>
 <p>Every log on our server, what it holds and how long it is kept:</p>
 <ul>
@@ -215,7 +213,6 @@
 <ul>
 <li><code>dn-currency</code> – the currency you chose in the tip dialog;</li>
 <li><code>dn-wallet</code> – whether your device offered Apple Pay or Google Pay, so that the right button shows at once;</li>
-<li><code>dn-supporter-key</code> – a supporter key from a tip or monthly support before 22 November 2026, if this browser kept one, so that the tip page can show it again;</li>
 <li><code>fbs-last</code> – when you last sent feedback.</li>
 </ul>
 <p>You can clear them in your browser's settings.</p></li>
@@ -231,8 +228,6 @@
 <li><strong>What we see:</strong> the amount, currency and time, how you paid (by card or with a digital wallet such as Apple Pay or Google Pay) and the name or e-mail address you gave for the receipt. Our administrators see this on the website's admin page, and as a notification on the devices where they have turned notifications on.</li>
 <li>Our server fetches it from Stripe when needed and keeps it only in memory, for a few minutes; it does not save it. The notifications are sent encrypted through the push service of the administrator's browser (Apple, Google, Mozilla or Microsoft), which cannot read them.</li>
 <li>For a tip our server asks Stripe to start the payment, with the amount and currency you chose. With Apple Pay or Google Pay, the wallet's one-time payment token, the e-mail address for the receipt and the name the wallet passes on go through our server on their way to Stripe without being saved.</li>
-<li>For a payment made before 22 November 2026, the link in its receipt asks our server for its supporter key, and the server asks Stripe whether that payment is paid. Nothing about you is saved on our side. A tip made since then comes with no key.</li>
-<li><strong>The supporter key</strong> contains no personal data (see the <a href="/payments/#before">payment terms</a>). We note that a key has been handed out – a number made from the payment, the time and how – so that we can count the keys.</li>
 <li><strong>Bookkeeping:</strong> tips are part of Solecraft AB's accounts, which the Swedish Bookkeeping Act (bokföringslagen) requires us to keep for seven years.</li>
 </ul>
 <p>Legal basis: carrying out the payment you have asked for (Article 6(1)(b)), our legal obligation to keep and preserve accounts (Article 6(1)(c)) and our legitimate interest in knowing about tips as they come in (Article 6(1)(f)).</p>

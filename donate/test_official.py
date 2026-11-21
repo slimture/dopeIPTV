@@ -319,13 +319,13 @@ def test_the_feedback_list_marks_source_and_filters_by_build():
 
 def test_the_copied_text_has_every_field():
     row = {"id": "a1b2c3d4e5f6", "t": 1_800_000_000, "kind": "error", "version": "1.5.0", "os": "Linux",
-           "build": "source", "sig": "ValueError: bad N", "sup": 1,
+           "build": "source", "sig": "ValueError: bad N",
            "text": "Kind: error\nPython: 3.12\n\nWhat happened:\nIt stopped when I zapped.\n\n"
                    "Error:\nTraceback (most recent call last):\n  File \"main.py\", line 9, in zap\n"
                    "ValueError: bad 3\n\nRecent log:\n21:04:11 INFO player: started\n21:04:12 ERROR boom"}
     text = feedback.plain(row)
     for want in ("dopeIPTV error report a1b2c3d4e5f6", "Sent: 2027-01-15 08:00 UTC", "Kind: error",
-                 "Version: 1.5.0", "System: Linux", "Build: source", "From: the app", "Supporter: yes",
+                 "Version: 1.5.0", "System: Linux", "Build: source", "From: the app",
                  "Problem: ValueError: bad N",
                  "What happened:\nIt stopped when I zapped.",                       # the message
                  "Traceback (most recent call last):\n  File \"main.py\", line 9, in zap\nValueError: bad 3",

@@ -580,13 +580,12 @@
     const live = every.filter((i) => !i.archived);
     const list = { kept: false };
     if (!every.length) { letGo("i", list); box.replaceChildren(mk("p", "empty", "No feedback in this period.")); return; }
-    // A supporter's feedback first while it is new; the rest the latest first.
-    const first = (i) => (i.sup && i.state === "new" ? 1 : 0);
+    // The latest first.
     const unread = (i) => (i.state === "new" ? 1 : 0);
     const by = {
-      recent: (a, b) => first(b) - first(a) || b.last - a.last,
+      recent: (a, b) => b.last - a.last,
       oldest: (a, b) => a.t - b.t,
-      unread: (a, b) => unread(b) - unread(a) || first(b) - first(a) || b.last - a.last,
+      unread: (a, b) => unread(b) - unread(a) || b.last - a.last,
     }[wordSort] || ((a, b) => b.last - a.last);
     const items = (archived ? every.filter((i) => i.archived) : live)
       .filter((i) => (!topic || i.topic === topic) && (!build || i.build === build))
@@ -601,11 +600,6 @@
       if (it.topic) { btn.append(mk("span", "chip t-" + it.topic, TOPIC[it.topic] || it.topic)); }
       if (it.from === "site") { btn.append(mk("span", "chip from-site", "Website")); }
       if (it.build === "source") { btn.append(sourceChip()); }
-      if (it.sup) {
-        const sup = mk("span", "chip sup", "\u2665 Supporter");
-        sup.title = "Sent from an app with a supporter key - read first";
-        btn.append(sup);
-      }
       btn.append(mk("span", "sig words", it.preview || "(empty)"), stateChip(it.state));
       if (it.waiting) { btn.append(chip("reply-waiting", "Replied", "They replied to your answer - your turn")); }
       else if (it.open) { btn.append(chip("can", "Can reply", "Your answer lets them reply - they have not yet")); }

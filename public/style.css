@@ -1249,9 +1249,8 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 .dn-payee a.dn-payee-link:has(img) { display: inline-flex; flex: none; }
 .dn-payee a:has(img):hover { opacity: .85; }
 /* -- support (the support page, /support/) -----------------------------------
-   Its link in the header, its ways to give - a tip and monthly support on
-   Stripe's own pages, GitHub Sponsors - and the thank-you with the
-   supporter key (nav.js) after paying. */
+   Its link in the header, the tip, and the thank-you (nav.js) after
+   paying. */
 nav.links .navsupport { color: var(--muted); }
 .navsupport .heart { width: 15px; height: 15px; flex: none; fill: var(--heart); }
 @media (min-width: 1001px) { nav.links a.navsupport { display: inline-flex; align-items: center; gap: 6px; } }
@@ -1274,12 +1273,9 @@ nav.links .navsupport { color: var(--muted); }
 .support-thanks-h { margin: 0 0 6px; font-size: 1.15rem; }
 @media (max-width: 760px) { .support-ways { grid-template-columns: 1fr; } }
 /* The support page (templates/support.html), where the app's heart lands:
-   the supporter's icon and why, the two ways as big cards - the tip on the
-   heart's colours, monthly support on the accent, the customer portal under
-   it -, what makes it safe on one line; then what a supporter gets (the two
-   supporter themes drawn small in their own colours, the icon, the heart,
-   feedback first), where the money goes, and the rules folded up as
-   questions - with who you pay open below them. */
+   the heart icon and why, the tip as a big card on the heart's colours,
+   what makes it safe on one line, and the rules folded up as questions -
+   with who you pay open below them. */
 /* The glow sits behind the icon and fades out before the header, which then
    meets the page's own colour - not a pink band under its edge. */
 .sp-hero { padding: 52px 0 46px; position: relative; isolation: isolate;
@@ -1361,18 +1357,6 @@ nav.links .navsupport { color: var(--muted); }
   .sp-sec { padding: 42px 0; }
   .sp-q > summary h3 { font-size: 16px; }
 }
-/* The supporter key under the thank-you: the key itself, set apart, to copy
-   or hand to the app. */
-.dn-key { margin-top: 14px; padding: 14px; border-radius: 14px; width: 100%; box-sizing: border-box;
-  background: color-mix(in srgb, var(--heart) 8%, transparent); display: flex; flex-direction: column; gap: 10px; }
-.support-thanks .dn-keyhead { color: var(--text); font-weight: 700; font-size: 14px; }
-.dn-keytext { display: block; font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: var(--text); background: var(--bg); border-radius: 10px; padding: 10px 12px; word-break: break-all;
-  user-select: all; -webkit-user-select: all; text-align: start; }
-.dn-keyrow { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.dn-keyrow .btn { flex: 1 1 140px; justify-content: center; }
-.support-thanks .dn-keynote { font-size: 13px; line-height: 1.5; }
-.support-thanks .dn-keystate { margin-top: 10px; font-size: 13px; }
 .dn-x { flex: none; width: 34px; height: 34px; margin: -4px -6px 0 0; border-radius: 50%;
   border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 24px;
   line-height: 1; cursor: pointer; }
@@ -1466,11 +1450,6 @@ dialog.dn { overflow-x: hidden; }
 .dn-done h3 { margin: 0; font-size: 1.2rem; }
 .dn-done p { margin: 0; color: var(--muted); }
 .dn-done .dn-heart { line-height: 1; color: var(--heart); margin-bottom: 6px; }
-/* The supporter key under the thank-you: the key itself, set apart, to copy
-   or hand to the app. */
-.dn-done .dn-keyhead { color: var(--text); font-weight: 700; font-size: 14px; }
-.dn-done .dn-keynote { font-size: 13px; line-height: 1.5; }
-.dn-done .dn-keystate { margin-top: 10px; font-size: 13px; }
 .dn-mine { font: inherit; font-size: 13px; font-weight: 650; color: var(--muted); background: none; border: 0;
   padding: 2px 0; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; align-self: center; }
 .dn-mine:hover { color: var(--text); }
@@ -2272,7 +2251,7 @@ footer { background: var(--bg); border-top: 1px solid var(--line); margin-top: 0
 .fbs-thanks { margin: 18px 0; text-align: center; font-weight: 650; font-size: 1.05rem; }
 
 /* The band, calm (render.jq support_band): the support page's top, small -
-   the supporter's icon, why in a sentence, one button to the support page.
+   the heart icon, why in a sentence, one button to the support page.
    A soft glow behind the icon and nothing drifting; the button's heart
    still beats while the band is in view (.is-live, above). */
 #support .supband.supband-calm { display: flex; flex-direction: column; align-items: center; gap: 0;

@@ -1,8 +1,7 @@
 """Ed25519 signatures (RFC 8032), in plain Python.
 
-A copy of the app's dopeiptv/core/ed25519.py, for supporter.py: signing
-when Python's cryptography package is not installed (supporter.py prefers
-it), and checking what was signed.
+A copy of the app's dopeiptv/core/ed25519.py, for release_sums.py: checking
+the release checksums' signature.
 
 Follows the reference code of RFC 8032, section 6, in extended coordinates.
 No relative imports: tools/ loads this file on its own.

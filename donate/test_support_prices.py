@@ -1,6 +1,6 @@
 """The support page (templates/support.html): a tip for the app, the one
-way, and nothing given for it - no monthly support, no supporter key, no
-other way to give (November 2026). Rendered with jq, as sync-releases.sh
+way, and nothing given for it - no monthly support, no other way to give
+(November 2026). Rendered with jq, as sync-releases.sh
 does."""
 import html
 import json
@@ -56,8 +56,9 @@ def test_one_tip_and_nothing_given_for_it():
     # The dialog's words: a tip, no key.
     words = re.search(r'<div id="tip-i18n" hidden([^>]*)>', page).group(1)
     assert 'data-title="Leave a tip"' in words and "data-key" not in words
-    # The thank-you for a receipt's link from before keeps its words.
-    assert '<div id="support-thanks" class="support-thanks" hidden' in page and "data-keycopy=" in page
+    # The thank-you after a tip's Payment Link: its one word, no key.
+    assert '<div id="support-thanks" class="support-thanks" hidden data-thanks=' in page
+    assert "data-keycopy=" not in page and "supporter" not in page.lower()
 
 
 def test_the_tip_hint_is_marked_for_the_dialog():

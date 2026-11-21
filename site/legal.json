@@ -61,12 +61,12 @@
         "payments": {
             "sv": {
                 "title": "Betalvillkor",
-                "desc": "Villkoren för dricks till dopeIPTV: vad dricks är, hur betalningen går till, månadsstöd och supporternycklar från tidigare, och pengarna tillbaka inom 14 dagar.",
+                "desc": "Villkoren för dricks till dopeIPTV: vad dricks är, hur betalningen går till, månadsstöd från tidigare, och pengarna tillbaka inom 14 dagar.",
                 "lede": "Dricks är ett frivilligt tack för appen – inget ges för den, och du får pengarna tillbaka inom 14 dagar."
             },
             "en": {
                 "title": "Payment terms",
-                "desc": "The terms for tips to dopeIPTV: what a tip is, how paying works, monthly support and supporter keys from before, and your money back within 14 days.",
+                "desc": "The terms for tips to dopeIPTV: what a tip is, how paying works, monthly support from before, and your money back within 14 days.",
                 "lede": "A tip is a voluntary thank-you for the app – nothing is given for it, and you get your money back within 14 days."
             }
         },

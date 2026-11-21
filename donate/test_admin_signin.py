@@ -249,9 +249,9 @@ def test_what_cannot_be_read_is_answered_and_a_fault_is_said_without_its_words()
             status, body, _r = _call(srv, "OPTIONS", "/pay/config")
             assert (status, body) == (501, {"error": "method"})
             # A fault of the service's own: answered, said once by kind and place.
-            donate.find_key = lambda data: 1 // 0
+            donate.Handler._feedback_replies = lambda self: 1 // 0
             for _ in range(3):
-                status, body, _r = _call(srv, "POST", "/support/key", {"t": "x" * 20, "secret": "PRIVATE-WORDS"}, site)
+                status, body, _r = _call(srv, "POST", "/feedback/replies", {"t": "x" * 20, "secret": "PRIVATE-WORDS"}, site)
                 assert (status, body) == (500, {"error": "internal"})
             # Refused sign-ins: why, never from where or what was typed.
             origin = "https://evil.example/<script>" + "A" * 3000
@@ -290,13 +290,13 @@ def test_what_cannot_be_read_is_answered_and_a_fault_is_said_without_its_words()
 def test_what_is_kept_beside_the_statistics_is_the_services_alone():
     donate, stats = _donate()
     os.makedirs(os.path.join(stats, "visits"))
-    for name in ("feedback.jsonl", "supporters.jsonl", os.path.join("visits", "2026-11-19.json")):
+    for name in ("feedback.jsonl", os.path.join("visits", "2026-11-19.json")):
         with open(os.path.join(stats, name), "w") as fh:
             fh.write("{}\n")
         os.chmod(os.path.join(stats, name), 0o644)
     os.chmod(stats, 0o750)
     os.chmod(os.path.join(stats, "visits"), 0o755)
-    assert donate.keep_private(stats) == 5
+    assert donate.keep_private(stats) == 4
     assert donate.keep_private(stats) == 0
 
     def mode(*path: str) -> int:

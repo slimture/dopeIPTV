@@ -73,7 +73,7 @@ CODE: dict[str, list[dict]] = {
     ],
     "reports": [
         {"id": "scrub", "repo": "app", "path": "dopeiptv/core/report.py",
-         "names": ["_IPV4", "_IPV6", "_MAC", "_EMAIL", "_SUPPORTER", "_KEYVAL", "_AUTH_LINE",
+         "names": ["_IPV4", "_IPV6", "_MAC", "_EMAIL", "_KEYVAL", "_AUTH_LINE",
                    "_BEARER", "_HOST_PATH", "_SAID", "_JWT", "_PREFIXED", "_LONG", "_HOME_DIR",
                    "_PHONE", "_hide_value", "_not_an_address", "scrub", "personal_values"],
          "with": [{"repo": "app", "path": "dopeiptv/core/log.py", "names": ["URL_IN_TEXT"]}]},
@@ -88,7 +88,7 @@ CODE: dict[str, list[dict]] = {
                    "names": ["_ReportMixin._answers_reply"]}]},
         {"id": "server", "repo": "site", "path": "donate/feedback.py",
          "names": ["_URL", "_IPV4", "_IPV6", "_EMAIL", "_MAC", "_KEYVAL", "_AUTH_LINE", "_BEARER",
-                   "_HOST_PATH", "_hide_value", "_SUPPORTER", "scrub", "accept"]},
+                   "_HOST_PATH", "_hide_value", "scrub", "accept"]},
         {"id": "limits", "repo": "site", "path": "donate/donate.py",
          "names": ["_forget_quiet", "_forget_loop", "_allowed"],
          # Which window a report's and an answer's ask is held for: the
@@ -199,7 +199,6 @@ TESTS: dict[str, list[tuple[str, str]]] = {
         "test_nothing_that_identifies_a_stream_or_a_person_is_left",
         "test_the_window_offers_scrubs_and_sends_only_on_send",
         "test_only_the_short_answers_go_with_feedback",
-        "test_a_supporter_key_never_goes_in_a_report",
         "test_asking_for_answers_sends_only_hashes")],
     # The cipher against RFC 8439's and HKDF against RFC 5869's own vectors.
     "sync": [("tests/test_sync.py", n) for n in (

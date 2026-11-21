@@ -196,19 +196,14 @@ def test_past_80_percent_it_says_so():
 # -- the routes in donate.py ----------------------------------------------------------
 
 def _service():
-    """donate.py's Handler on 127.0.0.1, with a signing key and statistics
-    folder of its own."""
-    import supporter
+    """donate.py's Handler on 127.0.0.1, with a statistics folder of its
+    own."""
     root = tempfile.mkdtemp()
-    seed_path = os.path.join(root, "supporter.key")
-    seed = secrets.token_bytes(32)
-    with open(seed_path, "w") as fh:
-        fh.write(seed.hex() + "\n")
     conf = os.path.join(root, "donate.conf")
     stats = os.path.join(root, "stats")
     os.makedirs(stats)
     with open(conf, "w") as fh:
-        fh.write(f"SUPPORTER_KEY_FILE={seed_path}\nSTATS_DIR={stats}\nLISTEN=127.0.0.1:0\n")
+        fh.write(f"STATS_DIR={stats}\nLISTEN=127.0.0.1:0\n")
     os.environ["DONATE_CONFIG"] = conf
     os.environ["STATS_DIR"] = stats
     sys.modules.pop("donate", None)
@@ -216,13 +211,14 @@ def _service():
     from http.server import ThreadingHTTPServer
     srv = ThreadingHTTPServer(("127.0.0.1", 0), donate.Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    key = supporter.make(seed, 739000, secrets.token_bytes(6))
+    # An older app's supporter key, in the header it sent: never read.
+    key = "DS1-" + secrets.token_urlsafe(75)
     return srv, key, stats, donate
 
 
 def _call(srv, method, path, key=None, body=None, ip="198.51.100.7", headers=None):
-    """A request as the app makes it; *key*: a supporter key, as an app from
-    before sync was for everyone still sends one."""
+    """A request as the app makes it; *key*: an old app's supporter key,
+    sent as it was in X-Dopeiptv-Supporter."""
     conn = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=10)
     h = {"X-Real-IP": ip}
     if key is not None:

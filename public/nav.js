@@ -201,12 +201,9 @@ var iptvHit = (function () {
  * - links from elsewhere: the tip dialog's old link (apps up to 1.6.4,
  *   older release notes) opens the tip dialog, the app's heart
  *   (#support) shows the band on the front page, an invitation; with the
- *   dialog off both land on /support/, a receipt's #key link always;
- * - a payment from before November 22, 2026 - a tip's receipt, or back
- *   from monthly support's Payment Link (/support/?paid=<Checkout Session
- *   id>) - still gets its supporter key in the thank-you: /support/key
- *   (donate/donate.py) asks Stripe whether it is paid; a copy button and a
- *   dopeiptv:// link, kept in this browser so the page shows it again;
+ *   dialog off both land on /support/;
+ * - back from a tip's Payment Link (/support/?paid=<Checkout Session id>):
+ *   a thank-you, nothing more;
  * - the owner's note: new tips at the foot of the site's pages, in the
  *   browser that has opened /admin/.
  */
@@ -243,16 +240,17 @@ var iptvHit = (function () {
   // -- where a link from elsewhere lands ----------------------------------------
   // The tip dialog takes its old link itself (the next part); without it -
   // the dialog off, or a browser without <dialog> - the support page has the
-  // tip. A receipt's #key (a tip paid before November 22, 2026) is the
-  // support page's thank-you to show.
+  // tip.
   var DIALOG = !!(document.getElementById("tip-i18n") && window.fetch && window.Promise &&
                   typeof HTMLDialogElement === "function");
   var path = window.location.pathname, onSupport = /^\/support\//.test(path);
-  var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
-  if ((!DIALOG && window.location.hash === "#donate") || (receipt && !onSupport)) {
-    window.location.replace("/support/" + window.location.search + (receipt ? window.location.hash : ""));
+  if (!DIALOG && window.location.hash === "#donate") {
+    window.location.replace("/support/" + window.location.search);
     return;
   }
+  // What an older page kept in this browser - a supporter key, gone since
+  // 1.6.11 - is not kept any longer.
+  try { localStorage.removeItem("dn-supporter-key"); } catch (e) { /* this browser keeps nothing */ }
   if (window.location.hash === "#support") {
     // The app's heart: the band, not a payment. The visitor reads why first.
     // A front page without it (no way to pay is set up yet) leaves that to
@@ -289,81 +287,16 @@ var iptvHit = (function () {
   });
 
   // -- the thank-you after paying ----------------------------------------------
+  // Back from a tip's Payment Link: a thank-you, and nothing is given for it.
   var box = document.getElementById("support-thanks");
-  if (box && window.fetch) {
-    var T = box.dataset, KEPT = "dn-supporter-key";
-    var paid = /[?&]paid=(cs_(?:live|test)_[A-Za-z0-9]{8,200})(?:&|$)/.exec(window.location.search);
-    var head = mk("p", "dn-keyhead"), code = mk("code", "dn-keytext"), state = mk("p", "dn-keystate");
-    code.setAttribute("translate", "no");
-    var row = mk("div", "dn-keyrow");
-    var copy = mk("button", "btn primary dn-keycopy", T.keycopy); copy.type = "button";
-    var openIt = mk("a", "btn dn-keyopen", T.keyopen);
-    row.append(copy, openIt);
-    var how = mk("p", "dn-keynote", T.keyhow);
-    var keyPart = mk("div", "dn-key"); keyPart.hidden = true;
-    keyPart.append(head, code, row, how);
-    box.append(mk("h2", "support-thanks-h", T.thanks), keyPart, state);
-    head.textContent = T.key;
-    state.hidden = true;
-    var pick = function () {        // no clipboard: the key selected, for the visitor's own copy
-      var r = document.createRange(); r.selectNodeContents(code);
-      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-    };
-    copy.addEventListener("click", function () {
-      var said = function () {
-        copy.textContent = T.keycopied;
-        setTimeout(function () { copy.textContent = T.keycopy; }, 2500);
-      };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(code.textContent).then(said, pick);
-      } else { pick(); }
-    });
-    var say = function (text) { state.textContent = text || ""; state.hidden = !text; };
-    var showKey = function (key) {
-      if (!/^DS1-[A-Za-z0-9_-]{20,}$/.test(key || "")) { return false; }
-      code.textContent = key;
-      openIt.href = "dopeiptv://supporter?key=" + encodeURIComponent(key);
-      keyPart.hidden = false; say("");
-      try { localStorage.setItem(KEPT, key); } catch (e) { /* this browser keeps nothing */ }
-      return true;
-    };
-    var tries = 0;
-    var ask = function (what) {
-      fetch("/support/key", { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify(what) })
-        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
-        .then(function (got) {
-          if (got[0] === 200 && showKey(got[1].key)) {
-            if (typeof iptvHit === "function") { iptvHit("supported"); }
-            return;
-          }
-          if (got[0] === 202 && ++tries < 6) { say(T.keywait); setTimeout(function () { ask(what); }, 5000); return; }
-          say(got[0] === 202 ? T.keywait : T.keynone);
-        })
-        .catch(function () { say(T.keywait); });
-    };
-    var kept = "";
-    try { kept = localStorage.getItem(KEPT) || ""; } catch (e) { kept = ""; }
-    if (paid) {
-      box.hidden = false;
-      say(T.loading);
-      try {     // the session's id is not for the history or a shared link
-        history.replaceState(null, "", path + window.location.search.replace(/([?&])paid=[^&]*/, "$1")
-          .replace(/[?&]+$/, "").replace(/\?&+/, "?") + window.location.hash);
-      } catch (e) { /* the address stays; harmless */ }
-      requestAnimationFrame(function () { box.scrollIntoView({ block: "start" }); });
-      ask({ s: paid[1] });
-    } else if (receipt) {
-      // A tip's receipt from before November 22, 2026: its key here.
-      box.hidden = false;
-      say(T.loading);
-      try { history.replaceState(null, "", path + window.location.search); } catch (e) { /* harmless */ }
-      requestAnimationFrame(function () { box.scrollIntoView({ block: "start" }); });
-      ask({ t: receipt[1] });
-    } else if (kept && !receipt && showKey(kept)) {
-      box.hidden = false;
-      box.querySelector(".support-thanks-h").textContent = T.again;
-    }
+  if (box && /[?&]paid=cs_(?:live|test)_[A-Za-z0-9]{8,200}(?:&|$)/.test(window.location.search)) {
+    box.append(mk("h2", "support-thanks-h", box.dataset.thanks));
+    box.hidden = false;
+    try {     // the session's id is not for the history or a shared link
+      history.replaceState(null, "", path + window.location.search.replace(/([?&])paid=[^&]*/, "$1")
+        .replace(/[?&]+$/, "").replace(/\?&+/, "?") + window.location.hash);
+    } catch (e) { /* the address stays; harmless */ }
+    requestAnimationFrame(function () { box.scrollIntoView({ block: "start" }); });
   }
 
   // -- the owner's note --------------------------------------------------------
@@ -707,10 +640,6 @@ var iptvCurrency = (function () {
  * where the device says it is, out of the ones /pay/config offers, and a
  * small menu in the dialog's head changes it on either step - on the card
  * form's step the form follows at once (remembered on this device).
- *
- * Until November 22, 2026 a tip came with a supporter key; a receipt's
- * link to it is the support page's to answer (the part above), and the
- * dialog has none of it.
  */
 (function () {
   "use strict";

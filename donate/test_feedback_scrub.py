@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The server's second cleaning of a report (feedback.scrub): the patterns
 the app's core/report.py removes - addresses, IPv4 and IPv6, MAC, e-mail,
-a supporter key, name=value logins, a home folder's name - removed here
+name=value logins, a home folder's name - removed here
 too, for an old app or a hand-made request; what only looks like one (a
 time, a version, a C++ name) left as it is. And a crash's first frame
 found in time, however its line is made (feedback.signature).
@@ -43,8 +43,8 @@ def test_what_only_looks_like_an_address_stays():
 
 def test_the_other_patterns_still_go():
     out = feedback.scrub("http://host.example/get.php?username=kalle&password=x 10.0.0.5 "
-                         "aa:bb:cc:dd:ee:ff kalle@example.se token=abc DS1-" + "A" * 24)
-    assert out == "http://<address> <ip> <mac> <email> token=<hidden> <supporter key>", out
+                         "aa:bb:cc:dd:ee:ff kalle@example.se token=abc")
+    assert out == "http://<address> <ip> <mac> <email> token=<hidden>", out
 
 
 def test_logins_in_quotes_json_headers_and_addresses_without_a_scheme_go():

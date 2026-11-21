@@ -95,7 +95,6 @@
 <li>typ av rapport (fel, krasch eller feedback), appens version och operativsystemets namn;</li>
 <li>texten, som också anger versionerna av appen, operativsystemet, Python, Qt och mpv, och hur videon ritas;</li>
 <li>för feedback det ämne, område och hur ofta du valde;</li>
-<li>om appen har en supporternyckel (bara ”ja” – aldrig nyckeln);</li>
 <li>om appen är en officiell version eller körs från källkoden;</li>
 <li>om du bad om svar, en hashsumma av en slumpad kod som bara din dator känner till.</li>
 </ul>
@@ -103,7 +102,7 @@
 
 <h4>Synkronisering av inställningar</h4>
 <p>För alla, bara om du slår på den. Det du väljer att synka – favoriter, inställningar och, om du slår på dem, spellistor med inloggningar och tittarhistorik – krypteras på din dator, innan något skickas, med en nyckel som tas fram ur en synkkod som bara dina datorer känner till.</p>
-<p>Vår server sparar bara de krypterade uppgifterna, under ett slumpmässigt nummer som också tas fram ur koden, tillsammans med ett versionsnummer och tidpunkten då de skrevs. Vi kan inte läsa dem och kan inte se vems de är: synkroniseringen kräver inget konto, ingen e-postadress, inget namn och ingen supporternyckel, och inget som visar vem du är skickas. Anrop för synkronisering loggas inte.</p>
+<p>Vår server sparar bara de krypterade uppgifterna, under ett slumpmässigt nummer som också tas fram ur koden, tillsammans med ett versionsnummer och tidpunkten då de skrevs. Vi kan inte läsa dem och kan inte se vems de är: synkroniseringen kräver inget konto, ingen e-postadress och inget namn, och inget som visar vem du är skickas. Anrop för synkronisering loggas inte.</p>
 <p>Numret ensamt öppnar ingenting: varje anrop har också med sig en behörighet som tas fram ur samma kod, och av den sparar servern bara en envägshash. När en dator med dopeIPTV 1.6.9 eller senare har synkroniserat vägrar servern att läsa, ersätta eller radera uppgifterna för den som inte har den.</p>
 <ul>
 <li><strong>Utrymme:</strong> en synkad kopia får vara högst 2 MB och alla kopior tillsammans högst 5 GB. Är det utrymmet fullt får en ny kopia vänta, medan kopior som redan finns fortfarande kan uppdateras.</li>
@@ -122,7 +121,6 @@
 <h4>Bara officiella versioner</h4>
 <p>När appen letar efter uppdateringar, skickar en felrapport eller feedback, synkroniserar eller tittar tillsammans anger den också om den är en officiell version från oss, körs från källkoden eller är ändrad.</p>
 <p>En ändrad version använder inte de tjänsterna – den letar inte efter uppdateringar här, och ett fel i den rapporteras till den som har gjort den. Vi räknar bara hur många anrop som nekas per dag och tjänst, utan IP-adress och utan något annat som visar vem det gäller.</p>
-<p><strong>Supporternyckeln</strong> kontrolleras i appen, utan uppkoppling. Inget skickas för att kontrollera den.</p>
 
 <p>Rättslig grund: vårt berättigade intresse av att leverera uppdateringar och veta hur många som installeras, och av att rätta de fel du rapporterar (artikel 6.1 f i dataskyddsförordningen); för synkronisering och titta tillsammans att tillhandahålla den tjänst du har bett om (artikel 6.1 b).</p>
 
@@ -154,7 +152,7 @@
 <ul>
 <li>Frontservern, som hanterar den krypterade anslutningen, för ingen logg över anropen till dopeiptv.org, och skriver bara ned ett fel när något hindrar den från att fungera (nedan). Anrop för synkronisering och för att titta tillsammans loggas aldrig någonstans.</li>
 <li>Inget annat loggas: servern bakom skriver ingen logg över andra anrop, och ingen som innehåller din IP-adress. För statistiken nedan lämnar den varje sidvisning, sidornas visningssignal och varje klick på en nedladdning direkt till vår egen tjänst genom en socket på samma maskin – med IP-adress, tidpunkt, sidan som efterfrågades (bara sidan – aldrig det en länk lade till i dess adress), status, webbläsare och språk –, som räknar den i minnet inom en minut och inte skriver ned någon IP-adress någonstans (nedan). För den öppna nedladdningsräknaren för den en liten logg över klick på nedladdningar: filens namn, svaret och om en webbläsare, appen eller en robot frågade – ingen IP-adress, ingen tidpunkt, ingen webbläsare. Den byts varje natt och bara föregående dygn sparas – högst två dygn –, sedan tas den bort automatiskt.</li>
-<li>Tjänsterna bakom webbplatsen – dricks, en supporternyckel för en betalning från före den 22 november 2026, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
+<li>Tjänsterna bakom webbplatsen – dricks, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
 </ul>
 <p>Varje logg på vår server, vad den innehåller och hur länge den sparas:</p>
 <ul>
@@ -215,7 +213,6 @@
 <ul>
 <li><code>dn-currency</code> – valutan du valde i dricksrutan;</li>
 <li><code>dn-wallet</code> – om din enhet erbjöd Apple Pay eller Google Pay, så att rätt knapp visas direkt;</li>
-<li><code>dn-supporter-key</code> – en supporternyckel från dricks eller månadsstöd före den 22 november 2026, om webbläsaren sparade en, så att dricksidan kan visa den igen;</li>
 <li><code>fbs-last</code> – när du senast skickade feedback.</li>
 </ul>
 <p>Du kan rensa dem i webbläsarens inställningar.</p></li>
@@ -231,8 +228,6 @@
 <li><strong>Det vi ser:</strong> belopp, valuta och tidpunkt, hur du betalade (kort eller en digital plånbok som Apple Pay eller Google Pay) och det namn eller den e-postadress du angav för kvittot. Våra administratörer ser det på webbplatsens administrationssida, och som en notis på de enheter där de har slagit på notiser.</li>
 <li>Vår server hämtar uppgifterna från Stripe vid behov och håller dem bara i minnet, några minuter; den sparar dem inte. Notiserna skickas krypterade via push-tjänsten i administratörens webbläsare (Apple, Google, Mozilla eller Microsoft), som inte kan läsa dem.</li>
 <li>För dricks ber vår server Stripe att påbörja betalningen, med det belopp och den valuta du valde. Med Apple Pay eller Google Pay passerar plånbokens engångstoken för betalningen, e-postadressen för kvittot och namnet som plånboken lämnar vår server på väg till Stripe utan att sparas.</li>
-<li>För en betalning från före den 22 november 2026 frågar länken i dess kvitto vår server efter supporternyckeln, och servern frågar Stripe om betalningen är genomförd. Inget om dig sparas hos oss. Dricks från och med dess ger ingen nyckel.</li>
-<li><strong>Supporternyckeln</strong> innehåller inga personuppgifter (se <a href="/payments/#tidigare">betalvillkoren</a>). Vi noterar att en nyckel har lämnats ut – ett nummer som tas fram ur betalningen, tidpunkten och hur – så att vi kan räkna nycklarna.</li>
 <li><strong>Bokföring:</strong> dricks ingår i Solecraft AB:s räkenskaper, som vi enligt bokföringslagen måste spara i sju år.</li>
 </ul>
 <p>Rättslig grund: att genomföra den betalning du har bett om (artikel 6.1 b), vår rättsliga förpliktelse att föra och bevara räkenskaper (artikel 6.1 c) och vårt berättigade intresse av att få veta om dricks när de kommer in (artikel 6.1 f).</p>

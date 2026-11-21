@@ -20,14 +20,9 @@ device on the admin page (needs Python's cryptography package).
                           ->  {"clientSecret", "publishableKey"}
     POST /pay/wallet      {"amount", "currency", "paymentMethod", "email", "name"}
                           ->  {"ok": true} | {"action": client_secret} | {"error"}
-    POST /support/key     a supporter key for a payment from before KEYS_UNTIL:
-                          {"cs": client_secret} (a page from then, right after
-                          paying) | {"t": receipt token} (a tip's receipt link)
-                          | {"s": "cs_..."} (back from monthly support's page)
-                          ->  {"key", "since"} | {"pending": true} (202) | {"error"}
                           (OLD_PATHS: a page cached from before November 2026
                           asks the same under its old names)
-    GET  /support/status  {"stripe", "dialog", "keys"}: whether it is set up
+    GET  /support/status  {"stripe", "dialog"}: whether it is set up
                           (--check; nginx does not pass it on)
     GET/PUT/DELETE /sync/<slot>
                           settings sync, for everyone (sync.py): ciphertext
@@ -42,13 +37,8 @@ modified build (X-dopeIPTV-Build: modified) with 403 and the words it shows
 (official.py); no header, as from older official apps, is fine. Only how
 many were refused is kept, per day - the admin page shows it.
 
-A tip is for the app, and nothing is given for it. Until November 22, 2026
-a tip or monthly support came with a supporter key for the app
-(supporter.py); a payment from before then still gets its key - the same
-key for the same payment - behind the link in its receipt (".../support/
-#key=<token>") or on the support page it came back to, and only once
-Stripe says it went through (KEYS_UNTIL). Nothing about the payer is kept
-here.
+A tip is for the app, and nothing is given for it. Nothing about the
+payer is kept here.
 
 The payer tips in their own currency: the page picks it from where the
 device says it is (nav.js), out of CURRENCIES below, and the amounts are
@@ -125,10 +115,6 @@ named by DONATE_CONFIG (default /usr/local/etc/iptv-donate.conf):
     ADMIN_SESSION_KEY_FILE  the key that signs the admin's session cookie
                             (default <STATS_DIR>/admin-session.key, made on
                             first use). Deleting it signs every browser out.
-    SUPPORTER_KEY_FILE      the supporter keys' signing key (default
-                            /usr/local/etc/iptv-donate-supporter.key; make it
-                            with supporter.py --new-key). Without it no key
-                            after paying - paying works the same.
     PUSH_CONTACT            who runs this, for the push services (a mailto:
                             or https URL; default DONATE_ORIGIN). The push key
                             and the devices live in STATS_DIR (push-vapid.pem,
@@ -167,9 +153,8 @@ WALLETS = ("apple_pay", "google_pay")
 #: still holds from then: answered as the new ones. Out once no page that
 #: old can be cached any longer (nginx's location for them goes with it).
 OLD_PATHS = {"/donate/config": "/pay/config", "/donate/session": "/pay/session",
-             "/donate/wallet": "/pay/wallet", "/donate/key": "/support/key"}
+             "/donate/wallet": "/pay/wallet"}
 _PM = re.compile(r"^pm_[A-Za-z0-9]{8,200}$")
-STRIPE_CS = "https://api.stripe.com/v1/checkout/sessions"
 
 
 CONFIG_FILE = os.environ.get("DONATE_CONFIG", "/usr/local/etc/iptv-donate.conf")
@@ -431,7 +416,7 @@ def _post(url: str, form: dict | None, key: str) -> tuple[int, dict]:
         return 0, {"error": {"message": str(e)}}
 
 
-# -- supporter keys (supporter.py) ----------------------------------------------
+# -- PaymentIntents ----------------------------------------------------------------
 
 def _intent(form: dict, key: str) -> tuple[int, dict]:
     """POST a PaymentIntent with this site's extras - the statement suffix
@@ -459,129 +444,6 @@ def _intent(form: dict, key: str) -> tuple[int, dict]:
             return status, body
 
 
-
-
-SUPPORTER_KEY_FILE = CONF.get("SUPPORTER_KEY_FILE", "/usr/local/etc/iptv-donate-supporter.key")
-#: A Checkout Session's id, as Stripe hands it back after paying.
-_CS = re.compile(r"^cs_(?:live|test)_[A-Za-z0-9]{8,200}$")
-#: The receipt link's token, and a PaymentIntent's id (the tip dialog).
-_TOKEN = re.compile(r"^[A-Za-z0-9_-]{16,40}$")
-_PI = re.compile(r"^pi_[A-Za-z0-9]{8,64}$")
-
-
-def _supporter_seed() -> bytes | None:
-    import supporter
-    return supporter.load_seed(SUPPORTER_KEY_FILE)
-
-
-def _stats_dir() -> str:
-    import admin
-    return CONF.get("STATS_DIR", os.path.join(admin.SITE, "stats"))
-
-
-#: Tips stopped coming with a supporter key on November 22, 2026 (00:00
-#: UTC): a payment made before then still gets its key, a later one none.
-KEYS_UNTIL = 1795305600
-
-
-def key_for(payment_id: str, created: int, how: str) -> dict | None:
-    """{"key", "since"} for a paid payment made before KEYS_UNTIL - always
-    the same key for the same one - or None: a later payment, or no signing
-    key."""
-    import supporter
-    seed = _supporter_seed()
-    if seed is None or created >= KEYS_UNTIL:
-        return None
-    key, ident = supporter.for_payment(seed, payment_id, created)
-    try:
-        supporter.record(_stats_dir(), ident, how)
-    except OSError as e:
-        print(f"[donate] supporter count: {e!r}", file=sys.stderr, flush=True)
-    return {"key": key, "since": supporter.check(key, _public())["since"]}
-
-
-def key_for_intent(pi: dict, how: str) -> dict | None:
-    """{"key", "since"} for a succeeded PaymentIntent from before
-    KEYS_UNTIL, or None - the same key as ever for the same payment."""
-    if pi.get("status") != "succeeded" or not _PI.match(str(pi.get("id") or "")):
-        return None
-    return key_for(str(pi["id"]), int(pi.get("created") or KEYS_UNTIL), how)
-
-
-def paid_session(cs: str) -> tuple[int, dict]:
-    """(200, the Checkout Session) once Stripe says it is paid; 202 while a
-    payment that takes a while (a bank debit) is still on its way; 404
-    otherwise - unknown, open or expired."""
-    stripe = _secret()
-    if not stripe:
-        return 503, {"error": "not configured"}
-    if not _CS.match(cs):
-        return 400, {"error": "bad"}
-    status, sess = _post(f"{STRIPE_CS}/{cs}", None, stripe)
-    if status != 200 or not isinstance(sess, dict):
-        return 404, {"error": "not found"}
-    if sess.get("status") != "complete":
-        return 404, {"error": "not paid"}
-    if sess.get("payment_status") != "paid":
-        return 202, {"pending": True}
-    return 200, sess
-
-
-_PUBLIC: dict[bytes, bytes] = {}
-
-
-def _public() -> bytes:
-    import ed25519
-    seed = _supporter_seed()
-    if not seed:
-        return b""
-    if seed not in _PUBLIC:
-        _PUBLIC.clear()
-        _PUBLIC[seed] = ed25519.public_key(seed)
-    return _PUBLIC[seed]
-
-
-def find_key(data: dict) -> tuple[int, dict]:
-    """POST /support/key, for a payment made before KEYS_UNTIL: a page from
-    then right after paying ({"cs"}: the PaymentIntent's client secret), the
-    link in a tip's receipt ({"t"}), or the support page back from monthly
-    support's Stripe page ({"s"}: the Checkout Session). Stripe says whether
-    the payment went through; each gives one key, the same one every time,
-    and a later payment none."""
-    stripe = _secret()
-    if not stripe or _supporter_seed() is None:
-        return 404, {"error": "no keys"}
-    if data.get("s"):
-        status, sess = paid_session(str(data.get("s") or ""))
-        if status != 200:
-            return status, sess
-        how = "monthly" if sess.get("mode") == "subscription" else "tip"
-        got = key_for(str(sess["id"]), int(sess.get("created") or KEYS_UNTIL), how)
-        return (200, got) if got else (404, {"error": "no keys"})
-    cs, token = str(data.get("cs") or ""), str(data.get("t") or "")
-    if cs:
-        pid = cs.split("_secret_", 1)[0]
-        if not _PI.match(pid) or "_secret_" not in cs:
-            return 400, {"error": "bad"}
-        status, pi = _post(f"{STRIPE_PI}/{pid}", None, stripe)
-        if status != 200 or not hmac.compare_digest(str(pi.get("client_secret") or ""), cs):
-            return 404, {"error": "not found"}
-        how = "page"
-    elif _TOKEN.match(token):
-        query = urllib.parse.urlencode({"query": f"metadata['supporter']:'{token}'", "limit": "3"})
-        status, found = _post(f"{STRIPE_PI}/search?{query}", None, stripe)
-        hits = [p for p in (found.get("data") or []) if (p.get("metadata") or {}).get("supporter") == token] \
-            if status == 200 else []
-        if not hits:
-            return 404, {"error": "not found"}
-        pi = hits[0]
-        how = "receipt"
-    else:
-        return 400, {"error": "bad"}
-    if pi.get("status") in ("processing", "requires_action", "requires_confirmation"):
-        return 202, {"pending": True}
-    got = key_for_intent(pi, how)
-    return (200, got) if got else (404, {"error": "not paid"})
 
 
 def wallet_pay(amount: int, currency: str, method: str, email: str, name: str) -> tuple[int, dict]:
@@ -1070,7 +932,7 @@ ADMIN_GET = ("/admin/admin.js", "/admin/analysis.js", "/admin/logtools.js", "/ad
              "/admin/builds.js", "/admin/feedback.js", *ADMIN_DATA, *ADMIN_FEEDBACK)
 ADMIN_POST = ("/admin/notify-test", "/admin/push-subscribe", "/admin/push-unsubscribe", "/admin/pick",
               "/admin/feedback-mark", "/admin/feedback-reply", "/admin/feedback-archive",
-              "/admin/feedback-delete", "/admin/supporter-key")
+              "/admin/feedback-delete")
 # From the app: an error report or feedback, sent when its user pressed Send.
 FEEDBACK_POST = "/feedback/report"
 # The app asking whether its reports have answers (with the hashes of its codes).
@@ -1560,8 +1422,6 @@ class Handler(BaseHTTPRequestHandler):
             if gone < 0:
                 return self._send(400, {"ok": False})
             return self._send(200, {"ok": True, "gone": gone})
-        if path == "/admin/supporter-key":
-            return self._send(*self._supporter_key(data))
         if path == "/admin/notify-test":
             sent, why = push("Notifications work", "This is how a new tip will look.", tag="test")
             return self._send(200 if sent else 502, {"ok": bool(sent), "sent": sent, "error": why})
@@ -1573,45 +1433,6 @@ class Handler(BaseHTTPRequestHandler):
         else:
             push_remove([str(data.get("endpoint") or "")])
         return self._send(200, {"ok": True, "devices": len(push_subs())})
-
-    def _supporter_key(self, data: dict) -> tuple[int, dict]:
-        """A supporter key made by an admin: again for a payment - a tip's
-        PaymentIntent (pi_...) or monthly support's Checkout Session (cs_...),
-        both in Stripe's Dashboard: the same key the payer got - or by hand
-        for someone who gave another way. Also how many have been handed out."""
-        import supporter
-        seed = _supporter_seed()
-        if seed is None:
-            return 503, {"error": "no signing key (supporter.py --new-key)"}
-        count = supporter.handed_out(_stats_dir())
-        if data.get("count"):
-            return 200, {"handed_out": count}
-        pid = str(data.get("pi") or "").strip()
-        if pid:
-            if not _PI.match(pid):
-                return 400, {"error": "not a payment id (pi_...)"}
-            status, pi = _post(f"{STRIPE_PI}/{pid}", None, _secret())
-            if status != 200:
-                return 404, {"error": "Stripe does not know that payment"}
-            got = key_for_intent(pi, "admin")
-            if not got:
-                return 409, {"error": "that payment has not succeeded (" + str(pi.get("status")) + ")"}
-            return 200, dict(got, handed_out=supporter.handed_out(_stats_dir()))
-        cs = str(data.get("cs") or "").strip()
-        if cs:
-            if not _CS.match(cs):
-                return 400, {"error": "not a Checkout Session id (cs_...)"}
-            status, sess = paid_session(cs)
-            if status == 202:
-                return 409, {"error": "that payment is still on its way"}
-            if status != 200:
-                return 404, {"error": "Stripe does not know that payment as paid"}
-            got = key_for(str(sess["id"]), int(sess.get("created") or time.time()), "admin")
-            return 200, dict(got or {}, handed_out=supporter.handed_out(_stats_dir()))
-        key, ident = supporter.made_by_hand(seed)
-        supporter.record(_stats_dir(), ident, "hand")
-        return 200, {"key": key, "since": supporter.check(key, _public())["since"],
-                     "handed_out": count + 1}
 
     def _refused(self, service: str) -> bool:
         """A modified build of the app (X-dopeIPTV-Build: modified) is not
@@ -1663,8 +1484,7 @@ class Handler(BaseHTTPRequestHandler):
             feedback_notice(
                 ("A reply to your answer" if data.get("thread")
                  else {"error": "An error report", "crash": "A crash report"}.get(kind, "Feedback"))
-                + (" from the website" if data.get("from") == "site"
-                   else " from a supporter" if data.get("supporter") == "yes" else " from the app"),
+                + (" from the website" if data.get("from") == "site" else " from the app"),
                 # A version and a system's name as the report is kept with
                 # them - never a sender's own sentence on the admins' phones.
                 "dopeIPTV " + (re.sub(r"[^0-9A-Za-z.+_-]", "", str(data.get("version") or ""))[:20] or "?")
@@ -1707,8 +1527,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _sync(self) -> None:
         """Someone's encrypted copy under a slot (sync.py), for anyone: no
-        key, no account (a supporter key an older app still sends is not
-        read). The address is never kept, logged or tied to the slot: the
+        account. The address is never kept, logged or tied to the slot: the
         limits hold it in memory only."""
         if self._refused("sync"):
             return
@@ -1868,8 +1687,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/admin/" or path in ADMIN_GET:
             return self._admin(path)
         if path == "/support/status":       # --check, through the socket; nginx does not pass it on
-            return self._send(200, {"stripe": bool(_secret()), "dialog": bool(PUBLISHABLE),
-                                    "keys": _supporter_seed() is not None})
+            return self._send(200, {"stripe": bool(_secret()), "dialog": bool(PUBLISHABLE)})
         if OLD_PATHS.get(path, path) != "/pay/config":
             return self._send(404, {"error": "not found"})
         if not PUBLISHABLE or not _secret():
@@ -1882,17 +1700,6 @@ class Handler(BaseHTTPRequestHandler):
                          "currencies": CURRENCIES,
                          # a page cached from before the currencies:
                          "min": row["min"], "max": row["max"], "presets": row["presets"]})
-
-    def _key(self) -> None:
-        if (self.headers.get("Origin") or "").rstrip("/") != ORIGIN:
-            return self._send(403, {"error": "origin"})
-        addr = self.headers.get("X-Real-IP") or "local"
-        if not _allowed("key:" + addr, 30):
-            return self._send(429, {"error": "slow down"})
-        data = self._body(1024)
-        if data is None:
-            return self._send(400, {"error": "body"})
-        return self._send(*find_key(data))
 
     def _on_post(self) -> None:
         path = self.path.split("?", 1)[0]
@@ -1907,8 +1714,6 @@ class Handler(BaseHTTPRequestHandler):
         if path == FEEDBACK_REPLIES:
             return self._feedback_replies()
         path = OLD_PATHS.get(path, path)
-        if path == "/support/key":
-            return self._key()
         if path not in ("/pay/session", "/pay/wallet"):
             return self._send(404, {"error": "not found"})
         origin = (self.headers.get("Origin") or "").rstrip("/")
@@ -2267,7 +2072,7 @@ def main() -> None:
     dialog = (f"on ({len(CURRENCIES)} currencies, {CURRENCY} by default)" if PUBLISHABLE
               else "off (no STRIPE_PUBLISHABLE_KEY)")
     print(f"[donate] listening on {LISTEN}{how}, Stripe {'set up' if _secret() else 'NOT set up'}, "
-          f"tip dialog {dialog}, supporter keys {'on' if _supporter_seed() is not None else 'off'}, "
+          f"tip dialog {dialog}, "
           f"push notifications {'ready' if push_ready() else 'off (no cryptography package)'}",
           file=sys.stderr, flush=True)
     if push_ready() and _secret():
