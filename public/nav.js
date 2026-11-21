@@ -547,6 +547,22 @@ var iptvCurrency = (function () {
   box.addEventListener("click", function (e) {
     if (e.target.closest("a") && narrow && narrow.matches) { box.open = false; }
   });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && box.open && narrow && narrow.matches) { box.open = false; }
+  });
+  // On a phone the folded contents is a bar that stays under the site's
+  // own: it says the part you are in, in that part's colour (style.css).
+  var summary = box.querySelector("summary"), now = null, said = "";
+  if (summary) {
+    var label = document.createElement("span");
+    label.className = "legal-toc-label";
+    label.textContent = summary.textContent;
+    now = document.createElement("span");
+    now.className = "legal-now";
+    summary.textContent = "";
+    summary.appendChild(now);
+    summary.appendChild(label);
+  }
   var links = {}, heads = [], queued = false;
   box.querySelectorAll('a[href^="#"]').forEach(function (a) {
     var h = document.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)));
@@ -557,11 +573,47 @@ var iptvCurrency = (function () {
     var current = null;
     heads.forEach(function (h) { if (h.getBoundingClientRect().top < window.innerHeight * 0.35) { current = h; } });
     heads.forEach(function (h) { links[h.id].classList.toggle("is-here", h === current); });
+    var id = current ? current.id : "";
+    if (now && id !== said) {
+      said = id;
+      now.textContent = "";
+      if (current) {
+        var li = links[id].closest("li"), n = li ? [].indexOf.call(li.parentNode.children, li) + 1 : 0;
+        var num = document.createElement("i"), name = document.createElement("span");
+        num.textContent = String(n);
+        name.textContent = links[id].textContent;
+        now.appendChild(num);
+        now.appendChild(name);
+        if (li) { box.style.setProperty("--hue", getComputedStyle(li).getPropertyValue("--hue")); }
+      } else {
+        box.style.removeProperty("--hue");
+      }
+    }
   }
   function soon() { if (!queued) { queued = true; window.requestAnimationFrame(mark); } }
   window.addEventListener("scroll", soon, { passive: true });
   window.addEventListener("resize", soon);
   mark();
+})();
+/* The legal pages' parts drawn in as they come into view - their number and
+ * their line, never their words. What is already on screen is marked before
+ * the page is told it may draw (.lg-js), so nothing there blinks; nothing
+ * moves for someone who asks the desktop for less motion. */
+(function () {
+  "use strict";
+  var heads = document.querySelectorAll(".legal > h2, .legal .tp-part");
+  if (!heads.length || !("IntersectionObserver" in window)) { return; }
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+  var seen = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add("lg-in"); seen.unobserve(e.target); }
+    });
+  }, { rootMargin: "0px 0px -8% 0px" });
+  [].forEach.call(heads, function (h) {
+    if (h.getBoundingClientRect().top < window.innerHeight) { h.classList.add("lg-in"); }
+    else { seen.observe(h); }
+  });
+  document.documentElement.classList.add("lg-js");
 })();
 /* The support page's questions are folded (render.jq support_faq): a link
  * to one - /support/#refund - opens it, on arrival and within the page. The

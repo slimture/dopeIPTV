@@ -1,4 +1,4 @@
-"""The code behind /transparency/ ("Privacy, behind the scenes"): what the
+"""The code behind /transparency/ ("Audit us"): what the
 page shows of the app's and the site's own code, taken from that code.
 
     python3 tools/transparency.py --app PATH --ref v1.6.7 [--out site/transparency.json]

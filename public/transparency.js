@@ -1,4 +1,4 @@
-/* Privacy, behind the scenes (/transparency/): each part's button copies its
+/* Audit us (/transparency/): each part's button copies its
    question, the page's own words for it - its promise, what we can know, the
    hosts it lists and the limits it names, with the rule for judging those -
    and its code together, ready to paste into any AI assistant. The
@@ -7,6 +7,35 @@
    clipboard, the text is put in a box, selected, to be copied by hand. */
 (function () {
   "use strict";
+  // Each part's own button, in view: at the part's end, under its folded
+  // rows, a copy of the one inside its proof (same words, same part), so
+  // nobody has to open the code to hand it to an AI. A sibling of the
+  // heading's, never inside it: the copy reads a part's heading and what
+  // follows it.
+  [].forEach.call(document.querySelectorAll(".tp-part"), function (sec) {
+    var h = sec.querySelector("h2[id]");
+    var own = h && document.querySelector('.tp-copy[data-for="' + h.id + '"]');
+    if (!own) { return; }
+    var row = document.createElement("p"), mini = own.cloneNode(true);
+    row.className = "tp-copy-row tp-tools";
+    mini.classList.remove("btn", "primary");
+    mini.classList.add("tp-copy-mini");
+    row.appendChild(mini);
+    sec.appendChild(row);
+  });
+  // A link to a folded row (the overview's limits) opens it.
+  function openTarget() {
+    var t = location.hash && document.getElementById(location.hash.slice(1));
+    if (t && t.tagName === "DETAILS") { t.open = true; }
+  }
+  window.addEventListener("hashchange", openTarget);
+  openTarget();
+  [].forEach.call(document.querySelectorAll('a[href^="#"]'), function (a) {
+    a.addEventListener("click", function () {
+      var t = document.getElementById(a.getAttribute("href").slice(1));
+      if (t && t.tagName === "DETAILS") { t.open = true; }
+    });
+  });
   var buttons = document.querySelectorAll(".tp-copy[data-for]");
   if (!buttons.length) { return; }
   function clean(el) { return el.textContent.replace(/\s+/g, " ").trim(); }
@@ -22,8 +51,13 @@
   // lists, the limits it names - and every block of code shown there or
   // named for it.
   // The heading a list or table stands under: the h3 just before it, or the
-  // one before its line of introduction.
+  // one before its line of introduction - or, for the limits folded in a
+  // row of their own, that row's words.
   function headOf(el) {
+    var fold = el.parentNode && el.parentNode.parentNode;
+    if (fold && fold.matches && fold.matches("details.tp-lim")) {
+      return clean(fold.querySelector(".tp-fold-t")) + ":\n";
+    }
     var prev = el.previousElementSibling;
     if (prev && prev.tagName === "P") { prev = prev.previousElementSibling; }
     return prev && prev.tagName === "H3" ? clean(prev) + ":\n" : "";

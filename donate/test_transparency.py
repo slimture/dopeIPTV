@@ -1,4 +1,4 @@
-"""Privacy, behind the scenes (/transparency/): the words of every language
+"""Audit us (/transparency/): the words of every language
 against the code they show (site/transparency.json, tools/transparency.py).
 
 - every placeholder in the words has something behind it, and every block
@@ -6,6 +6,8 @@ against the code they show (site/transparency.json, tools/transparency.py).
 - each language has the same placeholders as the English, so no language
   leaves out a proof;
 - each part's copy button has its question, and its proof is folded;
+- the overview at the top names every part, in order, with the number of
+  limits the part itself lists;
 - every address on the page points at the version it names - a tag or a
   commit, never a branch that moves;
 - what the page shows of this site's own files is still there to be shown
@@ -86,6 +88,22 @@ def test_each_copy_button_has_its_question_and_each_proof_is_folded():
         assert len(proofs) == len(parts), lang
         for proof in proofs:
             assert "<!--tp:copy " in proof.split("</details>\n")[-2] or "<!--tp:copy " in proof, lang
+
+
+def test_the_overview_names_every_part_with_its_own_count_of_limits():
+    for lang, text in _words().items():
+        table = text[text.index('<table class="tp-overview">'):text.index("</table>")]
+        rows = re.findall(r'<tr><td class="tp-ov-q"><a href="#([a-z]+)">.*?<td class="tp-ov-l">(.*?)</td></tr>', table)
+        assert [r[0] for r in rows] == re.findall(r'<h2 id="([a-z]+)">\d+\.', text), lang
+        for pid, cell in rows:
+            fold = re.search(r'<details class="tp-fold tp-lim" id="%s-limits">.*?<span class="tp-n">(\d+)</span>'
+                             r'.*?(<ul class="tp-limits">.*?</ul>)' % pid, text, re.S)
+            if fold is None:
+                assert cell == f'<a class="tp-ov-part" href="#{pid}">' + cell.split(">", 1)[1], f"{lang}: {pid}"
+                continue
+            n = fold.group(2).count("<li>")
+            assert int(fold.group(1)) == n, f"{lang}: {pid}"
+            assert cell == f'<a href="#{pid}-limits">{n}</a>', f"{lang}: {pid}"
 
 
 def test_every_address_names_its_version():

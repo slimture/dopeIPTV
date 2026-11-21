@@ -268,7 +268,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | mrow(" navdonate" + mcur("support"); "/support/"; t("support_nav"); $ICON.heart; macur("support")) as $menudonate
     # Under the rows, small: feedback and the rules, without scrolling to
     # the footer.
-    | ("          <div class=\"navmenu-foot\"><a href=\"#feedback\" data-feedback>\(t("foot_feedback") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/privacy/\">\(t("foot_privacy") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/terms/\">\(t("foot_terms") | h)</a></div>\n") as $menufoot
+    | ("          <div class=\"navmenu-foot\"><a href=\"#feedback\" data-feedback>\(t("foot_feedback") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/privacy/\">\(t("foot_privacy") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/transparency/\">\(t("foot_transparency") | h)</a><span aria-hidden=\"true\">·</span><a href=\"/terms/\">\(t("foot_terms") | h)</a></div>\n") as $menufoot
     # ...and on a phone, where the links fold into the menu, a heart of its
     # own in the header, one tap from anywhere.
     | "      <a class=\"navheart\" href=\"/support/\" aria-label=\"\(t("support_nav") | h)\" title=\"\(t("support_nav") | h)\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></a>\n" as $navheart
@@ -888,7 +888,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          perks: (if $page == "support" then support_perks else "" end),
          money: (if $page == "support" then support_money else "" end)});
 
-# -- /transparency/: privacy, behind the scenes -----------------------------------
+# -- /transparency/: Audit us -----------------------------------------------------
 # What the privacy policy promises, shown in the code that does it. The words
 # are the language's own (site/transparency/<lang>.html, the English where a
 # language has none yet: $body, in $ARGS.named.blang); the code, the examples
@@ -986,7 +986,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                 | "    <xhtml:link rel=\"alternate\" hreflang=\"\($alt | h)\" href=\"\(url($path; $alt) | h)\"/>\n"] | add)
             + "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"\($SITE + $path | h)\"/>\n"
             + "  </url>\n"] | add)
-      # Privacy, behind the scenes, in the languages it is written in.
+      # Audit us, in the languages it is written in.
       + (($ARGS.named.tpfile[0] // null) as $TP | ($ARGS.named.tplangs // []) as $TPL
          | if $TP == null then "" else
            ([$TPL[] as $code
