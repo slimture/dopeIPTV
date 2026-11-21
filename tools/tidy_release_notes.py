@@ -6,7 +6,8 @@ before it - by 1.4.5 a release was 360 lines before its files. This leaves
 each release with its own notes only:
 
   the latest release   its own section, as it is (the site's What's new and
-                       the app's update dialog read it)
+                       the app's update dialog read it), and a link to
+                       CHANGELOG.md under it
   an older release     its headline, its notes folded, and a link to
                        CHANGELOG.md, which has them all
   a test build         its list of changes folded
@@ -85,6 +86,12 @@ def tidy(rel: dict, latest: str) -> str | None:
     return new + "\n" if new != body else None
 
 
+def _own(text: str) -> str:
+    """A release's own notes, without the link to CHANGELOG.md it was given
+    while it was the latest."""
+    return text.replace(FOOTER, "").strip()
+
+
 def _shape(rel: dict, latest: str, body: str) -> str | None:
     """Only its own notes, folded where they should be; None when so already."""
     tag = str(rel.get("tag_name") or "")
@@ -103,12 +110,16 @@ def _shape(rel: dict, latest: str, body: str) -> str | None:
     version = tag.lstrip("vV")
     mine = next((text for v, text in sections(body) if v == version), None)
     if tag == latest:
-        if mine is None or len(sections(body)) <= 1:
+        if mine is None:
             return None
-        return mine + "\n"
+        return _own(mine) + "\n\n" + FOOTER + "\n"
     if FOOTER in body:
-        return None
-    text = _unwrap(HEAD.sub("", mine if mine is not None else body, count=1))
+        # Folded already - unless it was the latest: that one still opens
+        # with its own heading.
+        first = HEAD.match(body)
+        if not (first and first.group(1) == version):
+            return None
+    text = _unwrap(HEAD.sub("", _own(mine if mine is not None else body), count=1))
     if len(text.splitlines()) <= SHORT:
         # Short already: only the versions before it go, if there are any.
         return text + "\n\n" + FOOTER + "\n" if len(sections(body)) > 1 else None
