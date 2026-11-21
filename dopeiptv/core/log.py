@@ -71,7 +71,7 @@ AUTH_LINE = re.compile(r"(?i)\b((?:proxy-)?authorization|(?:set-)?cookie)([\"']?
 BEARER = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
 #: A box's MAC (a Stalker portal's login).
 MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
-#: A supporter key: the one thing that could tie a log to a donation.
+#: A supporter key: the one thing that could tie a log to a payment.
 SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A query without its address ("Max retries exceeded with url:
 # /get.php?username=...&password=..."), and an Xtream account in a path

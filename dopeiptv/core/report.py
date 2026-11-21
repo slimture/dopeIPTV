@@ -44,7 +44,7 @@ _IPV6 = re.compile(r"(?<![\w:])(?:(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
                    r"|[0-9A-Fa-f:]{0,30}[0-9A-Fa-f]::)(?![\w:])")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
-# A supporter key pasted into a report would be the one thing that could tie it to a donation.
+# A supporter key pasted into a report would be the one thing that could tie it to a payment.
 _SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A login written name=value or name: value - a quoted name or value too, as
 # JSON and config files write them ("password": "x y"); the quotes stay.

@@ -249,7 +249,7 @@ class _DonateMixin:
 
     # -- the answers -------------------------------------------------------------
     def donated(self) -> None:
-        """"I've donated": not asked for a year."""
+        """"I've supported": not asked for a year."""
         rhythm.put_away(self.settings, self._donate_time(), rhythm.DONATED_S)
         self._donate_heart_refresh()
 

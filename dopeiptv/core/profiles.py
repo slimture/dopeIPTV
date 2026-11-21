@@ -129,7 +129,7 @@ OWN_STORES = {
 SHARED = ("sources", "recordings and recording rules", "the guide",
           "devices: cast, boxes", "Nerd", "playback and network settings",
           "the window layout", "the parental lock's PIN and locked categories",
-          "asking for a donation: a donation is for the app, not one person "
+          "asking for support: support is for the app, not one person "
           "(core/donate_rhythm.py)")
 SHARED_EXAMPLES = ("playlists", "active_playlist", "recording_jobs", "recordings_dir",
                    "series_rules_abc", "category_overrides_abc", "channel_overrides_abc",

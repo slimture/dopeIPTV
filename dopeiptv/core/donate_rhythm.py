@@ -1,4 +1,4 @@
-"""When the app asks for a donation: one week a month, once it is used for
+"""When the app asks for support: one week a month, once it is used for
 real - and not again for a while once it has been answered.
 
 A *period* is ``PERIOD_DAYS`` days. One begins the first time the app runs
@@ -11,7 +11,7 @@ in a calendar month while all of this holds:
 - no period began this month, nor in the last ``GAP_DAYS`` days (one that
   began late in a month does not run into the next one);
 - nothing put it away: "Not right now" and "Hide for three months"
-  (``LATER_S``), "I've donated" (``DONATED_S``, taken at the person's word -
+  (``LATER_S``), "I've supported" (``DONATED_S``, taken at the person's word -
   the app has no way to know, and does not try).
 
 The window checks the rest: asking is switched on (Settings, General;
@@ -21,10 +21,10 @@ not drawn in full screen, TV mode or private viewing (its days still count).
 
 Left alone, a period ends by itself and the next month brings the next
 one. The first day it is in the heart's colour (``BRIGHT``), the other days
-muted (``MUTED``). Donate pressed ends the period: asked and answered for
+muted (``MUTED``). Support pressed ends the period: asked and answered for
 the month.
 
-Every key here is the household's: a donation is for the app, not for one
+Every key here is the household's: support is for the app, not for one
 person, so none is one of a profile's own (core/profiles.py keeps them out
 of its split), and settings sync leaves them to each computer (the
 ``donate_`` prefix, core/sync.py).
@@ -50,7 +50,7 @@ GAP_DAYS = 21
 BRIGHT_S = DAY
 #: "Not right now" / "Hide for three months".
 LATER_S = 90 * DAY
-#: "I've donated".
+#: "I've supported".
 DONATED_S = 365 * DAY
 
 #: Asking switched off in Settings ("false"); on when not stored.
@@ -59,7 +59,7 @@ K_ASK = "donate_ask"
 K_UNTIL = "donate_until"
 #: When the current, or the last, period began.
 K_PERIOD = "donate_period"
-#: When that period was ended early (Donate pressed).
+#: When that period was ended early (Support pressed).
 K_ENDED = "donate_period_end"
 #: The first run (or the first thing ever watched, for someone who has used
 #: the app longer than this key has existed).
@@ -159,13 +159,13 @@ def step(settings: Settings, now: float, watched: Callable[[], float],
 
 
 def put_away(settings: Settings, now: float, secs: float) -> None:
-    """Not asked again for *secs* ("Not right now", "I've donated"): the
+    """Not asked again for *secs* ("Not right now", "I've supported"): the
     heart and Home's card alike."""
     settings.setValue(K_UNTIL, now + secs)
 
 
 def end_period(settings: Settings, now: float) -> None:
-    """Donate pressed: this month's asking is over."""
+    """Support pressed: this month's asking is over."""
     r = Rhythm.read(settings)
     if r.phase(now) != OFF:
         settings.setValue(K_ENDED, now)

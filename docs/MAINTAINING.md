@@ -457,7 +457,7 @@ private `slimture/dopeiptv-server`. In short:
   (the server's configuration). The download section and the FAQ work
   without JavaScript.
 - The one non-static piece is `donate/donate.py`, a standard-library
-  service behind `/donate/` that makes the Stripe payments for the tip
+  service behind `/pay/` and `/support/key` that makes the Stripe payments for the tip
   dialog (card form, Apple Pay, Google Pay on the page itself), in the
   payer's own currency, and hands out supporter keys. For the app it
   serves feedback and its answers (`/feedback/`), settings sync (`/sync/`)

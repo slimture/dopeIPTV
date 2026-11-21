@@ -133,7 +133,7 @@ def _open_with_qt(url: str) -> bool:
     """Qt's opener, on a desktop session (Wayland or X11). It asks the
     compositor for an activation token and hands it on (to the desktop
     portal or the handler it starts), and that token is what lets GNOME
-    bring the browser to the front: without it the donate page opened
+    bring the browser to the front: without it the support page opened
     BEHIND the app, and GNOME's launch spinner turned until it gave up.
 
     Qt asks for the token on behalf of the window that has the focus. A
