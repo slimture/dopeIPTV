@@ -53,8 +53,11 @@ disagree, the code is what runs and the sentence is a bug: report it.
   every request but server mode's tuner's, and do not let a web page or a
   stranger use them as a way in or out.
 - **The update path.** Only what dopeIPTV's release key signed is
-  installed, and never a version older than the one running
-  (`core/selfupdate.py`, `signed_asset`).
+  installed, only a signed file that names the release offered - an
+  older release's file under a newer tag is refused, since the
+  signature covers the file and not the tag - and never a version older
+  than the one running (`core/selfupdate.py`, `signed_asset`,
+  `names_version`).
 
 Outside the model: a program that runs as the person (it can read what
 they can), an administrator of the computer, someone at the unlocked
@@ -244,7 +247,8 @@ is.
   that is never on the web server (`core/update_keys.py`,
   `selfupdate.signed_asset`), and the site mirrors a release's files only
   once that signature holds (`donate/release_sums.py`). An older signed
-  release is refused too.
+  release is refused too, under its own tag or a newer one
+  (`selfupdate.names_version`).
 - Tell who someone is from what the app sends: no account, name, e-mail,
   supporter key or id the app makes up and keeps. A sync slot and its
   credential come from the sync code (`auth_of`); feedback's answers are
