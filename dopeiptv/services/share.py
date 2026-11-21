@@ -87,7 +87,7 @@ class Share:
         return [p for p in (self._sources() or []) if p.get("id") and p.get("kind") != "local"]
 
     def _client(self, pl: dict) -> Any:
-        stamp = hashlib.sha1(json.dumps(pl, sort_keys=True, default=str).encode()).hexdigest()
+        stamp = hashlib.sha256(json.dumps(pl, sort_keys=True, default=str).encode()).hexdigest()
         pid = str(pl["id"])
         with self._lock:
             held = self._clients.get(pid)

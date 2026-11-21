@@ -440,6 +440,21 @@ class AnswersDialog(QDialog):
 PRIVACY_URL = "https://dopeiptv.org/privacy/?ref=app-feedback#app"
 
 
+def sent_with_text(picked: bool = False, supporter: bool = False, code: bool = False) -> str:
+    """The line under a report that says what goes with its text: the
+    version and the system as they are sent, what was picked in the
+    window, a supporter's mark and an answer code's hash when they go."""
+    from ..core import report
+    items = report.sent_beside()
+    if picked:
+        items.append(tr("report_item_picked"))
+    if supporter:
+        items.append(tr("report_item_supporter"))
+    if code:
+        items.append(tr("report_item_code"))
+    return tr("report_sent_with", items=" · ".join(items))
+
+
 def privacy_link() -> QPushButton:
     """A small link under a report's or feedback's fine print: the privacy
     policy, in the browser."""
@@ -468,10 +483,11 @@ class FeedbackDialog(QDialog):
     OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
 
     def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None,
-                 all_answers=None, copy_only: bool = False) -> None:
+                 all_answers=None, copy_only: bool = False, supporter: bool = False) -> None:
         super().__init__(parent)
         self._all_answers = all_answers
         self.copy_only = copy_only
+        self._supporter = supporter
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit, QScrollArea
 
@@ -605,8 +621,15 @@ class FeedbackDialog(QDialog):
         col.addWidget(self.answers)
         note = label(tr("fb_answers_note") + " " + tr("report_privacy"), 12, bold=False)
         col.addWidget(note)
+        # What goes beside the text, said as it changes (the answers' code).
+        self.beside = label("", 12, bold=False)
+        self.beside.setTextFormat(Qt.TextFormat.PlainText)
+        col.addWidget(self.beside)
+        self.answers.toggled.connect(lambda *_a: self._say_beside())
+        self._say_beside()
         self.answers.setVisible(not copy_only)
         note.setVisible(not copy_only)
+        self.beside.setVisible(not copy_only)
         col.addWidget(privacy_link(), 0, Qt.AlignmentFlag.AlignLeft)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -644,6 +667,10 @@ class FeedbackDialog(QDialog):
 
     def topic(self) -> str:
         return next((k for k, chip in self.topic_chips.items() if chip.isChecked()), "")
+
+    def _say_beside(self) -> None:
+        self.beside.setText(sent_with_text(picked=True, supporter=self._supporter,
+                                           code=self.answers.isChecked()))
 
     def _open_all_answers(self, *_a) -> None:
         if self._all_answers is not None:
@@ -848,6 +875,14 @@ class ReportDialog(QDialog):
         privacy.setWordWrap(True)
         privacy.setStyleSheet(f"font-size:12px; color:{P['muted']};")
         col.addWidget(privacy)
+        # What goes beside the text (report.send_status's other fields).
+        self.beside: QLabel | None = None
+        if not copy_only:
+            self.beside = QLabel(sent_with_text())
+            self.beside.setTextFormat(Qt.TextFormat.PlainText)
+            self.beside.setWordWrap(True)
+            self.beside.setStyleSheet(f"font-size:12px; color:{P['muted']};")
+            col.addWidget(self.beside)
         col.addWidget(privacy_link(), 0, Qt.AlignmentFlag.AlignLeft)
         buttons = QHBoxLayout()
         buttons.addStretch(1)

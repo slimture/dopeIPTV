@@ -19,6 +19,24 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   channel was left. The player now opens it again at that moment, its
   buffer in memory out of a disk's reach or none, as it does when private
   viewing is turned on (`core/dvr_pool.on_private_disk`).
+- An update is installed only when its signed file names the release
+  offered. A site or a mirror taken over could have offered an older
+  release's signed file under a newer tag - a step back to a version with a
+  known fault - since the signature covers the file, not the tag
+  (`core/selfupdate.names_version`). A size beyond any release file is not
+  fetched at all.
+- An error report's cleaning missed an IPv6 address that ends in "::"
+  (`2001:db8::`, `fe80::`) and left an IPv4's last three numbers after
+  `::ffff:`; both go now, here and in the site's second cleaning.
+- The report and feedback windows say what goes beside the text - the
+  app's version, the system, what was picked, a supporter's mark, the hash
+  of a code for answers - where they said "exactly what is sent" of the
+  text alone.
+- From a CodeQL scan: every TLS connection the app makes itself says
+  TLS 1.2 as its least (Python's default already; now no build's OpenSSL
+  settings can lower it), the app's own yt-dlp and its wrapper are this
+  user's alone to run, and the ids and stamps kept in memory are SHA-256
+  rather than SHA-1.
 
 ## [1.6.9]
 

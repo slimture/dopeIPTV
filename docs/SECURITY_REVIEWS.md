@@ -265,3 +265,21 @@ the error logs, the honest limits). Checked against the code, what holds:
 | The page | Its copy carried no promises or limits, parts 4 and 5 had no question, and several answers lacked their code | low | The website: each part's copy carries its promise, what we can know, its hosts and its limits with the rule for judging them; parts 4 and 5 have their questions; excerpts of `refuse_older` and `_get_https`, the settings file's question, the report sent on Send only, the relay's backlog left unread, private viewing turned on mid-play |
 | Feedback, Watch together | The page did not say that feedback carries `"supporter": "yes"`, nor that the relay cannot check signatures | low | The website: both said, in English and Swedish |
 | Updates, TMDB, the relay's clock, sync, the admin cookie, swap | Raised as unknown or open | answered | Already in the code: `selfupdate.refuse_older`, **Provider artwork, TMDB off**, the first answer's backlog left unread and the clock taken from it, the sync slot bound on its first write, the 600 a minute limit by address, the server's encrypted swap watched by `swap_state` |
+
+## November 2026 - the website's parts read one at a time, and a CodeQL scan (after 1.6.9)
+
+The maintainer gave each part of the Behind the scenes page, with its code
+from `v1.6.9`, to an up-to-date AI assistant on its own, and ran GitHub's
+CodeQL on `main`. Checked against the code, what holds:
+
+| Area | Finding | Severity | Done |
+|------|---------|----------|------|
+| Updates | The signature covers the file, not the tag: a site or mirror taken over could offer an older release's signed file under a newer tag - a step back to a version with a known fault | medium | After 1.6.9: the signed file must name the release offered (`selfupdate.names_version`); a size beyond any release file is not fetched |
+| Error reports | An IPv6 address ending in "::" (`2001:db8::`, `fe80::`) went through the cleaning, and `::ffff:192.0.2.7` left the IPv4's last three numbers | low | After 1.6.9: both go, in the app and in the site's second cleaning |
+| Error reports | The window said "exactly what is sent" while the version, the system, a supporter's mark and the answer code's hash went beside the text unseen | low | After 1.6.9: the window says each (`report.sent_beside`); the page says the version and system |
+| Error reports | Several reports' hashes are asked for in one request, and how long the limits hold an address was not said | info | The website: both said, the limits' windows and handlers in the excerpt |
+| Private viewing | "Nothing written to a disk" while encrypted swap counts as memory; a cast or server mode holding the buffer keeps it on the disk; it does not work backwards | info | The website: "nothing unencrypted", each written down as a limit |
+| CodeQL | 4 TLS contexts without an explicit least version (Python's default is TLS 1.2 already) | info | After 1.6.9: TLS 1.2 said where each is made (`cert_pin.at_least_tls12`) |
+| CodeQL | yt-dlp's own copy and wrapper runnable by other users; SHA-1 for ids kept in memory | low | After 1.6.9: this user's alone (0700); SHA-256 |
+| CodeQL | 40 log lines "logging a password", a cache file "storing a secret", SHA-1 for the picture cache's file names, MD5 in NextPVR's login, three sockets on every interface | answered | False positives or by design: the stream address (which holds an Xtream login) taints every row that carries one, while each line logs `url_for_log`, `redact_url`, `address_scheme` or `for_log` of it; the cache's names are no secret; NextPVR's protocol is MD5; the HDHomeRun and mDNS answers and server mode must listen on the network |
+| CodeQL | 25 in the tests (fake servers, test regexes) | answered | The tests' own, not the app's |

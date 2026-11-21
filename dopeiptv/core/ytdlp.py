@@ -391,7 +391,7 @@ def hook_path(found: Found, base: str | Path | None = None,
             folder.mkdir(parents=True, exist_ok=True)
             tmp = folder / (_WRAPPER + ".new")
             tmp.write_text(text, encoding="utf-8")
-            os.chmod(tmp, 0o755)
+            os.chmod(tmp, 0o700)            # this user's to run, no one else's
             os.replace(tmp, target)
     except OSError as e:
         log.info("yt-dlp: no wrapper script (%s) - using it directly", e)
@@ -475,7 +475,7 @@ def install(base: str | Path | None = None, *, releases: str = RELEASES,
             raise YtdlpError("download", type(e).__name__) from e
         if digest.hexdigest() != want:
             raise YtdlpError("checksum", asset)
-        os.chmod(tmp, os.stat(tmp).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)   # this user's alone
         if not version_of(str(tmp), run):
             raise YtdlpError("runs", asset)
         try:

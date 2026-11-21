@@ -123,6 +123,7 @@ def tls_context() -> ssl.SSLContext:
     """The system's certificates, and requests' (certifi) too: a packaged
     build may not find the system's."""
     ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     try:
         import certifi
         ctx.load_verify_locations(certifi.where())
