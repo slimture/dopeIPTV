@@ -1858,3 +1858,21 @@ window.iptvCopyButtons(document);
   });
   if (window.location.hash === "#feedback") { open(); }
 })();
+
+/* The legal pages' tabs: the bar's frosted look once the page is scrolled
+   (style.css keeps them in view under the site's bar). */
+(function () {
+  "use strict";
+  var bar = document.querySelector(".legal-tabbar");
+  if (!bar) { return; }
+  var stuck = false, queued = false;
+  function look() {
+    queued = false;
+    var now = window.scrollY > 2;
+    if (now !== stuck) { stuck = now; bar.classList.toggle("is-stuck", now); }
+  }
+  window.addEventListener("scroll", function () {
+    if (!queued) { queued = true; window.requestAnimationFrame(look); }
+  }, {passive: true});
+  look();
+})();

@@ -2758,3 +2758,31 @@ section.legal-main { padding: 18px 0 84px; }
 .legal button.tp-copy-mini:focus-visible { outline: 2px solid var(--proof); outline-offset: 3px; }
 .legal button.tp-copy-mini.is-done { color: #fff; background: var(--ok); }
 @media (prefers-reduced-motion: reduce) { .legal button.tp-copy-mini { transition: none; } }
+
+/* The legal pages' tabs stay in view under the site's bar while you read
+   (the window wide enough for them on one line); at rest they sit in the
+   head's glow, once you scroll they take the bar's own frosted look
+   (nav.js marks it .is-stuck). The contents beside the text and each
+   heading's place when a link leads there sit below them. */
+.legal-main, .legal-top { --tabbar-h: 0px; }
+.legal-tabbar { position: relative; z-index: 14; padding: 18px 0 0; text-align: center; }
+.legal-tabbar .legal-tabs { margin: 0 auto; }
+.legal-top { padding-top: 30px; }
+@media (min-width: 761px) {
+  .legal-main, .legal-top { --tabbar-h: 57px; }
+  .legal-tabbar { position: sticky; top: 57px; height: var(--tabbar-h); box-sizing: border-box; padding: 8px 0;
+    transition: background-color .2s ease, box-shadow .2s ease; }
+  .legal-tabbar.is-stuck { background: color-mix(in srgb, var(--bar, var(--bg)) 78%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--line) 70%, transparent); }
+  .cr .legal-tabbar.is-stuck { -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: color-mix(in srgb, var(--bar, var(--bg)) 96%, transparent); }
+  .legal-top { margin-top: calc(-1 * var(--tabbar-h)); padding-top: calc(var(--tabbar-h) + 30px); }
+  .legal-side { top: calc(57px + var(--tabbar-h) + 20px); max-height: calc(100vh - 57px - var(--tabbar-h) - 36px); }
+  .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 24px); }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .legal-side { top: calc(57px + var(--tabbar-h)); max-height: none; }
+  .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 84px); }
+}
+@media (prefers-reduced-motion: reduce) { .legal-tabbar { transition: none; } }
