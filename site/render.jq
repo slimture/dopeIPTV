@@ -102,7 +102,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     | explode | map(if . >= 48 and . <= 57 then $d[. - 48] else . end) | implode;
   def pad2: tostring | if length < 2 then "0" + . else . end;
   def fmt_date($iso):
-    (try ($iso | fromdateiso8601) catch null) as $ts
+    # A day alone ("2026-11-21", the transparency page's) is that day's start.
+    (try ($iso | if test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") then . + "T00:00:00Z" else . end | fromdateiso8601)
+     catch null) as $ts
     | if $ts == null then ""
       elif ($F.formats[$lang] // null) == null then $ts | strftime("%Y-%m-%d")
       else

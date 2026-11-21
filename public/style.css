@@ -2759,24 +2759,21 @@ section.legal-main { padding: 18px 0 84px; }
 @media (prefers-reduced-motion: reduce) { .legal button.tp-copy-mini { transition: none; } }
 
 /* The legal pages' tabs stay in view under the site's bar while you read
-   (the window wide enough for them on one line); at rest they sit in the
+   (on a phone as one row that scrolls sideways); at rest they sit in the
    head's glow, once you scroll they take the bar's own frosted look
    (nav.js marks it .is-stuck). The contents beside the text and each
    heading's place when a link leads there sit below them. */
-.legal-main, .legal-top { --tabbar-h: 0px; }
-.legal-tabbar { position: relative; z-index: 14; padding: 18px 0 0; text-align: center; }
+.legal-main, .legal-top { --tabbar-h: 57px; }
+.legal-tabbar { position: sticky; top: 57px; z-index: 14; height: var(--tabbar-h); box-sizing: border-box; padding: 8px 0;
+  text-align: center; transition: background-color .2s ease, box-shadow .2s ease; }
 .legal-tabbar .legal-tabs { margin: 0 auto; }
-.legal-top { padding-top: 30px; }
+.legal-tabbar.is-stuck { background: color-mix(in srgb, var(--bar, var(--bg)) 88%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--line) 70%, transparent); }
+.cr .legal-tabbar.is-stuck { -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: color-mix(in srgb, var(--bar, var(--bg)) 96%, transparent); }
+.legal-top { margin-top: calc(-1 * var(--tabbar-h)); padding-top: calc(var(--tabbar-h) + 30px); }
 @media (min-width: 761px) {
-  .legal-main, .legal-top { --tabbar-h: 57px; }
-  .legal-tabbar { position: sticky; top: 57px; height: var(--tabbar-h); box-sizing: border-box; padding: 8px 0;
-    transition: background-color .2s ease, box-shadow .2s ease; }
-  .legal-tabbar.is-stuck { background: color-mix(in srgb, var(--bar, var(--bg)) 78%, transparent);
-    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
-    box-shadow: 0 1px 0 color-mix(in srgb, var(--line) 70%, transparent); }
-  .cr .legal-tabbar.is-stuck { -webkit-backdrop-filter: none; backdrop-filter: none;
-    background: color-mix(in srgb, var(--bar, var(--bg)) 96%, transparent); }
-  .legal-top { margin-top: calc(-1 * var(--tabbar-h)); padding-top: calc(var(--tabbar-h) + 30px); }
   .legal-side { top: calc(57px + var(--tabbar-h) + 20px); max-height: calc(100vh - 57px - var(--tabbar-h) - 36px); }
   .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 24px); }
 }
@@ -2785,3 +2782,27 @@ section.legal-main { padding: 18px 0 84px; }
   .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 84px); }
 }
 @media (prefers-reduced-motion: reduce) { .legal-tabbar { transition: none; } }
+/* A phone: the tabs one row that scrolls sideways, the page you are on
+   brought into view (nav.js), its edges fading; the contents bar under it. */
+@media (max-width: 760px) {
+  .legal-main, .legal-top { --tabbar-h: 50px; }
+  .legal-tabbar { padding: 7px 0; text-align: start; }
+  .legal-tabbar .wrap { padding: 0; }
+  .legal-tabbar .legal-tabs { display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 2px; margin: 0; padding: 0 16px; box-shadow: none;
+    border-radius: 0; background: none; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 30px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 30px), transparent); }
+  .legal-tabbar .legal-tabs::-webkit-scrollbar { display: none; }
+  .legal-tabbar .legal-tabs a { flex: none; padding: 7px 13px; border-radius: 999px; font-size: 14.5px; white-space: nowrap; }
+  .legal-tabbar .legal-tabs a[aria-current="page"] { color: var(--text); font-weight: 600; box-shadow: none;
+    background: color-mix(in srgb, var(--text) 9%, transparent); }
+  .legal-top { padding-top: calc(var(--tabbar-h) + 22px); padding-bottom: 12px; }
+  .legal-side { top: calc(57px + var(--tabbar-h)); padding-top: 6px; padding-bottom: 6px; }
+}
+/* The page's gutter is 18px from 720px down: the contents bar reaches the
+   screen's edges by as much, never past them. */
+@media (max-width: 720px) {
+  .legal-side { margin-left: -18px; margin-right: -18px; padding-left: 18px; padding-right: 18px; }
+  .legal-tocbox > summary { padding-top: 8px; padding-bottom: 8px; }
+  .legal h2, .legal > h2, .legal .tp-part > h2, .legal .tp-fold, .legal .tp-proof { scroll-margin-top: calc(57px + var(--tabbar-h) + 72px); }
+}

@@ -1860,11 +1860,18 @@ window.iptvCopyButtons(document);
 })();
 
 /* The legal pages' tabs: the bar's frosted look once the page is scrolled
-   (style.css keeps them in view under the site's bar). */
+   (style.css keeps them in view under the site's bar), and on a phone the
+   page you are on brought into the middle of their row. */
 (function () {
   "use strict";
   var bar = document.querySelector(".legal-tabbar");
   if (!bar) { return; }
+  // A phone's row that scrolls sideways: the page you are on in its middle.
+  var tabs = bar.querySelector(".legal-tabs"), cur = tabs && tabs.querySelector('[aria-current="page"]');
+  if (cur && tabs.scrollWidth > tabs.clientWidth + 1) {
+    var t = tabs.getBoundingClientRect(), c = cur.getBoundingClientRect();
+    tabs.scrollLeft += (c.left + c.width / 2) - (t.left + t.width / 2);
+  }
   var stuck = false, queued = false;
   function look() {
     queued = false;
