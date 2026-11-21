@@ -1,9 +1,7 @@
-"""The support page (templates/support.html). Monthly support's price in
-the visitor's currency:
-render.jq reads SUPPORT_MONTHLY_PRICES ("SEK 29, EUR 2.50, GBP 2,50") into
-the page as data-prices for nav.js, with SUPPORT_MONTHLY_PRICE - else the
-first - as the words without JavaScript. Rendered with jq, as
-sync-releases.sh does."""
+"""The support page (templates/support.html): a tip for the app, the one
+way, and nothing given for it - no monthly support, no supporter key, no
+other way to give (November 2026). Rendered with jq, as sync-releases.sh
+does."""
 import html
 import json
 import os
@@ -48,53 +46,29 @@ def _support(prices: str, price: str = "", lang: str = "en", portal: str = "",
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
-def _price(page: str):
-    m = re.search(r'<bdi class="sway-price"([^>]*)>([^<]*)</bdi>', page)
-    assert m, "no monthly price on the support page"
-    attrs = dict(re.findall(r'(data-[a-z]+)="([^"]*)"', m.group(1)))
-    prices = json.loads(html.unescape(attrs["data-prices"])) if "data-prices" in attrs else None
-    return prices, attrs.get("data-base"), html.unescape(m.group(2))
-
-
-def test_each_currency_and_the_first_without_javascript():
-    prices, base, words = _price(_support("SEK 29, EUR 2.50, GBP 2,50; usd 3"))
-    assert prices == {"sek": "29", "eur": "2.50", "gbp": "2.50", "usd": "3"}
-    assert base == "sek" and words == "29 SEK"
-
-
-def test_the_price_as_written_wins_without_javascript():
-    _prices, base, words = _price(_support("SEK 29, EUR 2.50", "29 kr", "sv"))
-    assert base == "sek" and words == "29 kr"
-
-
-def test_a_line_that_is_no_price_is_left_out():
-    prices, _base, _words = _price(_support("SEK 29, nonsense, EUR two, USD 3.999, NOK 29"))
-    assert prices == {"sek": "29", "nok": "29"}
-
-
-def test_without_the_list_the_page_says_the_price_as_before():
-    prices, base, words = _price(_support("", "30 kr"))
-    assert prices is None and base is None and words == "30 kr"
+def test_one_tip_and_nothing_given_for_it():
+    page = _support("")
+    assert page.count('class="sway ') == 1 and 'class="sway sway-tip"' in page
+    assert '<bdi class="sway-hint">50 kr</bdi>' in page and "data-tip-dialog" in page
+    for gone in ("sway-monthly", "sway-manage", "sway-price", "sp-gh", "sp-perks", "sp-money", "class=\"perk",
+                 "data-monthly", "Sponsor", "monthly", "Monthly"):
+        assert gone not in page, gone
+    # The dialog's words: a tip, no key.
+    words = re.search(r'<div id="tip-i18n" hidden([^>]*)>', page).group(1)
+    assert 'data-title="Leave a tip"' in words and "data-key" not in words
+    # The thank-you for a receipt's link from before keeps its words.
+    assert '<div id="support-thanks" class="support-thanks" hidden' in page and "data-keycopy=" in page
 
 
 def test_the_tip_hint_is_marked_for_the_dialog():
     assert '<bdi class="sway-hint">50 kr</bdi>' in _support("")
 
 
-def test_the_portal_under_monthly_support_and_in_the_rules():
-    page = _support("", "29 kr", "sv", "https://billing.stripe.com/p/login/x")
-    assert '<a class="sway-manage" href="https://billing.stripe.com/p/login/x"' in page
-    assert 'tryck på <a href="https://billing.stripe.com/p/login/x">Hantera eller avsluta ditt månadsstöd</a> ovan' in page
-    plain = _support("", "29 kr", "sv")
-    assert "sway-manage" not in plain and 'href="#monthly">Hantera' in plain
-    assert "%PORTAL%" not in plain and "%MANAGE%" not in plain and "%EMAIL%" not in plain
-
-
 def test_four_short_questions_and_who_you_pay_in_the_visitor_s_language():
     # The whole of the rules is the payment terms (/payments/); the support
     # page asks four short questions in the visitor's own language.
     page = _support("", "29 kr", "sv")
-    assert re.findall(r'<details class="sp-q" id="([a-z]+)"', page) == ["cancel", "refund", "key", "again"]
+    assert re.findall(r'<details class="sp-q" id="([a-z]+)"', page) == ["what", "refund"]
     assert '<div class="sp-company" id="company">' in page and "559601-3176" in page
     assert "SE559601317601" in page and 'href="/about/#foretaget"' in page
     assert "Mogatan 21, 702 13 Örebro, Sverige" in page
@@ -102,27 +76,32 @@ def test_four_short_questions_and_who_you_pay_in_the_visitor_s_language():
     de = _support("", "", "de")
     assert "Bekomme ich mein Geld zurück?" in de and 'href="/about/#company"' in de
     assert "Changed your mind" not in de and "legal-meta" not in de and '<div class="sp-legal">' in de
-    assert "Tappat bort nyckeln?" in page
+    assert "Vad är dricksen för?" in page and "Tappat bort nyckeln?" not in page
     assert "<!--SUPPORT-OPTIONS-->" not in page and "legal-tabs" not in page
-    assert page.count('class="perk ') == 4 and page.count("<li><svg") >= 3
+    assert 'class="perk' not in page and page.count("<li><svg") >= 2
 
 
 def test_every_language_has_the_page_s_words():
     import glob
-    keys = [k for k in json.load(open(os.path.join(SITE, "lang", "en.json"), encoding="utf-8"))
-            if k.startswith(("support_trust_", "support_perk", "support_money_", "support_faq_", "support_manage"))]
-    keys += [k for k in json.load(open(os.path.join(SITE, "lang", "en.json"), encoding="utf-8"))
-             if k.startswith("support_fq_")] + ["support_who_h", "support_company_all", "foot_vat"]
-    assert len(keys) == 15 + 12
+    en = json.load(open(os.path.join(SITE, "lang", "en.json"), encoding="utf-8"))
+    keys = [k for k in en if k.startswith(("support_trust_", "support_faq_", "support_fq_"))]
+    keys += ["support_who_h", "support_company_all", "foot_vat"]
+    assert sorted(keys[:-3]) == ["support_faq_h", "support_fq_more", "support_fq_refund_a", "support_fq_refund_q",
+                                 "support_fq_what_a", "support_fq_what_q", "support_trust_refund",
+                                 "support_trust_stripe"]
+    # Nothing left of monthly support, the perks or where the money goes.
+    gone = ("support_monthly_", "support_gh_", "support_perk", "support_money_", "support_manage",
+            "support_trust_cancel", "support_fq_cancel_", "support_fq_key_", "support_fq_lost_", "tip_key_wait")
     for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
         have = json.load(open(f, encoding="utf-8"))
         assert not [k for k in keys if not have.get(k)], f
+        assert not [k for k in have if k.startswith(gone)], f
 
 
 def test_the_payment_terms_are_a_page_of_the_legal_set():
     # The support page's rules, one text, as a page with the legal tabs: each
     # folded question a numbered section, who you pay the last.
-    for lang, n, last in (("sv", 10, 'id="foretaget"'), ("en", 10, 'id="company"')):
+    for lang, n, last in (("sv", 7, 'id="foretaget"'), ("en", 7, 'id="company"')):
         page = _support("", "29 kr", lang, "https://billing.stripe.com/p/login/x", page="payments")
         tabs = re.search(r'<nav class="legal-tabs"[^>]*>(.*?)</nav>', page, re.S).group(1)
         assert re.findall(r'href="/([a-z]+)/"', tabs) == ["privacy", "transparency", "terms", "payments", "about"]
@@ -130,9 +109,9 @@ def test_the_payment_terms_are_a_page_of_the_legal_set():
         assert page.count('<span class="lnum">') == n and f'<h2 {last}>' in page
         assert "sp-q" not in page and "sp-company" not in page and "%PORTAL%" not in page
         assert 'class="legal-tocbox"' in page
-        assert 'href="https://billing.stripe.com/p/login/x"' in page
+        assert "billing.stripe.com" not in page and "#monthly" not in page
     plain = _support("", "", "de", page="payments")
-    assert 'lang="en"' in plain and 'href="/support/#monthly"' in plain
+    assert 'lang="en"' in plain and "What a tip is" in plain
 
 
 def test_the_support_page_links_its_rules_and_keeps_no_tabs():
@@ -150,7 +129,7 @@ def test_the_heart_says_support_us_and_the_footer_the_country():
         assert "%TOWN%" in have.get("foot_place", ""), f
         assert "foot_support" not in have, f
     en = _support("", "", "en", page="terms")
-    assert ">Support us</a>" in en and "· Örebro, Sweden ·" in en and "<bdi>559601-3176</bdi>" in en
+    assert ">Leave a tip</a>" in en and "· Örebro, Sweden ·" in en and "<bdi>559601-3176</bdi>" in en
     assert "· Örebro, Sverige ·" in _support("", "", "sv", page="terms")
 
 

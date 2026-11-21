@@ -195,20 +195,20 @@ var iptvHit = (function () {
   });
 })();
 
-/* Support, around the tip dialog (the next part): a tip is given in the
- * dialog, monthly support through Stripe's own Payment Link on the support
- * page (/support/, render.jq's support options). What is here:
+/* Around the tip dialog (the next part): a tip for the app is given in the
+ * dialog on the tip page (/support/) and nothing is given for it. What is
+ * here:
  * - links from elsewhere: the tip dialog's old link (apps up to 1.6.4,
  *   older release notes) opens the tip dialog, the app's heart
  *   (#support) shows the band on the front page, an invitation; with the
- *   dialog off both land on /support/, a receipt's #key link too;
- * - back from monthly support's Payment Link (/support/?paid=<Checkout
- *   Session id>) - or from a tip's receipt with the dialog off - the
- *   thank-you shows the supporter key: /support/key (donate/donate.py) asks
- *   Stripe whether it is paid; a copy button and a dopeiptv:// link, kept
- *   in this browser so the page shows it again;
- * - the owner's note: new tips and monthly support at the foot of the
- *   site's pages, in the browser that has opened /admin/.
+ *   dialog off both land on /support/, a receipt's #key link always;
+ * - a payment from before November 22, 2026 - a tip's receipt, or back
+ *   from monthly support's Payment Link (/support/?paid=<Checkout Session
+ *   id>) - still gets its supporter key in the thank-you: /support/key
+ *   (donate/donate.py) asks Stripe whether it is paid; a copy button and a
+ *   dopeiptv:// link, kept in this browser so the page shows it again;
+ * - the owner's note: new tips at the foot of the site's pages, in the
+ *   browser that has opened /admin/.
  */
 (function () {
   "use strict";
@@ -241,14 +241,15 @@ var iptvHit = (function () {
   }
 
   // -- where a link from elsewhere lands ----------------------------------------
-  // The tip dialog takes its old link and a receipt's #key itself (the next part).
-  // Without it - the dialog off, or a browser without <dialog> - the support
-  // page has the ways to give, and its thank-you a receipt's key.
+  // The tip dialog takes its old link itself (the next part); without it -
+  // the dialog off, or a browser without <dialog> - the support page has the
+  // tip. A receipt's #key (a tip paid before November 22, 2026) is the
+  // support page's thank-you to show.
   var DIALOG = !!(document.getElementById("tip-i18n") && window.fetch && window.Promise &&
                   typeof HTMLDialogElement === "function");
   var path = window.location.pathname, onSupport = /^\/support\//.test(path);
   var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
-  if (!DIALOG && (window.location.hash === "#donate" || (receipt && !onSupport))) {
+  if ((!DIALOG && window.location.hash === "#donate") || (receipt && !onSupport)) {
     window.location.replace("/support/" + window.location.search + (receipt ? window.location.hash : ""));
     return;
   }
@@ -352,8 +353,8 @@ var iptvHit = (function () {
       } catch (e) { /* the address stays; harmless */ }
       requestAnimationFrame(function () { box.scrollIntoView({ block: "start" }); });
       ask({ s: paid[1] });
-    } else if (receipt && !DIALOG) {
-      // A tip's receipt while the dialog is off: its key here instead.
+    } else if (receipt) {
+      // A tip's receipt from before November 22, 2026: its key here.
       box.hidden = false;
       say(T.loading);
       try { history.replaceState(null, "", path + window.location.search); } catch (e) { /* harmless */ }
@@ -675,8 +676,7 @@ var iptvCurrency = (function () {
 /* The tip dialog: Stripe's card form (the Payment Element) in a dialog on
  * this page - nothing leaves the site but the payment itself, which goes
  * from Stripe's iframes straight to Stripe. A tip is once and of any
- * amount; monthly support is a Payment Link on the support page, which the
- * dialog points to.
+ * amount, for the app; nothing is given for it.
  *
  * Every tip link (data-tip-dialog: the header's link and heart, the front
  * page's band, the support page's tip) points at the support page, so with
@@ -708,14 +708,9 @@ var iptvCurrency = (function () {
  * small menu in the dialog's head changes it on either step - on the card
  * form's step the form follows at once (remembered on this device).
  *
- * A tip comes with a supporter key for the app (donate/supporter.py): the
- * thank-you shows it with a copy button and a dopeiptv:// link that hands
- * it to the app. It comes from /support/key once Stripe says the payment
- * went through ({cs} right after paying, or back from a method that left
- * the page), in /pay/wallet's answer for Apple Pay and Google Pay, and
- * from the link in Stripe's receipt (dopeiptv.org/support/#key=<token>,
- * {t}) - so it can be fetched again later. Remembered in this browser only,
- * where the dialog offers it again.
+ * Until November 22, 2026 a tip came with a supporter key; a receipt's
+ * link to it is the support page's to answer (the part above), and the
+ * dialog has none of it.
  */
 (function () {
   "use strict";
@@ -728,7 +723,7 @@ var iptvCurrency = (function () {
   var STRIPE_JS = "https://js.stripe.com/endive/stripe.js";
   var ZERO_DECIMAL = /^(bif|clp|djf|gnf|jpy|kmf|krw|mga|pyg|rwf|ugx|vnd|vuv|xaf|xof|xpf)$/;
   var cfg = null, cfgLoading = null, stripeLoading = null, dlg = null, el = {}, chosen = 0, live = null, busy = false, cur = "";
-  var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false, paidSecret = "";
+  var stripe = null, pr = null, wallet = null, walletAmount = 0, prepping = false;
   var APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
   // Asked once: whoever turned motion down gets the dialog without the show.
   var CALM = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -1130,22 +1125,6 @@ var iptvCurrency = (function () {
     el.amounts.append(el.chips, other, el.err1);
     if (el.more1) { el.amounts.append(el.more1); }
     el.amounts.append(el.go, el.card);
-    // A supporter key this browser keeps, offered again (a supporter can
-    // still give again - the amounts are right above).
-    if (T.key && storedKey()) {
-      el.mine = mk("button", "dn-mine"); el.mine.type = "button";
-      el.mine.append(heart("dn-mineheart"), document.createTextNode(T.key));
-      el.mine.addEventListener("click", function () { keyOnly(); showKey(storedKey()); });
-      el.amounts.append(el.mine);
-    }
-    // Monthly support instead: its Payment Link is on the support page.
-    if (T.monthly) {
-      var monthly = mk("p", "dn-more dn-monthly"), to = mk("a", "", T.monthly);
-      to.href = "/support/#monthly";
-      monthly.append(to);
-      el.amounts.append(monthly);
-    }
-
     el.pay = mk("div", "dn-step"); el.pay.hidden = true;
     // The amount stays open here: the same choices, smaller, and an own
     // amount - the card form and the button follow at once.
@@ -1180,7 +1159,6 @@ var iptvCurrency = (function () {
     var bigHeart = mk("p", "dn-heart"); bigHeart.append(heart("dn-bigheart"));
     el.receipt = mk("p", "", T.receipt);
     el.done.append(bigHeart, mk("h3", "", T.thanks), el.receipt);
-    if (T.key) { el.done.append(keyBox()); }
 
     var body = mk("div", "dn-body");
     body.append(el.loading, el.amounts, el.pay, el.done);
@@ -1221,70 +1199,6 @@ var iptvCurrency = (function () {
     dlg.addEventListener("click", function (e) { if (e.target === dlg) { close(); } });
     document.body.appendChild(dlg);
   }
-  // -- the supporter key ------------------------------------------------------
-  function storedKey() {
-    try { return localStorage.getItem("dn-supporter-key") || ""; } catch (e) { return ""; }
-  }
-  function keyBox() {
-    el.key = mk("div", "dn-key"); el.key.hidden = true;
-    el.keyText = mk("code", "dn-keytext");
-    el.keyText.setAttribute("translate", "no");
-    var row = mk("div", "dn-keyrow");
-    el.keyCopy = mk("button", "btn primary dn-keycopy", T.keycopy); el.keyCopy.type = "button";
-    el.keyCopy.addEventListener("click", function () {
-      var said = function () {
-        el.keyCopy.textContent = T.keycopied;
-        setTimeout(function () { el.keyCopy.textContent = T.keycopy; }, 2500);
-      };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(el.keyText.textContent).then(said, function () { pick(); });
-      } else { pick(); }
-    });
-    el.keyOpen = mk("a", "btn dn-keyopen", T.keyopen);
-    row.append(el.keyCopy, el.keyOpen);
-    el.keyNote = mk("p", "dn-keynote", T.keyhow);
-    el.keyState = mk("p", "dn-keystate"); el.keyState.hidden = true;
-    el.key.append(mk("p", "dn-keyhead", T.key), el.keyText, row, el.keyNote);
-    var box = mk("div");
-    box.append(el.key, el.keyState);
-    return box;
-  }
-  function pick() {        // no clipboard: the key selected, for the visitor's own copy
-    var r = document.createRange(); r.selectNodeContents(el.keyText);
-    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-  }
-  function showKey(key) {
-    if (!el.key || !/^DS1-[A-Za-z0-9_-]{20,}$/.test(key || "")) { return; }
-    el.keyText.textContent = key;
-    el.keyOpen.href = "dopeiptv://supporter?key=" + encodeURIComponent(key);
-    el.key.hidden = false; el.keyState.hidden = true;
-    try { localStorage.setItem("dn-supporter-key", key); } catch (e) { /* this browser keeps nothing */ }
-  }
-  function keyState(text) {
-    if (!el.keyState) { return; }
-    el.keyState.textContent = text; el.keyState.hidden = !text;
-  }
-  // From the service: once the payment went through (Stripe is asked).
-  function fetchKey(ask, quiet) {
-    if (!T.key) { return; }
-    if (!quiet) { keyState(T.loading); }
-    fetch("/support/key", { method: "POST", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(ask) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return [r.status, j]; }); })
-      .then(function (got) {
-        if (got[0] === 200 && got[1].key) { showKey(got[1].key); return; }
-        keyState(quiet ? "" : got[0] === 202 ? T.keywait : T.keynone);
-      })
-      .catch(function () { keyState(quiet ? "" : T.keywait); });
-  }
-  // The thank-you without "a receipt is on its way": a key asked for later.
-  function keyOnly() {
-    if (!dlg) { build(); }
-    el.receipt.hidden = true;
-    show(el.done);
-    if (!dlg.open) { dlg.showModal(); }
-  }
-
   function show(step) {
     var thanks = step === el.done && el.done.hidden;
     [el.loading, el.amounts, el.pay, el.done].forEach(function (s) { s.hidden = s !== step; });
@@ -1466,9 +1380,8 @@ var iptvCurrency = (function () {
   function tipped() {
     if (typeof iptvHit === "function") { iptvHit("supported"); }
   }
-  function walletDone(res) {
+  function walletDone() {
     tipped(); show(el.done);
-    if (res && res.key) { showKey(res.key); } else if (res && res.cs) { fetchKey({ cs: res.cs }, true); }
   }
   function walletFailed(msg) {
     show(el.amounts);
@@ -1481,14 +1394,14 @@ var iptvCurrency = (function () {
         email: ev.payerEmail || "", name: ev.payerName || "" }) })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (res) {
-        if (res.ok) { ev.complete("success"); walletDone(res); return; }
+        if (res.ok) { ev.complete("success"); walletDone(); return; }
         if (res.action) {
           ev.complete("success");
           show(el.loading);
           var next = stripe.handleNextAction ? stripe.handleNextAction({ clientSecret: res.action })
                                              : stripe.confirmCardPayment(res.action);
           return next.then(function (r) {
-            if (r.error) { walletFailed(r.error.message); } else { walletDone({ cs: res.action }); }
+            if (r.error) { walletFailed(r.error.message); } else { walletDone(); }
           });
         }
         ev.complete("fail");
@@ -1562,7 +1475,6 @@ var iptvCurrency = (function () {
           return res.json();
         });
     }).then(function (sess) {
-      paidSecret = sess.clientSecret;
       return stripe.confirmPayment({
         elements: elements,
         clientSecret: sess.clientSecret,
@@ -1577,7 +1489,6 @@ var iptvCurrency = (function () {
       var state = r && r.paymentIntent && r.paymentIntent.status;
       if (state === "succeeded" || state === "processing") {
         teardown(); busy = false; tipped(); show(el.done);
-        fetchKey({ cs: paidSecret }, state !== "succeeded");
         return;
       }
       warn("payment ended as", state);
@@ -1612,8 +1523,6 @@ var iptvCurrency = (function () {
   });
 
   // Back from a payment method that left the page (Klarna and the like).
-  var back = /[?&]payment_intent_client_secret=([A-Za-z0-9_]+)/.exec(window.location.search);
-  var receipt = /^#key=([A-Za-z0-9_-]{16,40})$/.exec(window.location.hash);
   if (/[?&]tipped=1(&|$)/.test(window.location.search)) {
     try {
       // Stripe's own return parameters go too: the secret is not for the history.
@@ -1623,11 +1532,6 @@ var iptvCurrency = (function () {
         window.location.hash);
     } catch (e) { /* the address stays; harmless */ }
     build(); show(el.done); dlg.showModal();
-    if (back) { fetchKey({ cs: back[1] }, false); }
-  } else if (receipt) {
-    // The link in Stripe's receipt: the key again, once the payment went through.
-    keyOnly();
-    fetchKey({ t: receipt[1] }, false);
   } else if (window.location.hash === "#donate") {
     // The dialog's old link from elsewhere - apps up to 1.6.4, older
     // release notes - opens it.

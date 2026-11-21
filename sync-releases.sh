@@ -559,12 +559,13 @@ tplangs=$( (cd "$SITE/transparency" 2>/dev/null && for f in *.html; do
     [ -f "$f" ] && echo "${f%.html}"
 done) | jq -R . | jq -cs .)
 
-# The support page's ways - the tip dialog (SUPPORT_TIPS=on) or a tip's
-# Payment Link, monthly support's Payment Link and GitHub Sponsors (all on
-# dopeIPTV's own Stripe account) - with the amounts the page names: the
-# server's, never git's, in /usr/local/etc/iptv-site.conf (the server's runbook,
-# "Support"). Lines KEY=value, read here, never run. Until one of them is
-# set the site invites to nothing (site/render.jq).
+# The support page's tip - the tip dialog (SUPPORT_TIPS=on) or a tip's
+# Payment Link, on dopeIPTV's own Stripe account - with the amount the page
+# names: the server's, never git's, in /usr/local/etc/iptv-site.conf (the
+# server's runbook, "Support"). Lines KEY=value, read here, never run.
+# Until one of them is set the site invites to nothing (site/render.jq).
+# SUPPORT_MONTHLY_*, SUPPORT_SPONSORS_URL and SUPPORT_PORTAL_URL are read
+# no longer: a tip is the one way (November 2026).
 SITE_CONF=${IPTV_SITE_CONF:-/usr/local/etc/iptv-site.conf}
 conf() {  # conf KEY: its value in $SITE_CONF, or nothing
     [ -r "$SITE_CONF" ] || return 0
@@ -576,12 +577,7 @@ https_or_nothing() {  # an address that is not https:// is left out
 }
 tips=$(conf SUPPORT_TIPS)
 tip_url=$(https_or_nothing "$(conf SUPPORT_TIP_URL)")
-monthly_url=$(https_or_nothing "$(conf SUPPORT_MONTHLY_URL)")
-sponsors_url=$(https_or_nothing "$(conf SUPPORT_SPONSORS_URL)")
-portal_url=$(https_or_nothing "$(conf SUPPORT_PORTAL_URL)")
 tip_hint=$(conf SUPPORT_TIP_HINT)
-monthly_price=$(conf SUPPORT_MONTHLY_PRICE)
-monthly_prices=$(conf SUPPORT_MONTHLY_PRICES)
 
 render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY [BODY_LANG]]
     mkdir -p "${4%/*}"
@@ -589,9 +585,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY [BODY_LANG]]
     jq -n -j -f "$SITE/render.jq" \
         --arg page "$1" --arg lang "$2" --arg year "$year" --arg sums "$sums" \
         --arg pics_v "$pics_v" \
-        --arg tips "$tips" --arg tip_url "$tip_url" --arg monthly_url "$monthly_url" \
-        --arg sponsors_url "$sponsors_url" --arg portal_url "$portal_url" --arg tip_hint "$tip_hint" \
-        --arg monthly_price "$monthly_price" --arg monthly_prices "$monthly_prices" \
+        --arg tips "$tips" --arg tip_url "$tip_url" --arg tip_hint "$tip_hint" \
         --argjson avail "$avail" --argjson asset_urls "$asset_urls" \
         --argjson screenshots "$screenshots" --argjson help_mtime "$help_mtime" \
         --slurpfile site "$SITE/i18n.json" --slurpfile helpfile "$SITE/help.json" \

@@ -28,41 +28,25 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # shows the English text inside its own header and footer.
 | $legal[0] as $L
 | "https://dopeiptv.org" as $SITE | "https://github.com/slimture/dopeIPTV" as $REPO
-# Support (the support page, /support/), on dopeIPTV's own Stripe account:
-# a tip is given in the tip dialog on the page (nav.js: Stripe's card form,
+# A tip for the app (the support page, /support/), on dopeIPTV's own Stripe
+# account: given in the tip dialog on the page (nav.js: Stripe's card form,
 # Apple Pay and Google Pay, donate/donate.py) once SUPPORT_TIPS=on, else
-# through a Stripe Payment Link (SUPPORT_TIP_URL); monthly support is a
-# Payment Link (SUPPORT_MONTHLY_URL); and GitHub Sponsors. They are the
-# server's, not git's: sync-releases.sh reads them from
-# /usr/local/etc/iptv-site.conf and passes them here. A way with none of
-# them says "coming soon" and links nowhere. What the page suggests - a
-# tip's amount, the monthly one - is set beside them (SUPPORT_TIP_HINT,
-# SUPPORT_MONTHLY_PRICE). SUPPORT_MONTHLY_PRICES - "SEK 29, EUR 2.50, USD 3",
-# the monthly price's own currency first - are the amounts its Stripe price
-# has in each currency; nav.js shows the visitor's (Stripe charges the one of
-# where they are), SUPPORT_MONTHLY_PRICE (else the first) without nav.js.
+# through a Stripe Payment Link (SUPPORT_TIP_URL). They are the server's,
+# not git's: sync-releases.sh reads them from /usr/local/etc/iptv-site.conf
+# and passes them here. Without either the tip says "coming soon" and
+# links nowhere. What the page suggests is set beside them
+# (SUPPORT_TIP_HINT). A tip is for the app and gives nothing: no key, no
+# monthly support, no other way to give (November 2026).
 | (($ARGS.named.tips // "") == "on") as $TIPS_ON
 | ($ARGS.named.tip_url // "") as $TIP_URL
-| ($ARGS.named.monthly_url // "") as $MONTHLY_URL
-| ($ARGS.named.sponsors_url // "") as $SPONSORS_URL
-# Stripe's customer portal: where a monthly supporter changes their card or
-# cancels (SUPPORT_PORTAL_URL, its login link: they get a link by e-mail).
-| ($ARGS.named.portal_url // "") as $PORTAL_URL
 | (($ARGS.named.tip_hint // "") | if . == "" then "50 kr" else . end) as $TIP_HINT
-| [($ARGS.named.monthly_prices // "") | splits("[,;](?=\\s*[A-Za-z])")
-   | gsub("^\\s+|\\s+$"; "") | capture("^(?<c>[A-Za-z]{3})\\s+(?<a>[0-9]+([.,][0-9]{1,2})?)$")?
-   | {key: (.c | ascii_downcase), value: (.a | sub(","; "."))}] as $PRICE_LIST
-| ($PRICE_LIST | from_entries) as $MONTHLY_PRICES
-| (($ARGS.named.monthly_price // "")
-   | if . != "" then . elif ($PRICE_LIST | length) > 0
-     then "\($PRICE_LIST[0].value) \($PRICE_LIST[0].key | ascii_upcase)" else "30 kr" end) as $MONTHLY_PRICE
-# The ways to pay are invited to - the header's link and heart, the front
-# page's band, the footer's link - only once one is set up: until then the
-# support page is there (its policy, GitHub Sponsors, "coming soon"), but
-# nothing on the site asks for money that cannot be taken. Every one of them
-# goes to the support page, where both ways are - as the app's heart does;
-# its tip button opens the tip dialog there (data-tip-dialog).
-| ($TIPS_ON or $TIP_URL != "" or $MONTHLY_URL != "") as $SUPPORT_ON
+# The tip is invited to - the header's link and heart, the front page's
+# band, the footer's link - only once it is set up: until then the support
+# page is there (its terms, "coming soon"), but nothing on the site asks for
+# money that cannot be taken. Every one of them goes to the support page -
+# as the app's heart does; its tip button opens the tip dialog there
+# (data-tip-dialog).
+| ($TIPS_ON or $TIP_URL != "") as $SUPPORT_ON
 # The company behind dopeIPTV: in every footer and on the support page, as
 # Stripe's review and the Swedish E-Commerce Act ask.
 | "Solecraft AB" as $COMPANY
@@ -206,13 +190,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            ["emailmissing", "tip_email_missing"], ["range", "tip_range"],
            ["close", "tip_close"], ["loading", "support_loading"],
            ["apple", "tip_apple"], ["google", "tip_google"], ["card", "tip_card"],
-           ["key", "support_key"], ["keyhow", "support_key_how"], ["keycopy", "support_key_copy"],
-           ["keycopied", "support_key_copied"], ["keyopen", "support_key_open"], ["keywait", "tip_key_wait"],
-           ["keynone", "support_key_none"], ["payeenote", "tip_payee_note"], ["more", "tip_more"]][]
+           ["payeenote", "tip_payee_note"], ["more", "tip_more"]][]
           | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
       + " data-payee=\"\($COMPANY | h)\" data-payeelogo=\"\($PAYEE_LOGO | h)\" data-payeeurl=\"\($PAYEE_URL | h)\""
       + " data-moremail=\"\($EMAIL | h)\""
-      + (if $MONTHLY_URL == "" then "" else " data-monthly=\"\(t("support_monthly_h") | h)\"" end)
       + " data-lang=\"\($lang | h)\"></div>\n"
     end;
   # Feedback from the footer's link (nav.js): its words, on every page.
@@ -497,51 +478,38 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
       + "      </div>\n"
       + "    </div>\n"
       + "  </section>\n\n";
-  # The support page's ways to give (in the support page's legal text where
-  # it says <!--SUPPORT-OPTIONS-->), the thank-you nav.js fills in after
-  # paying, and the company. A way without its address says "coming soon".
-  # A tip with the dialog on opens it (data-tip-dialog), and without nav.js goes
-  # to the tip's Payment Link if there is one, else stays on this page.
-  def support_way($cls; $title; $text; $href; $btn; $primary; $ev):
-    ($ev == "tip" and $TIPS_ON) as $dialog
-    | "      <div class=\"sway \($cls)\"\(if $ev == "monthly" then " id=\"monthly\"" else "" end)>\n"
+  # The support page's tip, the thank-you nav.js fills in for a receipt's
+  # link from before November 22, 2026 (its supporter key), and the
+  # company. Without its address the tip says "coming soon". With the
+  # dialog on it opens it (data-tip-dialog), and without nav.js goes to the
+  # tip's Payment Link if there is one, else stays on this page.
+  def support_way($cls; $title; $text; $href; $btn):
+    "      <div class=\"sway \($cls)\">\n"
     + "        <h2>\($title | h)</h2>\n"
     + "        <p>\($text)</p>\n"
-    + (if $dialog then
-         "        <a class=\"btn\(if $primary then " primary" else "" end)\" href=\"\(if $href == "" then "/support/" else $href end | h)\" rel=\"nofollow noopener\" data-tip-dialog data-support=\"\($ev)\">\($btn | h)</a>\n"
+    + (if $TIPS_ON then
+         "        <a class=\"btn primary\" href=\"\(if $href == "" then "/support/" else $href end | h)\" rel=\"nofollow noopener\" data-tip-dialog data-support=\"tip\">\($btn | h)</a>\n"
        elif $href == "" then
-         "        <span class=\"btn\(if $primary then " primary" else "" end) is-off\" aria-disabled=\"true\">\(t("support_soon") | h)</span>\n"
+         "        <span class=\"btn primary is-off\" aria-disabled=\"true\">\(t("support_soon") | h)</span>\n"
        else
-         "        <a class=\"btn\(if $primary then " primary" else "" end)\" href=\"\($href | h)\" rel=\"nofollow noopener\" data-support=\"\($ev)\">\($btn | h)</a>\n"
+         "        <a class=\"btn primary\" href=\"\($href | h)\" rel=\"nofollow noopener\" data-support=\"tip\">\($btn | h)</a>\n"
        end)
-    + (if $ev == "monthly" and $PORTAL_URL != "" then
-         "        <a class=\"sway-manage\" href=\"\($PORTAL_URL | h)\" rel=\"nofollow noopener\">\(t("support_manage") | h)</a>\n"
-       else "" end)
     + "      </div>\n";
   # The support page's own parts (templates/support.html), in the reader's
-  # language: the two ways as big cards - a tip, monthly support with the
-  # customer portal under it -, GitHub Sponsors as a line once it is set up,
-  # what makes it safe, the thank-you nav.js fills in after paying; what a
-  # supporter gets and where the money goes. The rules - the legal text, in
-  # Swedish or English - fold up below them (site/legal/<lang>/support.html).
+  # language: the tip as one big card, what makes it safe, the thank-you
+  # for an old receipt; then two short questions. The rules - the legal
+  # text, in Swedish or English - are the payment terms (/payments/).
   def support_ways:
     def check: "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12.5l4.2 4.2L19 7\"/></svg>";
-    "      <div class=\"support-ways\">\n"
+    "      <div class=\"support-ways is-one\">\n"
     + support_way("sway-tip"; t("support_tip_h"); t("support_tip_p") | h
                   | gsub("%AMOUNT%"; "<bdi class=\"sway-hint\">\($TIP_HINT | h)</bdi>");
-                  $TIP_URL; t("support_tip_btn"); true; "tip")
-    + support_way("sway-monthly"; t("support_monthly_h"); t("support_monthly_p") | h
-                  | gsub("%AMOUNT%"; "<bdi class=\"sway-price\"\(if ($PRICE_LIST | length) > 0
-                      then " data-prices=\"\($MONTHLY_PRICES | tojson | h)\" data-base=\"\($PRICE_LIST[0].key | h)\"" else "" end)>\($MONTHLY_PRICE | h)</bdi>");
-                  $MONTHLY_URL; t("support_monthly_btn"); true; "monthly")
+                  $TIP_URL; t("support_tip_btn"))
     + "      </div>\n"
-    + (if $SPONSORS_URL != "" then
-         "      <p class=\"sp-gh\"><a href=\"\($SPONSORS_URL | h)\" rel=\"nofollow noopener\" data-support=\"github\">\(t("support_gh_btn") | h)</a> · \(t("support_gh_p") | h)</p>\n"
-       else "" end)
     + "      <ul class=\"sp-trust\">\n"
-    + ([["support_trust_stripe", "support_trust_refund", "support_trust_cancel"][]
+    + ([["support_trust_stripe", "support_trust_refund"][]
        | "        <li>\(check)\(t(.) | h)</li>\n"] | add)
-    # The rules behind those three, a page of the legal set (/payments/).
+    # The rules behind those, a page of the legal set (/payments/).
     + "        <li class=\"sp-trust-terms\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h4\"/></svg><a href=\"/payments/\">\(t("foot_payments") | h)</a></li>\n"
     + "      </ul>\n"
     + "      <div id=\"support-thanks\" class=\"support-thanks\" hidden"
@@ -551,22 +519,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          ["loading", "support_loading"]][]
         | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
     + "></div>\n";
-  def support_perks:
-    def theme($cls; $name):
-      "<span class=\"tp \($cls)\" aria-hidden=\"true\"><i class=\"tp-side\"></i><i class=\"tp-main\"><b></b><b></b><b class=\"on\"></b><b></b></i></span>";
-    "      <div class=\"sp-perks-grid\">\n"
-    + "        <div class=\"perk perk-themes\"><div class=\"perk-art\">\(theme("tp-aurora"; "Aurora"))\(theme("tp-dawn"; "Dawn"))</div><h3>\(t("support_perk_themes") | h)</h3><p>Aurora · Dawn</p></div>\n"
-    + "        <div class=\"perk perk-icon\"><div class=\"perk-art\"><img src=\"/supporter-icon.png?v=1\" width=\"64\" height=\"64\" alt=\"\"></div><h3>\(t("support_perk_icon") | h)</h3></div>\n"
-    + "        <div class=\"perk perk-heart\"><div class=\"perk-art\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg></div><h3>\(t("support_perk_heart") | h)</h3></div>\n"
-    + "        <div class=\"perk perk-feedback\"><div class=\"perk-art\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z\"/></svg></div><h3>\(t("support_perk_feedback") | h)</h3></div>\n"
-    + "      </div>\n";
-  def support_money:
-    "      <ul class=\"sp-money-list\">\n"
-    + ([[["support_money_dev", "<path d=\"M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16\"/>"],
-        ["support_money_servers", "<rect x=\"4\" y=\"4\" width=\"16\" height=\"6.5\" rx=\"2\"/><rect x=\"4\" y=\"13.5\" width=\"16\" height=\"6.5\" rx=\"2\"/><path d=\"M8 7.2h.01M8 16.7h.01\"/>"],
-        ["support_money_apple", "<rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8 20h8M12 16v4\"/>"]][]
-       | "        <li><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\">\(.[1])</svg><span>\(t(.[0]) | h)</span></li>\n"] | add)
-    + "      </ul>\n";
   # The app's own pictures (tools/site_screenshots.py in its repository):
   # public/screenshots/<lang>/<name>.webp, in the reader's language or else
   # English; $screenshots lists what is there as "<lang>/<name>". A smaller
@@ -846,13 +798,12 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # paid - so the page is the visitor's language all through.
   def support_faq:
     "<a href=\"mailto:\($EMAIL | h)\">\($EMAIL | h)</a>" as $mail
-    | "<a href=\"\((if $PORTAL_URL != "" then $PORTAL_URL else "#monthly" end) | h)\">\(t("support_manage") | h)</a>" as $manage
     | "      <div class=\"sp-legal\">\n"
-      + ([[["cancel", "support_fq_cancel"], ["refund", "support_fq_refund"], ["key", "support_fq_key"], ["again", "support_fq_lost"]][]
+      + ([[["what", "support_fq_what"], ["refund", "support_fq_refund"]][]
          | . as [$id, $k]
          | "        <details class=\"sp-q\" id=\"\($id)\">\n"
            + "          <summary><h3>\(t($k + "_q") | h)</h3></summary>\n"
-           + "          <div class=\"sp-a\"><p>\(t($k + "_a") | h | gsub("%EMAIL%"; $mail) | gsub("%MANAGE%"; $manage))</p></div>\n"
+           + "          <div class=\"sp-a\"><p>\(t($k + "_a") | h | gsub("%EMAIL%"; $mail))</p></div>\n"
            + "        </details>\n"] | add)
       + "        <p class=\"sp-more\"><a href=\"/payments/\">\(t("support_fq_more") | h)</a></p>\n"
       + "        <div class=\"sp-company\" id=\"company\">\n"
@@ -870,7 +821,10 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
        else ($body | if $page == "payments" then as_terms($X.toc // "Contents") else . end
              | legal_numbers | legal_toc($X.toc // "Contents")) end) as $parts
     | $tpl
-    | expand(common + {title: ($P.title | h), desc: ($P.desc | h), clang: ($cl | h),
+    # The support page in the visitor's own language; the legal set's
+    # pages in the language they are written in.
+    | expand(common + {title: (if $page == "support" then t("support_btn") else $P.title end | h),
+                       desc: (if $page == "support" then t("support_p") else $P.desc end | h), clang: ($cl | h),
                        canonical: (url($path; $cl) | h), grid: $parts.grid};
         {hreflang: legal_hreflang($path), nav: nav($page),
          tabs: ([($L.tabs // $L.pages)[] as $p
@@ -882,12 +836,9 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            + " <a href=\"\($path + "?lang=" + $X.link | h)\" hreflang=\"\($X.link | h)\" lang=\"\($X.link | h)\">\($X.other | h)</a>"),
          lede: (if ($P.lede // "") != "" then "        <p class=\"legal-lede\">\($P.lede | h)</p>\n" else "" end),
          toc: $parts.toc,
-         body: ((if $page == "support" then $body else $parts.body end)
-                | gsub("%PORTAL%"; (if $PORTAL_URL != "" then $PORTAL_URL else "/support/#monthly" end) | h)),
+         body: (if $page == "support" then $body else $parts.body end),
          ways: (if $page == "support" then support_ways else "" end),
-         faq: (if $page == "support" then support_faq else "" end),
-         perks: (if $page == "support" then support_perks else "" end),
-         money: (if $page == "support" then support_money else "" end)});
+         faq: (if $page == "support" then support_faq else "" end)});
 
 # -- /transparency/: Audit us -----------------------------------------------------
 # What the privacy policy promises, shown in the code that does it. The words

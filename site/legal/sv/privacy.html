@@ -35,7 +35,7 @@
 <li><strong>Appen sparar allt på din dator.</strong> Dina källor, inloggningar, favoriter, din historik och dina inställningar lämnar aldrig datorn. Ingen analys, ingen telemetri, ingen reklam.</li>
 <li><strong>Appen hör bara av sig när det finns ett skäl:</strong> för att leta efter uppdateringar (det går att stänga av), när du själv skickar en felrapport eller feedback – som du ser i sin helhet och som redan är rensad från namn, adresser, inloggningar och det du har tittat på – och, om du slår på det, för synkronisering och för att titta tillsammans, båda krypterade så att vi inte kan läsa dem.</li>
 <li><strong>Webbplatsens statistik skriver aldrig ned din IP-adress.</strong> Inga kakor och inga externa analystjänster. Webbservern lämnar varje sidvisning direkt till vår egen tjänst, som gör om din IP-adress till ett land i sitt minne och glömmer den – ingen logg, ingen fil och ingen säkerhetskopia innehåller den någonsin. Ett besök sparas i 14 dagar utan något som knyter det till dina andra dagar och raderas sedan – bara antal finns kvar; nyckeln som skulle kunna koppla ihop något finns bara i serverns minne. Det gör det mycket svårare, men aldrig helt omöjligt, att veta vem som besökte sidan (se avsnitt 3).</li>
-<li><strong>Dricks och månadsstöd</strong> betalas via Stripe. Kortuppgifter går direkt till Stripe och aldrig till oss, och vår server sparar inget om betalningen.</li>
+<li><strong>Dricks</strong> betalas via Stripe. Kortuppgifter går direkt till Stripe och aldrig till oss, och vår server sparar inget om betalningen.</li>
 <li><strong>Det här samlar vi aldrig in:</strong> vad du tittar på, dina källor, kanaler och inloggningar, och var du är noggrannare än land. Vi använder inga kakor som följer dig, säljer inga uppgifter, visar ingen reklam och har inga spårare från andra – inte ens typsnitten hämtas från någon annan.</li>
 </ul>
 </div>
@@ -46,7 +46,7 @@
 <li><a href="#appen">Appen dopeIPTV</a></li>
 <li><a href="#webbplatsen">Webbplatsen</a></li>
 <li><a href="#kakor">Kakor och lagring i din webbläsare</a></li>
-<li><a href="#stod">Dricks och månadsstöd</a></li>
+<li><a href="#stod">Dricks</a></li>
 <li><a href="#kontakt">När du kontaktar oss</a></li>
 <li><a href="#mottagare">Vilka som får del av uppgifterna</a></li>
 <li><a href="#overforing">Överföring till länder utanför EU/EES</a></li>
@@ -59,7 +59,7 @@
 
 <h2 id="ansvarig">1. Vem som ansvarar</h2>
 <p>Solecraft AB (org.nr 559601-3176), Mogatan 21, 702 13 Örebro, Sverige, är personuppgiftsansvarig för den behandling av personuppgifter som beskrivs här. Kontakta oss på <a href="mailto:info@solecraft.se">info@solecraft.se</a> – även när du vill använda dina rättigheter (avsnitt 10).</p>
-<p>Policyn gäller webbplatsen dopeiptv.org (den gamla adressen iptv.dope.rs skickar bara vidare dit), tjänsterna på den – stöd (dricks och månadsstöd), feedback och felrapporter, synkronisering av inställningar, titta tillsammans och uppdateringar – och appen dopeIPTV så som vi ger ut den.</p>
+<p>Policyn gäller webbplatsen dopeiptv.org (den gamla adressen iptv.dope.rs skickar bara vidare dit), tjänsterna på den – dricks, feedback och felrapporter, synkronisering av inställningar, titta tillsammans och uppdateringar – och appen dopeIPTV så som vi ger ut den.</p>
 
 <h2 id="appen">2. Appen dopeIPTV</h2>
 <h3>Det som stannar på din dator</h3>
@@ -154,7 +154,7 @@
 <ul>
 <li>Frontservern, som hanterar den krypterade anslutningen, för ingen logg över anropen till dopeiptv.org, och skriver bara ned ett fel när något hindrar den från att fungera (nedan). Anrop för synkronisering och för att titta tillsammans loggas aldrig någonstans.</li>
 <li>Inget annat loggas: servern bakom skriver ingen logg över andra anrop, och ingen som innehåller din IP-adress. För statistiken nedan lämnar den varje sidvisning, sidornas visningssignal och varje klick på en nedladdning direkt till vår egen tjänst genom en socket på samma maskin – med IP-adress, tidpunkt, sidan som efterfrågades (bara sidan – aldrig det en länk lade till i dess adress), status, webbläsare och språk –, som räknar den i minnet inom en minut och inte skriver ned någon IP-adress någonstans (nedan). För den öppna nedladdningsräknaren för den en liten logg över klick på nedladdningar: filens namn, svaret och om en webbläsare, appen eller en robot frågade – ingen IP-adress, ingen tidpunkt, ingen webbläsare. Den byts varje natt och bara föregående dygn sparas – högst två dygn –, sedan tas den bort automatiskt.</li>
-<li>Tjänsterna bakom webbplatsen – supporternyckeln, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
+<li>Tjänsterna bakom webbplatsen – dricks, en supporternyckel för en betalning från före den 22 november 2026, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
 </ul>
 <p>Varje logg på vår server, vad den innehåller och hur länge den sparas:</p>
 <ul>
@@ -215,7 +215,7 @@
 <ul>
 <li><code>dn-currency</code> – valutan du valde i dricksrutan;</li>
 <li><code>dn-wallet</code> – om din enhet erbjöd Apple Pay eller Google Pay, så att rätt knapp visas direkt;</li>
-<li><code>dn-supporter-key</code> – din supporternyckel efter dricks eller månadsstöd, så att dricksrutan och stödsidan kan visa den igen;</li>
+<li><code>dn-supporter-key</code> – en supporternyckel från dricks eller månadsstöd före den 22 november 2026, om webbläsaren sparade en, så att dricksidan kan visa den igen;</li>
 <li><code>fbs-last</code> – när du senast skickade feedback.</li>
 </ul>
 <p>Du kan rensa dem i webbläsarens inställningar.</p></li>
@@ -223,19 +223,19 @@
 </ul>
 <p>Vi använder inga kakor för reklam eller spårning, och även typsnitten kommer från vår egen server.</p>
 
-<h2 id="stod">5. Dricks och månadsstöd</h2>
-<p>Dricks och månadsstöd betalas via <strong>Stripe</strong> (Stripe Payments Europe, Ltd., 1 Grand Canal Street Lower, Dublin 2, Irland): dricks i Stripes betalformulär i dricksrutan på våra sidor, månadsstöd på Stripes egen betalsida, som vår stödsida länkar till.</p>
-<p>Du anger dina kortuppgifter i Stripes formulär eller på Stripes sida; de går direkt till Stripe och når aldrig oss. Stripe ansvarar själv för sin behandling av betalningen, enligt sin egen integritetspolicy (<a href="https://stripe.com/se/privacy" rel="noopener">stripe.com/se/privacy</a>). För månadsstöd sparar Stripe din e-postadress och prenumerationen, så att stödet kan dras varje månad och kvitton skickas tills du säger upp det.</p>
-<p>Våra sidor laddar Stripes skript och formulär först när du pekar på eller öppnar dricks, och Stripes formulär och sida kan använda egna kakor, till exempel för att förhindra bedrägerier.</p>
+<h2 id="stod">5. Dricks</h2>
+<p>Dricks betalas via <strong>Stripe</strong> (Stripe Payments Europe, Ltd., 1 Grand Canal Street Lower, Dublin 2, Irland), i Stripes betalformulär i dricksrutan på våra sidor.</p>
+<p>Du anger dina kortuppgifter i Stripes formulär; de går direkt till Stripe och når aldrig oss. Stripe ansvarar själv för sin behandling av betalningen, enligt sin egen integritetspolicy (<a href="https://stripe.com/se/privacy" rel="noopener">stripe.com/se/privacy</a>). Månadsstödet, som erbjöds fram till den 22 november 2026, har upphört; Stripe sparar sina uppgifter om en sådan prenumeration enligt sin egen policy.</p>
+<p>Våra sidor laddar Stripes skript och formulär först när du pekar på eller öppnar dricks, och Stripes formulär kan använda egna kakor, till exempel för att förhindra bedrägerier.</p>
 <ul>
-<li><strong>Det vi ser:</strong> belopp, valuta och tidpunkt, om det var dricks eller månadsstöd, hur du betalade (kort eller en digital plånbok som Apple Pay eller Google Pay) och det namn eller den e-postadress du angav för kvittot. Våra administratörer ser det på webbplatsens administrationssida, och som en notis på de enheter där de har slagit på notiser.</li>
+<li><strong>Det vi ser:</strong> belopp, valuta och tidpunkt, hur du betalade (kort eller en digital plånbok som Apple Pay eller Google Pay) och det namn eller den e-postadress du angav för kvittot. Våra administratörer ser det på webbplatsens administrationssida, och som en notis på de enheter där de har slagit på notiser.</li>
 <li>Vår server hämtar uppgifterna från Stripe vid behov och håller dem bara i minnet, några minuter; den sparar dem inte. Notiserna skickas krypterade via push-tjänsten i administratörens webbläsare (Apple, Google, Mozilla eller Microsoft), som inte kan läsa dem.</li>
 <li>För dricks ber vår server Stripe att påbörja betalningen, med det belopp och den valuta du valde. Med Apple Pay eller Google Pay passerar plånbokens engångstoken för betalningen, e-postadressen för kvittot och namnet som plånboken lämnar vår server på väg till Stripe utan att sparas.</li>
-<li>Efter betalningen – i dricksrutan, via länken i kvittot för dricks eller när Stripe skickar dig tillbaka till vår stödsida – frågar sidan vår server efter din supporternyckel, och servern frågar Stripe om betalningen är genomförd. Inget om dig sparas hos oss.</li>
-<li><strong>Supporternyckeln</strong> innehåller inga personuppgifter (se <a href="/payments/#nyckeln">betalvillkoren</a>). Vi noterar att en nyckel har lämnats ut – ett nummer som tas fram ur betalningen, tidpunkten och hur – så att vi kan räkna nycklarna.</li>
-<li><strong>Bokföring:</strong> dricks och månadsstöd ingår i Solecraft AB:s räkenskaper, som vi enligt bokföringslagen måste spara i sju år.</li>
+<li>För en betalning från före den 22 november 2026 frågar länken i dess kvitto vår server efter supporternyckeln, och servern frågar Stripe om betalningen är genomförd. Inget om dig sparas hos oss. Dricks från och med dess ger ingen nyckel.</li>
+<li><strong>Supporternyckeln</strong> innehåller inga personuppgifter (se <a href="/payments/#tidigare">betalvillkoren</a>). Vi noterar att en nyckel har lämnats ut – ett nummer som tas fram ur betalningen, tidpunkten och hur – så att vi kan räkna nycklarna.</li>
+<li><strong>Bokföring:</strong> dricks ingår i Solecraft AB:s räkenskaper, som vi enligt bokföringslagen måste spara i sju år.</li>
 </ul>
-<p>Rättslig grund: att genomföra den betalning du har bett om (artikel 6.1 b), vår rättsliga förpliktelse att föra och bevara räkenskaper (artikel 6.1 c) och vårt berättigade intresse av att få veta om dricks och stöd när de kommer in (artikel 6.1 f).</p>
+<p>Rättslig grund: att genomföra den betalning du har bett om (artikel 6.1 b), vår rättsliga förpliktelse att föra och bevara räkenskaper (artikel 6.1 c) och vårt berättigade intresse av att få veta om dricks när de kommer in (artikel 6.1 f).</p>
 
 <h2 id="kontakt">6. När du kontaktar oss</h2>
 <p>När du mejlar <a href="mailto:info@solecraft.se">info@solecraft.se</a> använder vi din e-postadress och det du skriver för att svara och hantera ditt ärende. Vi sparar mejlet så länge ärendet kräver, och längre bara när lagen kräver det – till exempel vid en återbetalning. Vår e-post hanteras av vår leverantör av e-posttjänster.</p>
@@ -246,7 +246,7 @@
 <p>Vi säljer inte och hyr inte ut personuppgifter. De delas bara med:</p>
 <ul>
 <li>driften av vår webbplats och dess tjänster: en server i Sverige;</li>
-<li>Stripe, för dricks och månadsstöd (avsnitt 5);</li>
+<li>Stripe, för dricks (avsnitt 5);</li>
 <li>vår leverantör av e-posttjänster, för e-post till oss;</li>
 <li>webbläsarnas push-tjänster, som för krypterade notiser till administratörernas egna enheter;</li>
 <li>myndigheter, när lagen kräver det.</li>

@@ -100,23 +100,22 @@ What the PHP version worked out on every request is split in two:
   browser's `Accept-Language` that the site has, else English - and answers
   `/dl.php` (on to the file) and `/trakt/callback/` (on to the app) itself.
 
-Nothing for this site talks to php-fpm. A tip is given in the tip dialog on
-the page (`public/nav.js`: Stripe's card form in Stripe's frames, Apple Pay,
-Google Pay, on dopeIPTV's own Stripe account); monthly support is Stripe's
-own page (a Payment Link), linked from the support page, `/support/`, with
-GitHub Sponsors beside them. What is on is the server's
-(`/usr/local/etc/iptv-site.conf`, read by `sync-releases.sh`), and until one
-is set the site invites to nothing. The one thing that is not static is a
+Nothing for this site talks to php-fpm. A tip for the app is given in the
+tip dialog on the tip page, `/support/` (`public/nav.js`: Stripe's card form
+in Stripe's frames, Apple Pay, Google Pay, on dopeIPTV's own Stripe
+account), and nothing is given for it. Whether it is on is the server's
+(`/usr/local/etc/iptv-site.conf`, read by `sync-releases.sh`), and until it
+is the site invites to nothing. The one thing that is not static is a
 small service, `donate/donate.py` (standard-library Python on a Unix socket):
-the dialog's `/pay/` makes the PaymentIntent, and back from paying,
-`/support/key` asks Stripe whether the payment went through and gives the
-supporter key for it.
+the dialog's `/pay/` makes the PaymentIntent; `/support/key` still gives the
+supporter key of a payment from before November 22, 2026, once Stripe says
+it went through.
 
 The same service serves the admin page, `/admin/` for its admins only
 (`donate/admin.py`, `donate/admin/`; signing in with a passkey, or a password
 and an authenticator code, and invites for a new admin:
 `donate/admin_auth.py`): unique visitors, how they found the
-site, countries, browsers and devices, downloads and tips and monthly support by day,
+site, countries, browsers and devices, downloads and tips by day,
 week, month and year, and every visit of the last 13 months one by one -
 sorted, grouped and filtered as wanted (`donate/admin/logtools.js`) - and an
 Analysis tab (`donate/admin/analysis.js`, `donate/analysis.py`) that breaks
@@ -167,9 +166,9 @@ curl -sI 'https://dopeiptv.org/trakt/callback/?code=x&state=y' | grep -i locatio
 
 ## The legal pages
 
-`/privacy/`, `/terms/`, `/support/` and `/about/` - the privacy policy,
-the terms of use, support (a tip, monthly support, the supporter key,
-refunds and disputes), and the company details the Swedish E-Commerce Act
+`/privacy/`, `/terms/`, `/payments/` and `/about/` - the privacy policy,
+the terms of use, the payment terms (a tip, monthly support and supporter
+keys from before, refunds and disputes), and the company details the Swedish E-Commerce Act
 asks for. Linked from a row at the foot of every page. Every footer names Solecraft AB with its
 organisation number, address and e-mail, and says in the reader's language
 that dopeIPTV does not contain, sell or link to any channels or other

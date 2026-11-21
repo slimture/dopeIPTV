@@ -1,5 +1,5 @@
 {
-    "updated": "2026-11-19",
+    "updated": "2026-11-21",
     "pages": [
         "privacy",
         "terms",
@@ -19,14 +19,14 @@
     },
     "text": {
         "sv": {
-            "updated": "Senast uppdaterad 19 november 2026",
+            "updated": "Senast uppdaterad 21 november 2026",
             "governing": "Det här är den svenska texten, som är den som gäller.",
             "other": "Read in English",
             "link": "en",
             "toc": "Innehåll"
         },
         "en": {
-            "updated": "Last updated 19 November 2026",
+            "updated": "Last updated 21 November 2026",
             "governing": "This is a translation of the Swedish text, which is the one that applies.",
             "other": "Läs på svenska",
             "link": "sv",
@@ -61,23 +61,23 @@
         "payments": {
             "sv": {
                 "title": "Betalvillkor",
-                "desc": "Villkoren för dricks och månadsstöd till dopeIPTV: hur betalningen går till, hur du säger upp, supporternyckeln och pengarna tillbaka inom 14 dagar.",
-                "lede": "Dricks och månadsstöd är frivilligt – säg upp när du vill och få pengarna tillbaka inom 14 dagar."
+                "desc": "Villkoren för dricks till dopeIPTV: vad dricks är, hur betalningen går till, månadsstöd och supporternycklar från tidigare, och pengarna tillbaka inom 14 dagar.",
+                "lede": "Dricks är ett frivilligt tack för appen – inget ges för den, och du får pengarna tillbaka inom 14 dagar."
             },
             "en": {
                 "title": "Payment terms",
-                "desc": "The terms for tips and monthly support to dopeIPTV: how paying works, cancelling, the supporter key and your money back within 14 days.",
-                "lede": "Tips and monthly support are voluntary – cancel whenever you like and get your money back within 14 days."
+                "desc": "The terms for tips to dopeIPTV: what a tip is, how paying works, monthly support and supporter keys from before, and your money back within 14 days.",
+                "lede": "A tip is a voluntary thank-you for the app – nothing is given for it, and you get your money back within 14 days."
             }
         },
         "support": {
             "sv": {
-                "title": "Stöd dopeIPTV",
-                "desc": "Dricks en gång eller månadsstöd till dopeIPTV, via Stripe. Frivilligt – appen förblir gratis och inget säljs i utbyte. Supporternyckeln, uppsägning, pengarna tillbaka och vem du betalar."
+                "title": "Ge dricks för dopeIPTV",
+                "desc": "Dricks för dopeIPTV, en gång och valfritt belopp, via Stripe. Frivilligt – appen är densamma för alla och inget ges för dricksen."
             },
             "en": {
-                "title": "Support dopeIPTV",
-                "desc": "A one-time tip or monthly support for dopeIPTV, through Stripe. Voluntary – the app stays free and nothing is sold in return. The supporter key, cancelling, refunds and who you pay."
+                "title": "Leave a tip for dopeIPTV",
+                "desc": "A tip for dopeIPTV, once and any amount, through Stripe. Voluntary – the app is the same for everyone and nothing is given for a tip."
             }
         },
         "about": {

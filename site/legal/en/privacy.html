@@ -35,7 +35,7 @@
 <li><strong>The app keeps everything on your computer.</strong> Your sources, logins, favourites, history and settings never leave it. No analytics, no telemetry, no advertising.</li>
 <li><strong>The app only contacts us when it has a reason:</strong> to look for updates (you can turn this off), when you send an error report or feedback yourself – which you see in full and which is already cleaned of names, addresses, logins and what you have watched – and, if you turn them on, for settings sync and for watching together, both encrypted so that we cannot read them.</li>
 <li><strong>The website's statistics never write your IP address down.</strong> No cookies and no outside analytics services. The web server hands each page view straight to our own service, which turns your IP address into a country in its memory and forgets it – no log, no file and no backup ever holds it. A visit is kept for 14 days without anything that ties it to your other days, then deleted – only counts remain; the key that could link anything exists only in the server's memory. That makes it much harder, though never strictly impossible, to tell who visited (see section 3).</li>
-<li><strong>Tips and monthly support</strong> are paid through Stripe. Card details go straight to Stripe and never to us, and our server keeps nothing about the payment.</li>
+<li><strong>Tips</strong> are paid through Stripe. Card details go straight to Stripe and never to us, and our server keeps nothing about the payment.</li>
 <li><strong>What we never collect:</strong> what you watch, your sources, channels and logins, and where you are more precisely than the country. We use no cookies that follow you, sell no data, show no ads and have no trackers from others – not even the fonts come from anyone else.</li>
 </ul>
 </div>
@@ -46,7 +46,7 @@
 <li><a href="#app">The dopeIPTV app</a></li>
 <li><a href="#website">The website</a></li>
 <li><a href="#cookies">Cookies and storage in your browser</a></li>
-<li><a href="#support">Tips and monthly support</a></li>
+<li><a href="#support">Tips</a></li>
 <li><a href="#contact">When you contact us</a></li>
 <li><a href="#recipients">Who receives the data</a></li>
 <li><a href="#transfers">Transfers outside the EU/EEA</a></li>
@@ -59,7 +59,7 @@
 
 <h2 id="controller">1. Who is responsible</h2>
 <p>Solecraft AB (company registration number 559601-3176), Mogatan 21, SE-702 13 Örebro, Sweden, is the controller for the processing of personal data described here. Contact us at <a href="mailto:info@solecraft.se">info@solecraft.se</a> – also when you want to use your rights (section 10).</p>
-<p>This policy covers the website dopeiptv.org (the old address iptv.dope.rs only forwards there), the services on it – support (tips and monthly support), feedback and error reports, settings sync, watch together and updates – and the dopeIPTV app as we publish it.</p>
+<p>This policy covers the website dopeiptv.org (the old address iptv.dope.rs only forwards there), the services on it – tips, feedback and error reports, settings sync, watch together and updates – and the dopeIPTV app as we publish it.</p>
 
 <h2 id="app">2. The dopeIPTV app</h2>
 <h3>What stays on your computer</h3>
@@ -154,7 +154,7 @@
 <ul>
 <li>The front server, which handles the encrypted connection, keeps no log of the requests to dopeiptv.org, and writes an error down only when something stops it working (below). Settings sync and watch together requests are never logged anywhere.</li>
 <li>Nothing else is logged: the server behind it writes no log of other requests, and none that holds your IP address. For the statistics below it hands each page view, the pages' view signal and each download click straight to our own service over a socket on the same machine – with IP address, time, the page asked for (only the page – never what a link added to its address), status, browser and language –, which counts it in memory within a minute and writes no IP address anywhere (below). For the public download counter it keeps one small log of download clicks: the file's name, the answer and whether a browser, the app or a robot asked – no IP address, no time, no browser. It is turned over every night and only the day before is kept – two days at the most –, then removed automatically.</li>
-<li>The services behind the website – the supporter key, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
+<li>The services behind the website – tips, a supporter key for a payment from before 22 November 2026, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
 </ul>
 <p>Every log on our server, what it holds and how long it is kept:</p>
 <ul>
@@ -215,7 +215,7 @@
 <ul>
 <li><code>dn-currency</code> – the currency you chose in the tip dialog;</li>
 <li><code>dn-wallet</code> – whether your device offered Apple Pay or Google Pay, so that the right button shows at once;</li>
-<li><code>dn-supporter-key</code> – your supporter key after a tip or monthly support, so that the tip dialog and the support page can show it again;</li>
+<li><code>dn-supporter-key</code> – a supporter key from a tip or monthly support before 22 November 2026, if this browser kept one, so that the tip page can show it again;</li>
 <li><code>fbs-last</code> – when you last sent feedback.</li>
 </ul>
 <p>You can clear them in your browser's settings.</p></li>
@@ -223,19 +223,19 @@
 </ul>
 <p>We use no cookies for advertising or tracking, and even the fonts come from our own server.</p>
 
-<h2 id="support">5. Tips and monthly support</h2>
-<p>Tips and monthly support are paid through <strong>Stripe</strong> (Stripe Payments Europe, Ltd., 1 Grand Canal Street Lower, Dublin 2, Ireland): a tip in Stripe's payment form in the tip dialog on our pages, monthly support on Stripe's own payment page, which our support page links to.</p>
-<p>You enter your card details in Stripe's form or on Stripe's page; they go straight to Stripe and never reach us. Stripe is responsible for its own processing of the payment, under its own privacy policy (<a href="https://stripe.com/privacy" rel="noopener">stripe.com/privacy</a>). For monthly support Stripe keeps your e-mail address and the subscription, so that it can charge each month and send receipts until you cancel.</p>
-<p>Our pages load Stripe's script and form only when you point at or open a tip, and Stripe's form and page may use their own cookies, for example to prevent fraud.</p>
+<h2 id="support">5. Tips</h2>
+<p>Tips are paid through <strong>Stripe</strong> (Stripe Payments Europe, Ltd., 1 Grand Canal Street Lower, Dublin 2, Ireland), in Stripe's payment form in the tip dialog on our pages.</p>
+<p>You enter your card details in Stripe's form; they go straight to Stripe and never reach us. Stripe is responsible for its own processing of the payment, under its own privacy policy (<a href="https://stripe.com/privacy" rel="noopener">stripe.com/privacy</a>). Monthly support, offered until 22 November 2026, has ended; Stripe keeps its record of such a subscription under its own policy.</p>
+<p>Our pages load Stripe's script and form only when you point at or open a tip, and Stripe's form may use its own cookies, for example to prevent fraud.</p>
 <ul>
-<li><strong>What we see:</strong> the amount, currency and time, whether it was a tip or monthly support, how you paid (by card or with a digital wallet such as Apple Pay or Google Pay) and the name or e-mail address you gave for the receipt. Our administrators see this on the website's admin page, and as a notification on the devices where they have turned notifications on.</li>
+<li><strong>What we see:</strong> the amount, currency and time, how you paid (by card or with a digital wallet such as Apple Pay or Google Pay) and the name or e-mail address you gave for the receipt. Our administrators see this on the website's admin page, and as a notification on the devices where they have turned notifications on.</li>
 <li>Our server fetches it from Stripe when needed and keeps it only in memory, for a few minutes; it does not save it. The notifications are sent encrypted through the push service of the administrator's browser (Apple, Google, Mozilla or Microsoft), which cannot read them.</li>
 <li>For a tip our server asks Stripe to start the payment, with the amount and currency you chose. With Apple Pay or Google Pay, the wallet's one-time payment token, the e-mail address for the receipt and the name the wallet passes on go through our server on their way to Stripe without being saved.</li>
-<li>After paying – in the tip dialog, through the link in a tip's receipt, or when Stripe sends you back to our support page – the page asks our server for your supporter key, and the server asks Stripe whether that payment is paid. Nothing about you is saved on our side.</li>
-<li><strong>The supporter key</strong> contains no personal data (see the <a href="/payments/#key">payment terms</a>). We note that a key has been handed out – a number made from the payment, the time and how – so that we can count the keys.</li>
-<li><strong>Bookkeeping:</strong> tips and monthly support are part of Solecraft AB's accounts, which the Swedish Bookkeeping Act (bokföringslagen) requires us to keep for seven years.</li>
+<li>For a payment made before 22 November 2026, the link in its receipt asks our server for its supporter key, and the server asks Stripe whether that payment is paid. Nothing about you is saved on our side. A tip made since then comes with no key.</li>
+<li><strong>The supporter key</strong> contains no personal data (see the <a href="/payments/#before">payment terms</a>). We note that a key has been handed out – a number made from the payment, the time and how – so that we can count the keys.</li>
+<li><strong>Bookkeeping:</strong> tips are part of Solecraft AB's accounts, which the Swedish Bookkeeping Act (bokföringslagen) requires us to keep for seven years.</li>
 </ul>
-<p>Legal basis: carrying out the payment you have asked for (Article 6(1)(b)), our legal obligation to keep and preserve accounts (Article 6(1)(c)) and our legitimate interest in knowing about tips and support as they come in (Article 6(1)(f)).</p>
+<p>Legal basis: carrying out the payment you have asked for (Article 6(1)(b)), our legal obligation to keep and preserve accounts (Article 6(1)(c)) and our legitimate interest in knowing about tips as they come in (Article 6(1)(f)).</p>
 
 <h2 id="contact">6. When you contact us</h2>
 <p>When you e-mail <a href="mailto:info@solecraft.se">info@solecraft.se</a>, we use your e-mail address and what you write to answer you and deal with your matter. We keep the e-mail as long as the matter needs, and longer only when the law requires it – for example for a refund. Our e-mail is handled by our e-mail service provider.</p>
@@ -246,7 +246,7 @@
 <p>We do not sell or rent out personal data. It is shared only with:</p>
 <ul>
 <li>the hosting of our website and its services: a server in Sweden;</li>
-<li>Stripe, for tips and monthly support (section 5);</li>
+<li>Stripe, for tips (section 5);</li>
 <li>our e-mail service provider, for e-mail to us;</li>
 <li>the browsers' push services, which carry encrypted notifications to the administrators' own devices;</li>
 <li>authorities, when the law requires it.</li>

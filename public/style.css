@@ -1231,8 +1231,6 @@ dialog.dn::backdrop { background: rgba(5, 7, 10, .66); }
 .dn-more a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px;
   text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
 .dn-more a:hover { color: var(--text); text-decoration-color: currentColor; }
-/* Monthly support instead: a quiet line at the foot of the amounts. */
-.dn-monthly { margin-top: 4px; }
 .dn-payee { margin: 14px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-align: center;
   display: flex; align-items: center; justify-content: center; gap: 8px; }
 /* Big enough and bright enough to be seen: at 15 px in the faint grey the
@@ -1268,7 +1266,6 @@ nav.links .navsupport { color: var(--muted); }
 .sway p { margin: 0 0 6px; color: var(--muted); font-size: 14.5px; line-height: 1.5; flex: 1; }
 .sway .btn { justify-content: center; align-self: stretch; text-decoration: none; }
 .sway .btn.is-off { opacity: .55; cursor: default; pointer-events: none; }
-.sway-gh .btn { background: var(--surface-2); }
 .sway bdi { white-space: nowrap; }
 .support-stripe { color: var(--faint); font-size: 13px; line-height: 1.5; margin: 0 0 18px; }
 .support-thanks { margin: 6px 0 26px; padding: 18px; border-radius: 16px;
@@ -1294,6 +1291,9 @@ nav.links .navsupport { color: var(--muted); }
   letter-spacing: -.03em; text-align: center; max-width: none; }
 .sp-lead { margin: 0 auto; color: var(--muted); font-size: 1.08rem; line-height: 1.65; max-width: 56ch; }
 .sp .support-ways { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 780px; margin: 34px auto 0; }
+/* A tip, the one way: one card, the width of a hand. */
+.sp .support-ways.is-one { grid-template-columns: minmax(0, 1fr); max-width: 440px; }
+.sp .support-ways.is-one .sway { text-align: center; }
 .sp .sway { padding: 26px 24px 22px; gap: 10px; border-radius: var(--radius); text-align: start;
   background: var(--surface); border: 1px solid var(--line); }
 .sp .sway h2 { font-size: 1.3rem; letter-spacing: -.02em; }
@@ -1305,15 +1305,6 @@ nav.links .navsupport { color: var(--muted); }
 .sp .sway-tip .btn.primary { color: #fff; background: linear-gradient(135deg, #ff6b8b, #ff2d55 60%, #e8174a);
   box-shadow: 0 12px 30px -16px rgba(255, 45, 85, .8); }
 .sp .sway-tip .btn.primary:hover { background: linear-gradient(135deg, #ff7d99, #ff3b62 60%, #f01e52); }
-.sway-manage { align-self: center; margin-top: 2px; color: var(--muted); font-size: 13.5px; line-height: 20px;
-  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-/* The tip's button level with monthly support's, which has the portal's
-   link under it. */
-.sp .support-ways:has(.sway-manage) .sway-tip::after { content: ""; display: block; height: 22px; }
-@media (max-width: 600px) { .sp .support-ways:has(.sway-manage) .sway-tip::after { display: none; } }
-.sway-manage:hover { color: var(--accent); }
-.sp-gh { margin: 16px auto 0; text-align: center; color: var(--faint); font-size: 14px; }
-.sp-gh a { color: var(--accent); }
 .sp-trust { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px;
   margin: 24px auto 0; padding: 0; color: var(--muted); font-size: 14px; }
 .sp-trust li { display: inline-flex; align-items: center; gap: 7px; }
@@ -1328,34 +1319,6 @@ nav.links .navsupport { color: var(--muted); }
 .sp-sec { padding: 60px 0; border-top: 1px solid var(--line); }
 .sp-sec h2 { font-size: clamp(1.45rem, 3vw, 1.95rem); letter-spacing: -.02em; margin: 0 auto 10px;
   text-align: center; max-width: none; }
-.sp-sec-p { margin: 0 auto 30px; max-width: 58ch; text-align: center; color: var(--muted); line-height: 1.6; }
-.sp-perks-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; max-width: 920px; margin: 0 auto; }
-.perk { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 16px 20px;
-  border-radius: 18px; background: var(--surface); text-align: center; }
-.perk-art { height: 72px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.perk h3 { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.35; }
-.perk p { margin: -6px 0 0; color: var(--faint); font-size: 13px; }
-.perk-art img { width: 64px; height: 64px; border-radius: 15px; }
-.perk-art svg { width: 46px; height: 46px; }
-.perk-heart svg { fill: var(--heart); }
-.perk-feedback svg { fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linejoin: round; }
-/* The supporter themes, drawn: a sidebar and a list with the selected row
-   in the theme's accent - Aurora's and Dawn's own colours (ui/theme.py). */
-.tp { display: flex; width: 62px; height: 48px; border-radius: 9px; overflow: hidden;
-  border: 1px solid var(--line); box-shadow: 0 8px 18px -10px rgba(0, 0, 0, .5); }
-.tp i { display: block; }
-.tp-side { width: 28%; background: var(--tp-side); }
-.tp-main { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 7px 6px; background: var(--tp-bg); }
-.tp-main b { display: block; height: 5px; border-radius: 3px; background: var(--tp-row); }
-.tp-main b.on { background: var(--tp-accent); }
-.tp-aurora { --tp-side: #100d25; --tp-bg: #1a1636; --tp-row: #2e2658; --tp-accent: #f0508c; }
-.tp-dawn { --tp-side: #f4e7e5; --tp-bg: #fffaf8; --tp-row: #edd3d5; --tp-accent: #d23a6e; }
-.sp-money-list { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
-  max-width: 920px; margin: 24px auto 0; padding: 0; }
-.sp-money-list li { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px;
-  background: var(--surface); font-size: 15px; line-height: 1.4; }
-.sp-money-list svg { flex: none; width: 26px; height: 26px; fill: none; stroke: var(--accent);
-  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .sp-faq .legal-note, .sp-faq .legal-meta { max-width: 720px; margin-left: auto; margin-right: auto; text-align: center; }
 .sp-legal { max-width: 720px; margin: 26px auto 0; font-size: 16px; line-height: 1.65; color: var(--text); text-align: start; }
 .sp-more { margin: 18px 0 0; }
@@ -1387,10 +1350,6 @@ nav.links .navsupport { color: var(--muted); }
 .sp-company h3 { margin: 0 0 4px; color: var(--text); font-size: 14px; font-weight: 600; }
 .sp-company p { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .sp-q > summary::after { transition: none; } }
-@media (max-width: 860px) {
-  .sp-perks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sp-money-list { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
-}
 @media (max-width: 600px) {
   .sp-hero { padding: 30px 0 34px; }
   .sp-icon { width: 72px; height: 72px; border-radius: 17px; }
@@ -1400,7 +1359,6 @@ nav.links .navsupport { color: var(--muted); }
   .sp .sway { padding: 20px 18px 18px; }
   .sp-trust { flex-direction: column; align-items: center; gap: 6px; }
   .sp-sec { padding: 42px 0; }
-  .perk { padding: 18px 12px 16px; }
   .sp-q > summary h3 { font-size: 16px; }
 }
 /* The supporter key under the thank-you: the key itself, set apart, to copy
@@ -1422,7 +1380,8 @@ nav.links .navsupport { color: var(--muted); }
 .dn-x:hover { background: var(--surface-2); color: var(--text); }
 .dn-body { padding: 16px 22px 22px; }
 .dn-step { display: flex; flex-direction: column; gap: 14px; }
-.dn-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+/* Three suggestions, one row; any other amount under them. */
+.dn-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .dn-chip { font: inherit; font-weight: 700; font-size: 15px; padding: 12px 4px; cursor: pointer;
   border-radius: 12px; border: 1px solid var(--line-2); background: var(--ink); color: var(--text);
   transition: border-color .15s ease, background .15s ease; }
@@ -1493,7 +1452,7 @@ nav.links .navsupport { color: var(--muted); }
 .dn-own .dn-input--sm:focus + .dn-ico { display: none; }
 dialog.dn { overflow-x: hidden; }
 @media (max-width: 560px) {
-  .dn-chips.dn-chips--sm { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dn-chips.dn-chips--sm { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .dn-back { font: inherit; font-size: 14px; cursor: pointer; border: 0; background: none;
   color: var(--muted); padding: 4px 0; }
@@ -1540,7 +1499,6 @@ dialog.dn { overflow-x: hidden; }
 @media (max-width: 560px) {
   dialog.dn { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 18px 18px 0 0;
     border-bottom: 0; max-height: calc(100dvh - 24px); }
-  .dn-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dn-body { padding-bottom: max(22px, env(safe-area-inset-bottom)); }
 }
 
