@@ -3,8 +3,8 @@
 File, View, History and Help in the menu bar, the same entries in the same
 places on Linux, Windows and macOS - Settings and Quit in File, About last
 in Help, where people look for them. On macOS Qt moves About, Settings and
-Quit into the application menu by their roles, and the supporter key and
-donating go there too (ApplicationSpecificRole), so it looks as it always
+Quit into the application menu by their roles, and Leave a tip goes
+there too (ApplicationSpecificRole), so it looks as it always
 has; every other entry is kept from being moved there by its words. The
 actions are made by the window (they keep their shortcuts and handlers);
 this only says where each goes."""
@@ -28,7 +28,7 @@ GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("view", "view", ("tv_mode", "teletext", "multiview", "cast", "together", "phone")),
     ("history", "history", ("stats", "private", "clear")),
     ("help", "help", ("feedback", "answers", "report_wait", "website")),
-    ("support", "help", ("supporter", "donate")),
+    ("support", "help", ("donate",)),
     ("about", "help", ("about",)),
 )
 
@@ -39,7 +39,6 @@ MENUS: tuple[tuple[str, str], ...] = (
 #: macOS: what goes into the application menu, by its role.
 _MAC_ROLES = {"about": QAction.MenuRole.AboutRole, "settings": QAction.MenuRole.PreferencesRole,
               "quit": QAction.MenuRole.QuitRole,
-              "supporter": QAction.MenuRole.ApplicationSpecificRole,
               "donate": QAction.MenuRole.ApplicationSpecificRole}
 
 WEBSITE = "https://dopeiptv.org/?ref=app-help"

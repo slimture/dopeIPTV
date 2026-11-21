@@ -123,7 +123,7 @@ def test_feedback_and_a_report_link_to_the_privacy_policy(monkeypatch):
 
 def test_the_windows_say_what_goes_beside_the_text(monkeypatch):
     # An outside review: the window said "exactly what is sent" while the
-    # version, the system, a supporter's mark and the answer code's hash
+    # version, the system and the answer code's hash
     # went beside the text unseen. Each is said now, as send_status writes it.
     app = _qapp()
     import json
@@ -132,16 +132,14 @@ def test_the_windows_say_what_goes_beside_the_text(monkeypatch):
     from dopeiptv import __version__
     from dopeiptv.core import build_check, report
     from dopeiptv.ui import dialogs
-    fb = dialogs.FeedbackDialog(None, lambda opts: "", supporter=True)
+    fb = dialogs.FeedbackDialog(None, lambda opts: "")
     _settle(app)
     line = fb.beside.text()
     assert f"dopeIPTV {__version__}" in line and platform.system() in line
-    for key in ("report_item_picked", "report_item_supporter", "report_item_code"):
+    for key in ("report_item_picked", "report_item_code"):
         assert dialogs.tr(key) in line, key
     fb.answers.setChecked(False)
     assert dialogs.tr("report_item_code") not in fb.beside.text()
-    plain = dialogs.FeedbackDialog(None, lambda opts: "")
-    assert dialogs.tr("report_item_supporter") not in plain.beside.text()
     rd = dialogs.ReportDialog(None, "error", "trace")
     assert rd.beside is not None and f"dopeIPTV {__version__}" in rd.beside.text()
     assert dialogs.ReportDialog(None, "error", "trace", copy_only=True).beside is None

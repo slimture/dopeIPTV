@@ -296,13 +296,12 @@ def test_a_login_outside_an_address_is_masked_too():
                        ("{'refresh_token': 'r3fresh', 'scope': 'public'}", "r3fresh"),
                        ("X-Emby-Token: 0123456789abcdef", "0123456789abcdef"),
                        ("X-Api-Key=k3yk3yk3y", "k3yk3yk3y"),
-                       ("portal box 00:1A:79:AB:CD:EF answered", "00:1A:79:AB:CD:EF"),
-                       ("key DS1-" + "A" * 100 + " pasted", "A" * 30)):
+                       ("portal box 00:1A:79:AB:CD:EF answered", "00:1A:79:AB:CD:EF")):
         out = _filtered("%s", line)
         assert gone not in out, out
     # The server a line is about stays, and so does a line of Python.
     assert _filtered("host: box.example login: joe") == "host: box.example login: joe"
-    code = '    key = str(settings.value("supporter_key", "") or "")'
+    code = '    key = str(settings.value("theme_light", "") or "")'
     assert _filtered("%s", code) == code
 
 
@@ -313,11 +312,10 @@ def test_an_address_s_new_names_lose_their_values():
 
 
 def test_the_log_s_login_patterns_are_the_report_s():
-    """The report and the log mask the same headers, tokens, MACs and
-    supporter keys; the log's names are the report's but the login and
-    the host."""
+    """The report and the log mask the same headers, tokens and MACs; the
+    log's names are the report's but the login and the host."""
     from dopeiptv.core import report
-    for name in ("AUTH_LINE", "BEARER", "MAC", "SUPPORTER"):
+    for name in ("AUTH_LINE", "BEARER", "MAC"):
         assert getattr(logmod, name).pattern == getattr(report, "_" + name).pattern, name
     names = report._KEYVAL.pattern.split("(", 2)[1]
     assert logmod.KEYVAL.pattern.split("(", 2)[1] == names.replace("|login|host", "")
@@ -371,12 +369,11 @@ def test_a_log_file_and_the_crash_file_are_this_user_s_alone(tmp_path, monkeypat
         os.umask(old)
 
 
-def test_sign_ins_codes_and_the_supporter_key_are_registered_where_they_are_read(monkeypatch):
-    """Trakt's and Simkl's tokens, the sync code, a room's code and the
-    supporter key - each masked in every log line from the moment the app
-    reads it."""
+def test_sign_ins_and_codes_are_registered_where_they_are_read(monkeypatch):
+    """Trakt's and Simkl's tokens, the sync code and a room's code - each
+    masked in every log line from the moment the app reads it."""
     import dopeiptv.core.workers as workers
-    from dopeiptv.core import supporter, sync, together
+    from dopeiptv.core import sync, together
     from dopeiptv.core.stores import KeptValues
 
     class S(dict):
@@ -391,9 +388,7 @@ def test_sign_ins_codes_and_the_supporter_key_are_registered_where_they_are_read
     sync.code_of(S(sync_code=sync.format_code(raw)))
     room = together.new_code()
     together.derive(room)
-    key = "DS1-" + "B" * 100
-    supporter.stored(S(supporter_key=key))
-    gone = ("trakt-acc3ss", "simkl-t0ken", sync.format_code(raw), room, room.replace("-", ""), key)
+    gone = ("trakt-acc3ss", "simkl-t0ken", sync.format_code(raw), room, room.replace("-", ""))
     out = redact(" / ".join(gone))
     assert not [g for g in gone if g in out], out
     assert "1700000000" not in logmod._secrets

@@ -182,9 +182,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - System: `desktop_entry` (Linux), `mpris` (the system's media controls)
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
-- Feedback and tips: feedback and its answers, `supporter_key` (its window;
-  a key from before 22 November 2026), `heart_icon` (the heart icon,
-  everyone's; never switched, 1.6.9's `supporter_icon` with a key decides), ask for a tip now and then (`donate_ask`; the
+- Feedback and tips: feedback and its answers, ask for a tip now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About
@@ -193,6 +191,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
   `theme_light` (these four this profile's), `corner_style`, `ui_scale`
+- App icon: `app_icon` (one of `ui/app_icon.LOOKS`; the household's, the
+  blue one when never picked)
 - Lists: `view_density`, `sort_order`
 - What the places show (all of it this profile's; core/places.py,
   ui/mw_place_look.py): `just_the_list` (Just the list: no rows over TV,

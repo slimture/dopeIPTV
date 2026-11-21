@@ -176,7 +176,6 @@ files = [
     "dopeiptv/core/phone_page.py",
     "dopeiptv/core/phone_browse.py",
     "dopeiptv/core/report.py",
-    "dopeiptv/core/supporter.py",
     "dopeiptv/core/backup.py",
     "dopeiptv/core/reset.py",
     "dopeiptv/core/sync.py",

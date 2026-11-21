@@ -71,8 +71,6 @@ AUTH_LINE = re.compile(r"(?i)\b((?:proxy-)?authorization|(?:set-)?cookie)([\"']?
 BEARER = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
 #: A box's MAC (a Stalker portal's login).
 MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
-#: A supporter key: the one thing that could tie a log to a payment.
-SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A query without its address ("Max retries exceeded with url:
 # /get.php?username=...&password=..."), and an Xtream account in a path
 # without its address ("url: /live/<user>/<pass>/1234.ts").
@@ -232,8 +230,8 @@ def redact_text(text: str) -> str:
     """*text* the app did not write - a line ffmpeg or mpv printed, an
     exception's message - safe to log: every address in it masked
     (_address_masked), a query or an Xtream account without its address,
-    a login header, a bearer token, a login written name=value, a box's
-    MAC and a supporter key, then every registered value. Never raises."""
+    a login header, a bearer token, a login written name=value and a box's
+    MAC, then every registered value. Never raises."""
     try:
         if "://" in text:
             text = URL_IN_TEXT.sub(lambda m: _address_masked(m.group(0)), text)
@@ -243,7 +241,6 @@ def redact_text(text: str) -> str:
             text = _PATH_IN_TEXT.sub(lambda m: f"/{m.group(1)}/***/***/", text)
         text = AUTH_LINE.sub(lambda m: f"{m.group(1)}{m.group(2)}***", text)
         text = BEARER.sub(lambda m: f"{m.group(1)} ***", text)
-        text = SUPPORTER.sub("***", text)
         text = MAC.sub("***", text)
         text = KEYVAL.sub(_value_masked, text)
     except Exception:

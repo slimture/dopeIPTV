@@ -27,6 +27,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   an Xtream server or a portal on the internet is on plain http: the login
   travels unencrypted in every address.
 
+### Added
+
+- Pick the app's icon under Settings > Appearance > App icon: the blue
+  one, a heart, one in your accent colour (it follows the accent),
+  midnight, paper, ocean, forest, sunset, grape, a round one or a retro
+  TV. It shows in the Dock, the taskbar and the app switcher while the
+  app runs; the installed program's own icon stays the blue one.
+
+### Removed
+
+- The supporter key, everywhere: its window, the menu entry, the row in
+  Settings, the line in About, the mark on the logo, the
+  `dopeiptv://supporter` link and the "supporter" word feedback carried.
+  An older app's key and heart-icon switch are removed from the settings
+  file at start. The heart icon is one of the icons to pick.
+
 ### Fixed
 
 - Posters went blank after a while in Movies, Series, Mine, Search, a
@@ -37,10 +53,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   again - from the disk cache, in a few milliseconds - and a picture that
   failed and rests for a moment is asked for again when the rest is over
   (`series_cards.ImageSource`, `LogoLoader.cooldown_left`).
-- Updating to 1.6.10 could change the app's icon: a heart-icon switch left
-  on from before, without a supporter key, now showed the heart. The switch
-  everyone has since 1.6.10 is a setting of its own (`heart_icon`); never
-  switched, the icon is what 1.6.9 showed.
+- Updating to 1.6.10 could switch the app to the heart icon by itself; the
+  icon is now the blue one until another is picked.
 
 ## [1.6.10]
 

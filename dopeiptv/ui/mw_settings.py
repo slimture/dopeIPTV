@@ -111,15 +111,8 @@ class SettingsContext:
     page_commits: dict[str, Callable[..., None]]
     #: What one page's code changes on another, while that one is built.
     shared: dict[str, Any]
-    #: The supporter key, read once ({"mine": ..., "read": ...}).
-    key_state: dict[str, Any]
-    #: supporter_key(): the key, read the first time it is asked for.
-    supporter_key: Callable[[], Any]
     #: restyle_dialog(): the window's own rules again, from the palette.
     restyle_dialog: Callable[[], None]
-    #: supporter_window(): the key's window; the pages follow what it
-    #: changed.
-    supporter_window: Callable[[], None]
     #: The sources (the window's playlist store; None without one).
     store: Any
     #: account_of(source, done): its account, looked up off the window's
@@ -377,6 +370,8 @@ class _SettingsMixin:
             card.restyle()           # the cast card, in the new colours
         self._places_restyle()       # the places' header, in the new colours
         self._guide_restyle()        # the Guide page's board, in the new colours
+        if hasattr(self, "_app_icon_refresh"):
+            self._app_icon_refresh()     # an icon in the accent, in the new one
         self._sp_restyle()           # a series' page
         self._pf_restyle()           # the Movies place and a film's page
         self._place_series_restyle()   # the Series place
@@ -1004,17 +999,6 @@ class _SettingsMixin:
         page_commits: dict = {}
         # What one page's code changes on another, while that one is built.
         shared: dict = {}
-        # The supporter key (General and Appearance): read once, again only
-        # after the key's window (every check of a key is a signature check).
-        key_state: dict = {"mine": None, "read": False}
-
-        def supporter_key():
-            if not key_state["read"]:
-                key_state["read"] = True
-                if hasattr(self, "open_supporter"):
-                    key_state["mine"] = self._supporter()
-            return key_state["mine"]
-
         def restyle_dialog() -> None:
             # The dialog's own rules are built from the palette too.
             d.setStyleSheet(settings_style())
@@ -1023,24 +1007,6 @@ class _SettingsMixin:
                 sync()
             for chip in d.findChildren(Chip):
                 chip.refresh()
-
-        def supporter_window() -> None:
-            """The key's window, from General's card; the page follows what
-            it changed - the card's row."""
-            self.open_supporter()
-            from .qt_i18n import format_month
-            key_state["read"] = True
-            mine = key_state["mine"] = self._supporter()
-            row = shared.get("supporter_row")
-            if row is not None:
-                key_btn, key_row, support_card = row
-                key_btn.setText(tr("set_supporter_open") if mine
-                                else tr("set_supporter_enter"))
-                if key_row.hint_label is not None:
-                    key_row.hint_label.setText(
-                        tr("supporter_tip", date=format_month(mine["since"]))
-                        if mine else tr("set_supporter_hint"))
-                support_card.refresh()
 
         # -- the sources: shared by Sources, General's backup and Nerd's boxes --
         store = self.playlist_store
@@ -1134,9 +1100,8 @@ class _SettingsMixin:
             win=self, dialog=d, shell=shell, pages={pg.key: pg for pg in shell.pages},
             on=on, rtl=rtl, is_on=is_on, flag=flag, own=own, nerd_link=nerd_link,
             nerd_switch=nerd_switch, link_cards=link_cards,
-            page_commits=page_commits, shared=shared, key_state=key_state,
-            supporter_key=supporter_key, restyle_dialog=restyle_dialog,
-            supporter_window=supporter_window, store=store,
+            page_commits=page_commits, shared=shared,
+            restyle_dialog=restyle_dialog, store=store,
             account_of=account_of, edit_source=edit_source,
             add_playlist=add_playlist, export_playlists=export_playlists,
             import_playlists=import_playlists)

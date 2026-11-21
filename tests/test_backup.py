@@ -88,7 +88,7 @@ def _fill(st: dict) -> None:
     m.setValue("nerd_adelay/0abc1234", "0.2")
     m.setValue("nerd_epg_map_a", json.dumps({"1": "one.tv"}))
     for key, value in (("theme", "nord"), ("language", "sv"), ("nerd_enabled", "true"),
-                       ("supporter_key", "DS1-abc"), ("trakt_access_token", "tok"),
+                       ("trakt_access_token", "tok"),
                        ("simkl_access_token", "stok"),
                        ("os_password", "pw"), ("nerd_remote_token", "rt"),
                        ("check_updates", "false"), ("volume", 70),
@@ -137,7 +137,6 @@ def test_export_then_restore_gives_the_same_data(tmp_path):
         mine = {k: v for k, v in before[name].items() if backup.covered(name, k)}
         assert mine and after[name] == mine, name
     # Logins come along, as the card says - Simkl's as Trakt's.
-    assert after["main"]["supporter_key"] == "DS1-abc"
     assert after["main"]["trakt_access_token"] == "tok"
     assert after["main"]["simkl_access_token"] == "stok"
     assert json.loads(after["main"]["playlists"])[0]["password"] == "secret"

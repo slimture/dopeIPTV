@@ -294,7 +294,7 @@ from dopeiptv.ui import app_icon
 assert "app_icon.show(" in inspect.getsource(A.main), \
     "main() must set the window icon through app_icon.show"
 src = inspect.getsource(app_icon.show) + inspect.getsource(app_icon.platform_icon)
-assert "platform_icon(supporter)" in src
+assert "platform_icon(look=look, accent=accent)" in src
 assert "_padded = _mac or sys.platform.startswith(\"linux\")" in src, \
     "macOS AND Linux must both take the margin; only Windows is full bleed"
 assert "inset=ICON_SAFE_INSET if _padded else 0.0" in src, \

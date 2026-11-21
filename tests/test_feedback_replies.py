@@ -95,9 +95,10 @@ def test_a_reply_goes_with_its_thread_and_a_closed_one_is_told(monkeypatch):
     try:
         assert report.send_status("feedback", "More words", personal=(), endpoint=inbox.url,
                                   extra={"reply": h, "thread": h, "supporter": "yes"}) == 200
+        # (the supporter mark is gone: an extra word of the kind is not sent)
         body = inbox.got[-1][2]
         assert body["thread"] == h and body["reply"] == h and body["text"] == "More words"
-        assert set(body) == {"kind", "version", "os", "text", "reply", "thread", "supporter"}
+        assert set(body) == {"kind", "version", "os", "text", "reply", "thread"}
         report.send_status("feedback", "x", personal=(), endpoint=inbox.url, extra={"thread": "not-a-hash"})
         assert "thread" not in inbox.got[-1][2]
         assert report.send_status("feedback", "x", personal=(), endpoint=closed.url, extra={"reply": h, "thread": h}) == 409
@@ -193,9 +194,6 @@ def test_the_window_sends_a_reply_in_its_thread_scrubbed_and_hears_closed(monkey
 
         def _personal_values(self) -> list[str]:
             return ["Anna's IPTV"]
-
-        def _supporter_now(self) -> bool:
-            return False
 
         def _show_toast(self, text, ms) -> None:
             self.toasts.append(text)

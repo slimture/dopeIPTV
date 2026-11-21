@@ -440,16 +440,14 @@ class AnswersDialog(QDialog):
 PRIVACY_URL = "https://dopeiptv.org/privacy/?ref=app-feedback#app"
 
 
-def sent_with_text(picked: bool = False, supporter: bool = False, code: bool = False) -> str:
+def sent_with_text(picked: bool = False, code: bool = False) -> str:
     """The line under a report that says what goes with its text: the
     version and the system as they are sent, what was picked in the
-    window, a supporter's mark and an answer code's hash when they go."""
+    window and an answer code's hash when it goes."""
     from ..core import report
     items = report.sent_beside()
     if picked:
         items.append(tr("report_item_picked"))
-    if supporter:
-        items.append(tr("report_item_supporter"))
     if code:
         items.append(tr("report_item_code"))
     return tr("report_sent_with", items=" · ".join(items))
@@ -483,11 +481,10 @@ class FeedbackDialog(QDialog):
     OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
 
     def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None,
-                 all_answers=None, copy_only: bool = False, supporter: bool = False) -> None:
+                 all_answers=None, copy_only: bool = False) -> None:
         super().__init__(parent)
         self._all_answers = all_answers
         self.copy_only = copy_only
-        self._supporter = supporter
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit, QScrollArea
 
@@ -669,8 +666,7 @@ class FeedbackDialog(QDialog):
         return next((k for k, chip in self.topic_chips.items() if chip.isChecked()), "")
 
     def _say_beside(self) -> None:
-        self.beside.setText(sent_with_text(picked=True, supporter=self._supporter,
-                                           code=self.answers.isChecked()))
+        self.beside.setText(sent_with_text(picked=True, code=self.answers.isChecked()))
 
     def _open_all_answers(self, *_a) -> None:
         if self._all_answers is not None:

@@ -426,15 +426,8 @@ def test_only_the_short_answers_go_with_feedback():
     finally:
         report._post = real
     assert got["topic"] == "bug" and got["area"] == "guide" and got["often"] == "once"
-    assert not {"name", "topicx", "area2", "often_", "key"} & set(got)
-    assert got["supporter"] == "yes"            # a word, never the key itself
-
-
-def test_a_supporter_key_never_goes_in_a_report():
-    from dopeiptv.core import supporter
-    key = supporter.make(bytes(32))
-    out = report.scrub(f"my key is {key} - does it work?")
-    assert key not in out and "<supporter key>" in out
+    # The supporter mark is gone with the key: not sent either.
+    assert not {"name", "topicx", "area2", "often_", "key", "supporter"} & set(got)
 
 
 def test_only_the_part_of_the_log_that_matters_goes_with_feedback():

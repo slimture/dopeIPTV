@@ -143,8 +143,6 @@ dopeiptv/
     update_keys.py     The public half of dopeIPTV's release signing key
     build_check.py     Official, modified or from source: the signed build
                        manifest checked once at start; X-dopeIPTV-Build
-    supporter.py       The supporter key: signed by dopeiptv.org, checked
-                       offline
     donate_rhythm.py   When the app asks for a tip (the sidebar's heart one
                        week a month), pure logic
     report.py          Error reports and feedback: scrubbed, shown in full,

@@ -12,7 +12,7 @@ Nor can it change one unnoticed: the tag refuses a changed copy. What it
 could do is hand back an earlier copy of its own; every copy carries a
 counter, sealed with the rest (counter()), so a computer that has seen a
 later one says so, keeps its own and puts it back (RoundResult.older).
-No account, no e-mail, no name and no supporter key go along: nothing that
+No account, no e-mail and no name go along: nothing that
 says who asks (donate/sync.py on the website branch). A copy no computer
 has read or written for 180 days is deleted there.
 
@@ -28,7 +28,7 @@ are turned down and it says so (sync_err_refused) until it is updated.
 
 What syncs (one switch each): favorites with their folders, settings from
 an explicit allow-list (never window sizes, folders and paths of this
-computer, the supporter key, the sync code, logins of other services),
+computer, the sync code, logins of other services),
 playlists with their logins (off by default), and watch history with resume
 points (off by default).
 
@@ -331,7 +331,7 @@ SETTINGS_ALLOW_PREFIX = ("nav_color_", "nav_bg_")
 #: Never, whatever the lists above say: what belongs to this computer, a
 #: secret, or the sync itself.
 SETTINGS_DENY = frozenset({
-    "supporter_key", "window_geometry", "splitter_state", "docked_video_height",
+    "window_geometry", "splitter_state", "docked_video_height",
     "mv_geometry", "popout_geometry", "recordings_dir", "local_dirs",
     "local_open_dir", "playlists", "active_playlist", "server", "username",
     "password", "parental_pin_hash", "parental_salt", "hwdec_mode", "volume",

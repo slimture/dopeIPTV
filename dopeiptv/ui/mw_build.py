@@ -65,16 +65,13 @@ class _BuildMixin(_BuildDetailMixin):
         calendar_action = action(tr("cal_menu"), self.open_calendar_export)
         private_action, clear_action = self._build_privacy_actions()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
-        # Where a supporter key goes, in plain sight (the site's thank-you
-        # points here).
-        self._supporter_action = action(tr("supporter_menu") + "…", lambda: self.open_supporter())
         report_actions = self._build_report_actions()
         self._feedback_action = report_actions["feedback"]
         website_action = action(tr("menu_website"), open_website)
         about_action = action(tr("menu_about"), self.show_about)
         quit_action = action(tr("menu_quit"), self.close)
         # File, View, History and Help on every platform (app_menu); on
-        # macOS About, Settings, Quit and the supporter entries go into the
+        # macOS About, Settings, Quit and Leave a tip go into the
         # application menu by their roles. Kept by name: the command
         # palette lists them.
         self._menu_actions = {
@@ -87,7 +84,7 @@ class _BuildMixin(_BuildDetailMixin):
             "private": private_action, "clear": clear_action,
             "stats": stats_action,
             **report_actions, "website": website_action,
-            "supporter": self._supporter_action, "donate": self._donate_action,
+            "donate": self._donate_action,
             "quit": quit_action}
         menus = lay_out(self.menuBar(), self._menu_actions)
         self._answers_menu = menus["help"]
@@ -114,7 +111,6 @@ class _BuildMixin(_BuildDetailMixin):
             about_action: lambda: tr("menu_about"),
             quit_action: lambda: tr("menu_quit"),
             self._donate_action: lambda: tr("donate_support") + "…",
-            self._supporter_action: lambda: tr("supporter_menu") + "…",
             self._feedback_action: lambda: tr("feedback_menu") + "…",
             self._report_wait_action: lambda: tr("report_title") + "…",
             report_actions["answers"]: self._answers_menu_text,
@@ -197,8 +193,8 @@ class _BuildMixin(_BuildDetailMixin):
         # The logo draws a small update badge in its top-right corner when a
         # newer release is out; clicking that corner opens About.
         self._sidebar_logo.update_clicked.connect(self.show_about)
-        # The logo alone in its row, centred. The donate heart, the private
-        # marker and a supporter's mark lie over it (mw_donate, mw_privacy) -
+        # The logo alone in its row, centred. The donate heart and the private
+        # marker lie over it (mw_donate, mw_privacy) -
         # in no layout, so nothing beside the logo moves.
         self._logo_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self._logo_row.setContentsMargins(0, 0, 0, 0)
@@ -427,8 +423,7 @@ class _BuildMixin(_BuildDetailMixin):
         self._settings_btn.setAccessibleName(tr("btn_settings"))
         self._settings_btn.clicked.connect(self.open_settings)
         # A small red heart on the logo's lower corner, its words in the
-        # tooltip (mw_donate) - the same place on every system; gone for a
-        # supporter, whose mark is the logo itself (widgets._SidebarLogo).
+        # tooltip (mw_donate) - the same place on every system.
         self._donate_btn = donate_btn = HeartButton(objectName="DonateHeart", size=12)
         donate_btn.setFixedSize(22, 22)
         donate_btn.setToolTip(tr("donate_support"))

@@ -7,8 +7,7 @@ Each ``build_<page>(ctx)`` fills its page the first time it is needed
 the page stores and applies, if anything, as
 ``ctx.page_commits[<page key>]``: commit(put, changed, final), run by
 open_settings' commit. *ctx* is the Settings window's SettingsContext
-(ui/mw_settings.py): General and Appearance share the supporter key's
-state and window through it, General the backup with Sources.
+(ui/mw_settings.py): General shares the backup with Sources through it.
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 from ..i18n import tr
 from .settings_ui import (
-    Chip, ChipGroups, ChoicePicker, ColorDot, ThemeTile, after_shown, hbox,
+    Chip, ChipGroups, ChoicePicker, ColorDot, IconTile, ThemeTile, after_shown, hbox,
 )
 from .theme import (
     ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, THEME_ORDER,
@@ -48,8 +47,7 @@ def build_general(ctx: SettingsContext) -> None:
     About."""
     win, d, general = ctx.win, ctx.dialog, ctx.pages["general"]
     shell, is_on, flag, nerd_switch = ctx.shell, ctx.is_on, ctx.flag, ctx.nerd_switch
-    link_cards, shared = ctx.link_cards, ctx.shared
-    supporter_key, supporter_window = ctx.supporter_key, ctx.supporter_window
+    link_cards = ctx.link_cards
     store, export_playlists = ctx.store, ctx.export_playlists
     import_playlists = ctx.import_playlists
     from ..i18n import LANGUAGES, current_language
@@ -182,10 +180,9 @@ def build_general(ctx: SettingsContext) -> None:
     tv_found.setWordWrap(True)
     c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
           search="lirc gamepad controller joystick cec remote evdev sdl")
-    # Feedback, a tip: feedback and its answers, a supporter key from
-    # before, the heart icon, and - last and quiet - whether the app asks
-    # for a tip now and then.
-    c = support_card = general.card(tr("set_feedback_tip_card"))
+    # Feedback, a tip: feedback and its answers and - last and quiet -
+    # whether the app asks for a tip now and then.
+    c = general.card(tr("set_feedback_tip_card"))
     if hasattr(win, "open_answers"):
         # Feedback, and the answers to it (their own window, over
         # this one).
@@ -207,20 +204,6 @@ def build_general(ctx: SettingsContext) -> None:
               search="feedback answer answers reply replies report idea bug svar")
         fb_pair.ensurePolished()                               # now in the window's style
         fb_pair.setFixedWidth(fb_pair.sizeHint().width())
-    if hasattr(win, "open_supporter"):
-        from .qt_i18n import format_month
-        mine = supporter_key()
-        key_btn = QPushButton(tr("set_supporter_open") if mine else tr("set_supporter_enter"))
-        key_btn.clicked.connect(lambda _c=False: supporter_window())
-        key_row = c.row(tr("supporter_menu"), key_btn,
-                        tr("supporter_tip", date=format_month(mine["since"])) if mine else tr("set_supporter_hint"),
-                        search="supporter key tip code nyckel")
-        shared["supporter_row"] = (key_btn, key_row, support_card)
-    # The heart icon, for everyone: applied as it is switched (commit
-    # below).
-    from . import app_icon
-    icon_box = c.toggle(tr("set_supporter_icon"), app_icon.wanted(win.settings),
-                        tr("set_supporter_icon_hint"))
     # Asking for a donation now and then (mw_donate): the
     # household's, off for good until switched on again.
     from ..core import donate_rhythm
@@ -259,11 +242,6 @@ def build_general(ctx: SettingsContext) -> None:
         if ask_box.isChecked() != donate_rhythm.asking(win.settings):
             put(donate_rhythm.K_ASK, flag(ask_box))
             win._donate_heart_refresh()
-        # Written once switched (on is the default): an untouched
-        # window stores nothing.
-        if icon_box.isChecked() != app_icon.wanted(win.settings):
-            put(app_icon.SETTING, flag(icon_box))
-            win._app_icon_refresh()
         if channel_box.currentData() != win._update_channel():
             put("update_channel", channel_box.currentData())
             # Look again now, on the channel just chosen.
@@ -421,6 +399,23 @@ def build_appearance(ctx: SettingsContext) -> None:
     follow_box.toggled.connect(follow)
     c.row(tr("setting_corners"), corner_box)
     c.row(tr("setting_ui_scale"), scale_box, tr("setting_ui_scale_hint"))
+
+    # The app's icon (ui/app_icon.py): the household's, shown as it is
+    # picked; never picked, the blue one.
+    from . import app_icon
+    icons = ChoicePicker(
+        [IconTile(key, tr(f"icon_{key}")) for key in app_icon.LOOKS],
+        app_icon.chosen(win.settings), spacing=8)
+
+    def pick_icon(key: str) -> None:
+        win.settings.setValue(app_icon.SETTING, key)
+        win._app_icon_refresh()
+
+    icons.picked.connect(pick_icon)
+    c = look.card(tr("set_card_app_icon"))
+    c.widget(icons, " ".join([tr("set_card_app_icon"), "icon ikon logo dock taskbar"]
+                             + [t.text() for t in icons.tiles]))
+    c.note(tr("set_app_icon_hint"))
     c = look.card(tr("set_card_lists"))
     c.row(tr("setting_list_size"), density_box)
     c.row(tr("setting_sort_by"), sort_box)

@@ -83,9 +83,8 @@ def test_a_file_address_is_the_path_it_names(url, posix, windows):
     ("dopeiptv://play?url=FILE%3A%2F%2F%2Fhome%2Fu%2Fx.mkv", None),
     ("dopeiptv://play?url=%2Fhome%2Fu%2Ffilm.mkv", None),
     ("dopeiptv://play?url=C%3A%5CUsers%5Cu%5Cx.mkv", None),
-    # The site's thank-you hands a supporter key over; nothing else rides along.
-    ("dopeiptv://supporter?key=DS1-AQALYXcAAAAAAAAACmF8F1Jg", {"supporter": "DS1-AQALYXcAAAAAAAAACmF8F1Jg"}),
-    ("dopeiptv://supporter?key=hello", None),
+    # The supporter key is gone: its old link does nothing.
+    ("dopeiptv://supporter?key=DS1-AQALYXcAAAAAAAAACmF8F1Jg", None),
     ("dopeiptv://supporter", None),
     # A link may not run anything but a stream: no other scheme, no
     # unknown verb, no play without an address.
@@ -412,27 +411,18 @@ def test_the_window_carries_out_each_command():
     assert calls.count(["forward"]) == 6
 
 
-def test_a_supporter_link_opens_the_supporter_window_filled_in():
-    """The key is shown in the supporter window, checked there; the call
-    that asked returns at once (the window opens after)."""
+def test_an_old_supporter_command_is_only_a_come_forward():
+    """The supporter key is gone: a command that still names one opens
+    nothing and takes nothing."""
     pytest.importorskip("PyQt6.QtWidgets")
-    from PyQt6.QtWidgets import QApplication
-
     from dopeiptv.ui.mw_commands import _CommandsMixin
-    app = QApplication.instance() or QApplication([])
 
     class Host(_CommandsMixin):
         def __init__(self):
-            self.opened, self.forward = [], 0
+            self.forward = 0
 
         def _come_forward(self):
             self.forward += 1
-
-        def open_supporter(self, key=""):
-            self.opened.append(key)
     h = Host()
-    assert h.handle_command({"supporter": "DS1-abcdefghijklmnopqrstuv"}) == {"ok": True}
-    assert h.opened == [] and h.forward == 1
-    for _ in range(5):
-        app.processEvents()
-    assert h.opened == ["DS1-abcdefghijklmnopqrstuv"]
+    h.handle_command({"supporter": "DS1-abcdefghijklmnopqrstuv"})
+    assert h.forward == 0 and not hasattr(h, "open_supporter")

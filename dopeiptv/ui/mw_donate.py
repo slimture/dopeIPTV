@@ -1,6 +1,5 @@
 """A tip, from inside the app - asked now and then, never in the way. A
-tip gives nothing in return; a supporter key from before 22 November 2026
-still stops the asking.
+tip gives nothing in return.
 
 "Leave a tip…" is always in the app menu and in About. Beyond that
 the app asks in one rhythm (core/donate_rhythm.py): one week a month, once
@@ -13,8 +12,8 @@ next month.
 The heart (or its right-click menu) opens the support page on the website
 (with a ?ref= saying from where - the site's statistics read it)
 and ends the week; the right-click's "Hide for three months" puts it away
-for three months; "I've left a tip" for a year, taken at the person's word. A
-supporter key: never asked. Settings, General can switch the asking off altogether. It is not
+for three months; "I've left a tip" for a year, taken at the person's word.
+Settings, General can switch the asking off altogether. It is not
 drawn in full screen, in TV mode, in private viewing or for a kids
 profile - the week's days still count.
 
@@ -33,8 +32,7 @@ from ..core.xdg import open_url
 from ..i18n import tr
 from .theme import HEART, P
 
-# The support page: why, a tip or monthly support, GitHub Sponsors - and
-# the supporter key after paying. Nothing is paid in the app.
+# The support page: why, a tip, GitHub Sponsors. Nothing is paid in the app.
 DONATE_URL = "https://dopeiptv.org/support/?ref={ref}"
 #: How long the seconds watched are taken as known (the household's logs
 #: are read again only after this, and only while a period could begin).
@@ -55,6 +53,9 @@ class _DonateMixin:
         self._donate_tick.setInterval(60_000)
         self._donate_tick.timeout.connect(self._donate_minute)
         self._donate_tick.start()
+        # The icon in the accent of the theme now (app.main showed it before
+        # the window had its theme).
+        self._app_icon_refresh()
 
     def _donate_time(self) -> float:
         """The clock the rhythm reads (a test sets its own)."""
@@ -108,12 +109,10 @@ class _DonateMixin:
         except Exception:
             return False
 
-    def _donate_phase(self, sup=False) -> str:
+    def _donate_phase(self) -> str:
         """Where the rhythm is now (a period begun if one may, and it would
-        be seen). *sup*: the supporter key, if the caller has it read."""
-        if sup is False:
-            sup = self._supporter()
-        if sup is not None or not rhythm.asking(self.settings):
+        be seen)."""
+        if not rhythm.asking(self.settings):
             return rhythm.OFF
         try:
             return rhythm.step(self.settings, self._donate_time(),
@@ -124,22 +123,11 @@ class _DonateMixin:
             return rhythm.OFF
 
     # -- the sidebar's heart ---------------------------------------------------
-    def _supporter(self):
-        from ..core import supporter
-        return supporter.stored(self.settings)
-
-    def _supporter_now(self) -> bool:
-        try:
-            return self._supporter() is not None
-        except Exception:                      # no settings yet
-            return False
-
     def _build_heart_badge(self) -> None:
         """The donate heart, laid over the logo like the private marker
         (mw_privacy) - in no layout, so the logo stays centred and nothing
         beside it moves: on the mark's lower right corner, on a ring of the
-        sidebar's colour. A supporter has no heart: the logo itself is their
-        mark (widgets._SidebarLogo.set_supporter)."""
+        sidebar's colour."""
         from .mw_privacy import _Follow
         logo = getattr(self, "_sidebar_logo", None)
         btn = getattr(self, "_donate_btn", None)
@@ -176,17 +164,17 @@ class _DonateMixin:
         the theme's muted ink after it."""
         return HEART if self._donate_bright else P.get("muted", HEART)
 
-    def _donate_show(self, sup=False) -> str:
+    def _donate_show(self) -> str:
         """The heart as the rhythm says: shown in its week, none while it
         would be in the way."""
         try:
-            return self._donate_place(sup)
+            return self._donate_place()
         except Exception as e:                 # never in the way of anything
             log.warning("donate: %s", e)
             return rhythm.OFF
 
-    def _donate_place(self, sup) -> str:
-        ph = self._donate_phase(sup)
+    def _donate_place(self) -> str:
+        ph = self._donate_phase()
         shown = ph != rhythm.OFF and not self._donate_quiet()
         self._donate_bright = ph == rhythm.BRIGHT
         btn = getattr(self, "_donate_btn", None)
@@ -200,28 +188,20 @@ class _DonateMixin:
         btn = getattr(self, "_donate_btn", None)
         if btn is None:
             return
-        # A supporter's heart is gone: the logo itself says it instead.
-        sup = self._supporter()
-        btn.setToolTip(tr("donate_support") + "\n" + tr("heart_tip_key"))
-        from .qt_i18n import format_month
-        logo = getattr(self, "_sidebar_logo", None)
-        if logo is not None and hasattr(logo, "set_supporter"):
-            logo.set_supporter(sup is not None, tr("supporter_tip", date=format_month(sup["since"]))
-                               if sup is not None else "")
-        self._donate_show(sup)
-        self._app_icon_refresh()
+        btn.setToolTip(tr("donate_support"))
+        self._donate_show()
 
     def _donate_minute(self) -> None:
         """Once a minute: a period begun or over, its first day gone, a
-        snooze run out - and the app's icon kept in step with the key."""
+        snooze run out."""
         self._donate_heart_refresh()
 
     def _app_icon_refresh(self) -> None:
-        """The app's icon as Settings > General says: the heart icon or the
-        plain one, live (app_icon.wanted)."""
+        """The app's icon as Settings > Appearance says, live
+        (app_icon.chosen); "accent" follows the accent."""
         from . import app_icon
         try:
-            app_icon.show(app_icon.wanted(self.settings))
+            app_icon.show(app_icon.chosen(self.settings))
         except Exception as e:
             log.warning("app icon: %s", e)
 
@@ -251,29 +231,13 @@ class _DonateMixin:
         btn = btn or self._donate_btn
         menu = QMenu(btn)
         menu.addAction(tr("donate_support"), self._donate_go_heart)
-        menu.addAction(tr("supporter_menu"), self.open_supporter)
         menu.addAction(tr("donate_hide"), self.hide_donate_heart)
-        if self._supporter() is None:
-            menu.addAction(tr("donate_did"), self.donated)
+        menu.addAction(tr("donate_did"), self.donated)
         menu.exec(btn.mapToGlobal(pos))
 
     def heart_clicked(self, ref: str = "app-heart") -> None:
-        """The heart: the donate page, or for a supporter their thank-you
-        (from which they can still donate again)."""
-        if self._supporter() is not None:
-            self.open_supporter()
-        else:
-            self._donate_go(ref)
-
-    def open_supporter(self, key: str = "") -> None:
-        """The supporter window; *key* (from a dopeiptv://supporter link)
-        filled in, so the person sees it checked and kept."""
-        from .dialogs import SupporterDialog
-        d = SupporterDialog(self, self.settings, donate=lambda: self.open_donate("supporter"))
-        if key:
-            d.key.setText(key)
-        d.exec()
-        self._donate_heart_refresh()
+        """The heart: the support page."""
+        self._donate_go(ref)
 
     def open_donate(self, ref: str) -> None:
         open_url(DONATE_URL.format(ref=ref))

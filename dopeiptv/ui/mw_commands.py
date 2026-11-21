@@ -64,7 +64,7 @@ class _CommandsMixin:
             log.info("command: not one the app takes - left")
             return {"ok": False}
         log.info("command: %s", ", ".join(sorted(cmd)))
-        if (cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter")
+        if (cmd.get("open") or cmd.get("play") or cmd.get("channel")
                 or cmd.get("number") or cmd.get("tv")):
             self._come_forward()
         if cmd.get("tv") is True and hasattr(self, "enter_tv_mode"):
@@ -75,13 +75,6 @@ class _CommandsMixin:
             # now): nothing is played for the profile before it is given.
             log.info("command: nothing played - who is watching is not chosen yet")
             return {"ok": False, "locked": True}
-        key = str(cmd.get("supporter") or "").strip()
-        if key and hasattr(self, "open_supporter"):
-            # Shown in the supporter window (checked there, offline), never
-            # taken silently; after this call returns - the asker is waiting.
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(0, lambda: self.open_supporter(key))
-            return {"ok": True}
         url = str(cmd.get("play") or "").strip()
         if url:
             if cmd.get("link") and not self._link_known(url):

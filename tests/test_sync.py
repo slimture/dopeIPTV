@@ -17,23 +17,21 @@ import pytest
 from PyQt6.QtCore import QSettings
 
 from dopeiptv.core import chacha20poly1305 as aead
-from dopeiptv.core import shortcut_keys, supporter, sync
+from dopeiptv.core import shortcut_keys, sync
 from dopeiptv.core.stores import FavoriteStore, HistoryStore, PlaylistStore
 from dopeiptv.i18n import tr
 
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 
-SEED, PUB = supporter.new_seed()
 SUNSCREEN = (b"Ladies and Gentlemen of the class of '99: If I could offer you only one "
              b"tip for the future, sunscreen would be it.")
 ALL = sync.CATEGORIES
 
 
 @pytest.fixture(autouse=True)
-def _no_proxy_and_a_test_key(monkeypatch):
+def _no_proxy(monkeypatch):
     for var in ("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(supporter, "PUBLIC_KEY_HEX", PUB.hex())
     # Nothing in here may reach the real site.
     monkeypatch.setattr(sync, "ENDPOINT", "http://127.0.0.1:9/never/")
 
@@ -281,7 +279,8 @@ def site():
 
 
 def _key():
-    return supporter.make(SEED)
+    """An older app's supporter key, left in a settings file: never synced."""
+    return "DS1-" + "k" * 100
 
 
 # -- what syncs, what never does --------------------------------------------------------
@@ -1071,7 +1070,8 @@ def _settle(w, secs=10.0):
 
 
 def test_off_nothing_runs_and_anyone_can_start(tmp_path, site, qapp):
-    """Sync is for everyone: no supporter key, and none sent when there is."""
+    """Sync is for everyone, and an older app's key left in the settings
+    file is never sent."""
     w = _window(tmp_path, "w", site)
     assert not w._sync_on() and not w._sync_timer.isActive()
     assert not w.sync_now(manual=True)
@@ -1081,7 +1081,7 @@ def test_off_nothing_runs_and_anyone_can_start(tmp_path, site, qapp):
     code = w._sync_start_here()                                   # no key at all
     assert sync.parse_code(code) and w._sync_on() and _settle(w)
     assert w._sync_status[0] == "ok" and len(site.slots) == 1
-    w.settings.setValue("supporter_key", _key())                  # a supporter's
+    w.settings.setValue("supporter_key", _key())                  # an older app's
     w.settings.setValue("theme", "nord")
     assert w.sync_now(manual=True) and _settle(w) and w._sync_status[0] == "ok"
     for h in site.headers:

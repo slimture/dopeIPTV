@@ -135,7 +135,7 @@ def test_the_question_shows_the_server_and_the_whole_address():
     ({"number": 7}, {"number": 7}),
     ({"number": "7"}, {"number": "7"}),
     ({"open": True, "tv": True}, {"open": True, "tv": True}),
-    ({"supporter": "DS1-abcdefghijklmnopqrstuv"}, {"supporter": "DS1-abcdefghijklmnopqrstuv"}),
+    ({"supporter": "DS1-abcdefghijklmnopqrstuv"}, {}),
     ({"open": True, "anything": {"else": 1}}, {"open": True}),
     ({}, {}),
     # A file never from a link; no relative path, no scheme of mpv's own.
@@ -153,7 +153,6 @@ def test_the_question_shows_the_server_and_the_whole_address():
     ({"channel": {"name": "SVT1"}}, None),
     ({"number": True}, None),
     ({"number": [1]}, None),
-    ({"supporter": "hello"}, None),
     ("play", None),
     ([{"play": "http://h/x.ts"}], None),
     (None, None),

@@ -276,7 +276,7 @@ def test_its_keys_are_shown_as_the_system_writes_them(app):
 @pytest.mark.parametrize("platform", ["darwin", "linux", "win32"])
 def test_a_menu_entry_is_named_by_the_menu_it_is_in(app, monkeypatch, platform):
     """An entry says which menu it is in. On macOS About, Settings, Quit
-    and the supporter's entries are in the application menu, named like the
+    and Leave a tip are in the application menu, named like the
     app - not in Help or File, where they are on Linux and Windows."""
     from PyQt6.QtGui import QAction
     from PyQt6.QtWidgets import QWidget
@@ -302,7 +302,7 @@ def test_a_menu_entry_is_named_by_the_menu_it_is_in(app, monkeypatch, platform):
     kinds = {text.removeprefix("Menu entry "): kind for text, kind in kinds.items()}
     assert set(kinds) == set(names)
     mac = platform == "darwin"
-    for name in ("about", "supporter", "donate"):
+    for name in ("about", "donate"):
         assert kinds[name] == (APP_NAME if mac else tr("menu_help")), name
     for name in ("settings", "quit"):
         assert kinds[name] == (APP_NAME if mac else tr("menu_file")), name

@@ -18,7 +18,7 @@ disagree, the code is what runs and the sentence is a bug: report it.
   password, an M3U address with a token in it, a portal's MAC, a box's or
   a media server's login or token -, Trakt's and Simkl's sign-ins,
   OpenSubtitles' login, the sync code, a Watch together room's code, the
-  tokens of the app's own servers and the supporter key. They stay in the
+  tokens of the app's own servers. They stay in the
   settings files (`core/settings_files.py`), and out of the log
   (`core/log.py`: each value the app holds masked wherever it appears, one
   of three characters or fewer as a word of its own, so a short password
@@ -145,7 +145,6 @@ rebinding).
 |---|---|
 | A `dopeiptv://` link with a quote in it that adds `--server`, `--play` or Qt's `-platformpluginpath` | `core/commands.own_arguments`: nothing after a link is read, by the app or by Qt (`app.py` hands Qt the program's name alone) |
 | A link that plays an address | Asked first in the window, with the server and the whole address shown (`ui/mw_commands._ask_link_play`), one question at a time; a stream only, never a file (`commands.stream_url_ok`) |
-| A link with a supporter key | Shown in the supporter window, never taken silently |
 | A request to the phone remote, the remote API, server mode, the rewind buffer or a cast | A token in every address that the page cannot know; the phone remote never counts a web page's guesses and refuses its changes (`cross_site`: `Sec-Fetch-Site`, `Origin`) |
 | Someone on the home network who reads the phone remote's traffic | Its key never crosses the network: it is after the `#` of the code's address (`/r/#key`, which no browser sends) and kept on the phone; every request is signed with it - HMAC-SHA256 over the method, the address, the time, a nonce and the body (`core/phone_remote.signature`, the page's own SHA-256 since `crypto.subtle` needs https) - within a minute of this computer's clock, each nonce once (`SIGN_WINDOW_MS`, `NONCES_MAX`): one seen on the way can be neither changed nor sent again. A picture's address is signed until a quarter of an hour on (`PICTURE_TTL_MS`). An address of before, with the key in its path, makes a new key at once (`leaked`, `on_leaked`). The calendar app, which cannot sign, gets a key of its own that opens the calendar alone (`calendar_token`) |
 | Someone on the home network who saw a converted cast's address | The converter serves only the receiver it was started for (`providers/cast_bridge.receiver_addresses`, 403 for any other address), a new token each run; the Apple TV's bridge, which is not told the Apple TV's address (Apple's menu picks it), serves this computer and the first other address that asks for the run's stream alone - the Apple TV, within seconds of being told -, 403 for any other (`providers/airplay_bridge.admits`) |
@@ -159,7 +158,7 @@ rebinding).
 
 - A link to a channel plays without a question: [below](#a-link-to-a-channel-plays-without-a-question).
 - A page can bring the window forward (`dopeiptv://open`) and open the
-  link's question or the supporter window.
+  link's question.
 
 ### Another user or program on the same computer
 
@@ -213,7 +212,7 @@ provider.
 
 The site serves the app the update feed and downloads, feedback and its
 answers, settings sync, the Watch together relay and the Trakt sign-in's
-redirect, and signs supporter keys. Its code is on the `website` branch
+redirect. Its code is on the `website` branch
 (`donate/sync.py`, `donate/together.py`, `donate/feedback.py`,
 `donate/release_sums.py`). A modified build uses none of these services
 (`build_check.allowed`, `refuse`), and the site refuses one that says it
@@ -249,8 +248,8 @@ is.
   once that signature holds (`donate/release_sums.py`). An older signed
   release is refused too, under its own tag or a newer one
   (`selfupdate.names_version`).
-- Tell who someone is from what the app sends: no account, name, e-mail,
-  supporter key or id the app makes up and keeps. A sync slot and its
+- Tell who someone is from what the app sends: no account, name, e-mail
+  or id the app makes up and keeps. A sync slot and its
   credential come from the sync code (`auth_of`); feedback's answers are
   asked for by the hash of a random code kept on the computer
   (`report.new_code`).

@@ -1955,6 +1955,51 @@ class ThemeTile(_Choice):
         pr.end()
 
 
+class IconTile(_Choice):
+    """One of the app's icons (ui/app_icon.LOOKS) as it is drawn, with its
+    name under it on two lines at most (a name such as "Ihre Akzentfarbe"
+    is wider than the tile); the one chosen ringed in the accent."""
+
+    W, ICON = 88, 56
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(self.W, self.ICON + 12 + 2 * self.fontMetrics().height())
+
+    def paintEvent(self, _event) -> None:
+        from . import app_icon
+        from .theme import ACCENT
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        box = QRectF((self.width() - self.ICON) / 2, 4, self.ICON, self.ICON)
+        pr.setPen(Qt.PenStyle.NoPen)
+        app_icon.draw_look(pr, app_icon.LOOKS[self.key], box.adjusted(4, 4, -4, -4),
+                           self.ICON, ACCENT)
+        on, hover = self.isChecked(), self.underMouse()
+        if on or hover:
+            ring = QPen(QColor(P["accent"] if on else P["muted3"]))
+            ring.setWidthF(2.0)
+            pr.setPen(ring)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawRoundedRect(box.adjusted(1, 1, -1, -1), 14, 14)
+        if self.hasFocus():
+            focus = QPen(QColor(P["accent_hi"]))
+            focus.setWidthF(1.0)
+            focus.setStyle(Qt.PenStyle.DashLine)
+            pr.setPen(focus)
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.drawRoundedRect(box.adjusted(-2, -2, 2, 2), 16, 16)
+        pr.setPen(QColor(P["text"] if on else P["muted"]))
+        fm = pr.fontMetrics()
+        label = QRectF(1, box.bottom() + 4, self.width() - 2, 2 * fm.height() + 2)
+        flags = (Qt.AlignmentFlag.AlignHCenter.value | Qt.AlignmentFlag.AlignTop.value
+                 | Qt.TextFlag.TextWordWrap.value)
+        need = fm.boundingRect(label.toRect(), flags, self.text())
+        text = self.text()
+        if need.height() > label.height() or need.width() > label.width():
+            text = fm.elidedText(text, Qt.TextElideMode.ElideRight, int(label.width()))
+        pr.drawText(label, flags, text)
+
+
 class ColorDot(_Choice):
     """A round swatch: one accent colour, the theme's own (half the theme's
     background, half its accent) or a colour of the user's own (a colour

@@ -44,8 +44,6 @@ _IPV6 = re.compile(r"(?<![\w:])(?:(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
                    r"|[0-9A-Fa-f:]{0,30}[0-9A-Fa-f]::)(?![\w:])")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
-# A supporter key pasted into a report would be the one thing that could tie it to a payment.
-_SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A login written name=value or name: value - a quoted name or value too, as
 # JSON and config files write them ("password": "x y"); the quotes stay.
 # (The log's filter masks the same, core/log.py, all but the login and host.)
@@ -107,7 +105,6 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
     for value in sorted({v.strip() for v in personal if v and len(v.strip()) >= 3}, key=len, reverse=True):
         out = re.sub(re.escape(value), "<private>", out, flags=re.IGNORECASE)
-    out = _SUPPORTER.sub("<supporter key>", out)
     out = _EMAIL.sub("<email>", out)
     out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
@@ -318,10 +315,10 @@ def send_status(kind: str, text: str, *, personal: Iterable[str], timeout: float
               # what is the person's own: the last pass, so no way out
               # skips either.
               "text": scrub(text or "", personal)[:MAX_TEXT]}
-    # What feedback is about (a topic, an area, how often) and "supporter":
-    # "yes" from a supporter (read first): single words from a short list.
+    # What feedback is about (a topic, an area, how often): single words
+    # from a short list.
     fields.update({k: v for k, v in extra.items()
-                   if k in ("topic", "area", "often", "supporter")
+                   if k in ("topic", "area", "often")
                    and isinstance(v, str) and v.isalpha() and len(v) <= 12})
     # The hash of the code this computer keeps to be told the answers - and
     # for a reply to an answer, the same hash as the thread it belongs to.

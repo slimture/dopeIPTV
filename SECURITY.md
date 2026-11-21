@@ -78,7 +78,7 @@ Update channel → Test builds) first, as it is made.
 - dopeiptv.org's services: the update feed and downloads, feedback and its
   answers (`/feedback/`), settings sync (`/sync/`), the Watch together
   relay (`/together/`), the Trakt sign-in's redirect (`/trakt/callback`),
-  the tip dialog and supporter keys (`/pay/`, `/support/key`), and the site
+  the tip dialog (`/pay/`), and the site
   itself.
 
 **Out of scope:**

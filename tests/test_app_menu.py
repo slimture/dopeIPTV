@@ -1,5 +1,5 @@
 """The menu bar: File, View, History and Help on every platform; on macOS
-About, Settings, Quit and the supporter entries in the application menu by
+About, Settings, Quit and Leave a tip in the application menu by
 their roles, as it has always looked there."""
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from dopeiptv.ui import app_menu
 #: Every entry the window makes (main_window's _menu_actions).
 NAMES = ("about", "settings", "open_video", "open_address", "refresh", "reminders", "calendar",
          "multiview", "cast", "together", "phone", "tv_mode", "teletext", "private", "clear",
-         "stats", "feedback", "answers", "report_wait", "website", "supporter", "donate", "quit")
+         "stats", "feedback", "answers", "report_wait", "website", "donate", "quit")
 TITLES = [tr("menu_file"), tr("menu_view"), tr("nav_history"), tr("menu_help")]
 ROLE = QAction.MenuRole
 MOVED = (ROLE.AboutRole, ROLE.PreferencesRole, ROLE.ApplicationSpecificRole, ROLE.QuitRole)
@@ -50,19 +50,19 @@ def test_four_menus_with_settings_and_quit_in_file_and_about_last_in_help(monkey
     assert _seq(menus["view"]) == ["tv_mode", "teletext", "multiview", "cast", "together", "phone"]
     assert _seq(menus["history"]) == ["stats", "private", "clear"]
     assert _seq(menus["help"]) == ["feedback", "answers", "report_wait", "website",
-                                   "|", "supporter", "donate", "|", "about"]
+                                   "|", "donate", "|", "about"]
     # No macOS role: nothing is moved anywhere.
     assert all(a.menuRole() == ROLE.TextHeuristicRole for a in acts.values())
     # An error's report waits hidden; its group keeps the others.
     acts["report_wait"].setVisible(False)
     assert _seq(menus["help"], visible_only=True) == ["feedback", "answers", "website",
-                                                      "|", "supporter", "donate", "|", "about"]
+                                                      "|", "donate", "|", "about"]
     assert all(m.separatorsCollapsible() for m in menus.values())
 
 
 def test_a_missing_entry_leaves_no_stray_separator_or_empty_menu(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
-    bar, acts = _bar(drop=("supporter", "donate", "settings", "stats", "private", "clear"))
+    bar, acts = _bar(drop=("donate", "settings", "stats", "private", "clear"))
     menus = app_menu.lay_out(bar, acts)
     assert [a.text() for a in bar.actions()] == [tr("menu_file"), tr("menu_view"), tr("menu_help")]
     assert "history" not in menus
@@ -87,12 +87,12 @@ def test_on_a_mac_the_roles_keep_it_as_it_was(monkeypatch):
     assert acts["about"].menuRole() == ROLE.AboutRole
     assert acts["settings"].menuRole() == ROLE.PreferencesRole
     assert acts["quit"].menuRole() == ROLE.QuitRole
-    assert acts["supporter"].menuRole() == acts["donate"].menuRole() == ROLE.ApplicationSpecificRole
-    rest = [a for n, a in acts.items() if n not in ("about", "settings", "quit", "supporter", "donate")]
+    assert acts["donate"].menuRole() == ROLE.ApplicationSpecificRole
+    rest = [a for n, a in acts.items() if n not in ("about", "settings", "quit", "donate")]
     # Never moved by its words ("Settings", "About" in some language).
     assert all(a.menuRole() == ROLE.NoRole for a in rest)
     # Today's macOS layout: the application menu, then what stays in each.
-    assert _app_menu(menus) == ["about", "settings", "supporter", "donate", "quit"]
+    assert _app_menu(menus) == ["about", "settings", "donate", "quit"]
 
     def stays(menu):
         return [a.text() for a in menu.actions() if a.menuRole() not in MOVED]
