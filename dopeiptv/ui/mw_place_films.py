@@ -460,7 +460,10 @@ class _PlaceFilmsMixin:
         if not url:
             return ""
         logos = self.logos
-        if url in logos.cache or url in logos.waiting:
+        if url in logos.cache or url in logos.waiting or logos.is_dead(url):
+            # Resting after a failure: kept, so the card's picture source
+            # asks again when the rest is over (else it stayed blank until
+            # the card was dressed again).
             return url
         return url if self.cover.should_fetch(url, row, "vod") else ""
 

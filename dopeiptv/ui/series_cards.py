@@ -20,7 +20,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Callable
 
 from PyQt6.QtCore import (
-    QAbstractListModel, QModelIndex, QPoint, QRect, QRectF, QSize, Qt, pyqtSignal,
+    QAbstractListModel, QModelIndex, QPoint, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import (
@@ -120,13 +120,24 @@ class ImageSource:
     """Pictures for the page: from a loader's memory when there, else
     asked for (on the loader's own threads) and the page repainted when
     they come - all of it (*repaint*), or only where that picture shows
-    (*arrived*, given its address). A picture is asked for once per page."""
+    (*arrived*, given its address).
+
+    A picture is asked for while it is not in the loader's memory and no
+    ask of this page's is on its way: the loader's memory keeps the most
+    recently used pictures within its budget, so one scrolled past long
+    ago is let go and asked for again here - from the disk cache, in a few
+    milliseconds. (Asked once per page, a poster let go stayed blank until
+    the app was started again: the top of a long list first.) One that
+    failed and is resting (the loader's cooldown) is asked for again when
+    the rest is over: the page is painted again then."""
 
     def __init__(self, loader, repaint, arrived: Callable[[str], None] | None = None) -> None:
         self.loader = loader
         self._repaint = repaint
         self._arrived_at = arrived
+        #: The pictures this page asked for and has no answer to yet.
         self._asked: set[str] = set()
+        self._retry: QTimer | None = None
 
     def get(self, url: str | None) -> QPixmap | None:
         if not url or self.loader is None:
@@ -139,9 +150,18 @@ class ImageSource:
 
     def want(self, url: str | None) -> None:
         """*url* asked for now, before it is painted (a card about to come
-        on screen); nothing when it is in memory, asked already or dead."""
-        if (not url or self.loader is None or url in self._asked
-                or url in self.loader.cache or self.loader.is_dead(url)):
+        on screen); nothing when it is in memory, on its way or resting."""
+        if not url or self.loader is None or url in self.loader.cache:
+            return
+        if url in self._asked:
+            # On its way - unless the loader let the ask go unanswered (a
+            # host resting when its turn came): then asked again below.
+            waiting = getattr(self.loader, "waiting", None)
+            if waiting is None or url in waiting:
+                return
+        rest = self._rest(url)
+        if rest > 0:
+            self._retry_in(rest)
             return
         self._asked.add(url)
         self.loader.get(url, partial(self._arrived, url))
@@ -149,7 +169,33 @@ class ImageSource:
     def forget(self) -> None:
         self._asked.clear()
 
+    def _rest(self, url: str) -> float:
+        """How long the loader rests *url* (a loader without cooldown_left:
+        its usual short rest while it says the address is dead)."""
+        left = getattr(self.loader, "cooldown_left", None)
+        if left is not None:
+            return float(left(url))
+        return 20.0 if self.loader.is_dead(url) else 0.0
+
+    def _retry_in(self, secs: float) -> None:
+        """The page painted again when a resting picture may be asked for."""
+        ms = int(secs * 1000) + 100
+        t = self._retry
+        if t is None:
+            t = self._retry = QTimer()
+            t.setSingleShot(True)
+            t.timeout.connect(self._repaint_now)
+        if not t.isActive() or t.remainingTime() > ms:
+            t.start(ms)
+
+    def _repaint_now(self) -> None:
+        try:
+            self._repaint()
+        except RuntimeError:
+            pass        # the page is gone
+
     def _arrived(self, url: str, _pm) -> None:
+        self._asked.discard(url)
         if self._arrived_at is not None:
             self._arrived_at(url)
         else:

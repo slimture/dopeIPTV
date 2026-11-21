@@ -655,6 +655,14 @@ class LogoLoader(QObject):
             return False
         return True
 
+    def cooldown_left(self, url: str | None) -> float:
+        """Seconds until *url* - or its host - may be fetched again (0: now)."""
+        if not url:
+            return 0.0
+        now = time.monotonic()
+        until = max(self.dead.get(url, 0.0), self.dead_hosts.get(self._host_of(url), 0.0))
+        return max(0.0, until - now)
+
     def _disk_path(self, url: str) -> Path | None:
         if self.disk_dir is None:
             return None

@@ -29,6 +29,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Posters went blank after a while in Movies, Series, Mine, Search, a
+  series' page and TV mode - the top of a long list first - and stayed so
+  until the app was started again. The app keeps the pictures it used most
+  recently in memory and lets the oldest go; a card asked for its picture
+  only once, so one let go was never asked for again. It is now asked for
+  again - from the disk cache, in a few milliseconds - and a picture that
+  failed and rests for a moment is asked for again when the rest is over
+  (`series_cards.ImageSource`, `LogoLoader.cooldown_left`).
 - Updating to 1.6.10 could change the app's icon: a heart-icon switch left
   on from before, without a supporter key, now showed the heart. The switch
   everyone has since 1.6.10 is a setting of its own (`heart_icon`); never

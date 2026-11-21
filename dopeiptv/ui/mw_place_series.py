@@ -315,7 +315,7 @@ class _PlaceSeriesMixin:
             return ""
         loader = self.logos
         try:
-            if (url in loader.cache or url in loader.waiting
+            if (url in loader.cache or url in loader.waiting or loader.is_dead(url)
                     or cover.should_fetch(url, it, "series")):
                 return str(url)
         except Exception:
