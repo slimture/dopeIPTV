@@ -145,16 +145,16 @@
 <div class="tp-more-body">
 <h3>Så fungerar det</h3>
 <p>Här är allt appen skickar till dopeiptv.org, och vad av ditt tittande som finns i det:</p>
-<ul>
+<ul class="tp-said">
 <li><strong>Uppdateringskontrollen</strong>, en gång om dagen: appens namn, version och system – ingenting om vad du tittar på (<a href="#updates">del 3</a>).</li>
 <li><strong>En felrapport eller feedback</strong>, bara när du trycker på Skicka: kanalnamn och titlar tas bort innan du ser den (<a href="#reports">del 7</a>).</li>
 <li><strong>Synkronisering av inställningar</strong>, om du slår på den: dina favoriter – och din historik, om du väljer den – låsta med en nyckel som vi aldrig ser (<a href="#sync">del 8</a>).</li>
 <li><strong>Titta tillsammans</strong>, om du startar ett rum: det som spelas, låst med en nyckel som görs av rummets kod (<a href="#together">del 9</a>).</li>
 </ul>
 <p>Andra får veta något om vad du tittar på, och du ska veta vilka:</p>
-<ul>
+<ul class="tp-said">
 <li><strong>Din leverantör</strong> ser varje kanal och film du spelar – den skickar strömmen till dig.</li>
-<li><strong>The Movie Database</strong> tillfrågas om en films eller seriers affisch och beskrivning: den får titeln och året – och, som varje tjänst, din IP-adress. Det är på från början; <em>Leverantörens bilder, TMDB av</em> under Inställningar › Affischer och info stänger av det – då tillfrågas den inte om något alls.</li>
+<li><strong>The Movie Database</strong> tillfrågas om en films eller seriers affisch och beskrivning, över HTTPS: den får titeln och året – och, som varje tjänst, din IP-adress. Nyckeln appen frågar med är densamma i varje kopia, så den säger att frågan kommer från dopeIPTV, inte vem som frågar (en egen, som du anger i Inställningar, är din). Varje titel frågas en gång och sparas sedan på din dator, och inget frågas om det du tittar på privat. Det är på från början; <em>Leverantörens bilder, TMDB av</em> under Inställningar › Affischer och info stänger av det – då tillfrågas den inte om något alls.</li>
 <li><strong>Trakt och Simkl</strong> får veta vad du tittar på bara om du loggar in hos dem – det är det de är till för.</li>
 <li><strong>OpenSubtitles</strong> får det du söker efter, när du söker undertexter, och <strong>radio-browser.info</strong> stationen du spelar bara om du slår på det.</li>
 </ul>
@@ -170,7 +170,7 @@
 <!--tp:ex updates lines-->
 <p class="fine">Framtaget genom att köra appens egen kod, där anropet till The Movie Database fångades innan det skickades.</p>
 <h3>Koden</h3>
-<p>Anropet till The Movie Database – titeln och året, och inget annat om dig:</p>
+<p>Anropet till The Movie Database – över HTTPS, titeln och året, och inget annat om dig –, nyckeln som alla kopior delar, och uppslaget som frågar en gång per titel och aldrig om det som spelas privat:</p>
 <!--tp:code watching tmdb-->
 <h3>Kontrollera det själv</h3>
 <blockquote class="tp-ask" data-for="watching"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – anropet den gör till The Movie Database för att hitta en affisch. Förklara på enkel svenska vad den skickar. Granska den sedan kritiskt: säger något i den vem personen är, eller mer än titeln hen tittar på? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>
@@ -181,7 +181,7 @@
 <h3>Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Din leverantör ser vad du spelar, och den som kan se din nättrafik ser vilka servrar du ansluter till – och hos en leverantör på okrypterad <code>http://</code> vilka strömmar.</li>
-<li>Affischer hämtas för det du bläddrar bland, inte bara för det du spelar: en titel som du scrollar förbi kan också efterfrågas.</li>
+<li>Affischer hämtas för det du bläddrar bland, inte bara för det du spelar: en titel som du scrollar förbi kan också efterfrågas. Bilderna kommer sedan från TMDB:s bildserver, med filnamn som pekar på titlarna.</li>
 </ul>
 </div>
 </section>

@@ -35,7 +35,7 @@
     }
     // The page's words may sit in a block of their own (Read more, the
     // limits' box): looked for inside each, never inside the proof.
-    var WORDS = ".tp-promise, .tp-know, table.tp-hosts, ul.tp-limits, ul.tp-names";
+    var WORDS = ".tp-promise, .tp-know, table.tp-hosts, ul.tp-limits, ul.tp-names, ul.tp-said";
     function take(x) {
       if (x.classList.contains("tp-promise")) {
         words.push((lab.promise ? lab.promise + " " : "") + clean(x));
@@ -45,6 +45,11 @@
         words.push(headOf(x) + [].map.call(x.querySelectorAll("tbody tr"), function (tr) {
           return "- " + [].map.call(tr.cells, clean).join(" – ");
         }).join("\n"));
+      } else if (x.classList.contains("tp-said")) {
+        // What is sent and to whom: under its own line of introduction.
+        var intro = x.previousElementSibling;
+        words.push((intro && intro.tagName === "P" ? clean(intro) + "\n" : headOf(x)) +
+          [].map.call(x.children, function (li) { return "- " + clean(li); }).join("\n"));
       } else {
         words.push(headOf(x) +
           [].map.call(x.children, function (li) { return "- " + clean(li); }).join("\n"));

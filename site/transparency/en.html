@@ -145,16 +145,16 @@
 <div class="tp-more-body">
 <h3>How it works</h3>
 <p>Here is everything the app sends to dopeiptv.org, and what of your watching is in it:</p>
-<ul>
+<ul class="tp-said">
 <li><strong>The update check</strong>, once a day: the app's name, version and system – nothing about what you watch (<a href="#updates">part 3</a>).</li>
 <li><strong>An error report or feedback</strong>, only when you press Send: channel names and titles are taken out before you see it (<a href="#reports">part 7</a>).</li>
 <li><strong>Settings sync</strong>, if you turn it on: your favourites – and your history, if you choose it – locked with a key we never see (<a href="#sync">part 8</a>).</li>
 <li><strong>Watch together</strong>, if you start a room: what plays, locked with a key made from the room's code (<a href="#together">part 9</a>).</li>
 </ul>
 <p>Others do learn something of what you watch, and you should know who:</p>
-<ul>
+<ul class="tp-said">
 <li><strong>Your provider</strong> sees every channel and film you play – it sends you the stream.</li>
-<li><strong>The Movie Database</strong> is asked for a film's or a series' poster and description: it gets the title and the year – and, like every service, your IP address. It is on by default; <em>Provider artwork, TMDB off</em> under Settings › Posters &amp; info turns it off – then it is asked nothing at all.</li>
+<li><strong>The Movie Database</strong> is asked for a film's or a series' poster and description, over HTTPS: it gets the title and the year – and, like every service, your IP address. The key the app asks with is the same in every copy, so it says the question comes from dopeIPTV, not who asks (one of your own, set in Settings, is yours). Each title is asked once and then remembered on your computer, and nothing is asked about what you watch privately. It is on by default; <em>Provider artwork, TMDB off</em> under Settings › Posters &amp; info turns it off – then it is asked nothing at all.</li>
 <li><strong>Trakt and Simkl</strong> get what you watch only if you sign in to them – that is what they are for.</li>
 <li><strong>OpenSubtitles</strong> gets what you search for, when you search for subtitles, and <strong>radio-browser.info</strong> the station you play only if you turn that on.</li>
 </ul>
@@ -170,7 +170,7 @@
 <!--tp:ex updates lines-->
 <p class="fine">Made by running the app's own code, the request to The Movie Database caught before it was sent.</p>
 <h3>The code</h3>
-<p>The request to The Movie Database – the title and the year, and nothing else of yours:</p>
+<p>The request to The Movie Database – over HTTPS, the title and the year, and nothing else of yours –, the key every copy shares, and the lookup that asks once per title and never about what plays privately:</p>
 <!--tp:code watching tmdb-->
 <h3>Check it yourself</h3>
 <blockquote class="tp-ask" data-for="watching"><p>Below is code from dopeIPTV, an open-source TV player – the request it makes to The Movie Database to find a poster. Explain in plain English what it sends. Then review it critically: does anything in it say who the person is or more than the title they look at? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>
@@ -181,7 +181,7 @@
 <h3>What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Your provider sees what you play, and anyone who can see your network traffic sees which servers you connect to – and with a provider on plain <code>http://</code>, which streams.</li>
-<li>Posters are looked up for what you browse, not only for what you play: a title you scroll past may be asked for too.</li>
+<li>Posters are looked up for what you browse, not only for what you play: a title you scroll past may be asked for too. The pictures then come from TMDB's picture server, by file names that point to the titles.</li>
 </ul>
 </div>
 </section>
