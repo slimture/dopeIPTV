@@ -587,11 +587,15 @@ var iptvCurrency = (function () {
     var h = document.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)));
     if (h) { links[h.id] = a; heads.push(h); }
   });
+  // Audit us lists every question in its overview at the top: the contents
+  // beside it, the same questions, stay quiet until the first part.
+  var quietable = !!document.querySelector(".tp-overview");
   function mark() {
     queued = false;
     var current = null;
     heads.forEach(function (h) { if (h.getBoundingClientRect().top < window.innerHeight * 0.35) { current = h; } });
     heads.forEach(function (h) { links[h.id].classList.toggle("is-here", h === current); });
+    if (quietable) { box.classList.toggle("is-quiet", !current); }
     var id = current ? current.id : "";
     if (now && id !== said) {
       said = id;

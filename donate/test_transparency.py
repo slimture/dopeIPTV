@@ -92,16 +92,18 @@ def test_each_copy_button_has_its_question_and_each_proof_is_folded():
 
 def test_the_overview_names_every_part_with_its_own_count_of_limits():
     for lang, text in _words().items():
-        table = text[text.index('<table class="tp-overview">'):text.index("</table>")]
-        rows = re.findall(r'<tr><td class="tp-ov-q"><a href="#([a-z]+)">.*?<td class="tp-ov-l">(.*?)</td></tr>', table)
+        listing = text[text.index('<ul class="tp-overview">'):]
+        listing = listing[:listing.index("</ul>")]
+        rows = re.findall(r'<li><a class="tp-ov-q" href="#([a-z]+)">.*?<a class="tp-ov-l" href="#([a-z]+)-limits"[^>]*>(\d+) ',
+                          listing, re.S)
         assert [r[0] for r in rows] == re.findall(r'<h2 id="([a-z]+)">\d+\.', text), lang
-        for pid, cell in rows:
+        for pid, target, count in rows:
+            assert target == pid, f"{lang}: {pid}"
             fold = re.search(r'<details class="tp-fold tp-lim" id="%s-limits">.*?<span class="tp-n">(\d+)</span>'
                              r'.*?(<ul class="tp-limits">.*?</ul>)' % pid, text, re.S)
             assert fold, f"{lang}: {pid} names no limits of its own"
             n = fold.group(2).count("<li>")
-            assert int(fold.group(1)) == n, f"{lang}: {pid}"
-            assert cell.startswith(f'<a href="#{pid}-limits">{n}<span class="tp-ov-unit"> '), f"{lang}: {pid}"
+            assert int(fold.group(1)) == n == int(count), f"{lang}: {pid}"
 
 
 def test_every_address_names_its_version():
