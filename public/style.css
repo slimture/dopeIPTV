@@ -2687,7 +2687,13 @@ section.legal-main { padding: 18px 0 84px; }
 .legal .tp-part > h2 { min-height: 44px; padding-inline-start: 58px; font-size: 24px; }
 .legal .tp-part > h2::before { width: 44px; height: 44px; border-radius: 13px; background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .legal .tp-part > h2::after { top: 11px; inset-inline-start: 11px; width: 22px; height: 22px; background: var(--accent); }
-.legal .tp-part .lnum { width: auto; height: auto; padding: 0; border-radius: 0; background: none; color: var(--faint); font-size: 15px; }
+/* The part's number - what the text's "part 7" points to - a small word
+   over its question, not a lone figure beside it. */
+.legal .tp-part > h2 { display: block; }
+.legal .tp-part .lnum { display: block; width: auto; height: auto; margin: 0 0 3px; padding: 0; border-radius: 0; background: none;
+  color: var(--faint); font: 700 12.5px/1.3 var(--sans); letter-spacing: .07em; text-transform: uppercase; }
+.legal .tp-part .lnum::before { content: "Part "; }
+.legal:lang(sv) .tp-part .lnum::before { content: "Del "; }
 .legal .tp-part .tp-promise { margin: 0 0 10px; padding: 0; padding-inline-start: 36px; border-radius: 0; background: none;
   color: var(--text); font-size: 20px; line-height: 1.45; font-weight: 600; }
 .legal .tp-part .tp-promise::before { inset-inline-start: 0; top: 4px; width: 24px; height: 24px; background: var(--ok); }
