@@ -98,13 +98,38 @@ def _not_an_address(text: str) -> bool:
     return text.startswith("127.") or (text == __version__ and text.count(".") == 3)
 
 
+class Secret(str):
+    """A login among the person's values (personal_values): hidden wherever
+    it stands, with the word around it."""
+
+
+def _own_value(value: str, secret: bool) -> str:
+    """The pattern one of the person's values is hidden by. A name - a
+    source's, a channel's, a title, a server - only where it stands as a
+    word of its own: hidden inside another word it told what it was ("not
+    st<private>d yet" with a channel called Arte), and that word was never
+    it. A login wherever it stands, with the whole word around it, so no
+    part of a word is left to tell where it began."""
+    body = re.escape(value)
+    if secret:
+        return rf"\w*{body}\w*"
+    head = r"(?<!\w)" if re.match(r"\w", value) else ""
+    tail = r"(?!\w)" if re.search(r"\w$", value) else ""
+    return head + body + tail
+
+
 def scrub(text: str, personal: Iterable[str] = ()) -> str:
     """*text* without anything that identifies a stream or a person."""
     # Whole addresses first (a login or a name inside one goes with it),
     # then the person's own values, longest first (a name inside another).
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
-    for value in sorted({v.strip() for v in personal if v and len(v.strip()) >= 3}, key=len, reverse=True):
-        out = re.sub(re.escape(value), "<private>", out, flags=re.IGNORECASE)
+    kinds: dict[str, bool] = {}
+    for v in personal:
+        value = v.strip() if v else ""
+        if len(value) >= 3:
+            kinds[value] = kinds.get(value, False) or isinstance(v, Secret)
+    for value in sorted(kinds, key=len, reverse=True):
+        out = re.sub(_own_value(value, kinds[value]), "<private>", out, flags=re.IGNORECASE)
     out = _EMAIL.sub("<email>", out)
     out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
@@ -140,7 +165,7 @@ def personal_values(playlists: Iterable[dict], channels: Iterable[str] = (),
         for key in ("name", "server", "username", "password", "mac", "epg_url"):
             v = str(p.get(key) or "")
             if v:
-                out.append(v)
+                out.append(Secret(v) if key in ("username", "password", "mac") else v)
                 if key == "server":
                     host = re.sub(r"^[a-z]+://", "", v).split("/")[0].split("@")[-1].split(":")[0]
                     out.append(host)

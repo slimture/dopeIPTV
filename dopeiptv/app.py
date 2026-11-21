@@ -533,6 +533,13 @@ def main() -> int:
     # is never Qt's to act on. The person's own command line is as before.
     linked = any(is_link(a) for a in sys.argv[1:])
     app = QApplication(sys.argv[:1] if linked else sys.argv)
+    # QApplication has just set every locale category from the environment
+    # (a LC_ALL there wins over the LC_NUMERIC above): put the one libmpv
+    # needs back now, on this thread, before any worker makes a core
+    # (media/players.numeric_c; every core is made after it again).
+    if _libmpv is not None:
+        from .media.players import numeric_c
+        numeric_c()
     # A command (--play, --channel, a dopeiptv:// link) goes to the copy
     # already running, if there is one; this start then ends here.
     if command is not None:

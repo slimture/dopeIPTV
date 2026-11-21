@@ -621,3 +621,23 @@ def test_a_report_loses_logins_told_in_words_tokens_home_folders_and_phone_numbe
     for text in ("Login failed: 401", "the PIN was wrong", "dopeIPTV 1.6.9 (Linux; x86_64)",
                  "at 21:05:03 on 2026-11-20", 'File "/usr/lib/python3.11/x.py", line 12'):
         assert report.scrub(text) == text, text
+
+
+def test_a_name_is_hidden_as_a_word_and_a_login_with_the_word_around_it():
+    """Crash report a8f41ba99eed said "Video: own thread (not st<private>d
+    yet)": a channel called Arte hidden inside "started" told what it was,
+    and "started" was never it."""
+    personal = report.personal_values(
+        [{"name": "Arte", "username": "kalle", "password": "Sommar24", "server": "http://tv.example:8080"}],
+        channels=["Arte HD", "One"], titles=["Dune"])
+    out = report.scrub("Video: own thread (not started yet); Arte HD froze; done; "
+                       "Dune: Part Two; Arte; none", personal)
+    assert out == ("Video: own thread (not started yet); <private> froze; done; "
+                   "<private>: Part Two; <private>; none")
+    # A login, wherever it stands: with the whole word around it.
+    out = report.scrub("user kalle77x, retry %3DSommar24%26 ok; kalle", personal)
+    assert "kalle" not in out and "Sommar24" not in out and "77x" not in out
+    assert out == "user <private>, retry %<private>%26 ok; <private>"
+    # A name that begins or ends with something else than a letter.
+    assert report.scrub("[SE] Kanal 5 froze", ["[SE] Kanal 5"]) == "<private> froze"
+    assert report.scrub("x[SE] Kanal 5y", ["[SE] Kanal 5"]) == "x[SE] Kanal 5y"

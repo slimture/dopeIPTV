@@ -125,9 +125,13 @@ def redact(text: str) -> str:
     Iterates a SNAPSHOT: a client is built on a worker thread (the account
     panel fetches through run_async), so register_secrets can add to the
     set while another thread is formatting a log line, and iterating a set
-    that grows under you raises RuntimeError."""
+    that grows under you raises RuntimeError.
+
+    A value inside a longer word takes the whole word with it: "st***d"
+    told where a login of "arte" began and what it was."""
     for s in tuple(_secrets):
-        text = text.replace(s, "***")
+        if s in text:
+            text = re.sub(r"\w*" + re.escape(s) + r"\w*", "***", text)
     for s in tuple(_short):
         if s in text:
             text = re.sub(r"(?<![0-9A-Za-z])" + re.escape(s) + r"(?![0-9A-Za-z])", "***", text)

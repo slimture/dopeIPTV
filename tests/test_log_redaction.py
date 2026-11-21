@@ -426,3 +426,12 @@ def test_a_line_that_could_not_be_masked_is_withheld_not_written_as_it_was(monke
     _RedactFilter().filter(rec)
     assert "hunter2pw" not in rec.getMessage()
     assert rec.getMessage().startswith(logmod.WITHHELD)
+
+
+def test_a_login_inside_a_longer_word_takes_the_word_with_it():
+    """"not st***d yet" told a login of "arte" by where the mask began and
+    ended: the whole word goes, never a part of it."""
+    logmod.register_secrets("arte")
+    out = redact("Video: own thread (not started yet) /live/arte/x/1.ts")
+    assert out == "Video: own thread (not *** yet) /live/***/x/1.ts"
+    assert "st***" not in out and "***d" not in out

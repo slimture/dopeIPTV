@@ -75,10 +75,37 @@ except Exception as _e:
     _libmpv_error = f"{type(_e).__name__}: {_e}"
 
 
+def numeric_c() -> bool:
+    """Whether LC_NUMERIC is "C" now - set so first when it is not.
+
+    libmpv makes no core under another numeric locale: mpv_create() says
+    "Non-C locale detected" and hands back NULL, and python-mpv passes that
+    NULL straight on to mpv_set_option_string - a segfault (crash report
+    a8f41ba99eed: Nerd's check of the mpv options made its core on a
+    worker before the player had made one, on a system in Swedish). Qt's
+    QApplication sets every category from the environment on Unix - a
+    LC_ALL there wins over the LC_NUMERIC the start puts beside it - and a
+    native file dialog can again, so every core is made after this; Qt and
+    Python format numbers without the C locale, so nothing else changes.
+    Asked first and set only when it is not "C": the locale is the whole
+    process's, and a worker should not write it while nothing needs it."""
+    import locale
+    try:
+        was = locale.setlocale(locale.LC_NUMERIC)
+        if was == "C":
+            return True
+        locale.setlocale(locale.LC_NUMERIC, "C")
+        log.info("LC_NUMERIC was %s: set to C for libmpv", was)
+        return locale.setlocale(locale.LC_NUMERIC) == "C"
+    except locale.Error as e:
+        log.warning("could not set LC_NUMERIC=C: %s", e)
+        return False
+
+
 def throwaway_mpv():
     """A core that shows and plays nothing, to try options on (Nerd's
-    checks); None without libmpv."""
-    if _libmpv is None:
+    checks); None without libmpv, or where libmpv would make none."""
+    if _libmpv is None or not numeric_c():
         return None
     return _libmpv.MPV(vo="null", ao="null", terminal=False, idle=True)
 

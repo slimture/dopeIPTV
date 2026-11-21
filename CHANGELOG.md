@@ -26,6 +26,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - The add-a-source form and a source's page say so under the address when
   an Xtream server or a portal on the internet is on plain http: the login
   travels unencrypted in every address.
+- An error report hid one of your names - a channel's, a source's, a
+  title - even inside another word, and the placeholder then told what it
+  was: "not st<private>d yet" with a channel called Arte. A name is now
+  hidden only where it stands as a word of its own, and a login wherever it
+  stands with the whole word around it; the log does the same with a login
+  (`report._own_value`, `log.redact`).
 
 ### Added
 
@@ -55,6 +61,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   (`series_cards.ImageSource`, `LogoLoader.cooldown_left`).
 - Updating to 1.6.10 could switch the app to the heart icon by itself; the
   icon is now the blue one until another is picked.
+- The app could crash as Settings opened, before anything had played, on a
+  system whose language writes numbers with a decimal comma (Swedish,
+  German...) and that sets `LC_ALL`: Nerd's check of the mpv options made
+  its mpv core while the numeric locale was the system's, libmpv makes none
+  then, and python-mpv crashed on the nothing it got. Every core is now made
+  after the numeric locale is put back to "C", and the start puts it back
+  as soon as Qt has set it (`players.numeric_c`).
 
 ## [1.6.10]
 
