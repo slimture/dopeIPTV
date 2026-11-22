@@ -11,7 +11,9 @@ stops it: every viewer is let go, every provider connection closed, the
 buffers wiped.
 
 ``--port N`` listens on N this time (the setting stays); ``--no-discovery``
-leaves UDP 65001 alone (another tuner emulator on the computer has it).
+leaves UDP 65001 alone (another tuner emulator on the computer has it). A
+tuner open to every device of this computer's networks without its token
+is said in the log at every start (``open_note``).
 A settings file that could not be made readable by this user alone stops
 it, until ``--settings-not-private`` says once to go on with that file.
 """
@@ -155,6 +157,23 @@ def taken_note(taken: Any) -> str:
     return f"port {taken.port} is taken: {who}; {nxt}"
 
 
+def open_note(cfg: Any) -> str:
+    """What the tuner is open to without its token, logged at every start
+    while it is every device of this computer's networks (what a server set
+    up before 1.6.9 keeps) - nothing is changed here. Returns the line ("")
+    when there is nothing to say."""
+    from .services import home_server as hs
+    if cfg.open != hs.OPEN_HOME:
+        return ""
+    nets = ", ".join(str(n) for n in hs.home_networks()) or "this computer's own networks"
+    line = (f"server: every device on {nets} can use the tuner and watch without its token - "
+            "what server mode did before 1.6.9. To let in only the devices that need it, in the "
+            "app: Settings > Nerd > Remote and automation > Server mode > Devices without the "
+            "token")
+    log.warning("%s", line)
+    return line
+
+
 def _arg(argv: list[str], name: str) -> str | None:
     if name in argv:
         i = argv.index(name)
@@ -212,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     open_mode(settings, ran_before=bool(str(settings.value(K_DEVICE, "") or "").strip()))
     cfg = read_config(settings)
     register_secrets(cfg.token)
+    open_note(cfg)
     port = _arg(argv, "--port")
     if port is not None:
         try:

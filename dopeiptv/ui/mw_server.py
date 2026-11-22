@@ -17,6 +17,13 @@ Nothing a device watches is the person's: no history, statistics, Trakt or
 Simkl, Discord or events - the restream never goes through the playback
 path those hook into.
 
+A tuner kept open to every device of this computer's networks from before
+1.6.9 (home_server.open_untold) keeps working, and is said once while the
+server runs: a decision card whose "Close it" lets in only the devices that
+used it so this run (home_server.closed_mode - nobody when none did, and a
+message says what a device needs then); dismissed, it stays as it is and is
+not said again (K_OPEN_TOLD).
+
 Its port in use: whose it is - dopeIPTV's own server (a ``--server`` from a
 terminal or at login, another window) or another program - asked off the
 window's thread (home_server.look_at_port) and said in a note that offers
@@ -28,6 +35,8 @@ from __future__ import annotations
 
 import threading
 from typing import Any
+
+from PyQt6.QtCore import QTimer
 
 from ..core import connections
 from ..core.log import log
@@ -187,18 +196,104 @@ class _ServerMixin:
         rec = getattr(self, "rec", None)
         if rec is not None:
             rec.before_spawn = self._server_rec_room
-        from PyQt6.QtCore import QTimer
         if self._home_timer is None:
             self._home_timer = QTimer(self)
             self._home_timer.setInterval(30000)
             self._home_timer.timeout.connect(self._server_sources_now)
         self._home_timer.start()
+        # The tuner kept open to every device from before 1.6.9: said once,
+        # a moment after it starts (the window up by then).
+        QTimer.singleShot(1500, self._server_tell_open)
+
+    # -- the tuner kept open from before 1.6.9 --------------------------------------------
+    #: The decision card's key (ui/notices.py).
+    _OPEN_CARD = "server_open_home"
+
+    def _server_tell_open(self) -> None:
+        """While server mode runs with the tuner open to every device of
+        this computer's networks, kept so unasked (home_server.open_untold):
+        a decision card says so, plainly - "Close it" lets in only the
+        devices that used it so (``_server_close_open``); dismissed, it is
+        kept as it is and not said again (K_OPEN_TOLD)."""
+        from ..services import home_server as hs
+        if self._home is None or not hs.open_untold(self.settings) \
+                or self.__dict__.get("_open_card_up"):
+            return
+        from .notices import NoticeHub, hub_of
+        hub = hub_of(self)
+        if not isinstance(hub, NoticeHub):
+            return
+        self._open_card_up = True
+        log.info("server: the tuner is open to every device of this computer's networks "
+                 "without its token, as before 1.6.9 - said once")
+        hub.post(tr("srv_open_carried"), title=tr("srv_open_carried_title"), level="warning",
+                 action=self._server_close_open, action_label=tr("srv_open_close"),
+                 decide=True, key=self._OPEN_CARD)
+        hub.changed.connect(self._server_open_card_changed)
+
+    def _server_open_card_changed(self) -> None:
+        """The hub changed: once the card is gone - answered or dismissed -
+        it is not said again. Dismissed is "keep it"."""
+        from .notices import hub_of
+        hub = hub_of(self)
+        if any(m.key == self._OPEN_CARD for m in hub.messages()):
+            return
+        try:
+            hub.changed.disconnect(self._server_open_card_changed)
+        except (TypeError, RuntimeError):
+            pass
+        self._open_card_up = False
+        from ..services import home_server as hs
+        if not hs.open_told(self.settings):
+            self.settings.setValue(hs.K_OPEN_TOLD, "true")
+            if hs.open_mode_of(self.settings) == hs.OPEN_HOME:
+                log.info("server: the open tuner is kept as it is (the card dismissed)")
+
+    def _server_close_open(self) -> None:
+        """The card's "Close it": the devices that used the tuner without
+        its token this run - and those listed before - let in by their
+        address alone; with none known, nobody, and a message says what a
+        device needs then (Settings, where a device is let in)."""
+        from ..services import home_server as hs
+        from .notices import hub_of
+        srv = self._home
+        seen = srv.open_seen() if srv is not None else []
+        mode, hosts = hs.closed_mode(seen, self.settings.value(hs.K_OPEN_HOSTS, "") or "")
+        self.settings.setValue(hs.K_OPEN, mode)
+        if hosts:
+            self.settings.setValue(hs.K_OPEN_HOSTS, hosts)
+        self.settings.setValue(hs.K_OPEN_TOLD, "true")
+        log.info("server: the open tuner closed - %s",
+                 f"{len(hosts.split(','))} device(s) let in by their address"
+                 if mode == hs.OPEN_DEVICES else "every device takes its token now")
+        if srv is not None:
+            self._server_apply()
+        hub = hub_of(self)
+        if mode == hs.OPEN_DEVICES:
+            hub.post(tr("srv_open_closed_devices", hosts=hosts), level="info",
+                     action=lambda: self.open_settings(at_page="nerd_serve"),
+                     action_label=tr("settings_title"))
+        else:
+            hub.post(tr("srv_open_closed_off"), level="warning",
+                     action=lambda: self.open_settings(at_page="nerd_serve"),
+                     action_label=tr("settings_title"))
 
     def _server_stop(self, wait: bool = False) -> None:
         """Every device's stream ends, every connection of the server's
         closes (*wait*: before this returns - the app is closing)."""
         srv, self._home = self._home, None
         self._home_taken = self._home_offer = 0
+        if self.__dict__.get("_open_card_up"):
+            # Server mode off: the card goes too, unanswered - said again
+            # when it next runs so.
+            from .notices import hub_of
+            hub = hub_of(self)
+            try:
+                hub.changed.disconnect(self._server_open_card_changed)
+            except (TypeError, RuntimeError):
+                pass
+            self._open_card_up = False
+            hub.dismiss_key(self._OPEN_CARD)
         p = getattr(self, "player", None)
         if p is not None and getattr(p, "live_hook", None) is not None:
             p.live_hook = None

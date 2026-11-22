@@ -1427,3 +1427,132 @@ def test_server_mode_set_up_before_keeps_its_open_tuner_and_a_new_one_is_shut():
     assert hs.open_mode(new) == hs.OPEN_OFF, "turned on now: stays shut"
     headless = S({hs.K_DEVICE: "1234ABCD"})
     assert hs.open_mode(headless, ran_before=True) == hs.OPEN_HOME, "a --server of before"
+
+
+# -- the tuner kept open from before 1.6.9 is said, and closed on a click ----------------
+
+class _S(dict):
+    def value(self, k, d=None):
+        return self.get(k, d)
+
+    def setValue(self, k, v):  # noqa: N802
+        self[k] = v
+
+
+def test_an_open_tuner_kept_unasked_is_told_once_and_one_chosen_is_not():
+    kept = _S({hs.K_ON: "true"})
+    hs.open_mode(kept)
+    assert hs.open_untold(kept), "a server set up before 1.6.9: said once"
+    kept[hs.K_OPEN_TOLD] = "true"
+    assert not hs.open_untold(kept) and hs.open_told(kept)
+    assert not hs.open_untold(_S({hs.K_OPEN: hs.OPEN_OFF}))
+    assert not hs.open_untold(_S({hs.K_OPEN: hs.OPEN_DEVICES}))
+
+
+def test_closing_it_keeps_the_devices_that_used_it_so_else_nobody():
+    assert hs.closed_mode(["192.168.1.20", "127.0.0.1"]) == (hs.OPEN_DEVICES,
+                                                             "192.168.1.20, 127.0.0.1")
+    # Those listed before stay, once each; an address of the internet never.
+    assert hs.closed_mode(["192.168.1.20"], "192.168.1.20, 10.0.0.5") == (
+        hs.OPEN_DEVICES, "192.168.1.20, 10.0.0.5")
+    assert hs.closed_mode(["8.8.8.8"]) == (hs.OPEN_OFF, "")
+    assert hs.closed_mode([]) == (hs.OPEN_OFF, "")
+
+
+def test_the_exposure_is_said_in_plain_words_for_each_mode():
+    import ipaddress
+
+    from dopeiptv.i18n import tr
+    assert hs.exposure(hs.OPEN_OFF) == ("srv_open_now_off", {})
+    assert hs.exposure(hs.OPEN_DEVICES, ["192.168.1.20"]) == (
+        "srv_open_now_devices", {"hosts": "192.168.1.20"})
+    assert hs.exposure(hs.OPEN_DEVICES, []) == ("srv_open_hosts_none", {})
+    key, params = hs.exposure(hs.OPEN_HOME, networks=[ipaddress.ip_network("192.168.1.0/24")])
+    assert key == "srv_open_now_home" and "192.168.1.0/24" in tr(key, **params)
+    assert hs.exposure(hs.OPEN_HOME)[0] == "srv_open_home_warn"
+
+
+def test_the_devices_that_use_the_open_tuner_are_noted(server):
+    srv = server[0]
+    srv.config.open = hs.OPEN_HOME
+    assert srv.open_seen() == []
+    assert json.loads(_get(srv, "/discover.json").read())["FriendlyName"] == "dopeIPTV"
+    assert srv.open_seen() == ["127.0.0.1"]
+    srv.note_open_use("::ffff:192.168.1.7")
+    srv.note_open_use("not an address")
+    assert srv.open_seen() == ["127.0.0.1", "192.168.1.7"]
+    for i in range(hs.OPEN_HOSTS_MAX + 5):
+        srv.note_open_use(f"10.1.0.{i}")
+    assert len(srv.open_seen()) == hs.OPEN_HOSTS_MAX
+    # Under its token: no device let in without it, nothing noted.
+    srv._open_seen.clear()
+    _get(srv, f"/t/{TOKEN}/discover.json").read()
+    assert srv.open_seen() == []
+
+
+def test_headless_logs_the_open_tuner_at_every_start(caplog):
+    import inspect
+
+    from dopeiptv import headless
+    with caplog.at_level("WARNING"):
+        line = headless.open_note(hs.Config(open=hs.OPEN_HOME))
+    assert "without its token" in line and "before 1.6.9" in line
+    assert "Devices without the token" in line and line in caplog.text
+    assert headless.open_note(hs.Config(open=hs.OPEN_OFF)) == ""
+    assert headless.open_note(hs.Config(open=hs.OPEN_DEVICES)) == ""
+    assert "open_note(cfg)" in inspect.getsource(headless.main)
+
+
+def _window_with_server(seen):
+    pytest.importorskip("PyQt6.QtWidgets")
+    from PyQt6.QtWidgets import QApplication, QWidget
+
+    from dopeiptv.ui.mw_server import _ServerMixin
+    _window_with_server.app = QApplication.instance() or QApplication([])
+
+    class W(QWidget, _ServerMixin):
+        def __init__(self):
+            super().__init__()
+            from dopeiptv.ui.notices import NoticeHub
+            self.notices = NoticeHub()
+            self.settings = _S({hs.K_ON: "true", hs.K_OPEN: hs.OPEN_HOME})
+            self.applied, self.opened = 0, []
+            self._home = type("Srv", (), {"open_seen": lambda _self: list(seen)})()
+
+        def _server_apply(self, wanted=None):
+            self.applied += 1
+            return {}
+
+        def open_settings(self, at_page=""):
+            self.opened.append(at_page)
+    return W()
+
+
+def test_the_card_says_it_once_and_dismissed_keeps_it():
+    from dopeiptv.ui.notices import hub_of
+    w = _window_with_server([])
+    w._server_tell_open()
+    hub = hub_of(w)
+    cards = [m for m in hub.messages() if m.key == w._OPEN_CARD]
+    assert len(cards) == 1 and cards[0].decide
+    w._server_tell_open()                       # not twice
+    assert len([m for m in hub.messages() if m.key == w._OPEN_CARD]) == 1
+    hub.dismiss(cards[0].id)                    # dismissed: kept, not said again
+    assert w.settings[hs.K_OPEN] == hs.OPEN_HOME and hs.open_told(w.settings)
+    w._server_tell_open()
+    assert not [m for m in hub.messages() if m.key == w._OPEN_CARD]
+
+
+def test_close_it_lets_in_only_the_devices_that_used_it():
+    from dopeiptv.ui.notices import hub_of
+    w = _window_with_server(["192.168.1.20"])
+    w._server_close_open()
+    assert w.settings[hs.K_OPEN] == hs.OPEN_DEVICES
+    assert w.settings[hs.K_OPEN_HOSTS] == "192.168.1.20" and w.applied == 1
+    # None known: nobody, and a message says where a device is let in.
+    w = _window_with_server([])
+    w._server_close_open()
+    assert w.settings[hs.K_OPEN] == hs.OPEN_OFF and hs.open_told(w.settings)
+    msg = next(m for m in hub_of(w).messages() if m.action is not None)
+    msg.action()
+    assert w.opened == ["nerd_serve"]

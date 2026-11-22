@@ -1063,9 +1063,14 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
                       (hs.OPEN_HOME, tr("srv_open_home"))], open_was)
 
     def open_job() -> Any:
-        if open_box.currentData() != hs.OPEN_HOME:
-            return None
-        return lambda: Check(WARN, "srv_open_home_warn")
+        # What the tuner is open to, in plain words - whichever is chosen.
+        mode = str(open_box.currentData() or hs.OPEN_OFF)
+        hosts = hs.parse_open_hosts(open_hosts.text())[0]
+
+        def look() -> Any:
+            key, params = hs.exposure(mode, hosts, hs.home_networks() if mode == hs.OPEN_HOME else ())
+            return Check(OK if mode == hs.OPEN_OFF else WARN, key, params)
+        return look
     open_line = CheckLine(open_job, tr("srv_open"))
     lines.append(open_line)
     c.row(tr("srv_open"), open_box, tr("srv_open_hint"),
@@ -1084,6 +1089,7 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
     hosts_line = CheckLine(hosts_job, tr("srv_open_hosts"))
     lines.append(hosts_line)
     open_hosts.textChanged.connect(hosts_line.changed)
+    open_hosts.textChanged.connect(open_line.changed)
     hosts_row = c.row(tr("srv_open_hosts"), open_hosts, tr("srv_open_hosts_hint"),
                       stretch_control=True, search="address addresses devices Plex token",
                       below=hosts_line)
@@ -1185,6 +1191,9 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         # nothing (the server stores what it found the first time it starts).
         if mode != open_was or settings.value(hs.K_OPEN) is not None:
             out[hs.K_OPEN] = mode
+        if mode == hs.OPEN_HOME and mode != open_was:
+            # Chosen here, its warning in sight: nothing to tell again.
+            out[hs.K_OPEN_TOLD] = "true"
         return out
     values.switch = on  # type: ignore[attr-defined]
     values.port = port.value  # type: ignore[attr-defined]
