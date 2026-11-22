@@ -282,6 +282,43 @@ def test_a_link_in_place_of_the_socket_folder_is_not_listened_in(app, monkeypatc
     server.close()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="folder modes")
+def test_a_socket_folder_that_cannot_be_made_the_users_own_is_not_listened_in(
+        app, monkeypatch, tmp_path, caplog):
+    """It fails closed: a folder that could not be made, or narrowed to
+    this user alone, is never listened in - the app starts without the
+    second-start handoff, said once, as without Qt's network library."""
+    import logging
+
+    from dopeiptv.core import instance
+    blocker = tmp_path / "a-file"
+    blocker.write_text("")
+    monkeypatch.setenv("DOPEIPTV_INSTANCE_SOCKET", str(blocker / "s"))   # its folder is a file
+    with caplog.at_level(logging.WARNING, logger="dopeiptv"):
+        server = instance.CommandServer(lambda _c: None)
+    assert not server.listening
+    said = [r for r in caplog.records if "not listening" in r.getMessage()]
+    assert len(said) == 1 and "a window of its own" in said[0].getMessage()
+    server.close()
+
+    wide = tmp_path / "wide"
+    wide.mkdir()
+    os.chmod(wide, 0o755)
+    monkeypatch.setenv("DOPEIPTV_INSTANCE_SOCKET", str(wide / "s"))
+
+    def refused(*_a, **_k):
+        raise PermissionError(1, "Operation not permitted")
+    monkeypatch.setattr(instance.os, "chmod", refused)
+    server = instance.CommandServer(lambda _c: None)
+    assert not server.listening and not (wide / "s").exists()
+    server.close()
+    monkeypatch.setattr(instance.os, "chmod", lambda *_a, **_k: None)   # "done", and not so
+    server = instance.CommandServer(lambda _c: None)
+    assert not server.listening and not (wide / "s").exists()
+    assert instance._folder_refusal(str(wide / "s"))
+    server.close()
+
+
 def test_a_windows_pipe_s_name_holds_a_word_only_its_user_can_read(monkeypatch, tmp_path):
     """Named pipes are the whole machine's: another account could make
     dopeiptv-<user> first and hear this one's commands. The name carries a

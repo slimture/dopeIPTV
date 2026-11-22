@@ -14,7 +14,9 @@ Where it comes from:
   the file is trusted). A newer app names a newer release, and the copy
   follows it (looked at once a day, nothing asked of the network unless the
   named release changed). A copy the app did not put there itself is not
-  run. YouTube changes often: where the named release is too old, the
+  run, nor one whose bytes no longer hash to the SHA-256 it was put there
+  with - looked at right before every run, mpv's own runs through the
+  hook's wrapper too. YouTube changes often: where the named release is too old, the
   system's yt-dlp (kept up to date by its package manager) is the way.
 
 It is never in the app's own packages. The managed copy can be turned off
@@ -249,11 +251,6 @@ def _mark(base: str | Path | None, tag: str, sha256: str) -> None:
                                      encoding="utf-8")
 
 
-#: The copies whose bytes were hashed against their mark this run, by
-#: path: the size and time they had then.
-_HASHED: dict[str, str] = {}
-
-
 def _sha256_of(p: Path) -> str:
     digest = hashlib.sha256()
     with open(p, "rb") as fh:
@@ -262,26 +259,46 @@ def _sha256_of(p: Path) -> str:
     return digest.hexdigest()
 
 
-def own_copy(base: str | Path | None = None) -> bool:
-    """Whether the managed copy is one install() put there and checked: its
-    mark says so, its size and time are what they were, and - once a run,
-    or again after its size or time changed - its bytes still hash to the
-    SHA-256 the mark keeps (the pinned release's)."""
-    p = managed_path(base)
+def _marked(base: str | Path | None = None) -> list[str] | None:
+    """The managed copy's mark (tag, SHA-256, size, time), or None."""
     try:
         mark = (managed_dir(base) / _MARK_FILE).read_text(encoding="utf-8").split()
-        now = _mark_of(p)
-        if not (_runnable(p) and len(mark) == 4 and " ".join(mark[2:]) == now):
+    except OSError:
+        return None
+    return mark if len(mark) == 4 and re.fullmatch(r"[0-9a-fA-F]{64}", mark[1]) else None
+
+
+def own_copy(base: str | Path | None = None) -> bool:
+    """Whether the managed copy is one install() put there and checked: its
+    mark says so, its size and time are what they were, and its bytes hash
+    to the SHA-256 the mark keeps (the pinned release's) - hashed every time
+    it is asked, which is right before every run (a few MB: milliseconds),
+    so a file swapped under the same size and time is not run either."""
+    p = managed_path(base)
+    mark = _marked(base)
+    try:
+        if mark is None or not _runnable(p) or " ".join(mark[2:]) != _mark_of(p):
             return False
-        if _HASHED.get(str(p)) == now:
-            return True
         if _sha256_of(p) != mark[1].lower():
             log.warning("yt-dlp: the app's copy no longer matches its checksum - not run")
             return False
-        _HASHED[str(p)] = now
         return True
     except OSError:
         return False
+
+
+def _may_run(path: str) -> bool:
+    """Whether *path* may be run now: the system's yt-dlp is the system's;
+    the app's own copy (where the app keeps it, or any copy with the app's
+    mark beside it) only while it still hashes to its mark - looked at
+    again right before each run."""
+    p = Path(path)
+    try:
+        managed = p == managed_path() or (p == managed_path(p.parent)
+                                          and (p.parent / _MARK_FILE).exists())
+    except OSError:
+        managed = False
+    return own_copy(p.parent) if managed else True
 
 
 def find(managed_on: bool = True, base: str | Path | None = None,
@@ -327,7 +344,9 @@ def _run_kwargs() -> dict[str, Any]:
 def version_of(path: str, run: Callable[..., Any] = subprocess.run,
                timeout: float = 60.0) -> str:
     """``yt-dlp --version`` - its release ("2025.10.22"), or "" when it
-    does not run."""
+    does not run (the app's own copy: or no longer hashes to its mark)."""
+    if not _may_run(path):
+        return ""
     try:
         done = run([path, "--version"], timeout=timeout, **_run_kwargs())
     except (OSError, subprocess.SubprocessError, ValueError) as e:
@@ -351,7 +370,9 @@ def resolve(path: str, url: str, run: Callable[..., Any] = subprocess.run,
             timeout: float = 60.0) -> dict[str, Any]:
     """Ask yt-dlp for the stream behind *url* (one stream with picture and
     sound): {"url", "title", "live", "headers"}. For a libmpv without the
-    ytdl hook."""
+    ytdl hook. The app's own copy is hashed against its mark first."""
+    if not _may_run(path):
+        raise YtdlpError("checksum", "the app's copy changed since it was checked")
     cmd = [path, "-J", "--no-playlist", "--no-warnings", "-f", FORMAT, "--", url]
     try:
         done = run(cmd, timeout=timeout, **_run_kwargs())
@@ -381,34 +402,101 @@ def resolve(path: str, url: str, run: Callable[..., Any] = subprocess.run,
             if isinstance(headers, dict) else {}}
 
 
-def wrapper_text(real: str, env: dict[str, str]) -> str:
-    """A shell script that runs *real* with the system's library paths, not
+#: What a wrapper may hash the app's copy with, the first this system has:
+#: each prints the SHA-256 of what it reads first on its line.
+_HASHERS = (("sha256sum",), ("shasum", "-a", "256"), ("openssl", "dgst", "-sha256", "-r"))
+_HASHER: dict[str, list[str] | None] = {}
+
+
+def _hasher(env: dict[str, str]) -> list[str] | None:
+    """A program of this system's that prints the SHA-256 of what it reads
+    - tried once on nothing, its answer checked, before it is trusted; None
+    where there is none (kept per PATH for the run)."""
+    where = env.get("PATH") or os.defpath
+    if where in _HASHER:
+        return _HASHER[where]
+    found: list[str] | None = None
+    empty = hashlib.sha256(b"").hexdigest()
+    for cmd in _HASHERS:
+        exe = shutil.which(cmd[0], path=where)
+        if not exe:
+            continue
+        try:
+            done = subprocess.run([exe, *cmd[1:]], input=b"", capture_output=True,
+                                  timeout=10, env=env)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            continue
+        said = done.stdout.decode("ascii", "replace").split()
+        if done.returncode == 0 and said and said[0].lower() == empty:
+            found = [exe, *cmd[1:]]
+            break
+    if found is None:
+        log.info("yt-dlp: nothing here hashes the app's copy before mpv runs it - "
+                 "it is hashed before each page the app opens")
+    _HASHER[where] = found
+    return found
+
+
+def wrapper_text(real: str, env: dict[str, str] | None,
+                 check: tuple[list[str], str] | None = None) -> str:
+    """A shell script that runs *real*: with the system's library paths, not
     the app bundle's (a frozen build's LD_LIBRARY_PATH and the like, which
-    mpv's ytdl hook would otherwise pass on): *env* is what to give them,
-    a variable missing from it is unset."""
+    mpv's ytdl hook would otherwise pass on) where *env* is given - what to
+    give them, a variable missing from it unset; and with *check* (a
+    hashing program, the SHA-256 the app's copy has) only once its bytes
+    hash to it: mpv runs it whenever it likes, so the hash is taken before
+    every one of those runs too."""
     lines = ["#!/bin/sh",
              "# Written by dopeIPTV: yt-dlp without the app bundle's library paths."]
-    for var in BUNDLE_VARS:
-        if var in env:
+    for var in BUNDLE_VARS if env is not None else ():
+        if env is not None and var in env:
             lines.append(f"{var}={shlex.quote(env[var])}; export {var}")
         else:
             lines.append(f"unset {var}")
+    if check is not None:
+        hasher, sha = check
+        lines += ["# The app's own copy runs only while its bytes are those it checked.",
+                  f"got=$({shlex.join(hasher)} < {shlex.quote(real)}) || got=",
+                  'case "$got" in',
+                  f"  {sha.lower()}*) ;;",
+                  '  *) echo "ERROR: dopeIPTV: the app\'s copy of yt-dlp no longer matches its'
+                  ' checksum - not run" >&2; exit 1 ;;',
+                  "esac"]
     lines.append(f'exec {shlex.quote(real)} "$@"')
     return "\n".join(lines) + "\n"
 
 
+def _hook_check(found: Found, env: dict[str, str]) -> tuple[list[str], str] | None:
+    """For the app's own copy on Linux and macOS: the hashing program and
+    the SHA-256 its mark keeps, for the wrapper to look at before each of
+    mpv's runs; None for the system's, or where the system has no program
+    to hash with (then it is hashed before each page the app opens)."""
+    if not found.managed or sys.platform == "win32":
+        return None
+    mark = _marked(Path(found.path).parent)
+    if mark is None:
+        return None
+    hasher = _hasher(env)
+    return (hasher, mark[1]) if hasher is not None else None
+
+
 def hook_path(found: Found, base: str | Path | None = None,
               frozen: bool | None = None) -> str:
-    """What mpv's ytdl hook should run: yt-dlp itself, or - in a frozen
-    build on Linux and macOS - a small script that clears the bundle's
-    library paths first."""
+    """What mpv's ytdl hook should run: yt-dlp itself, or - on Linux and
+    macOS, in a frozen build or for the app's own copy - a small script
+    that clears the bundle's library paths first, and runs the app's copy
+    only while it still hashes to its mark."""
     if frozen is None:
         frozen = bool(getattr(sys, "frozen", False))
-    if not frozen or sys.platform == "win32":
+    if sys.platform == "win32":
+        return found.path
+    env = system_env()
+    check = _hook_check(found, env)
+    if not frozen and check is None:
         return found.path
     folder = managed_dir(base)
     target = folder / _WRAPPER
-    text = wrapper_text(found.path, system_env())
+    text = wrapper_text(found.path, env if frozen else None, check)
     try:
         if not (target.is_file() and target.read_text(encoding="utf-8") == text):
             folder.mkdir(parents=True, exist_ok=True)
