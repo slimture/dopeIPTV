@@ -3196,5 +3196,6 @@
   "tls_offer": "Le certificat de {name} n'a pas pu être vérifié : il a expiré, il est auto-signé ou il a été émis pour un autre nom. N'importe qui sur le trajet pourrait alors lire ce qui est envoyé, y compris l'identifiant dans ses adresses. Lire {name} sans vérification ?",
   "tls_offer_go": "Lire sans vérification",
   "src_tls_unchecked": "Lire sans vérifier le certificat",
-  "src_tls_unchecked_hint": "Ses flux sont lus même si leur certificat n'est pas valide. N'importe qui sur le trajet pourrait alors les lire, ainsi que l'identifiant dans leurs adresses. Désactivé, chaque flux venant d'Internet est vérifié."
+  "src_tls_unchecked_hint": "Ses flux sont lus même si leur certificat n'est pas valide. N'importe qui sur le trajet pourrait alors les lire, ainsi que l'identifiant dans leurs adresses. Désactivé, chaque flux venant d'Internet est vérifié.",
+  "upd_err_folder_shared": "D'autres comptes de cet ordinateur peuvent modifier le dossier {folder} : la mise à jour n'y est donc pas placée. Déplacez dopeIPTV dans un dossier à vous, ou téléchargez la nouvelle version à la main."
 }

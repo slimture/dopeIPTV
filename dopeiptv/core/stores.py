@@ -16,7 +16,7 @@ from typing import Any
 
 from PyQt6.QtCore import QSettings
 
-from . import pins, privacy
+from . import pins, privacy, site_out
 from .log import register_secrets
 
 
@@ -812,10 +812,14 @@ class PlaylistStore:
                     if value:
                         settings.setValue(f"{legacy}_default", value)
                 self._save()
+        # Every source's login known to the log's mask and to what goes to
+        # dopeiptv.org (core/site_out.py) before any client is made.
+        site_out.learn(self.items, settings)
 
     def _save(self) -> None:
         self.settings.setValue("playlists", json.dumps(self.items))
         self.settings.setValue("active_playlist", self.active_id)
+        site_out.learn(self.items)
 
     def playlists(self) -> list[dict]:
         return list(self.items)

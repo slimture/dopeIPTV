@@ -3196,5 +3196,6 @@
   "tls_offer": "Sertifikat {name} tidak dapat diperiksa: sudah kedaluwarsa, ditandatangani sendiri, atau dibuat untuk nama lain. Siapa pun di jalur itu dapat membaca apa yang dikirim, termasuk login di alamatnya. Putar {name} tanpa pemeriksaan?",
   "tls_offer_go": "Putar tanpa pemeriksaan",
   "src_tls_unchecked": "Putar tanpa memeriksa sertifikat",
-  "src_tls_unchecked_hint": "Siarannya tetap diputar meski sertifikatnya tidak valid. Siapa pun di jalur itu dapat membacanya, beserta login di alamatnya. Jika mati, setiap siaran dari internet diperiksa."
+  "src_tls_unchecked_hint": "Siarannya tetap diputar meski sertifikatnya tidak valid. Siapa pun di jalur itu dapat membacanya, beserta login di alamatnya. Jika mati, setiap siaran dari internet diperiksa.",
+  "upd_err_folder_shared": "Akun lain di komputer ini bisa mengubah folder {folder}, jadi pembaruan tidak ditaruh di sana. Pindahkan dopeIPTV ke folder milik Anda sendiri, atau unduh versi baru secara manual."
 }

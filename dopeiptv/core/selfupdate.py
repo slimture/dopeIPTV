@@ -24,6 +24,7 @@ import os
 import platform
 import re
 import shlex
+import stat
 import subprocess
 import sys
 import threading
@@ -257,6 +258,50 @@ def _expected_sha256(asset: dict) -> str | None:
     return m.group(1).lower() if m else None
 
 
+#: What each file download() checked hashes to, by its path: checked again
+#: right before it runs or is put in place (verify_again).
+_VERIFIED: dict[str, str] = {}
+
+
+def verify_again(path: Path) -> None:
+    """*path* still the very bytes download() checked - right before it is
+    run or put in place, so nothing changed in between goes on; otherwise
+    UpdateError, the file removed."""
+    want = _VERIFIED.get(str(path))
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+    except OSError as e:
+        raise UpdateError("upd_err_download", error=e) from e
+    if not want or h.hexdigest() != want:
+        log.error("update: %s is not the file that was checked - not used", path.name)
+        path.unlink(missing_ok=True)
+        _VERIFIED.pop(str(path), None)
+        raise UpdateError("upd_err_checksum")
+
+
+def shared_folder(folder: Path) -> bool:
+    """Whether another account could put a file of its own in *folder*'s
+    place for one of ours - rename ours away, write one under its name:
+    a folder not ours or root's, or one others may write to without the
+    sticky bit (which keeps what is ours ours). POSIX only."""
+    if os.name != "posix":
+        return False
+    try:
+        st = os.stat(folder)
+    except OSError:
+        return True
+    if st.st_uid not in (os.geteuid(), 0):
+        return True
+    if st.st_mode & stat.S_ISVTX:
+        return False
+    if st.st_mode & 0o002:
+        return True
+    return bool(st.st_mode & 0o020) and st.st_gid != os.getegid()
+
+
 def download(asset: dict, dest: Path,
              progress: Callable[[int, int], None] | None = None,
              cancel: threading.Event | None = None) -> None:
@@ -306,6 +351,7 @@ def download(asset: dict, dest: Path,
             raise UpdateError("upd_err_incomplete", got=got, size=size)
         if h.hexdigest() != sha:
             raise UpdateError("upd_err_checksum")
+        _VERIFIED[str(dest)] = sha
     except UpdateError:
         dest.unlink(missing_ok=True)
         raise
@@ -373,13 +419,19 @@ def install(release: dict, current_version: str,
         raise UpdateError("upd_err_no_asset", cpu=cpu)
     asset = signed_asset(release, asset)
     target = target_path(current, current_version, tag)
+    if shared_folder(target.parent):
+        # Another account could swap the checked file for one of its own
+        # before it runs (the start-up check) or is put in place.
+        raise UpdateError("upd_err_folder_shared", folder=str(target.parent))
     part = target.with_name(f".{target.name}.part")
     download(asset, part, progress, cancel)
     try:
         part.chmod(0o755)
+        verify_again(part)
         self_check(part, tag, current)
         if cancel is not None and cancel.is_set():
             raise UpdateError("cancelled")
+        verify_again(part)
         os.replace(part, target)
     except Exception:
         part.unlink(missing_ok=True)

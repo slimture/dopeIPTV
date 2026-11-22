@@ -279,3 +279,108 @@ def test_the_window_asks_first_then_says_it_calmly_with_where_it_is(tmp_path, mo
     monkeypatch.setattr("dopeiptv.core.xdg.open_folder", opened.append)
     msg.action()
     assert opened == [str(f.parent)]
+
+
+def test_a_link_to_nothing_is_not_private(tmp_path, nothing_noted):
+    """What is written through a link that points nowhere lands where it
+    points, which nothing made private: noted, never passed."""
+    folder = tmp_path / "dopeiptv"
+    folder.mkdir(mode=0o700)
+    f = folder / "dopeiptv.conf"
+    f.symlink_to(tmp_path / "elsewhere" / "settings.conf")
+    assert settings_files.keep_private(str(f)) is False
+    assert settings_files.not_private() == [str(f)]
+    assert not (tmp_path / "elsewhere").exists()
+
+
+def test_a_file_another_account_owns_is_not_private(tmp_path, monkeypatch, nothing_noted):
+    f = _shared_file(tmp_path)
+    real = settings_files.os.stat
+    me = os.geteuid()
+
+    class Theirs:
+        def __init__(self, st):
+            self._st = st
+
+        def __getattr__(self, name):
+            return me + 1 if name == "st_uid" else getattr(self._st, name)
+
+    monkeypatch.setattr(settings_files.os, "stat",
+                        lambda p, *a, **k: Theirs(real(p, *a, **k)) if str(p) == str(f)
+                        else real(p, *a, **k))
+    assert settings_files.keep_private(str(f)) is False
+    assert settings_files.not_private() == [str(f)]
+
+
+def test_every_file_others_may_read_is_asked_about_not_the_first_alone(tmp_path, monkeypatch,
+                                                                        nothing_noted):
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+    from dopeiptv.ui.notices import NoticeHub
+
+    class Settings(dict):
+        def value(self, k, d=None):
+            return self.get(k, d)
+
+        def setValue(self, k, v):
+            self[k] = v
+
+    class Window(_SettingsMixin):
+        def __init__(self, answers):
+            self.notices = NoticeHub()
+            self.settings = Settings()
+            self.asked: list[str] = []
+            self.closed = False
+            self.answers = list(answers)
+
+        def _ask_settings_open(self, path):
+            self.asked.append(path)
+            return self.answers.pop(0)
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(settings_files.os, "chmod", lambda path, mode: None)
+    one = _shared_file(tmp_path)
+    other = tmp_path / "dopeiptv" / "resume.conf"
+    other.write_text("")
+    os.chmod(other, 0o644)
+    settings_files.keep_private(str(one))
+    settings_files.keep_private(str(other))
+    w = Window(["go", "go"])
+    w._tell_settings_not_private()
+    assert w.asked == [str(one), str(other)] and not w.closed
+    marks = settings_files.accepted_marks(w.settings[settings_files.ACCEPTED_KEY])
+    assert marks == {settings_files.accepted_mark(str(one)), settings_files.accepted_mark(str(other))}
+    # One said yes to before 1.6.12 (a single mark), the other new: asked.
+    later = Window(["quit"])
+    later.settings[settings_files.ACCEPTED_KEY] = settings_files.accepted_mark(str(one))
+    later._tell_settings_not_private()
+    assert later.asked == [str(other)] and later.closed
+
+
+def test_an_unanswered_question_closes_the_window(tmp_path, monkeypatch, nothing_noted):
+    """It fails closed: a question that could not be asked never lets the
+    window go on with a file others may read."""
+    from dopeiptv.ui.mw_settings import _SettingsMixin
+    from dopeiptv.ui.notices import NoticeHub
+
+    class Window(_SettingsMixin):
+        def __init__(self):
+            self.notices = NoticeHub()
+            self.closed = False
+
+        def _ask_settings_open(self, path):
+            raise RuntimeError("no screen")
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(settings_files.os, "chmod", lambda path, mode: None)
+    settings_files.keep_private(str(_shared_file(tmp_path)))
+    w = Window()
+    w.settings = type("S", (dict,), {"value": lambda self, k, d=None: self.get(k, d),
+                                     "setValue": lambda self, k, v: self.__setitem__(k, v)})()
+    w._tell_settings_not_private()
+    assert w.closed

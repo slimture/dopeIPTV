@@ -197,19 +197,21 @@ def main(argv: list[str] | None = None) -> int:
     from .core import settings_files
     settings_files.protect()            # the logins and tokens: this user's alone
     settings = QSettings(ORG, ORG)
-    exposed = settings_files.not_private()
+    if settings_files.not_private() and "--settings-not-private" in argv:
+        value = settings.value(settings_files.ACCEPTED_KEY, "")
+        for path in settings_files.not_private():
+            value = settings_files.with_accepted(value, path)
+        settings.setValue(settings_files.ACCEPTED_KEY, value)
+    exposed = settings_files.waiting(settings.value(settings_files.ACCEPTED_KEY, ""))
     if exposed:
-        mark = settings_files.accepted_mark(exposed[0])
-        if "--settings-not-private" in argv:
-            settings.setValue(settings_files.ACCEPTED_KEY, mark)
-        if str(settings.value(settings_files.ACCEPTED_KEY, "") or "") != mark:
-            # Every login and token is in it: no server on it until the
-            # person says so - once, for that file.
+        # Every login and token is in them: no server on them until the
+        # person says so - once, for those files; every one named.
+        for path in exposed:
             log.error("server: %s could not be made readable by this user alone - it holds "
-                      "every login, and other accounts on this computer may read it. Move the "
+                      "logins, and other accounts on this computer may read it. Move the "
                       "settings to a drive that keeps permissions, or start once with "
-                      "--settings-not-private to go on with it as it is", exposed[0])
-            return 2
+                      "--settings-not-private to go on with it as it is", path)
+        return 2
     from .core import nerd
     from .i18n import set_language
     set_language(str(settings.value("language", "en") or "en"))

@@ -7,6 +7,27 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Security
+
+- Nothing that goes to dopeiptv.org can carry a login of yours: every
+  request the app makes passes one check before a byte is sent, and one to
+  dopeiptv.org that holds a source's user name, password, token or box
+  MAC - or your Trakt, Simkl, OpenSubtitles, proxy or Kodi login, or the
+  sync code - readable in its address, headers or body, in any encoded
+  form, is not sent. What is end-to-end encrypted (a synced copy, a room's
+  messages) is the only thing it does not read. Every source's login is
+  known to the log's mask from the start, not only once the source is
+  opened.
+- The log fails closed in one more place: a fault while masking a line
+  withholds it instead of writing it half-masked, and a logged exception
+  keeps only its masked traceback.
+- An update is checked again right before it starts or is put in place,
+  and an AppImage in a folder other accounts may change is not updated
+  there (move it to a folder of your own, or update by hand).
+- A settings file another account owns, or a link to nowhere, counts as
+  not private; every settings file others may read is asked about, not the
+  first alone, and a question that cannot be asked closes the window.
+
 ### Fixed
 
 - A programme's description with HTML from the provider in it (a web

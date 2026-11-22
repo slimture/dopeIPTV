@@ -3196,5 +3196,6 @@
   "tls_offer": "{name} sertifikası doğrulanamadı: süresi dolmuş, kendinden imzalı ya da başka bir ad için verilmiş. Yoldaki herkes gönderdiklerini, adreslerindeki giriş bilgilerini de okuyabilir. {name} doğrulanmadan oynatılsın mı?",
   "tls_offer_go": "Doğrulamadan oynat",
   "src_tls_unchecked": "Sertifikayı doğrulamadan oynat",
-  "src_tls_unchecked_hint": "Yayınlar sertifikaları geçersiz olsa da oynar. Yoldaki herkes bunları ve adreslerindeki giriş bilgilerini okuyabilir. Kapalıyken internetten gelen her yayın doğrulanır."
+  "src_tls_unchecked_hint": "Yayınlar sertifikaları geçersiz olsa da oynar. Yoldaki herkes bunları ve adreslerindeki giriş bilgilerini okuyabilir. Kapalıyken internetten gelen her yayın doğrulanır.",
+  "upd_err_folder_shared": "Bu bilgisayardaki diğer hesaplar {folder} klasörünü değiştirebildiği için güncelleme oraya konmuyor. dopeIPTV'yi kendinize ait bir klasöre taşıyın ya da yeni sürümü elle indirin."
 }

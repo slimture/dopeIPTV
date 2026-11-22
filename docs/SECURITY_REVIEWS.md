@@ -422,3 +422,29 @@ playback, and writes down why the rest stays.
 | Media engines | FFmpeg and mpv decode outside input in the app's own process | medium | Answered: a sandbox for the decoders is the step towards 9/10, a project of its own after 1.6.11 (the Flatpak runs in Flatpak's sandbox already) |
 | Release signing | The signing infrastructure | medium | Answered: the update key lives only in GitHub environments of its own with a required reviewer, administrators may not bypass; the next kit's part 19 says so |
 | Logins at rest | The settings file, not a keyring | medium | Answered: planned as a round of its own after 1.6.11 |
+
+## November 2026 - two independent AI reviews of the released 1.6.11
+
+The maintainer gave the released 1.6.11's kit to an independent AI
+assistant twice: once all ten parts, once part 1 (the provider's login)
+alone. Neither found a critical weakness, nor any way a login reaches
+dopeiptv.org; both said the code shown cannot prove that none ever could.
+This round makes that a rule the app enforces and tests, rather than a
+promise, and closes the smaller findings.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | "Nothing proves no path sends a login to dopeiptv.org" - the absence of a leak shown, not proven | - | Fixed: every request the app makes goes out through one adapter (`_lazy_requests`), which asks `core/site_out.check` first; one for dopeiptv.org that holds a source's login (user name, password, token, MAC, a login in an address or header, HTTP Basic's base64) or the person's other logins (Trakt, Simkl, OpenSubtitles, the sync code, Nerd's proxy and headers, a Kodi's), readable in its address, headers or body in any encoded form, is not sent. Only what is sealed under a key the site never has (a synced copy, a room's message) is not read. tests/test_site_out.py, a report whose scrub missed a login among them |
+| Logins | A login registered with the log only once its client is made | low | Fixed: every source's login is known to the log's mask as the sources are read (`site_out.learn` from PlaylistStore) |
+| Logs | `redact_text` fell back to the registered values alone on a fault - it failed open for what is not registered | medium | Fixed: a fault in any step gives the withheld line, never the text half-masked |
+| Logs | A record kept its exception after its traceback was masked; a handler reading it saw it unmasked | low | Fixed: once masked into `exc_text`, `exc_info` is dropped |
+| Logs | A login of three characters or fewer is masked only as a word of its own | low | Answered: as a substring it would blank ordinary words all over the log; written down (the report hides such a login as a word too) |
+| Settings files | Only the first file others may read was asked about | medium | Fixed: every such file, one after another (`settings_files.waiting`, `with_accepted`; a mark of before kept); server mode names and refuses them all |
+| Settings files | The question failing let the window go on | low | Fixed: a question that could not be asked closes the window |
+| Settings files | A link to nowhere passed the check; ownership was not looked at | low | Fixed: a link to nothing, and a file or folder another account owns, count as not private |
+| Updates | A checked file could be changed before it runs or is put in place, where others may write to its folder | medium (conditional) | Fixed: an AppImage in a folder another account may change gets no update (`selfupdate.shared_folder`, a message in 27 languages); the file is checked again right before its start-up check and before it is put in place, the Windows installer right before it runs (`verify_again`), the Mac app by codesign in the swap itself |
+| Private viewing | A TMDB request already on its way when private viewing begins is not called back | medium | Answered: it is asked again right before the request; one already sent cannot be taken back - written down |
+| Private viewing | A disk buffer a recording or cast holds keeps writing during private viewing | medium | Open: asked of the maintainer - stop it, or ask first |
+| Watch together | Rooms are bound by the first credential; older apps' messages rely on the relay's clock | medium | Open: needs the relay (dopeiptv-server) and a choice about apps before 1.6.11 |
+| Website | Statistics go on when swap is unsafe; access logs and backups not shown | medium (conditional) | Open: the server's part, in dopeiptv-server |
+| Wording | Absolute words ("never", "nothing") where the code does not enforce them | info | Open: the transparency page's words, on the website branch |

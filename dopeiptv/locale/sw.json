@@ -3196,5 +3196,6 @@
   "tls_offer": "Cheti cha {name} hakikuweza kukaguliwa: kimeisha muda, kimejitia sahihi chenyewe au kilitolewa kwa jina lingine. Yeyote njiani angeweza kusoma kinachotumwa, hata kuingia kulikomo kwenye anwani zake. Cheza {name} bila kukagua?",
   "tls_offer_go": "Cheza bila kukagua",
   "src_tls_unchecked": "Cheza bila kukagua cheti",
-  "src_tls_unchecked_hint": "Mitiririko yake hucheza hata cheti chake kisipokuwa sahihi. Yeyote njiani angeweza kuisoma, pamoja na kuingia kulikomo kwenye anwani zake. Ikizimwa, kila mtiririko kutoka intaneti hukaguliwa."
+  "src_tls_unchecked_hint": "Mitiririko yake hucheza hata cheti chake kisipokuwa sahihi. Yeyote njiani angeweza kuisoma, pamoja na kuingia kulikomo kwenye anwani zake. Ikizimwa, kila mtiririko kutoka intaneti hukaguliwa.",
+  "upd_err_folder_shared": "Akaunti nyingine kwenye kompyuta hii zinaweza kubadilisha folda {folder}, kwa hiyo sasisho haliwekwi hapo. Hamisha dopeIPTV kwenye folda yako mwenyewe, au pakua toleo jipya kwa mkono."
 }

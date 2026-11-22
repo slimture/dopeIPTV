@@ -187,6 +187,7 @@ files = [
     "dopeiptv/providers/device_urls.py",
     "dopeiptv/core/safe_xml.py",
     "dopeiptv/core/tagless.py",
+    "dopeiptv/core/site_out.py",
     "dopeiptv/core/source_files.py",
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",

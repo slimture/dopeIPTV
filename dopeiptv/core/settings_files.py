@@ -40,8 +40,9 @@ FOLDER_MODE = 0o700
 
 #: The settings files this start could not keep to this user, in order.
 _not_private: list[str] = []
-#: The file the person said to go on with, readable by others all the same
-#: (accepted_mark): asked again for any other file, or a moved one.
+#: The files the person said to go on with, readable by others all the same
+#: (accepted_mark, one or more): asked again for any other file, or a moved
+#: one.
 ACCEPTED_KEY = "settings_open_accepted"
 _lock = threading.Lock()
 
@@ -71,6 +72,28 @@ def accepted_mark(path: str) -> str:
     return hashlib.sha256(os.path.abspath(path).encode("utf-8", "replace")).hexdigest()[:32]
 
 
+def accepted_marks(value: Any) -> set[str]:
+    """The marks ACCEPTED_KEY's *value* holds - one, or several apart."""
+    return set(str(value or "").split())
+
+
+def with_accepted(value: Any, path: str) -> str:
+    """ACCEPTED_KEY's *value* with *path* gone on with too."""
+    return " ".join(sorted(accepted_marks(value) | {accepted_mark(path)}))
+
+
+def waiting(value: Any) -> list[str]:
+    """The files of not_private() the person has not said to go on with,
+    as ACCEPTED_KEY's *value* has it - every one, not the first alone."""
+    marks = accepted_marks(value)
+    return [p for p in not_private() if accepted_mark(p) not in marks]
+
+
+def _theirs(path: str) -> bool:
+    """Whether *path* (a link followed) is this user's own."""
+    return os.stat(path).st_uid == os.geteuid()
+
+
 def not_private() -> list[str]:
     """The settings files this start could not make readable by this user
     alone (their paths; empty when every one is)."""
@@ -90,13 +113,24 @@ def keep_private(path: str, *, folder: bool = True, create: bool = True) -> bool
         if folder:
             parent = os.path.dirname(path)
             os.makedirs(parent, mode=FOLDER_MODE, exist_ok=True)
+            if not _theirs(parent):
+                _note(path, "its folder is another account's")
+                return False
             kept = _narrow(parent, FOLDER_MODE)
+        if os.path.islink(path) and not os.path.exists(path):
+            # A link to nothing: what is written there lands where it
+            # points, which nothing here has made private.
+            _note(path, "a link to a file that is not there")
+            return False
         if create and not os.path.lexists(path):
             try:
                 os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, FILE_MODE))
             except FileExistsError:
                 pass
         if os.path.exists(path):
+            if not _theirs(path):
+                _note(path, "another account owns it")
+                return False
             kept = _narrow(path, FILE_MODE) and kept
         if not kept:
             _note(path, "its drive keeps no permissions")

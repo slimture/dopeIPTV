@@ -3196,5 +3196,6 @@
   "tls_offer": "Het certificaat van {name} kon niet worden gecontroleerd: het is verlopen, ondertekent zichzelf of is gemaakt voor een andere naam. Iedereen onderweg kan dan meelezen wat het verstuurt, ook de inloggegevens in de adressen. {name} zonder controle afspelen?",
   "tls_offer_go": "Zonder controle afspelen",
   "src_tls_unchecked": "Afspelen zonder het certificaat te controleren",
-  "src_tls_unchecked_hint": "De streams spelen ook als hun certificaat niet klopt. Iedereen onderweg kan ze dan meelezen, en de inloggegevens in hun adressen. Uit: elke stream van internet wordt gecontroleerd."
+  "src_tls_unchecked_hint": "De streams spelen ook als hun certificaat niet klopt. Iedereen onderweg kan ze dan meelezen, en de inloggegevens in hun adressen. Uit: elke stream van internet wordt gecontroleerd.",
+  "upd_err_folder_shared": "Andere accounts op deze computer kunnen de map {folder} wijzigen, dus de update wordt daar niet neergezet. Verplaats dopeIPTV naar een eigen map of download de nieuwe versie handmatig."
 }

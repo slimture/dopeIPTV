@@ -126,7 +126,7 @@ from typing import Any, Callable
 
 from . import build_check
 from . import chacha20poly1305 as aead
-from . import ed25519
+from . import ed25519, site_out
 from .log import log, register_secrets
 from .sync import hkdf
 
@@ -242,6 +242,7 @@ def _stretched(code: str) -> bytes:
     raw = shown.replace("-", "")
     # Whoever has the code is in the room: never in a log.
     register_secrets(shown, raw, shown.lower())
+    site_out.never(shown, raw, shown.lower())
     return hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, STRETCH, 32)
 
 
@@ -1068,7 +1069,7 @@ class Relay:
 
     def post(self, blob: bytes) -> int:
         """Sends one sealed message; the relay's time (ms)."""
-        got = self._call("POST", 15.0, data=bytes(blob),
+        got = self._call("POST", 15.0, data=site_out.sealed(bytes(blob)),
                          headers=dict(self.headers, **{"Content-Type": "application/octet-stream"}))
         return _int(got.get("now"), 0) or 0
 

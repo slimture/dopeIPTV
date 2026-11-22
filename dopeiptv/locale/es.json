@@ -3196,5 +3196,6 @@
   "tls_offer": "No se pudo comprobar el certificado de {name}: ha caducado, está autofirmado o se emitió para otro nombre. Cualquiera en el camino podría leer lo que envía, también el inicio de sesión de sus direcciones. ¿Reproducir {name} sin comprobarlo?",
   "tls_offer_go": "Reproducir sin comprobar",
   "src_tls_unchecked": "Reproducir sin comprobar el certificado",
-  "src_tls_unchecked_hint": "Sus emisiones se reproducen aunque su certificado no sea válido. Cualquiera en el camino podría leerlas, y el inicio de sesión de sus direcciones. Desactivado, se comprueba cada emisión de Internet."
+  "src_tls_unchecked_hint": "Sus emisiones se reproducen aunque su certificado no sea válido. Cualquiera en el camino podría leerlas, y el inicio de sesión de sus direcciones. Desactivado, se comprueba cada emisión de Internet.",
+  "upd_err_folder_shared": "Otras cuentas de este ordenador pueden cambiar la carpeta {folder}, así que la actualización no se coloca allí. Mueve dopeIPTV a una carpeta tuya o descarga la nueva versión a mano."
 }

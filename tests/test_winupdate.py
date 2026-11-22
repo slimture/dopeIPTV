@@ -86,9 +86,11 @@ def test_the_installer_starts_at_once_and_waits_for_the_app_itself(monkeypatch):
             seen["argv"], seen["kw"] = argv, kw
 
     monkeypatch.setattr(winupdate.subprocess, "Popen", Popen)
+    monkeypatch.setattr(winupdate, "verify_again", lambda path: seen.setdefault("checked", path))
     monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", "C:/old")
     setup = Path("C:/Users/O'Brien/AppData/Local/Temp/dopeIPTV-update/x-setup.exe")
     winupdate.restart_into(setup, pid=4242)
+    assert seen["checked"] == setup, "the installer checked again right before it runs"
     assert seen["argv"] == [str(setup), "/update", "/relaunch", "/waitpid=4242"]
     env = seen["kw"]["env"]
     assert "_PYI_APPLICATION_HOME_DIR" not in env and env["PYINSTALLER_RESET_ENVIRONMENT"] == "1"
@@ -160,3 +162,23 @@ def test_windows_refusing_the_installer_is_said_not_a_crash():
     at = src.index("updater.restart_into(new)")
     assert src.rfind("try:", 0, at) > src.rfind("def chosen", 0, at)
     assert "except OSError" in src[at:at + 200]
+
+
+def test_an_installer_changed_since_its_check_never_runs(monkeypatch, tmp_path):
+    from dopeiptv.core import selfupdate
+    started = []
+    monkeypatch.setattr(winupdate.subprocess, "Popen", lambda *a, **k: started.append(a))
+    setup = tmp_path / "x-setup.exe"
+    setup.write_bytes(b"checked bytes")
+    import hashlib
+    monkeypatch.setitem(selfupdate._VERIFIED, str(setup), hashlib.sha256(b"checked bytes").hexdigest())
+    setup.write_bytes(b"something else")
+    with pytest.raises(selfupdate.UpdateError):
+        winupdate.restart_into(setup, pid=4242)
+    assert started == [] and not setup.exists()
+    # one never checked at all: the same
+    other = tmp_path / "y-setup.exe"
+    other.write_bytes(b"x")
+    with pytest.raises(selfupdate.UpdateError):
+        winupdate.restart_into(other, pid=4242)
+    assert started == []

@@ -3196,5 +3196,6 @@
   "tls_offer": "Impossibile verificare il certificato di {name}: è scaduto, è autofirmato o è stato emesso per un altro nome. Chiunque lungo il percorso potrebbe leggere ciò che invia, anche le credenziali nei suoi indirizzi. Riprodurre {name} senza verifica?",
   "tls_offer_go": "Riproduci senza verifica",
   "src_tls_unchecked": "Riproduci senza verificare il certificato",
-  "src_tls_unchecked_hint": "I suoi flussi vengono riprodotti anche se il certificato non è valido. Chiunque lungo il percorso potrebbe leggerli, insieme alle credenziali nei loro indirizzi. Disattivato, ogni flusso da Internet viene verificato."
+  "src_tls_unchecked_hint": "I suoi flussi vengono riprodotti anche se il certificato non è valido. Chiunque lungo il percorso potrebbe leggerli, insieme alle credenziali nei loro indirizzi. Disattivato, ogni flusso da Internet viene verificato.",
+  "upd_err_folder_shared": "Altri account di questo computer possono modificare la cartella {folder}, quindi l'aggiornamento non viene messo lì. Sposta dopeIPTV in una cartella tua o scarica la nuova versione a mano."
 }

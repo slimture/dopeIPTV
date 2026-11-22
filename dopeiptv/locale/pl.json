@@ -3196,5 +3196,6 @@
   "tls_offer": "Nie udało się sprawdzić certyfikatu {name}: wygasł, jest podpisany przez siebie lub wystawiony dla innej nazwy. Każdy po drodze mógłby wtedy odczytać to, co wysyła, także dane logowania w adresach. Odtwarzać {name} bez sprawdzania?",
   "tls_offer_go": "Odtwarzaj bez sprawdzania",
   "src_tls_unchecked": "Odtwarzaj bez sprawdzania certyfikatu",
-  "src_tls_unchecked_hint": "Strumienie grają nawet wtedy, gdy certyfikat się nie zgadza. Każdy po drodze mógłby je odczytać, razem z danymi logowania w ich adresach. Wyłączone: każdy strumień z internetu jest sprawdzany."
+  "src_tls_unchecked_hint": "Strumienie grają nawet wtedy, gdy certyfikat się nie zgadza. Każdy po drodze mógłby je odczytać, razem z danymi logowania w ich adresach. Wyłączone: każdy strumień z internetu jest sprawdzany.",
+  "upd_err_folder_shared": "Inne konta na tym komputerze mogą zmieniać folder {folder}, więc aktualizacja nie jest tam umieszczana. Przenieś dopeIPTV do własnego folderu albo pobierz nową wersję ręcznie."
 }

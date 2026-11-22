@@ -3196,5 +3196,6 @@
   "tls_offer": "Certifikat za {name} nije se mogao provjeriti: istekao je, sam se potpisuje ili je izdan za drugo ime. Bilo tko usput mogao bi pročitati što šalje, i prijavu u adresama. Reproducirati {name} bez provjere?",
   "tls_offer_go": "Reproduciraj bez provjere",
   "src_tls_unchecked": "Reproduciraj bez provjere certifikata",
-  "src_tls_unchecked_hint": "Prijenosi se reproduciraju i kad certifikat nije ispravan. Bilo tko usput mogao bi ih pročitati, zajedno s prijavom u adresama. Isključeno, svaki prijenos s interneta se provjerava."
+  "src_tls_unchecked_hint": "Prijenosi se reproduciraju i kad certifikat nije ispravan. Bilo tko usput mogao bi ih pročitati, zajedno s prijavom u adresama. Isključeno, svaki prijenos s interneta se provjerava.",
+  "upd_err_folder_shared": "Drugi računi na ovom računalu mogu mijenjati mapu {folder}, pa se ažuriranje ne stavlja tamo. Premjesti dopeIPTV u svoju mapu ili ručno preuzmi novu verziju."
 }
