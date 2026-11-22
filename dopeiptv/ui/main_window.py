@@ -309,6 +309,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # The place the app opens on (mw_places): where the person left off,
         # or Mine - its list mode set before the first list is fetched.
         self._init_places()
+        # No category yet: the build's first filter asks it (a start on
+        # Radio asked for its Search row and crashed - 1.6.9's report).
+        self._current_cat = None
         self.all_items: list = []
         # Which Favorites section is showing: "chan", "movie" or
         # "series". Drives the content kind (poster vs live, play as

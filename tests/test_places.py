@@ -185,6 +185,12 @@ w._leave_guide_page()
 pump()
 assert w._place == "series" and lit() == ["series"]
 w.close()
+# Radio, Local files and Recordings too: the build's first filter runs
+# before any category is picked (1.6.9 crashed on every start on Radio).
+for place in ("radio", "local", "rec"):
+    w, s = window({"last_place": place, "last_list_place": place})
+    assert w.mode == place and w._place == place, (place, w.mode, w._place)
+    w.close()
 # ...or always on Mine; Home's "start on Home" carried over to it.
 w, s = window({"home_enabled": "true", "home_start": "true", "home_sh_pop_movies": "false",
                "last_place": "radio"})

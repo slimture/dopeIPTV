@@ -141,6 +141,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- The app closed at start when it had been left on Radio: building the
+  window filtered Radio's list before any of its rows was picked.
 - Posters went blank after a while in Movies, Series, Mine, Search, a
   series' page and TV mode - the top of a long list first - and stayed so
   until the app was started again. The app keeps the pictures it used most
