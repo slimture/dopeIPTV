@@ -516,6 +516,39 @@ def test_through_the_persons_own_proxy(servers, bridges, tmp_path, monkeypatch):
     assert net_bridge.guard_for({}, "http://p.example/1.m3u8", proxy="socks5://h.example:1080") is None
 
 
+def test_through_the_proxy_a_name_is_looked_up_here_first(servers, bridges, monkeypatch):
+    """The proxy connects where its own lookup says, out of the bridge's
+    sight: a name that resolves here to this computer is not asked of it
+    at all - for a tunnel or plain http (Bridge._proxied). Best effort: a
+    name that does not resolve here is the proxy's, and the stream's own
+    server is let through as written."""
+    srv = servers({"/x": (200, {}, b"plain")})
+    proxy = bridges()
+    chain = bridges(policy=Policy(internet=True, entry=("127.0.0.1", srv.port)),
+                    upstream=proxy.address)
+    real = socket.getaddrinfo
+
+    def resolve(host, *a, **kw):
+        if host == "rebind.example":
+            return real("127.0.0.1", *a, **kw)
+        if host == "nowhere.example":
+            raise socket.gaierror("no such name")
+        return real(host, *a, **kw)
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    plain = _ask(chain, f"GET http://rebind.example:{srv.port}/x HTTP/1.1\r\nHost: x\r\n\r\n")
+    assert plain.startswith(b"HTTP/1.1 502 ") and b"this computer" in plain
+    tunnel = _ask(chain, f"CONNECT rebind.example:{srv.port} HTTP/1.1\r\nHost: x\r\n\r\n")
+    assert tunnel.startswith(b"HTTP/1.1 502 ")
+    assert proxy.served == 0 and srv.seen == []
+    # Not resolved here: the proxy's to look up (it cannot either - its 502,
+    # its own words, not the guard's).
+    asked = _ask(chain, "GET http://nowhere.example/x HTTP/1.1\r\nHost: x\r\n\r\n")
+    assert asked.startswith(b"HTTP/1.1 502 ") and b"no such name" in asked
+    assert b"may not reach" not in asked
+    # The stream's own server, as the address's own judgement let it play.
+    assert _get(chain, f"http://127.0.0.1:{srv.port}/x").endswith(b"plain")
+
+
 # -- the API for what the app starts -----------------------------------------------
 
 def _no_bridge(*_a, **_k):

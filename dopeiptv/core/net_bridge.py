@@ -148,6 +148,9 @@ HEAD_MAX = 64 * 1024
 #: program of another account on this computer that opens thousands gets
 #: nothing but closed sockets.
 MAX_SERVING = 64
+#: Names looked up before they are asked of the person's proxy
+#: (Bridge._proxied), at most this many kept per bridge.
+_PROXIED_SEEN_MAX = 512
 #: A connection that has not sent its request with the key by then is let go.
 HEAD_TIMEOUT = 10.0
 #: How long the server an alias stands for may take to answer a request's
@@ -778,6 +781,9 @@ class Bridge:
         self.guarded = 0
         self.failures: list[str] = []        # the last few, for the log and the tests
         self._pins_ok: dict[tuple[str, int], float] = {}
+        #: A name asked for through the person's proxy, looked up here
+        #: (``_proxied``): (when, why) per host and port.
+        self._proxied_seen: dict[tuple[str, int], tuple[float, str]] = {}
         self._aliases: OrderedDict[str, Alias] = OrderedDict()
         self._said: set[tuple[str, str]] = set()
         self._lock = threading.Lock()
@@ -906,7 +912,7 @@ class Bridge:
         policy lets it land: judged as written, then by the socket's peer
         before a byte is sent (Guarded otherwise) - or, through the person's
         proxy, a tunnel it opens there."""
-        why = self.policy.written(host, port)
+        why = self.policy.written(host, port) or self._proxied(host, port)
         if why:
             raise Guarded(host, port, why, self.policy.internet)
         if self._up is not None:
@@ -929,10 +935,38 @@ class Bridge:
         absolute form, ``_via``)."""
         if self._up is None:
             return self._open(host, port), False
-        why = self.policy.written(host, port)
+        why = self.policy.written(host, port) or self._proxied(host, port)
         if why:
             raise Guarded(host, port, why, self.policy.internet)
         return socket.create_connection((self._up.host, self._up.port), CONNECT_TIMEOUT), True
+
+    def _proxied(self, host: str, port: int) -> str:
+        """Why *host*:*port* is not to be asked of the person's proxy, by
+        where the name leads from here: each address it resolves to judged
+        as a connection that landed there (``Policy.landed``). Best effort,
+        as dest_guard.proxied_refusal's: the proxy looks the name up itself
+        and connects where its own answer says, and a name that does not
+        resolve here is the proxy's. "" without a proxy, for an address as
+        written (``written`` judged it) and for the stream's own server.
+        Kept PROXIED_TTL per host and port."""
+        if self._up is None or not self.policy.internet or self.policy.is_entry(host, port):
+            return ""
+        name = _name(host)
+        if stream_address._ip(name) is not None:
+            return ""
+        now = time.monotonic()
+        key = (name, int(port))
+        with self._lock:
+            hit = self._proxied_seen.get(key)
+        if hit is not None and now - hit[0] < dest_guard.PROXIED_TTL:
+            return hit[1]
+        why = next((w for w in (self.policy.landed(name, port, a)
+                                for a in dest_guard._resolved(name, port)) if w), "")
+        with self._lock:
+            if len(self._proxied_seen) >= _PROXIED_SEEN_MAX:
+                self._proxied_seen.clear()
+            self._proxied_seen[key] = (now, why)
+        return why
 
     def _tunnel(self, host: str, port: int) -> socket.socket:
         """A tunnel to *host*:*port* through the person's proxy."""
