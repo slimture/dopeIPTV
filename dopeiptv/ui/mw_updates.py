@@ -108,8 +108,10 @@ def channel_seen(settings, channel: str, version: str = VERSION) -> None:
     """The channel *channel* noted: a switch from Test builds to Releases
     while *version*, a test build, runs is kept as that build's - the one
     time the release it carries the number of is offered over it
-    (updates.offered) - and told to core/updates; anything else forgets it."""
-    seen = str(settings.value(K_CHANNEL_SEEN, "") or "")
+    (updates.offered) - and told to core/updates; anything else forgets it.
+    Nothing noted yet is Releases, the default: a computer that never left
+    it writes nothing."""
+    seen = str(settings.value(K_CHANNEL_SEEN, "") or "") or "stable"
     if seen != channel:
         if seen == "nightly" and channel == "stable" and is_nightly(version):
             settings.setValue(K_LEFT_NIGHTLY, version)

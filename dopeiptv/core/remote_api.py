@@ -451,17 +451,18 @@ def play_refusal(url: str, resolve: Callable[[str], list[str]] | None = None) ->
     text = str(url or "").strip()
     if stream_address.acestream(text):
         return ""
-    why = stream_address.host_refusal(text)
-    if why:
-        return why
     try:
         parts = urlsplit(text)
         host = (parts.hostname or "").rstrip(".")
     except ValueError:
         return dest_guard.THIS_COMPUTER
+    if not host and parts.scheme.lower() in _LISTENING:
+        return ""        # udp://@:1234 listens here: nothing is asked of this computer
+    why = stream_address.host_refusal(text)
+    if why:
+        return why
     if not host:
-        # An empty host is this computer's to FFmpeg (http://:8080/).
-        return "" if parts.scheme.lower() in _LISTENING else dest_guard.THIS_COMPUTER
+        return dest_guard.THIS_COMPUTER     # http://:8080/ is this computer's to FFmpeg
     kind = dest_guard.named_kind(host)
     if kind in (dest_guard.THIS_COMPUTER, dest_guard.LINK_LOCAL):
         return kind

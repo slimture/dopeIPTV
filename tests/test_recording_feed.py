@@ -204,6 +204,8 @@ def test_the_tick_starts_the_old_way_once_when_the_feed_says_so(tmp_path, monkey
     from urllib.parse import urlsplit
 
     from dopeiptv.core import net_bridge
+    # A bridge of its own: one kept from another test may hold that test's aliases.
+    monkeypatch.setattr(net_bridge, "_bridges", type(net_bridge._bridges)())
     url = "http://h.invalid/live/u/p/1.ts"
     j = {"id": "a", "url": url, "title": "T", "stop": None, "status": "scheduled",
          "start": time.time()}
@@ -221,3 +223,4 @@ def test_the_tick_starts_the_old_way_once_when_the_feed_says_so(tmp_path, monkey
     rm.tick()                                   # that ended too: failed, no third try
     assert len(seen) == 2 and j["status"] == "failed"
     assert "_alias" not in j and bridge.aliases == 0       # the alias forgotten with it
+    bridge.close()
