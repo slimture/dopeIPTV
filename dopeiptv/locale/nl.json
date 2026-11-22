@@ -66,6 +66,8 @@
   "setting_list_size": "Lijstgrootte",
   "setting_upcoming_count": "Weergegeven komende programma's",
   "setting_sort_by": "Lijsten sorteren op",
+  "setting_channel_numbers": "Zendernummers tonen",
+  "setting_channel_numbers_hint": "Het nummer voor elke zender in de tv-lijst. Een getypt nummer zapt hoe dan ook naar die zender.",
   "setting_theme": "Thema",
   "setting_accent_color": "Accentkleur",
   "setting_language": "Taal",

@@ -66,6 +66,8 @@
   "setting_list_size": "اندازه فهرست",
   "setting_upcoming_count": "برنامه‌های آینده نمایش‌داده‌شده",
   "setting_sort_by": "مرتب‌سازی فهرست‌ها بر اساس",
+  "setting_channel_numbers": "نمایش شمارهٔ کانال‌ها",
+  "setting_channel_numbers_hint": "شمارهٔ پیش از هر کانال در فهرست تلویزیون. تایپ یک شماره در هر حال به کانال آن می‌رود.",
   "setting_theme": "زمینه",
   "setting_accent_color": "رنگ تأکید",
   "setting_language": "زبان",

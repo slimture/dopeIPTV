@@ -66,6 +66,8 @@
   "setting_list_size": "Veličina liste",
   "setting_upcoming_count": "Prikazano nadolazećih emisija",
   "setting_sort_by": "Sortiraj liste po",
+  "setting_channel_numbers": "Prikaži brojeve kanala",
+  "setting_channel_numbers_hint": "Broj ispred svakog kanala na TV listi. Upisan broj ionako prebacuje na njegov kanal.",
   "setting_theme": "Tema",
   "setting_accent_color": "Boja akcenta",
   "setting_language": "Jezik",

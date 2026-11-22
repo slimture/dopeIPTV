@@ -66,6 +66,8 @@
   "setting_list_size": "Liststorlek",
   "setting_upcoming_count": "Antal kommande program",
   "setting_sort_by": "Sortera listor efter",
+  "setting_channel_numbers": "Visa kanalnummer",
+  "setting_channel_numbers_hint": "Numret före varje kanal i TV-listan. Att knappa in ett nummer byter till kanalen oavsett.",
   "setting_theme": "Tema",
   "setting_accent_color": "Accentfärg",
   "setting_language": "Språk",

@@ -66,6 +66,8 @@
   "setting_list_size": "Ukuran daftar",
   "setting_upcoming_count": "Program mendatang yang ditampilkan",
   "setting_sort_by": "Urutkan daftar berdasarkan",
+  "setting_channel_numbers": "Tampilkan nomor saluran",
+  "setting_channel_numbers_hint": "Nomor di depan setiap saluran di daftar TV. Mengetik nomor tetap berpindah ke salurannya.",
   "setting_theme": "Tema",
   "setting_accent_color": "Warna aksen",
   "setting_language": "Bahasa",

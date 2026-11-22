@@ -66,6 +66,8 @@
   "setting_list_size": "Μέγεθος λίστας",
   "setting_upcoming_count": "Εμφανιζόμενα προσεχή προγράμματα",
   "setting_sort_by": "Ταξινόμηση λιστών κατά",
+  "setting_channel_numbers": "Εμφάνιση αριθμών καναλιών",
+  "setting_channel_numbers_hint": "Ο αριθμός μπροστά από κάθε κανάλι στη λίστα TV. Πληκτρολογώντας έναν αριθμό πηγαίνετε στο κανάλι του έτσι κι αλλιώς.",
   "setting_theme": "Θέμα",
   "setting_accent_color": "Χρώμα τονισμού",
   "setting_language": "Γλώσσα",

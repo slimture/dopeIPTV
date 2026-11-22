@@ -66,6 +66,8 @@
   "setting_list_size": "Listengröße",
   "setting_upcoming_count": "Angezeigte kommende Sendungen",
   "setting_sort_by": "Listen sortieren nach",
+  "setting_channel_numbers": "Kanalnummern zeigen",
+  "setting_channel_numbers_hint": "Die Nummer vor jedem Sender in der TV-Liste. Eine eingetippte Nummer schaltet so oder so auf den Sender.",
   "setting_theme": "Thema",
   "setting_accent_color": "Akzentfarbe",
   "setting_language": "Sprache",

@@ -66,6 +66,8 @@
   "setting_list_size": "リストサイズ",
   "setting_upcoming_count": "表示する今後の番組数",
   "setting_sort_by": "リストの並べ替え基準",
+  "setting_channel_numbers": "チャンネル番号を表示",
+  "setting_channel_numbers_hint": "テレビ一覧の各チャンネルの前に付く番号です。番号を入力すれば、表示しなくてもそのチャンネルに切り替わります。",
   "setting_theme": "テーマ",
   "setting_accent_color": "アクセントカラー",
   "setting_language": "言語",

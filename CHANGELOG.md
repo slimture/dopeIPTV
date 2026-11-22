@@ -107,6 +107,9 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 ### Added
 
 - A decision card's words show whole with a click on them.
+- Settings > Appearance > Show channel numbers. The TV list shows no
+  numbers by default now - calmer, with more room for the names; typing a
+  number still zaps to its channel.
 - Pick the app's icon under Settings > Appearance > App icon: the blue
   one, a heart, one in your accent colour (it follows the accent),
   midnight, paper, ocean, forest, sunset, grape, a round one or a retro

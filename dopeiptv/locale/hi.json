@@ -66,6 +66,8 @@
   "setting_list_size": "सूची आकार",
   "setting_upcoming_count": "दिखाए गए आगामी कार्यक्रम",
   "setting_sort_by": "सूचियों को इसके अनुसार क्रमबद्ध करें",
+  "setting_channel_numbers": "चैनल नंबर दिखाएँ",
+  "setting_channel_numbers_hint": "टीवी सूची में हर चैनल से पहले का नंबर। नंबर टाइप करने पर उसका चैनल हर हाल में खुलता है।",
   "setting_theme": "थीम",
   "setting_accent_color": "एक्सेंट रंग",
   "setting_language": "भाषा",

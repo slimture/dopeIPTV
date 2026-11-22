@@ -66,6 +66,8 @@
   "setting_list_size": "Tamaño de lista",
   "setting_upcoming_count": "Programas próximos mostrados",
   "setting_sort_by": "Ordenar listas por",
+  "setting_channel_numbers": "Mostrar números de canal",
+  "setting_channel_numbers_hint": "El número delante de cada canal en la lista de TV. Escribir un número cambia a su canal de todos modos.",
   "setting_theme": "Tema",
   "setting_accent_color": "Color de acento",
   "setting_language": "Idioma",

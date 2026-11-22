@@ -66,6 +66,8 @@
   "setting_list_size": "فہرست کا سائز",
   "setting_upcoming_count": "دکھائے گئے آنے والے پروگرام",
   "setting_sort_by": "فہرستوں کو ترتیب دیں بلحاظ",
+  "setting_channel_numbers": "چینل نمبر دکھائیں",
+  "setting_channel_numbers_hint": "ٹی وی فہرست میں ہر چینل سے پہلے کا نمبر۔ نمبر ٹائپ کرنے سے ہر حال میں اس کا چینل کھلتا ہے۔",
   "setting_theme": "تھیم",
   "setting_accent_color": "ایکسنٹ رنگ",
   "setting_language": "زبان",

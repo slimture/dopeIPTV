@@ -66,6 +66,8 @@
   "setting_list_size": "Liste boyutu",
   "setting_upcoming_count": "Gösterilen yaklaşan programlar",
   "setting_sort_by": "Listeleri sıralama ölçütü",
+  "setting_channel_numbers": "Kanal numaralarını göster",
+  "setting_channel_numbers_hint": "TV listesinde her kanalın önündeki numara. Bir numara yazmak her durumda o kanala geçer.",
   "setting_theme": "Tema",
   "setting_accent_color": "Vurgu rengi",
   "setting_language": "Dil",

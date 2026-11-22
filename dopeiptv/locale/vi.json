@@ -66,6 +66,8 @@
   "setting_list_size": "Kích thước danh sách",
   "setting_upcoming_count": "Số chương trình sắp tới hiển thị",
   "setting_sort_by": "Sắp xếp danh sách theo",
+  "setting_channel_numbers": "Hiện số kênh",
+  "setting_channel_numbers_hint": "Số trước mỗi kênh trong danh sách TV. Gõ một số vẫn chuyển sang kênh đó dù có hiện hay không.",
   "setting_theme": "Giao diện",
   "setting_accent_color": "Màu nhấn",
   "setting_language": "Ngôn ngữ",

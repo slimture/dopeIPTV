@@ -66,6 +66,8 @@
   "setting_list_size": "ขนาดรายการ",
   "setting_upcoming_count": "จำนวนรายการที่กำลังจะมาถึงที่แสดง",
   "setting_sort_by": "เรียงรายการตาม",
+  "setting_channel_numbers": "แสดงหมายเลขช่อง",
+  "setting_channel_numbers_hint": "หมายเลขหน้าช่องแต่ละช่องในรายการทีวี พิมพ์หมายเลขก็สลับไปยังช่องนั้นได้เสมอ",
   "setting_theme": "ธีม",
   "setting_accent_color": "สีเน้น",
   "setting_language": "ภาษา",

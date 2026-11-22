@@ -66,6 +66,8 @@
   "setting_list_size": "목록 크기",
   "setting_upcoming_count": "표시할 예정 프로그램 수",
   "setting_sort_by": "목록 정렬 기준",
+  "setting_channel_numbers": "채널 번호 표시",
+  "setting_channel_numbers_hint": "TV 목록에서 각 채널 앞에 붙는 번호입니다. 번호를 입력하면 어느 쪽이든 그 채널로 바뀝니다.",
   "setting_theme": "테마",
   "setting_accent_color": "강조 색상",
   "setting_language": "언어",

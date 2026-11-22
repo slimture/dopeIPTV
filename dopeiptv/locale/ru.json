@@ -66,6 +66,8 @@
   "setting_list_size": "Размер списка",
   "setting_upcoming_count": "Показывать предстоящих программ",
   "setting_sort_by": "Сортировка списков по",
+  "setting_channel_numbers": "Показывать номера каналов",
+  "setting_channel_numbers_hint": "Номер перед каждым каналом в списке ТВ. Набранный номер в любом случае переключает на канал.",
   "setting_theme": "Тема",
   "setting_accent_color": "Цвет акцента",
   "setting_language": "Язык",

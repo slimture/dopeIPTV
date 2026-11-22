@@ -66,6 +66,8 @@
   "setting_list_size": "列表大小",
   "setting_upcoming_count": "显示的即将播出节目数",
   "setting_sort_by": "列表排序方式",
+  "setting_channel_numbers": "显示频道编号",
+  "setting_channel_numbers_hint": "电视列表中每个频道前的编号。无论是否显示，输入编号都会切换到该频道。",
   "setting_theme": "主题",
   "setting_accent_color": "强调色",
   "setting_language": "语言",

@@ -66,6 +66,8 @@
   "setting_list_size": "حجم القائمة",
   "setting_upcoming_count": "البرامج القادمة المعروضة",
   "setting_sort_by": "فرز القوائم حسب",
+  "setting_channel_numbers": "إظهار أرقام القنوات",
+  "setting_channel_numbers_hint": "الرقم قبل كل قناة في قائمة التلفاز. كتابة رقم تنقلك إلى قناته في كل الأحوال.",
   "setting_theme": "السمة",
   "setting_accent_color": "لون التمييز",
   "setting_language": "اللغة",

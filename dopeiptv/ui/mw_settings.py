@@ -1271,7 +1271,8 @@ class _SettingsMixin:
                 self.player.apply_default_options()
             if "show_stream_info" in changed and self.player:
                 self.player._read_stream_info()
-            if changed & {"view_density", "sort_order", "show_stream_info"}:
+            if changed & {"view_density", "sort_order", "show_stream_info",
+                          "list_channel_numbers"}:
                 self._apply_view_settings()
                 self.list_model.refresh_all()
             visit.update(changed)

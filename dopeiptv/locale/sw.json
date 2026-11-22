@@ -66,6 +66,8 @@
   "setting_list_size": "Ukubwa wa orodha",
   "setting_upcoming_count": "Vipindi vijavyo vinavyoonyeshwa",
   "setting_sort_by": "Panga orodha kulingana na",
+  "setting_channel_numbers": "Onyesha nambari za chaneli",
+  "setting_channel_numbers_hint": "Nambari kabla ya kila chaneli kwenye orodha ya TV. Kuandika nambari hubadili kwenda chaneli yake kwa vyovyote.",
   "setting_theme": "Mandhari",
   "setting_accent_color": "Rangi ya lafudhi",
   "setting_language": "Lugha",

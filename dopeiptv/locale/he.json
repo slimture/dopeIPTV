@@ -66,6 +66,8 @@
   "setting_list_size": "גודל רשימה",
   "setting_upcoming_count": "תוכניות עתידיות מוצגות",
   "setting_sort_by": "מיין רשימות לפי",
+  "setting_channel_numbers": "הצגת מספרי ערוצים",
+  "setting_channel_numbers_hint": "המספר שלפני כל ערוץ ברשימת הטלוויזיה. הקלדת מספר עוברת לערוץ שלו בכל מקרה.",
   "setting_theme": "ערכת נושא",
   "setting_accent_color": "צבע הדגשה",
   "setting_language": "שפה",

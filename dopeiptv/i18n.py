@@ -208,6 +208,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "setting_list_size": {"en": "List size"},
     "setting_upcoming_count": {"en": "Upcoming programmes shown"},
     "setting_sort_by": {"en": "Sort lists by"},
+    "setting_channel_numbers": {"en": "Show channel numbers"},
+    "setting_channel_numbers_hint": {"en": "The number before each channel in the TV list. Typing a number zaps to its channel either way."},
     "setting_theme": {"en": "Theme"},
     "setting_accent_color": {"en": "Accent color"},
     "setting_language": {"en": "Language"},

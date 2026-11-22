@@ -195,7 +195,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
   `theme_light` (these four this profile's), `corner_style`, `ui_scale`
 - App icon: `app_icon` (one of `ui/app_icon.LOOKS`; the household's, the
   blue one when never picked)
-- Lists: `view_density`, `sort_order`
+- Lists: `view_density`, `sort_order`, `list_channel_numbers` (Show channel numbers, off by default)
 - What the places show (all of it this profile's; core/places.py,
   ui/mw_place_look.py): `just_the_list` (Just the list: no rows over TV,
   Movies, Series and Local files, compact headers, Movies and Series as

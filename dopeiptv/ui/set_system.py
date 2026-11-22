@@ -419,6 +419,9 @@ def build_appearance(ctx: SettingsContext) -> None:
     c = look.card(tr("set_card_lists"))
     c.row(tr("setting_list_size"), density_box)
     c.row(tr("setting_sort_by"), sort_box)
+    from .channel_list import CHANNEL_NUMBERS_KEY, channel_numbers_shown
+    numbers_box = c.toggle(tr("setting_channel_numbers"), channel_numbers_shown(win.settings),
+                           tr("setting_channel_numbers_hint"))
 
     # What the places show (core/places.py, mw_place_look): Just the
     # list over all of it, the rows over the lists, the sidebar's
@@ -464,6 +467,8 @@ def build_appearance(ctx: SettingsContext) -> None:
         put("view_density", density_box.currentData())
         put("ui_scale", scale_box.currentData())
         put("sort_order", sort_box.currentData())
+        if numbers_box.isChecked() != channel_numbers_shown(win.settings):
+            put(CHANNEL_NUMBERS_KEY, flag(numbers_box))
         # Written once switched: an untouched window stores nothing.
         if just_box.isChecked() != _places.just_list(win.settings):
             put(_places.JUST_LIST_KEY, flag(just_box))
