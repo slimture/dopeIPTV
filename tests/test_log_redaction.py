@@ -435,3 +435,63 @@ def test_a_login_inside_a_longer_word_takes_the_word_with_it():
     out = redact("Video: own thread (not started yet) /live/arte/x/1.ts")
     assert out == "Video: own thread (not *** yet) /live/***/x/1.ts"
     assert "st***" not in out and "***d" not in out
+
+
+# -- a login in its encoded forms ----------------------------------------------------
+
+_PW = 'p@ss w/rd"é'
+
+
+def _forms_of(value):
+    import json
+    import re
+    from urllib.parse import quote, quote_plus
+    upper = [quote(value, safe=""), quote(value), quote_plus(value), quote_plus(value, safe="/")]
+    lower = [re.sub(r"%[0-9A-F]{2}", lambda m: m.group(0).lower(), q) for q in upper]
+    escaped = [json.dumps(value)[1:-1], json.dumps(value, ensure_ascii=False)[1:-1],
+               json.dumps(value)[1:-1].replace("/", "\\/"),
+               re.sub(r"\\u([0-9a-f]{4})", lambda m: "\\u" + m.group(1).upper(), json.dumps(value)[1:-1])]
+    return upper + lower + escaped
+
+
+def test_a_login_is_masked_percent_encoded_and_json_escaped_too():
+    """A password with characters an address or JSON writes otherwise
+    (%40, + for a space, \\" and \\u00e9) is masked in those forms as well:
+    quote, quote_plus, either case of hex, JSON with and without \\u."""
+    logmod.register_secrets("anna", _PW)
+    for form in _forms_of(_PW):
+        assert form != _PW
+        line = f"retry with {form} now"
+        for out in (redact(line), logmod.redact_text(line), _filtered("%s", line)):
+            assert form not in out, (form, out)
+            assert out.startswith("retry with ") and out.endswith(" now"), out
+
+
+def test_http_basic_s_base64_of_user_and_password_is_masked_padded_or_not():
+    import base64
+    logmod.register_secrets("anna", "hunter2pw")
+    for raw in (b"anna:hunter2pw", b"anna:hunter2pw!"):
+        for enc in (base64.b64encode, base64.urlsafe_b64encode):
+            b64 = enc(raw).decode()
+            for form in (b64, b64.rstrip("=")):
+                for line in (f"sent {form} to the box", f"headers={{'X-Auth': '{form}'}}",
+                             f"GET /api/{form}/status"):
+                    out = _filtered("%s", line)
+                    assert form.rstrip("=") not in out, (line, out)
+    # Registered together, two short values are masked as Basic too.
+    logmod.register_secrets("tv", "pw")
+    b64 = base64.b64encode(b"tv:pw").decode()
+    assert b64.rstrip("=") not in redact(f"auth {b64} ok") and redact("tv and pw") == "*** and ***"
+
+
+def test_encoded_forms_keep_the_short_rule_and_leave_ordinary_text_alone():
+    """A login of three characters or fewer is masked as a word of its own -
+    its encoded forms too - and ordinary words, numbers and hex stay."""
+    logmod.register_secrets("a@b")
+    assert redact("login a%40b failed, a%40bc and xa%40b stay") == "login *** failed, a%40bc and xa%40b stay"
+    logmod.register_secrets("hunter2pw", "k@lle")
+    for keep in ("21:05:03 INFO play: started stream 1234 (Settings, connection)",
+                 "sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                 "dopeiptv-remote listening on port 3673",
+                 "QWxhZGRpbjpvcGVuIHNlc2FtZQ== is someone else's"):
+        assert _filtered("%s", keep) == keep, keep

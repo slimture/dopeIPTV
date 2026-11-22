@@ -24,7 +24,8 @@ import sys
 from typing import Any, Callable, Iterable
 
 from . import build_check
-from .log import URL_IN_TEXT, log, open_private, private_folder, recent_lines
+from .log import (URL_IN_TEXT, base64_masked, basic_forms, encoded_forms, log, open_private,
+                  private_folder, recent_lines)
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
 REPLIES = "https://dopeiptv.org/feedback/replies"
@@ -62,13 +63,16 @@ _HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\
 
 
 # A login told in words: "my password is hunter2", "lösenord: x",
-# "username kalle" - the word after the name, in the languages most reports
-# come in. ("login" and "pin" are left: "login failed", "the PIN was wrong".)
+# "username kalle" - the word after the name, on the same line, in the
+# languages most reports come in. ("login" and "pin" are left: "login
+# failed", "the PIN was wrong".) Never across a line: "my password" at the
+# end of the person's words took the first word of the report below them.
 _SAID = re.compile(r"(?i)\b(password|passwd|passcode|username|user name|"
                    r"l\u00f6senord|anv\u00e4ndarnamn|passwort|benutzername|kennwort|"
                    r"mot de passe|identifiant|contrase\u00f1a|usuario|senha|usu\u00e1rio|"
                    r"wachtwoord|gebruikersnaam|has\u0142o|parola|salasana|adgangskode|passord)"
-                   r"(\s*[:=]\s*|\s+(?:is now|is|was|\u00e4r|var|ist|est|es|\u00e9)?\s*)"
+                   r"([^\S\r\n]*[:=][^\S\r\n]*|[^\S\r\n]+(?:is now|is|was|\u00e4r|var|ist|est|es|\u00e9)?"
+                   r"[^\S\r\n]*)"
                    r"(?![\"']?<)([^\s,;.!?]{2,128})")
 # A token whatever it is called: a JSON web token, a GitHub or Slack token,
 # and any run of 32 or more letters and digits with both in it (a key, a
@@ -125,6 +129,13 @@ def _own_value(value: str, secret: bool) -> str:
     return head + body + tail
 
 
+def _holds_login(logins: list[str]) -> Callable[[str], bool]:
+    """Whether a text holds one of *logins* - one of SHORT_SECRET characters
+    or fewer as a word of its own - whatever its case."""
+    pats = [re.compile(_own_value(v, True), re.IGNORECASE) for v in logins]
+    return lambda text: any(p.search(text) for p in pats)
+
+
 def scrub(text: str, personal: Iterable[str] = ()) -> str:
     """*text* without anything that identifies a stream or a person."""
     # Whole addresses first (a login or a name inside one goes with it),
@@ -137,8 +148,16 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
         # "a"); a login is hidden however short it is.
         if len(value) >= 3 or (value and isinstance(v, Secret)):
             kinds[value] = kinds.get(value, False) or isinstance(v, Secret)
+    logins = [value for value, secret in kinds.items() if secret]
+    for value in logins:
+        # A login as an address, a form or JSON writes it too; a short one's
+        # forms hidden as words of their own, as it is.
+        for form in encoded_forms(value):
+            kinds.setdefault(form, len(value) > SHORT_SECRET)
     for value in sorted(kinds, key=len, reverse=True):
         out = re.sub(_own_value(value, kinds[value]), "<private>", out, flags=re.IGNORECASE)
+    if logins:
+        out = base64_masked(out, _holds_login(logins), "<private>")
     out = _EMAIL.sub("<email>", out)
     out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
@@ -178,6 +197,10 @@ def personal_values(playlists: Iterable[dict], channels: Iterable[str] = (),
                 if key == "server":
                     host = re.sub(r"^[a-z]+://", "", v).split("/")[0].split("@")[-1].split(":")[0]
                     out.append(host)
+        user, password = str(p.get("username") or ""), str(p.get("password") or "")
+        if user and password:
+            # The two as HTTP Basic sends them (a box's, a media server's).
+            out += [Secret(b) for b in sorted(basic_forms(user, password))]
     out += [str(c) for c in channels if c]
     out += [str(t) for t in titles if t]
     return out

@@ -652,3 +652,42 @@ def test_a_short_login_is_hidden_as_a_word_of_its_own():
     assert "password <private>" in out and "for <private>," in out
     assert "a cab and abc stay" in out
     assert scrub("TV channel", ["TV"]) == "TV channel"      # a short name is no login
+
+
+def test_a_login_is_hidden_percent_encoded_json_escaped_and_as_http_basic():
+    """The person's logins are hidden as written and as an address, a form,
+    JSON and HTTP Basic write them: quote, quote_plus, either case of hex,
+    JSON-escaped, and base64 of user:password padded or not."""
+    import base64
+    import re
+    from urllib.parse import quote, quote_plus
+    pw = 'p@ss w/rd"é'
+    personal = report.personal_values([{"name": "Box", "username": "anna", "password": pw}])
+    forms = [quote(pw, safe=""), quote(pw), quote_plus(pw), quote_plus(pw, safe="/"),
+             json.dumps(pw)[1:-1], json.dumps(pw, ensure_ascii=False)[1:-1],
+             json.dumps(pw)[1:-1].replace("/", "\\/")]
+    forms += [re.sub(r"%[0-9A-F]{2}", lambda m: m.group(0).lower(), f) for f in forms[:4]]
+    for raw in ("anna:" + pw).encode(), ("anna:" + pw).encode("latin-1"):
+        for enc in (base64.b64encode, base64.urlsafe_b64encode):
+            b64 = enc(raw).decode()
+            forms += [b64, b64.rstrip("=")]
+    for form in forms:
+        out = report.scrub(f"retry with {form} now", personal)
+        assert form.rstrip("=") not in out, (form, out)
+        assert out.startswith("retry with ") and out.endswith(" now"), out
+    # Base64 of text that holds a login, wherever it stands.
+    hidden = base64.b64encode(b"user=anna;pass=" + pw.encode()).decode().rstrip("=")
+    assert hidden not in report.scrub(f"GET /api/{hidden}/x", personal)
+    # The short rule holds for their forms; ordinary text stays.
+    short = report.scrub("login a%40b failed; a%40bc stays", [report.Secret("a@b")])
+    assert short == "login <private> failed; a%40bc stays"
+    keep = "QWxhZGRpbjpvcGVuIHNlc2FtZQ== is someone else's; sha 0f1e2d3c"
+    assert report.scrub(keep, personal) == keep
+
+
+def test_a_login_told_in_words_stays_on_its_line():
+    """"my password" at the end of the person's words took the first word of
+    the report below them: hidden on its own line only."""
+    out = report.scrub("I forgot my password\n\ndopeIPTV 1.6.10\nusername: kalle77")
+    assert "dopeIPTV 1.6.10" in out and "kalle77" not in out
+    assert report.scrub("password\nnext") == "password\nnext"

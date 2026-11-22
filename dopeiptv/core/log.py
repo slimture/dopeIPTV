@@ -19,13 +19,16 @@ WARNING+ to stderr, so nothing is ever silently lost.
 """
 from __future__ import annotations
 
-from typing import Any
+from itertools import permutations
+from typing import Any, Callable
 
+import base64
+import json
 import logging
 import os
 import re
 import sys
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, quote_plus, urlencode, urlsplit, urlunsplit
 
 log = logging.getLogger("dopeiptv")
 _configured = False
@@ -102,21 +105,109 @@ _PLAIN_PARAMS = frozenset((
 _STREAM_ID = re.compile(r"\d+(?:\.[A-Za-z0-9]{1,5})?")
 
 
+#: A login is masked as written and as each of these writes it.
+_HEX = re.compile(r"%[0-9A-F]{2}")
+_U_HEX = re.compile(r"\\u([0-9a-f]{4})")
+
+
+def encoded_forms(value: str) -> set[str]:
+    """*value* as an address, a form, JSON or Python's repr writes it, where
+    that is not the value itself: percent-encoded (quote, quote_plus; the
+    hex upper and lower case) and escaped (JSON with and without \\uXXXX,
+    either case, an escaped "/"; a repr). The error report hides a login in
+    all of them too (core/report.py)."""
+    out: set[str] = set()
+    for safe in ("", "/"):
+        for q in (quote(value, safe=safe), quote_plus(value, safe=safe)):
+            out |= {q, _HEX.sub(lambda m: m.group(0).lower(), q)}
+    for j in (json.dumps(value)[1:-1], json.dumps(value, ensure_ascii=False)[1:-1]):
+        for k in (j, _U_HEX.sub(lambda m: "\\u" + m.group(1).upper(), j)):
+            out |= {k, k.replace("/", "\\/")}
+    out.add(repr(value)[1:-1])
+    out.discard(value)
+    return {v for v in out if v}
+
+
+def basic_forms(user: str, password: str) -> set[str]:
+    """HTTP Basic's base64 of "user:password" - standard and URL-safe,
+    padded and not, from UTF-8 and (as requests sends it) Latin-1."""
+    out: set[str] = set()
+    text = f"{user}:{password}"
+    raws = {text.encode("utf-8")}
+    try:
+        raws.add(text.encode("latin-1"))
+    except UnicodeEncodeError:
+        pass
+    for raw in raws:
+        for enc in (base64.b64encode, base64.urlsafe_b64encode):
+            b64 = enc(raw).decode("ascii")
+            out |= {b64, b64.rstrip("=")}
+    return out
+
+
+#: A run that may be base64 (either alphabet, padded or not), long enough
+#: to be worth reading; past the longest it is read in parts.
+_B64_RUN = re.compile(r"[A-Za-z0-9+/_-]{8,2048}={0,2}")
+_URLSAFE = str.maketrans("-_", "+/")
+
+
+def _b64_text(run: str) -> str | None:
+    """What *run* reads as when it is base64 of printable text, else None."""
+    body = run.rstrip("=").translate(_URLSAFE)
+    if len(body) % 4 == 1:
+        return None
+    try:
+        text = base64.b64decode(body + "=" * (-len(body) % 4), validate=True).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return text if text and text.isprintable() else None
+
+
+def base64_masked(text: str, holds: Callable[[str], bool], mark: str) -> str:
+    """*text* with every run that is base64 of text holding one of the
+    person's values (*holds*) put as *mark* - HTTP Basic's user:password
+    above all, padded or not, wherever it stands. A run read as one, else
+    each of its "/" parts; what reads as no printable text is left alone,
+    so ordinary words stay as they are."""
+    def one(m: re.Match[str]) -> str:
+        run = m.group(0)
+        said = _b64_text(run)
+        if said is not None and holds(said):
+            return mark
+        if "/" not in run:
+            return run
+        return "/".join(mark if len(part) >= 8 and (s := _b64_text(part)) is not None and holds(s)
+                        else part for part in run.split("/"))
+    return _B64_RUN.sub(one, text)
+
+
+def _short_pattern(s: str) -> str:
+    return r"(?<![0-9A-Za-z])" + re.escape(s) + r"(?![0-9A-Za-z])"
+
+
+def _holds_secret(text: str) -> bool:
+    """Whether *text* holds a registered value (a short one as a word)."""
+    return any(s in text for s in tuple(_secrets)) or any(
+        s in text and re.search(_short_pattern(s), text) for s in tuple(_short))
+
+
 def register_secrets(*values: str | None) -> None:
     """Remember credential values so they never reach a log or a log file.
 
     Masking by VALUE rather than by position catches every shape the same
     credential arrives in - a path segment, a query parameter, a requests
     exception message quoting the full URL - without a parser that has to
-    keep up with each new one."""
-    for v in values:
+    keep up with each new one. Each is masked in its encoded forms too
+    (encoded_forms), and values registered together - a user name and its
+    password - as HTTP Basic's base64 of the two (basic_forms)."""
+    given = [v for v in values if v and v.strip()]
+    for v in given:
         # One of three characters or fewer is masked only where it stands
         # as a word of its own (_short): as a substring it would blank out
-        # ordinary words all over the log.
-        if v and len(v) > 3:
-            _secrets.add(v)
-        elif v and v.strip():
-            _short.add(v)
+        # ordinary words all over the log. Its encoded forms with it.
+        (_secrets if len(v) > 3 else _short).update({v, *encoded_forms(v)})
+    for a, b in permutations(given[:4], 2):
+        _secrets.update(basic_forms(a, b))
 
 
 def redact(text: str) -> str:
@@ -128,13 +219,16 @@ def redact(text: str) -> str:
     that grows under you raises RuntimeError.
 
     A value inside a longer word takes the whole word with it: "st***d"
-    told where a login of "arte" began and what it was."""
+    told where a login of "arte" began and what it was. Base64 that reads
+    as text holding a value goes whole (base64_masked)."""
     for s in tuple(_secrets):
         if s in text:
             text = re.sub(r"\w*" + re.escape(s) + r"\w*", "***", text)
     for s in tuple(_short):
         if s in text:
-            text = re.sub(r"(?<![0-9A-Za-z])" + re.escape(s) + r"(?![0-9A-Za-z])", "***", text)
+            text = re.sub(_short_pattern(s), "***", text)
+    if _secrets or _short:
+        text = base64_masked(text, _holds_secret, "***")
     return text
 
 
