@@ -3197,5 +3197,8 @@
   "tls_offer_go": "Riproduci senza verifica",
   "src_tls_unchecked": "Riproduci senza verificare il certificato",
   "src_tls_unchecked_hint": "I suoi flussi vengono riprodotti anche se il certificato non è valido. Chiunque lungo il percorso potrebbe leggerli, insieme alle credenziali nei loro indirizzi. Disattivato, ogni flusso da Internet viene verificato.",
-  "upd_err_folder_shared": "Altri account di questo computer possono modificare la cartella {folder}, quindi l'aggiornamento non viene messo lì. Sposta dopeIPTV in una cartella tua o scarica la nuova versione a mano."
+  "upd_err_folder_shared": "Altri account di questo computer possono modificare la cartella {folder}, quindi l'aggiornamento non viene messo lì. Sposta dopeIPTV in una cartella tua o scarica la nuova versione a mano.",
+  "private_kept_title": "Ancora scritto sul disco",
+  "private_kept_body": "Una registrazione o un cast sta ancora scrivendo questo canale sul disco. Fermalo ora o lascialo finire: nient'altro di questo canale viene conservato mentre guardi in privato.",
+  "private_kept_stop": "Ferma"
 }

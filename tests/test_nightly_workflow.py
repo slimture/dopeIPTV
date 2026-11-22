@@ -112,3 +112,33 @@ def test_three_test_builds_are_kept():
     # The newest release stays near the top of the releases page.
     assert "- name: Keep the newest three" in NIGHTLY
     assert "| sort_by(.createdAt) | reverse | .[3:] | .[].tagName'" in NIGHTLY
+
+
+def _jobs(text: str) -> dict[str, str]:
+    """A workflow's jobs, each its block of lines (read as text: no YAML
+    library in CI's installs)."""
+    body = text[text.index("\njobs:\n") + 7:]
+    out: dict[str, str] = {}
+    name = None
+    for line in body.splitlines():
+        if line.startswith("  ") and not line.startswith("   ") and line.rstrip().endswith(":") \
+                and not line.lstrip().startswith("#"):
+            name = line.strip()[:-1]
+            out[name] = ""
+        elif name is not None:
+            out[name] += line + "\n"
+    return out
+
+
+def test_the_apple_secrets_reach_the_macos_job_alone_in_its_own_environment():
+    """The Developer ID certificate and the notary key live in the
+    environment macos-signing (docs/MAINTAINING.md): only the macOS job,
+    which runs in it, names them - no other build job."""
+    text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    jobs = _jobs(text)
+    apple = ("MACOS_CERT_P12", "MACOS_CERT_PASSWORD", "APPLE_API_KEY_P8",
+             "APPLE_API_KEY_ID", "APPLE_API_ISSUER_ID")
+    assert "environment: macos-signing" in jobs["macos-dmg"]
+    for name, block in jobs.items():
+        named = [s for s in apple if f"secrets.{s}" in block]
+        assert not named or name == "macos-dmg", (name, named)

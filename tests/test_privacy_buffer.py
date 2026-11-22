@@ -317,3 +317,60 @@ def test_the_player_asks_for_memory_while_viewing_privately():
     assert "self._dvr_new_pool(" in inspect.getsource(dvr_player.DvrPlayerMixin.dvr_pool_for_server)
     assert "memory=dvr_memory()" in inspect.getsource(dvr_player.DvrPlayerMixin._dvr_new_pool)
     assert "sweep_abandoned(memory)" in inspect.getsource(dvr_player.dvr_base)
+
+
+def test_a_buffer_a_recording_or_cast_keeps_on_the_disk_is_asked_about_not_stopped():
+    """Private viewing turned on while a recording or a cast keeps the
+    channel's buffer on the disk: a card asks - nothing is stopped by
+    itself; Stop it ends the recording and the cast that keep it there."""
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from dopeiptv.ui.mw_privacy import _PrivacyMixin
+    from dopeiptv.ui.notices import NoticeHub
+
+    class Rec:
+        def __init__(self):
+            self.alive = True
+
+    recorder = Rec()
+
+    class Session:
+        recorders = [recorder]
+        held = True
+
+    class Pool:
+        def __init__(self, s):
+            self.s = s
+
+        def kept_on_disk_private(self):
+            return self.s
+
+    class Recordings:
+        def __init__(self):
+            self.jobs = [{"id": "j1", "status": "recording", "recorder": recorder},
+                         {"id": "j2", "status": "recording", "recorder": object()}]
+            self.cancelled = []
+
+        def cancel(self, jid):
+            self.cancelled.append(jid)
+
+    class Window(_PrivacyMixin):
+        def __init__(self, session):
+            self.notices = NoticeHub()
+            self.player = type("P", (), {"_dvr_pool": Pool(session)})()
+            self.rec = Recordings()
+            self._cast_device = "Living room"
+            self.ended = []
+
+        def _end_cast(self, why):
+            self.ended.append(why)
+
+    w = Window(Session())
+    w._private_ask_kept()
+    [card] = w.notices.decisions()
+    assert w.rec.cancelled == [] and w.ended == [], "nothing stopped by itself"
+    card.action()
+    assert w.rec.cancelled == ["j1"] and len(w.ended) == 1
+    quiet = Window(None)
+    quiet._private_ask_kept()
+    assert quiet.notices.decisions() == []

@@ -3197,5 +3197,8 @@
   "tls_offer_go": "Lire sans vérification",
   "src_tls_unchecked": "Lire sans vérifier le certificat",
   "src_tls_unchecked_hint": "Ses flux sont lus même si leur certificat n'est pas valide. N'importe qui sur le trajet pourrait alors les lire, ainsi que l'identifiant dans leurs adresses. Désactivé, chaque flux venant d'Internet est vérifié.",
-  "upd_err_folder_shared": "D'autres comptes de cet ordinateur peuvent modifier le dossier {folder} : la mise à jour n'y est donc pas placée. Déplacez dopeIPTV dans un dossier à vous, ou téléchargez la nouvelle version à la main."
+  "upd_err_folder_shared": "D'autres comptes de cet ordinateur peuvent modifier le dossier {folder} : la mise à jour n'y est donc pas placée. Déplacez dopeIPTV dans un dossier à vous, ou téléchargez la nouvelle version à la main.",
+  "private_kept_title": "Encore écrit sur le disque",
+  "private_kept_body": "Un enregistrement ou une diffusion écrit encore cette chaîne sur le disque. Arrêtez-le maintenant ou laissez-le finir : rien d'autre de cette chaîne n'est gardé pendant que vous regardez en privé.",
+  "private_kept_stop": "Arrêter"
 }

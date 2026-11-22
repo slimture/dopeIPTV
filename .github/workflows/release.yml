@@ -761,9 +761,14 @@ jobs:
   # APPLE_API_KEY_ID and APPLE_API_ISSUER_ID for notarytool. Without them -
   # a fork - the .app is signed ad hoc as before and users allow the first
   # launch under Privacy & Security -> Open Anyway.
+  #
+  # The five Apple secrets live in the environment `macos-signing`
+  # (docs/MAINTAINING.md, "macOS signing"): only this job, and only on
+  # main, testing and v* tags, can read them - no other job or branch.
   macos-dmg:
     needs: ytdlp-pin
     name: macOS .dmg (${{ matrix.arch }})
+    environment: macos-signing
     permissions:
       contents: write      # attaches its packages to the release (on a tag)
     runs-on: ${{ matrix.runner }}

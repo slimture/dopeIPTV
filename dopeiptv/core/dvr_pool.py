@@ -168,6 +168,18 @@ class DvrPool:
             return bool(s is not None and not s.closed and s.private and not s.memory_cap
                         and not s.recording and not s.held)
 
+    def kept_on_disk_private(self) -> DvrSession | None:
+        """The channel on screen when it is watched privately with its
+        buffer on the disk kept there by a recording or a cast reading it -
+        what private viewing then asks about (ui/mw_privacy.py): None
+        otherwise."""
+        with self._lock:
+            s = self.active
+            if (s is not None and not s.closed and s.private and not s.memory_cap
+                    and (s.recording or s.held)):
+                return s
+            return None
+
     def release(self, s: DvrSession) -> None:
         """The player is done with *s*: frozen - unless a recording still
         reads it, which keeps its connection until it ends."""

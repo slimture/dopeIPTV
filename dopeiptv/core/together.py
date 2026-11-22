@@ -80,16 +80,19 @@ before this computer joined is acted on:
   lets it take this computer in turn - and, should it speak on without
   naming this computer (its answer lost on the way), it is asked so now
   and then (NUDGE_EVERY).
-- An older app's message (no "p") is judged by time: what the relay
-  already held when this computer's first request was answered is not
-  acted on (those in the room answer the hello with what plays now; the
-  hello waits for that first answer, and where it could not, the backlog
-  is read under the rules below instead); and, once the relay's clock is
-  known here, a message is dropped when its moment "t" is more than
-  JOIN_SLACK_MS before this computer joined.
+- An older app's message (no "p": 1.6.10 and before) is not taken at all
+  since 1.6.12 - its only guard against an old message handed again was
+  the relay's clock. The person is told once, as for an unsigned one,
+  that someone with an older app is left out until they update. What the
+  relay already held when this computer's first request was answered is
+  not acted on either (those in the room answer the hello with what plays
+  now; the hello waits for that first answer, and where it could not, the
+  backlog is read under the rules below instead); and, once the relay's
+  clock is known here, a message is dropped when its moment "t" is more
+  than JOIN_SLACK_MS before this computer joined.
 
-Either way a message more than STALE_MS old or more than AHEAD_MS in the
-future is dropped. A message is stamped as it is sent and normally arrives
+Every message more than STALE_MS old or more than AHEAD_MS in the future
+is dropped too. A message is stamped as it is sent and normally arrives
 within a second - a slow network, three tries at sending and the long
 poll's 25 s stay far inside these minutes. Senders are forgotten only
 after STALE_MS + AHEAD_MS without a word, when nothing of theirs would be
@@ -783,14 +786,17 @@ class Room:
         """What *msg* changes, as events: ("joined" | "left" | "status" |
         "hello", Member), ("state", (old, new)), ("answer", sender) - an
         answer naming *sender* is to go out -, ("unsigned", None) - once a
-        room, for the first message no key signs (an app up to 1.6.8, left
-        out until it is updated). Nothing for one of this computer's own,
+        room, for the first message no key signs (an app up to 1.6.8) or
+        that says no PROTO (an app up to 1.6.10), left out until it is
+        updated. Nothing for one of this computer's own,
         an old one handed again, one out of its time, or one of a sender of
         PROTO said before it named this computer."""
         if msg.sender == self.me:
             return []
-        if not msg.signed:
-            log.debug("together: an unsigned message was dropped")
+        if not msg.signed or msg.proto < PROTO:
+            # An older app's: unsigned, or with no guard against an old
+            # message handed again but the relay's clock.
+            log.debug("together: a message of an older app was dropped")
             if not self._told_unsigned:
                 self._told_unsigned = True
                 return [("unsigned", None)]

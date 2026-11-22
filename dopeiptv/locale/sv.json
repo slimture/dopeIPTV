@@ -3197,5 +3197,8 @@
   "tls_offer_go": "Spela utan kontroll",
   "src_tls_unchecked": "Spela utan att kontrollera certifikatet",
   "src_tls_unchecked_hint": "Strömmarna spelas även när certifikatet inte håller. Vem som helst på vägen kan då läsa dem, och inloggningen i deras adresser. Avstängt kontrolleras varje ström från internet.",
-  "upd_err_folder_shared": "Andra konton på den här datorn kan ändra mappen {folder}, så uppdateringen läggs inte där. Flytta dopeIPTV till en egen mapp, eller ladda ner den nya versionen för hand."
+  "upd_err_folder_shared": "Andra konton på den här datorn kan ändra mappen {folder}, så uppdateringen läggs inte där. Flytta dopeIPTV till en egen mapp, eller ladda ner den nya versionen för hand.",
+  "private_kept_title": "Skrivs fortfarande till disken",
+  "private_kept_body": "En inspelning eller cast skriver fortfarande kanalen till disken. Stoppa den nu, eller låt den gå klart - inget annat av kanalen sparas medan du tittar privat.",
+  "private_kept_stop": "Stoppa"
 }

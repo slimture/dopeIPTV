@@ -24,6 +24,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - An update is checked again right before it starts or is put in place,
   and an AppImage in a folder other accounts may change is not updated
   there (move it to a folder of your own, or update by hand).
+- **Watch together** takes messages only from 1.6.11 and later: an older
+  app's only guard against an old message handed again was the relay's
+  clock. Someone with an older app is told to update, as before for 1.6.8.
+- **Private viewing** asks when a recording or a cast keeps the channel's
+  rewind buffer on the disk as it is turned on: Stop it, or let it finish -
+  nothing is stopped by itself.
+- The macOS build's signing certificate and notary key are read by the
+  macOS build alone, in an environment of their own.
 - A settings file another account owns, or a link to nowhere, counts as
   not private; every settings file others may read is asked about, not the
   first alone, and a question that cannot be asked closes the window.

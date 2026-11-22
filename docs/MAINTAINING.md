@@ -392,6 +392,23 @@ Without the secrets (a fork) the job builds the ad hoc signed
 .dmg it always did; with the certificate but no API key a release fails
 rather than ship something half done.
 
+- **Where the secrets live (since 1.6.12).** The `macos-dmg` job runs in
+  the environment `macos-signing`, so the certificate and the API key reach
+  that job alone - never the other build jobs, which run PyInstaller,
+  pip's packages and other people's tools, nor a workflow on another
+  branch. Set it up once, in the repository's Settings > Environments:
+  1. New environment `macos-signing`. Deployment branches and tags:
+     *Selected* - the branches `main` and `testing` and the tag pattern
+     `v*`. No required reviewer: nightlies build the .dmg too, and one
+     would wait for you on every push to `testing`.
+  2. Its own secrets, the same five values as now: `MACOS_CERT_P12`,
+     `MACOS_CERT_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`,
+     `APPLE_API_ISSUER_ID` (GitHub never shows a secret again: take them
+     from the password manager; a .p12 can be exported again from Keychain
+     Access, a lost .p8 means a new API key).
+  3. Delete the five repository-wide secrets of those names.
+  Until then the job runs as before: an environment that does not exist is
+  made without rules, and the repository-wide secrets still reach it.
 - **The certificate** is valid five years (from November 2026). Before it
   runs out, make a new *Developer ID Application* certificate at
   developer.apple.com from a certificate request made in Keychain Access,

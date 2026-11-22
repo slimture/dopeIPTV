@@ -3197,5 +3197,8 @@
   "tls_offer_go": "Phát không kiểm tra",
   "src_tls_unchecked": "Phát không kiểm tra chứng chỉ",
   "src_tls_unchecked_hint": "Các luồng vẫn phát dù chứng chỉ không hợp lệ. Bất kỳ ai trên đường truyền đều có thể đọc chúng, cùng thông tin đăng nhập trong địa chỉ. Khi tắt, mọi luồng từ internet đều được kiểm tra.",
-  "upd_err_folder_shared": "Các tài khoản khác trên máy tính này có thể thay đổi thư mục {folder}, nên bản cập nhật không được đặt ở đó. Hãy chuyển dopeIPTV sang một thư mục của riêng bạn, hoặc tải phiên bản mới về thủ công."
+  "upd_err_folder_shared": "Các tài khoản khác trên máy tính này có thể thay đổi thư mục {folder}, nên bản cập nhật không được đặt ở đó. Hãy chuyển dopeIPTV sang một thư mục của riêng bạn, hoặc tải phiên bản mới về thủ công.",
+  "private_kept_title": "Vẫn đang ghi ra ổ đĩa",
+  "private_kept_body": "Một bản ghi hoặc lượt truyền vẫn đang ghi kênh này ra ổ đĩa. Dừng ngay bây giờ, hoặc để nó chạy xong - không có gì khác của kênh này được giữ lại khi bạn xem riêng tư.",
+  "private_kept_stop": "Dừng lại"
 }
