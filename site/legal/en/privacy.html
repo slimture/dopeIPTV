@@ -114,7 +114,8 @@
 <p>Who is in the room (the name you choose for it), what plays and play, pause and seek go between your computers encrypted with a key made from the room code, which only the people in the room know. Our server only passes the encrypted messages on.</p>
 <ul>
 <li><strong>What our server sees:</strong> the room under a name also made from the code, a random number for each person in it, how big the messages are and when they are sent – not who you are, the names or what you watch.</li>
-<li><strong>What it keeps:</strong> nothing is written to disk. The server keeps a room's latest messages in memory and forgets the room an hour after the last request. Watch together requests are not logged.</li>
+<li><strong>Who it lets in:</strong> from dopeIPTV 1.6.11 every request also carries a credential made from the same code, of which the server keeps only a one-way hash, in memory with the room. The first request binds the room to it, and from then on the server turns away anyone without it: knowing the room's name is not enough to put anything in the room, take a place in it or read from it. A room only older versions use is not bound; someone who joins a bound room later with an older version is turned away.</li>
+<li><strong>What it keeps:</strong> nothing is written to disk. The server keeps a room's latest messages in memory and forgets the room an hour after the last request, and a day after it was made at the latest. Watch together requests are not logged.</li>
 </ul>
 <p>It cannot be used while private viewing is on.</p>
 
@@ -152,7 +153,7 @@
 <ul>
 <li>The front server, which handles the encrypted connection, keeps no log of the requests to dopeiptv.org, and writes an error down only when something stops it working (below). Settings sync and watch together requests are never logged anywhere.</li>
 <li>Nothing else is logged: the server behind it writes no log of other requests, and none that holds your IP address. For the statistics below it hands each page view, the pages' view signal and each download click straight to our own service over a socket on the same machine – with IP address, time, the page asked for (only the page – never what a link added to its address), status, browser and language –, which counts it in memory within a minute and writes no IP address anywhere (below). For the public download counter it keeps one small log of download clicks: the file's name, the answer and whether a browser, the app or a robot asked – no IP address, no time, no browser. It is turned over every night and only the day before is kept – two days at the most –, then removed automatically.</li>
-<li>The services behind the website – tips, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make.</li>
+<li>The services behind the website – tips, feedback, sync and watch together – keep IP addresses only in memory, briefly – at most a day – to limit how many requests one address can make. To limit how many watch together rooms one address makes, a room keeps a keyed hash of the address that made it – never the address – in memory, for as long as the room is kept.</li>
 </ul>
 <p>Every log on our server, what it holds and how long it is kept:</p>
 <ul>
@@ -261,7 +262,7 @@
 <li><strong>Statistics</strong> – no IP address, no name and no mark of a visitor: each visit for 14 days as a visit of its day alone, then deleted; the sketches that count different visitors, in memory only, until the month after has ended, and the key – in memory only – as long; only counts remain. Update records, never with an IP address, exact time or ID: 30 days.</li>
 <li><strong>Error reports and feedback</strong> – no IP address, no name, no e-mail address, and cleaned of anything identifying before they are stored: 12 months, then removed automatically – with our answers to them and your replies to an answer. An answer we write to a whole problem at once holds only our own words and is kept until we remove it.</li>
 <li><strong>Synced data</strong> – encrypted on your computer, so we cannot read it or tell whose it is: until you delete it, or 180 days after it was last used.</li>
-<li><strong>Watch together</strong> – encrypted, in memory only, never on disk: until an hour after the room's last request.</li>
+<li><strong>Watch together</strong> – encrypted, in memory only, never on disk: until an hour after the room's last request, a day at the most.</li>
 <li><strong>Request limits</strong> – the services behind the website keep IP addresses only in memory, for at most a day, to stop abuse. They are never written down.</li>
 <li><strong>Payments</strong> – the name or e-mail address you give for the receipt: at Stripe under its terms, and in our accounts for seven years, as the Swedish Bookkeeping Act requires. Our server itself saves none of it.</li>
 <li><strong>E-mail you send us</strong>: as long as the matter needs.</li>

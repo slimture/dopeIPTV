@@ -44,7 +44,7 @@
 <a class="tp-ov-l" href="#sync-limits" title="What it does not protect against – how many the part names">6 limits</a></li>
 <li><a class="tp-ov-q" href="#together">Can you see what we watch together?</a>
 <p class="tp-ov-a"><strong class="tp-verdict is-good">No</strong> Locked between your computers – our server only passes on what it cannot open.</p>
-<a class="tp-ov-l" href="#together-limits" title="What it does not protect against – how many the part names">7 limits</a></li>
+<a class="tp-ov-l" href="#together-limits" title="What it does not protect against – how many the part names">9 limits</a></li>
 <li><a class="tp-ov-q" href="#website">Does this website track me?</a>
 <p class="tp-ov-a"><strong class="tp-verdict is-good">No</strong> No cookies, no outside services, and your IP address is never written down.</p>
 <a class="tp-ov-l" href="#website-limits" title="What it does not protect against – how many the part names">4 limits</a></li>
@@ -456,7 +456,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code reports answers-->
 <p>On our server, the second cleaning and what is stored – look for what is <em>not</em> there: no IP address, no browser details.</p>
 <!--tp:code reports server-->
-<p>And the one use of your IP address: in memory, to limit how many requests one address makes – for a report and for an ask for answers, ten minutes after the address's last request, then forgotten within a minute. The same limits guard sync and Watch together; only the limit on new sync slots remembers an address for a day.</p>
+<p>And the one use of your IP address: in memory, to limit how many requests one address makes – for a report and for an ask for answers, ten minutes after the address's last request, then forgotten within a minute. The same limits guard sync and Watch together; only the limit on new sync slots remembers an address for a day, and a Watch together room keeps a keyed hash of the address that made it – never the address – for as long as the room, a day at the most, to limit how many rooms one address holds.</p>
 <!--tp:code reports limits-->
 <p>And the tests that check all of this every time the app is built. A change that let something through would fail them:</p>
 <!--tp:tests reports-->
@@ -548,10 +548,10 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <div class="tp-fold-body">
 <ol class="tp-flow">
 <li><b>The room code</b> – ten characters you share with your friends – stays with the people in the room.</li>
-<li><b>From the code</b> each computer makes the same room name and the same key.</li>
-<li><b>Our server</b> passes the locked messages on, keeps them only in memory, and forgets the room an hour after the last request.</li>
+<li><b>From the code</b> each computer makes the same room name, the same key and the same credential for the room.</li>
+<li><b>Our server</b> lets in only requests with the room's credential, passes the locked messages on, keeps them only in memory, and forgets the room an hour after the last request.</li>
 </ol>
-<p>Ten characters are quick to type, but on their own they would be quicker to guess than a key should be. So the code is first stretched with <strong>PBKDF2</strong> – 600,000 rounds of SHA-256, so trying every code against one room would keep a graphics card busy for centuries – and then turned into a room name and a key with HKDF, as for sync. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Each person gets a key of their own for each room (Ed25519) and is known in it by a hash of the key's public half: every message is signed with that key, so nobody – the relay included – can speak as someone else, and a message without a signature is left out. Each message also carries a count, remembered for the rest of the app's run: one passed on twice is used once, and one from well before you joined, or far from the relay's time, is not acted on. A code of eight characters from 1.6.7 no longer joins: the app says so, and a new room gives one of ten. The app talks to the relay only over HTTPS, and never follows a redirect elsewhere.</p>
+<p>Ten characters are quick to type, but on their own they would be quicker to guess than a key should be. So the code is first stretched with <strong>PBKDF2</strong> – 600,000 rounds of SHA-256, so trying every code against one room would keep a graphics card busy for centuries – and then turned into a room name and a key with HKDF, as for sync. Each message – who joined, what plays, play, pause and seek – is encrypted with ChaCha20-Poly1305 and padded to one of four fixed sizes, so its length says little about what is in it. Each person gets a key of their own for each room (Ed25519) and is known in it by a hash of the key's public half: every message is signed with that key, so nobody – the relay included – can speak as someone else, and a message without a signature is left out. Each message also carries a count, remembered for the rest of the app's run: one passed on twice is used once. From version 1.6.11 the app takes another member's messages only from the first one that names the key it made for this stay in the room – an answer to its own hello – so nothing said before you joined is acted on, after a restart too, whatever time the server says; a member on an older version is still judged by the time, and one of theirs from well before you joined, or far from the relay's time, is not acted on. From 1.6.11 every request to the relay also carries a credential made from the code, under a label of its own. The relay keeps only a one-way hash of it: the first request binds the room, and from then on the relay turns away anyone without it – knowing the room's name is not enough to put a message in the room, take a place in it or read from it. A code of eight characters from 1.6.7 no longer joins: the app says so, and a new room gives one of ten. The app talks to the relay only over HTTPS, and never follows a redirect elsewhere.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -564,15 +564,15 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:ex together request-->
 <p class="fine">Made by running the app's own code with the room code <code>K7PQM-2XDH9</code>. The title, the name and the position are all in there – locked.</p>
 <h3>The code</h3>
-<p>The room name and the key from the code, and how a message is padded and locked:</p>
+<p>The room name, the key and the room's credential from the code, and how a message is padded and locked:</p>
 <!--tp:code together key-->
 <p>Each person's key and id, and how a message is signed and its signature checked:</p>
 <!--tp:code together signed-->
-<p>How each message gets its count, and how one seen before, or out of its time, is left out:</p>
+<p>How each message gets its count, and how one seen before, out of its time, or from someone who has not yet named you, is left out:</p>
 <!--tp:code together replay-->
 <p>What the server already held when the app joined is never read, and the server's clock is taken from that very first answer:</p>
 <!--tp:code together backlog-->
-<p>On our server: a message is taken as bytes and passed on – nothing opens it, nothing is written to disk – and the request, where the address is used only for the limits:</p>
+<p>On our server: the room's credential checked against the hash it keeps, a message taken as bytes and passed on – nothing opens it, nothing is written to disk – and the request, where the address is used only for the limits:</p>
 <!--tp:code together server-->
 <p>And the tests that check a message without a signature speaks for no one, an old one is not used again and an old code joins nothing:</p>
 <!--tp:tests together-->
@@ -582,16 +582,18 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 </div>
 </details>
 <details class="tp-fold tp-lim" id="together-limits">
-<summary><span class="tp-fold-t">What it does not protect against</span> <span class="tp-n">7</span></summary>
+<summary><span class="tp-fold-t">What it does not protect against</span> <span class="tp-n">9</span></summary>
 <div class="tp-fold-body">
 <ul class="tp-limits">
 <li>Anyone who gets the room code can join the room and see the names and what plays. Share it only with the people you watch with. A room takes at most eight people.</li>
 <li>The people in the room see the name you choose and what you watch – that is the point of it.</li>
 <li>Our server sees the room name, an id for each person – the hash of a key made for that room –, how big the messages are and when they are sent – and, like every server, the IP address they come from, which it uses only in memory, for the limits. It could also hold messages back or pass them on late; it cannot read, change or forge them, or speak as one of you. Watch together cannot be used while private viewing is on.</li>
 <li>Whoever has the code is in the room, as far as the app can tell: the app cannot tell a friend from someone the code was passed on to.</li>
-<li>The app remembers the running numbers only while it runs, and takes the server's time from the server. After a restart, then, a server that lies about its clock could hand an older, genuine message from the room again – that something played, paused or was sought – and the app would follow it. It cannot make a new message or change one.</li>
+<li>The app remembers the running numbers only while it runs. From 1.6.11 that does not matter for members on 1.6.11: their messages are taken only from one that names your stay in the room. A member on an older version is still judged by the time, which the app takes from the server: after a restart a server that lies about its clock could hand an older, genuine message of theirs again – that something played, paused or was sought – and the app would follow it. It cannot make a new message or change one.</li>
 <li>The room code is enough for a room for an evening, not for a secret that must hold for years: a server that kept the locked messages instead, and set a thousand graphics cards guessing the code for about a year, could open them.</li>
-<li>Our server cannot check the signatures – they are inside what is encrypted, and it has no key. Whoever knows the room's id – our server, or someone with the code – can therefore put messages in the room that the members' apps then drop, within the limits on how many and how large: that can disturb a room, but not speak in it.</li>
+<li>Our server cannot check the signatures – they are inside what is encrypted, and it has no key. So our server, or someone with the code, can put messages in the room that the members' apps then drop – in a room only older versions use, anyone who knows the room's id can too – within the limits on how many and how large: that can disturb a room, but not speak in it.</li>
+<li>Someone who learns a room's name while our server does not hold the room – before anyone has joined, or after it was forgotten – could bind it first with a credential of their own. Your app is then turned away, says so, and you start a new room.</li>
+<li>Someone on a version older than 1.6.11 who joins a room a newer member is already in is turned away – their app says the room is full – and the others are told that someone on an older version was left out. Those already in a room of older versions keep their place when a newer member joins.</li>
 </ul>
 </div>
 </details>

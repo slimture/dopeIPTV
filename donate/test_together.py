@@ -109,15 +109,18 @@ def test_at_most_eight_and_a_seat_is_given_up():
 
 
 def test_a_room_keeps_its_last_messages_only():
-    relay = together.Relay()
+    clock = FakeClock()
+    relay = together.Relay(clock=clock)
     for _ in range(together.KEEP_MESSAGES + 50):
-        relay.post(ROOM, A, _blob(64))
+        clock.t += 1.1                  # within what one member may post a minute
+        assert relay.post(ROOM, A, _blob(64))[0] == 200
     body = relay.poll(ROOM, B, 0, 0)[1]
     assert len(body["msgs"]) == together.KEEP_MESSAGES
     assert body["msgs"][0][0] == 51 and body["seq"] == together.KEEP_MESSAGES + 50
-    big = together.Relay()
+    big = together.Relay(clock=clock)
     for _ in range(200):
-        big.post(ROOM, A, _blob(together.MAX_MESSAGE))
+        clock.t += 1.1
+        assert big.post(ROOM, A, _blob(together.MAX_MESSAGE))[0] == 200
     kept = big.poll(ROOM, B, 0, 0)[1]["msgs"]
     assert sum(len(base64.b64decode(m)) for _s, m in kept) <= together.ROOM_BYTES
 
@@ -164,6 +167,126 @@ def test_too_many_rooms_and_waiters():
     t0 = time.monotonic()
     assert relay.poll(ROOM, A, 0, 10, "198.51.100.1")[0] == 200
     assert time.monotonic() - t0 < 1
+
+
+KEY_A, KEY_B = "5a" * 32, "6b" * 32          # two rooms' credentials (the app's auth_of)
+
+
+def test_the_first_credential_binds_a_room_and_nothing_else_gets_in():
+    relay = together.Relay()
+    assert relay.poll(ROOM, A, 0, 0, auth=KEY_A)[0] == 200                # binds it
+    assert relay.post(ROOM, B, _blob(), KEY_A)[0] == 200                  # the same code
+    refused = (403, {"error": "refused"})
+    # A room id alone opens nothing: no message in, no seat, nothing read.
+    for member in (A, "c3" * 8):
+        assert relay.post(ROOM, member, _blob()) == refused
+        assert relay.post(ROOM, member, _blob(), KEY_B) == refused
+        assert relay.poll(ROOM, member, 0, 0) == refused
+        assert relay.poll(ROOM, member, 0, 0, auth=KEY_B) == refused
+        assert relay.leave(ROOM, member, KEY_B) == refused
+    assert relay.leave(ROOM, B) == refused
+    status, body = relay.poll(ROOM, A, 0, 0, auth=KEY_A)
+    assert status == 200 and body["n"] == 2 and len(body["msgs"]) == 1     # B's, and only B's
+    # Only the credential's hash is kept, never the credential.
+    room = relay._rooms[ROOM]
+    assert room.auth == together._seal(KEY_A) != KEY_A
+    assert relay.leave(ROOM, B, KEY_A) == (200, {"left": True})
+    # A credential that is no credential is turned down as malformed.
+    for bad in ("5A" * 32, "5a" * 31, "x" * 64, "5a" * 33):
+        assert relay.poll(ROOM, A, 0, 0, auth=bad)[0] == 400, bad
+
+
+def test_a_room_of_older_apps_stays_open_and_those_in_it_keep_their_seat():
+    clock = FakeClock()
+    relay = together.Relay(clock=clock)
+    old1, old2, late = "01" * 8, "02" * 20, "03" * 20
+    assert relay.poll(ROOM, old1, 0, 0)[0] == 200                         # no credential: as before
+    assert relay.post(ROOM, old2, _blob())[0] == 200
+    assert "older" not in relay.poll(ROOM, old1, 0, 0)[1]
+    # A newer app joins: the room is bound, and those already in it stay.
+    status, body = relay.poll(ROOM, A, 0, 0, auth=KEY_A)
+    assert status == 200 and body["n"] == 3 and "older" not in body
+    assert relay.post(ROOM, old1, _blob())[0] == 200
+    assert relay.poll(ROOM, old2, 0, 0)[0] == 200
+    # One who comes later without it is turned down - and the member with
+    # the credential is told someone was.
+    assert relay.poll(ROOM, late, 0, 0) == (403, {"error": "refused"})
+    assert relay.poll(ROOM, A, 0, 0, auth=KEY_A)[1]["older"] is True
+    assert "older" not in relay.poll(ROOM, old1, 0, 0)[1]               # an older app is not told
+    clock.t += 60
+    assert relay.poll(ROOM, old1, 0, 0)[0] == 200                       # still seated: still in
+    clock.t += 40
+    assert "older" not in relay.poll(ROOM, A, 0, 0, auth=KEY_A)[1]      # a while ago now
+    # A seat given up - silent too long, or left - is not given back without it.
+    assert relay.poll(ROOM, old2, 0, 0) == (403, {"error": "refused"})
+    assert relay.leave(ROOM, old1) == (200, {"left": True})
+    assert relay.post(ROOM, old1, _blob()) == (403, {"error": "refused"})
+    # A room no newer app ever came to is never bound.
+    other = "ef" * 32
+    for _ in range(3):
+        assert relay.post(other, old1, _blob())[0] == 200
+    assert relay._rooms[other].auth == ""
+
+
+def test_a_member_posts_so_many_messages_a_minute():
+    clock = FakeClock()
+    relay = together.Relay(clock=clock)
+    for _ in range(together.MAX_PER_MINUTE):
+        assert relay.post(ROOM, A, _blob(), KEY_A)[0] == 200
+    assert relay.post(ROOM, A, _blob(), KEY_A) == (429, {"error": "slow down"})
+    assert relay.post(ROOM, B, _blob(), KEY_A)[0] == 200                  # another member
+    assert relay.poll(ROOM, A, 0, 0, auth=KEY_A)[0] == 200                # reading goes on
+    clock.t += 60
+    assert relay.post(ROOM, A, _blob(), KEY_A)[0] == 200
+    assert relay.poll(ROOM, B, 0, 0, auth=KEY_A)[1]["seq"] == together.MAX_PER_MINUTE + 2
+
+
+def test_one_address_keeps_so_many_rooms_and_a_room_lives_a_day_at_the_most():
+    clock = FakeClock()
+    relay = together.Relay(clock=clock)
+    ip, other = "203.0.113.30", "203.0.113.31"
+    rooms = [f"{i:064x}" for i in range(together.ROOMS_PER_ADDR + 1)]
+    for rid in rooms[:-1]:
+        assert relay.post(rid, A, _blob(), KEY_A, ip)[0] == 200
+    assert relay.post(rooms[-1], A, _blob(), KEY_A, ip) == (429, {"error": "slow down"})
+    assert relay.poll(rooms[-1], A, 0, 0, ip, KEY_A)[0] == 429
+    assert relay.post(rooms[0], A, _blob(), KEY_A, ip)[0] == 200          # its own rooms go on
+    assert relay.post(rooms[-1], A, _blob(), KEY_A, other)[0] == 200      # another address
+    # The rooms keep no address: only a hash under this run's own key.
+    assert all(ip not in r.opener and r.opener for r in relay._rooms.values())
+    assert relay._tag(ip) != together.Relay()._tag(ip)
+    # A day after it was made a room is forgotten however busy it is: its
+    # messages, seats and binding with it, and the address's count.
+    born = relay._rooms[rooms[0]].born
+    while clock.t + 1800 - born <= together.LIFETIME_SECS:
+        clock.t += 1800
+        assert relay.post(rooms[0], A, _blob(), KEY_A, ip)[0] == 200
+    assert relay._rooms[rooms[0]].born == born and len(relay._rooms) == 1   # the idle ones went
+    clock.t = born + together.LIFETIME_SECS + 1
+    status, body = relay.poll(rooms[0], B, 10, 0, ip, KEY_B)
+    assert status == 200 and body["reset"] is True and body["n"] == 1 and body["msgs"] == []
+    assert relay._rooms[rooms[0]].auth == together._seal(KEY_B)
+    assert relay._made_by == {relay._tag(ip): 1}
+
+
+def test_a_long_poll_on_a_room_forgotten_answers_and_the_next_starts_over():
+    clock = FakeClock()
+    relay = together.Relay(clock=clock)
+    relay.post(ROOM, A, _blob(), KEY_A)
+    out = {}
+
+    def waiter():
+        out["got"] = relay.poll(ROOM, B, 1, 5, auth=KEY_A)
+
+    t = threading.Thread(target=waiter)
+    t.start()
+    time.sleep(0.3)
+    relay._rooms[ROOM].born -= together.LIFETIME_SECS + 1      # its time is up, the clock still
+    t0 = time.monotonic()
+    relay.poll(ROOM, A, 0, 0, auth=KEY_A)                                 # makes the room anew
+    t.join(5)
+    assert not t.is_alive() and time.monotonic() - t0 < 2 and out["got"][0] == 200
+    assert relay.poll(ROOM, B, 1, 0, auth=KEY_A)[1]["reset"] is True
 
 
 def test_counts_say_nothing_but_counts():
@@ -284,6 +407,41 @@ def test_one_address_cannot_open_every_room():
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_the_route_takes_the_credential_and_counts_an_ipv6_address_by_its_64():
+    srv, stats, donate = _service()
+    try:
+        path = f"/together/{ROOM}"
+        auth = {together.AUTH_HEADER: KEY_A}
+        assert _call(srv, "POST", path, A, _blob(100), headers=auth)[0] == 200
+        assert _call(srv, "GET", path + "?after=0&wait=0", B) == (403, {"error": "refused"})
+        assert _call(srv, "GET", path + "?after=0&wait=0", B,
+                     headers={together.AUTH_HEADER: KEY_A.upper()})[0] == 200
+        assert _call(srv, "GET", path + "?after=0&wait=0", B,
+                     headers={together.AUTH_HEADER: "nope"})[0] == 400
+        assert _call(srv, "DELETE", path, B)[0] == 403
+        assert _call(srv, "DELETE", path, B, headers=auth) == (200, {"left": True})
+        # The addresses of one /64 are one asker to the limits.
+        donate.TOGETHER_PER_WINDOW = 4
+        codes = [_call(srv, "GET", path + "?after=0&wait=0", A, ip=f"2001:db8:5:6::{i:x}",
+                       headers=auth)[0] for i in range(1, 6)]
+        assert codes == [200] * 4 + [429]
+        assert _call(srv, "GET", path + "?after=0&wait=0", A, ip="2001:db8:5:7::1",
+                     headers=auth)[0] == 200
+        # Nothing on disk: not the room, its credential or an address.
+        for dirpath, _dirs, files in os.walk(stats):
+            assert not files, (dirpath, files)
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_where_an_address_counts():
+    assert together.where("203.0.113.9") == "203.0.113.9"
+    assert together.where("2001:db8:5:6::1") == together.where("2001:db8:5:6:ffff::9") == "2001:db8:5:6::/64"
+    assert together.where("::ffff:203.0.113.9") == "203.0.113.9"
+    assert together.where("local") == "local" and together.where("") == ""
 
 
 def test_a_room_nobody_spoke_in_goes_soon_and_makes_way_when_full():

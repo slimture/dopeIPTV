@@ -44,7 +44,7 @@
 <a class="tp-ov-l" href="#sync-limits" title="Det här skyddar det inte mot – så många som delen anger">6 gränser</a></li>
 <li><a class="tp-ov-q" href="#together">Kan ni se vad vi tittar på tillsammans?</a>
 <p class="tp-ov-a"><strong class="tp-verdict is-good">Nej</strong> Låst mellan era datorer – vår server skickar bara vidare det den inte kan öppna.</p>
-<a class="tp-ov-l" href="#together-limits" title="Det här skyddar det inte mot – så många som delen anger">7 gränser</a></li>
+<a class="tp-ov-l" href="#together-limits" title="Det här skyddar det inte mot – så många som delen anger">9 gränser</a></li>
 <li><a class="tp-ov-q" href="#website">Spårar den här webbplatsen mig?</a>
 <p class="tp-ov-a"><strong class="tp-verdict is-good">Nej</strong> Inga kakor, inga externa tjänster, och din IP-adress skrivs aldrig ned.</p>
 <a class="tp-ov-l" href="#website-limits" title="Det här skyddar det inte mot – så många som delen anger">4 gränser</a></li>
@@ -456,7 +456,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code reports answers-->
 <p>På vår server: den andra rensningen och det som sparas – titta efter det som <em>inte</em> finns där: ingen IP-adress, inga uppgifter om webbläsaren.</p>
 <!--tp:code reports server-->
-<p>Och den enda användningen av din IP-adress: i minnet, för att begränsa hur många anrop en adress gör – för en rapport och för en fråga om svar i tio minuter efter adressens senaste anrop, och sedan glömd inom en minut. Samma gränser skyddar synken och Titta tillsammans; bara gränsen för nya synkplatser minns en adress ett dygn.</p>
+<p>Och den enda användningen av din IP-adress: i minnet, för att begränsa hur många anrop en adress gör – för en rapport och för en fråga om svar i tio minuter efter adressens senaste anrop, och sedan glömd inom en minut. Samma gränser skyddar synken och Titta tillsammans; bara gränsen för nya synkplatser minns en adress ett dygn, och ett rum för Titta tillsammans håller en nyckelhash av adressen som skapade det – aldrig adressen – så länge rummet finns, högst ett dygn, för att begränsa hur många rum en adress har.</p>
 <!--tp:code reports limits-->
 <p>Och testerna som kontrollerar allt det här varje gång appen byggs. En ändring som släppte igenom något skulle göra att de misslyckas:</p>
 <!--tp:tests reports-->
@@ -548,10 +548,10 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <div class="tp-fold-body">
 <ol class="tp-flow">
 <li><b>Rummets kod</b> – tio tecken du delar med dina vänner – stannar hos dem som är i rummet.</li>
-<li><b>Ur koden</b> tar varje dator fram samma rumsnamn och samma nyckel.</li>
-<li><b>Vår server</b> skickar de låsta meddelandena vidare, håller dem bara i minnet och glömmer rummet en timme efter det senaste anropet.</li>
+<li><b>Ur koden</b> tar varje dator fram samma rumsnamn, samma nyckel och samma behörighet för rummet.</li>
+<li><b>Vår server</b> släpper bara in anrop med rummets behörighet, skickar de låsta meddelandena vidare, håller dem bara i minnet och glömmer rummet en timme efter det senaste anropet.</li>
 </ol>
-<p>Tio tecken går fort att skriva, men ensamma skulle de gå lättare att gissa än en nyckel bör. Därför sträcks koden först ut med <strong>PBKDF2</strong> – 600 000 varv SHA-256, så att det skulle hålla ett grafikkort sysselsatt i århundraden att prova varje kod mot ett rum – och görs sedan om till ett rumsnamn och en nyckel med HKDF, som för synken. Varje meddelande – vem som kom in, vad som spelas, play, paus och spolning – krypteras med ChaCha20-Poly1305 och fylls ut till en av fyra fasta storlekar, så att längden säger lite om innehållet. Var och en får en egen nyckel för varje rum (Ed25519) och känns igen där på en hash av nyckelns publika halva: varje meddelande signeras med den nyckeln, så att ingen – inte heller servern – kan tala som någon annan, och ett meddelande utan signatur lämnas utanför. Varje meddelande har också ett löpnummer, som appen minns resten av sin körning: ett som skickas vidare två gånger används en gång, och ett från långt innan du kom in, eller långt från serverns tid, används inte. En kod på åtta tecken från 1.6.7 kommer inte längre in: appen säger det, och ett nytt rum ger en på tio. Appen pratar bara med servern över HTTPS, och följer aldrig en omdirigering någon annanstans.</p>
+<p>Tio tecken går fort att skriva, men ensamma skulle de gå lättare att gissa än en nyckel bör. Därför sträcks koden först ut med <strong>PBKDF2</strong> – 600 000 varv SHA-256, så att det skulle hålla ett grafikkort sysselsatt i århundraden att prova varje kod mot ett rum – och görs sedan om till ett rumsnamn och en nyckel med HKDF, som för synken. Varje meddelande – vem som kom in, vad som spelas, play, paus och spolning – krypteras med ChaCha20-Poly1305 och fylls ut till en av fyra fasta storlekar, så att längden säger lite om innehållet. Var och en får en egen nyckel för varje rum (Ed25519) och känns igen där på en hash av nyckelns publika halva: varje meddelande signeras med den nyckeln, så att ingen – inte heller servern – kan tala som någon annan, och ett meddelande utan signatur lämnas utanför. Varje meddelande har också ett löpnummer, som appen minns resten av sin körning: ett som skickas vidare två gånger används en gång. Från version 1.6.11 tar appen emot en annan medlems meddelanden först från det första som nämner nyckeln den gjorde för den här vistelsen i rummet – ett svar på dess egen hälsning – så inget som sades innan du kom in används, inte heller efter en omstart, vad servern än säger att klockan är; en medlem med en äldre version bedöms fortfarande efter tiden, och ett meddelande från den från långt innan du kom in, eller långt från serverns tid, används inte. Från 1.6.11 har varje anrop till servern också med sig en behörighet som tas fram ur koden, under en egen etikett. Servern sparar bara en envägshash av den: det första anropet binder rummet, och sedan nekar servern alla som inte har den – att känna till rummets namn räcker inte för att lägga ett meddelande i rummet, ta en plats i det eller läsa ur det. En kod på åtta tecken från 1.6.7 kommer inte längre in: appen säger det, och ett nytt rum ger en på tio. Appen pratar bara med servern över HTTPS, och följer aldrig en omdirigering någon annanstans.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -564,15 +564,15 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:ex together request-->
 <p class="fine">Framtaget genom att köra appens egen kod med rummets kod <code>K7PQM-2XDH9</code>. Titeln, namnet och positionen finns alla där – låsta.</p>
 <h3>Koden</h3>
-<p>Rumsnamnet och nyckeln ur koden, och hur ett meddelande fylls ut och låses:</p>
+<p>Rumsnamnet, nyckeln och rummets behörighet ur koden, och hur ett meddelande fylls ut och låses:</p>
 <!--tp:code together key-->
 <p>Var och ens nyckel och id, och hur ett meddelande signeras och signaturen kontrolleras:</p>
 <!--tp:code together signed-->
-<p>Hur varje meddelande får sitt löpnummer, och hur ett som redan har setts, eller är utanför sin tid, lämnas utanför:</p>
+<p>Hur varje meddelande får sitt löpnummer, och hur ett som redan har setts, är utanför sin tid eller kommer från någon som ännu inte har nämnt dig, lämnas utanför:</p>
 <!--tp:code together replay-->
 <p>Det som redan låg hos servern när appen gick med läses aldrig, och serverns klocka tas från just det första svaret:</p>
 <!--tp:code together backlog-->
-<p>På vår server: ett meddelande tas emot som byte och skickas vidare – inget öppnar det, inget skrivs till disk – och anropet, där adressen bara används för gränserna:</p>
+<p>På vår server: rummets behörighet kontrolleras mot hashen den sparar, ett meddelande tas emot som byte och skickas vidare – inget öppnar det, inget skrivs till disk – och anropet, där adressen bara används för gränserna:</p>
 <!--tp:code together server-->
 <p>Och testerna som kontrollerar att ett meddelande utan signatur inte talar för någon, att ett gammalt inte används igen och att en gammal kod inte kommer in:</p>
 <!--tp:tests together-->
@@ -582,16 +582,18 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 </div>
 </details>
 <details class="tp-fold tp-lim" id="together-limits">
-<summary><span class="tp-fold-t">Det här skyddar det inte mot</span> <span class="tp-n">7</span></summary>
+<summary><span class="tp-fold-t">Det här skyddar det inte mot</span> <span class="tp-n">9</span></summary>
 <div class="tp-fold-body">
 <ul class="tp-limits">
 <li>Den som får rummets kod kan gå in i rummet och se namnen och vad som spelas. Dela den bara med dem du tittar med. Ett rum tar högst åtta personer.</li>
 <li>De som är i rummet ser namnet du väljer och vad du tittar på – det är det som är meningen.</li>
 <li>Vår server ser rumsnamnet, ett id för var och en – hashen av en nyckel som gjorts för det rummet –, hur stora meddelandena är och när de skickas – och, som alla servrar, IP-adressen de kommer från, som den bara använder i minnet, för gränserna. Den skulle också kunna hålla inne meddelanden eller skicka dem vidare sent; den kan inte läsa, ändra eller förfalska dem, eller tala som någon av er. Titta tillsammans går inte att använda medan privat läge är på.</li>
 <li>Den som har koden är med i rummet, så långt appen kan se: appen kan inte skilja en vän från någon som koden har skickats vidare till.</li>
-<li>Löpnumren minns appen bara medan den körs, och serverns tid tar den från servern. Efter en omstart skulle därför en server som ljuger om sin klocka kunna skicka ett äldre, äkta meddelande från rummet igen – att något spelades, pausades eller spolades – och appen skulle följa det. Den kan inte göra ett nytt meddelande eller ändra ett.</li>
+<li>Löpnumren minns appen bara medan den körs. Från 1.6.11 spelar det ingen roll för medlemmar med 1.6.11: deras meddelanden tas emot först från ett som nämner din vistelse i rummet. En medlem med en äldre version bedöms fortfarande efter tiden, som appen tar från servern: efter en omstart skulle en server som ljuger om sin klocka kunna skicka ett äldre, äkta meddelande från den medlemmen igen – att något spelades, pausades eller spolades – och appen skulle följa det. Den kan inte göra ett nytt meddelande eller ändra ett.</li>
 <li>Rummets kod räcker för ett rum en kväll, inte för en hemlighet som ska hålla i åratal: en server som i stället sparade de låsta meddelandena och lät tusen grafikkort gissa koden i ungefär ett år skulle kunna öppna dem.</li>
-<li>Vår server kan inte kontrollera signaturerna – de ligger inne i det krypterade, och servern har inte nyckeln. Den som känner till rummets id – vår server, eller den som har koden – kan därför lägga meddelanden i rummet som medlemmarnas appar sedan slänger, inom gränserna för hur många och hur stora: det kan störa ett rum, men inte tala i det.</li>
+<li>Vår server kan inte kontrollera signaturerna – de ligger inne i det krypterade, och servern har inte nyckeln. Vår server, eller den som har koden, kan därför lägga meddelanden i rummet som medlemmarnas appar sedan slänger – i ett rum som bara äldre versioner använder kan också den som känner till rummets id det – inom gränserna för hur många och hur stora: det kan störa ett rum, men inte tala i det.</li>
+<li>Den som får veta ett rums namn medan vår server inte har rummet – innan någon har gått in, eller sedan det har glömts – skulle kunna binda det först med en egen behörighet. Din app nekas då, säger det, och ni startar ett nytt rum.</li>
+<li>Den som har en äldre version än 1.6.11 och går med i ett rum där en medlem med en nyare redan är nekas – appen säger att rummet är fullt – och de andra får veta att någon med en äldre version lämnades utanför. De som redan är i ett rum med äldre versioner behåller sin plats när en medlem med en nyare går med.</li>
 </ul>
 </div>
 </details>

@@ -30,7 +30,9 @@ device on the admin page (needs Python's cryptography package).
                           writes and new slots limited per address
     GET/POST/DELETE /together/<room>
                           watch together (together.py): sealed messages passed
-                          between the people in a room, in memory only
+                          between the people in a room, in memory only; a
+                          room bound to its credential (X-Together-Auth)
+                          refuses requests without it
 
 /together/, /sync/ and /feedback/report answer an app that says it is a
 modified build (X-dopeIPTV-Build: modified) with 403 and the words it shows
@@ -1582,8 +1584,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _together(self) -> None:
         """Watch together's relay (together.py): a room's sealed messages,
-        in memory only. Neither the room, the member nor the address is
-        kept beyond memory or logged (the rate limit holds the address)."""
+        in memory only. Neither the room, the member, the room's credential
+        nor the address is kept beyond memory or logged (the rate limit
+        holds the address; the room, its credential's hash). An IPv6
+        address counts by its /64."""
         if self._refused("together"):
             return
         import together
@@ -1594,7 +1598,11 @@ class Handler(BaseHTTPRequestHandler):
         member = (self.headers.get(together.MEMBER_HEADER) or "").strip().lower()
         if not together.MEMBER.match(member):
             return self._send_quiet(400, {"error": "member"})
-        addr = self.headers.get("X-Real-IP") or "local"
+        # From 1.6.11; an older app sends none (together.py says what then).
+        auth = (self.headers.get(together.AUTH_HEADER) or "").strip().lower()
+        if auth and not together.AUTH.match(auth):
+            return self._send_quiet(400, {"error": "auth"})
+        addr = together.where(self.headers.get("X-Real-IP") or "local")
         if not _allowed("tg:" + addr, TOGETHER_PER_WINDOW):
             return self._send_quiet(429, {"error": "slow down"})
         # Asking for a room that is not there makes it: without a limit of
@@ -1611,9 +1619,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_quiet(400, {"error": "after or wait"})
             if wait != wait:                     # NaN
                 return self._send_quiet(400, {"error": "after or wait"})
-            return self._send_quiet(*together.RELAY.poll(room, member, after, wait, addr))
+            return self._send_quiet(*together.RELAY.poll(room, member, after, wait, addr, auth))
         if self.command == "DELETE":
-            return self._send_quiet(*together.RELAY.leave(room, member))
+            return self._send_quiet(*together.RELAY.leave(room, member, auth))
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -1624,7 +1632,7 @@ class Handler(BaseHTTPRequestHandler):
         if length <= 0:
             return self._send_quiet(400, {"error": "body"})
         blob = self.rfile.read(length)
-        return self._send_quiet(*together.RELAY.post(room, member, blob))
+        return self._send_quiet(*together.RELAY.post(room, member, blob, auth, addr))
 
     def _send_quiet(self, status: int, body: dict) -> None:
         """_send, for an answer whose asker may have gone meanwhile (a long

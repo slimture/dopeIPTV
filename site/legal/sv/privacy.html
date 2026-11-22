@@ -114,7 +114,8 @@
 <p>Vilka som är i rummet (namnet du väljer för det), vad som spelas och play, paus och spolning går mellan era datorer krypterat med en nyckel som tas fram ur rummets kod, som bara de som är i rummet känner till. Vår server skickar bara de krypterade meddelandena vidare.</p>
 <ul>
 <li><strong>Det vår server ser:</strong> rummet under ett namn som också tas fram ur koden, ett slumpat nummer för var och en i det, hur stora meddelandena är och när de skickas – inte vem du är, namnen eller vad du tittar på.</li>
-<li><strong>Det den sparar:</strong> inget skrivs till disk. Servern håller ett rums senaste meddelanden i minnet och glömmer rummet en timme efter det senaste anropet. Anrop för att titta tillsammans loggas inte.</li>
+<li><strong>Vilka den släpper in:</strong> från dopeIPTV 1.6.11 har varje anrop också med sig en behörighet som tas fram ur samma kod, och av den sparar servern bara en envägshash, i minnet tillsammans med rummet. Det första anropet binder rummet till den, och sedan nekar servern alla som inte har den: att känna till rummets namn räcker inte för att lägga något i rummet, ta en plats i det eller läsa ur det. Ett rum som bara äldre versioner använder binds inte; den som senare går med i ett bundet rum med en äldre version nekas.</li>
+<li><strong>Det den sparar:</strong> inget skrivs till disk. Servern håller ett rums senaste meddelanden i minnet och glömmer rummet en timme efter det senaste anropet, och senast ett dygn efter att det skapades. Anrop för att titta tillsammans loggas inte.</li>
 </ul>
 <p>Det går inte att använda medan privat läge är på.</p>
 
@@ -152,7 +153,7 @@
 <ul>
 <li>Frontservern, som hanterar den krypterade anslutningen, för ingen logg över anropen till dopeiptv.org, och skriver bara ned ett fel när något hindrar den från att fungera (nedan). Anrop för synkronisering och för att titta tillsammans loggas aldrig någonstans.</li>
 <li>Inget annat loggas: servern bakom skriver ingen logg över andra anrop, och ingen som innehåller din IP-adress. För statistiken nedan lämnar den varje sidvisning, sidornas visningssignal och varje klick på en nedladdning direkt till vår egen tjänst genom en socket på samma maskin – med IP-adress, tidpunkt, sidan som efterfrågades (bara sidan – aldrig det en länk lade till i dess adress), status, webbläsare och språk –, som räknar den i minnet inom en minut och inte skriver ned någon IP-adress någonstans (nedan). För den öppna nedladdningsräknaren för den en liten logg över klick på nedladdningar: filens namn, svaret och om en webbläsare, appen eller en robot frågade – ingen IP-adress, ingen tidpunkt, ingen webbläsare. Den byts varje natt och bara föregående dygn sparas – högst två dygn –, sedan tas den bort automatiskt.</li>
-<li>Tjänsterna bakom webbplatsen – dricks, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra.</li>
+<li>Tjänsterna bakom webbplatsen – dricks, feedback, synkronisering och titta tillsammans – håller IP-adresser bara i minnet, en kort stund – högst ett dygn – för att begränsa hur många anrop en adress kan göra. För att begränsa hur många rum för att titta tillsammans en adress skapar håller ett rum en nyckelhash av adressen som skapade det – aldrig adressen – i minnet, så länge rummet finns kvar.</li>
 </ul>
 <p>Varje logg på vår server, vad den innehåller och hur länge den sparas:</p>
 <ul>
@@ -261,7 +262,7 @@
 <li><strong>Statistik</strong> – ingen IP-adress, inget namn och inget märke av en besökare: varje besök i 14 dagar som ett besök bara den dagen, sedan raderat; skisserna som räknar olika besökare, bara i minnet, tills månaden efter är slut, och nyckeln – bara i minnet – lika länge; bara antal finns kvar. Uppgifter om uppdateringar, aldrig med IP-adress, exakt tidpunkt eller id: 30 dagar.</li>
 <li><strong>Felrapporter och feedback</strong> – ingen IP-adress, inget namn, ingen e-postadress, och rensade från sådant som kan identifiera innan de sparas: 12 månader, sedan tas de bort automatiskt – med våra svar på dem och dina svar på ett svar. Ett svar vi skriver på ett helt problem på en gång innehåller bara våra egna ord och sparas tills vi tar bort det.</li>
 <li><strong>Synkade data</strong> – krypterade på din dator, så att vi varken kan läsa dem eller se vems de är: tills du raderar dem, eller 180 dagar efter att de senast användes.</li>
-<li><strong>Titta tillsammans</strong> – krypterat, bara i minnet, aldrig på disk: tills en timme efter rummets senaste anrop.</li>
+<li><strong>Titta tillsammans</strong> – krypterat, bara i minnet, aldrig på disk: tills en timme efter rummets senaste anrop, högst ett dygn.</li>
 <li><strong>Begränsning av anrop</strong> – tjänsterna bakom webbplatsen håller IP-adresser bara i minnet, högst ett dygn, för att stoppa missbruk. De skrivs aldrig ned.</li>
 <li><strong>Betalningar</strong> – det namn eller den e-postadress du anger för kvittot: hos Stripe enligt dess villkor, och i våra räkenskaper i sju år, som bokföringslagen kräver. Vår server sparar inget av det själv.</li>
 <li><strong>Mejl du skickar till oss</strong>: så länge ärendet kräver.</li>
