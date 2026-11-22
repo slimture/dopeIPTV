@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Salva senza password",
   "set_feedback_tip_card": "Feedback e mance",
   "nerd_tls_strict": "Verifica il certificato di ogni stream",
-  "nerd_tls_strict_hint": "Il player e le registrazioni verificano il certificato di uno stream https, come fanno sempre le richieste dell'app. Un provider il cui certificato non supera la verifica – scaduto, autofirmato o emesso per un altro nome – non riproduce nulla: disattiva l'opzione o considera attendibile quel certificato nella pagina della sua sorgente.",
+  "nerd_tls_strict_hint": "Ogni flusso da Internet ha già il certificato verificato. Questo verifica anche un server di casa: uno con certificato autofirmato non riprodurrà nulla; considera attendibile quel certificato nella pagina della sua sorgente.",
   "playlist_http_note": "http non cifrato: l'accesso passa in chiaro in ogni indirizzo e chiunque lungo il percorso può leggerlo. Usa https se il provider lo offre.",
   "subs_private_ask": "Questo è in riproduzione privata, quindi a OpenSubtitles non si chiede nulla finché non premi Cerca: allora le parole nel campo vengono inviate.",
   "set_card_app_icon": "Icona dell'app",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Tramonto",
   "icon_grape": "Uva",
   "icon_round": "Rotonda",
-  "icon_retro": "TV retrò"
+  "icon_retro": "TV retrò",
+  "diag_certificate": "Impossibile verificare il certificato del fornitore: è scaduto, è autofirmato o è stato emesso per un altro nome.",
+  "tls_offer": "Impossibile verificare il certificato di {name}: è scaduto, è autofirmato o è stato emesso per un altro nome. Chiunque lungo il percorso potrebbe leggere ciò che invia, anche le credenziali nei suoi indirizzi. Riprodurre {name} senza verifica?",
+  "tls_offer_go": "Riproduci senza verifica",
+  "src_tls_unchecked": "Riproduci senza verificare il certificato",
+  "src_tls_unchecked_hint": "I suoi flussi vengono riprodotti anche se il certificato non è valido. Chiunque lungo il percorso potrebbe leggerli, insieme alle credenziali nei loro indirizzi. Disattivato, ogni flusso da Internet viene verificato."
 }

@@ -1298,7 +1298,7 @@ class CastBridge:
         a byte more in memory, never one on the disk."""
         from ..core import privacy
         while True:
-            time.sleep(WATCH_EVERY)
+            privacy.wait_change(WATCH_EVERY)     # at once as it begins
             with self._run_lock:
                 if self.generation != gen or self._server is None:
                     return

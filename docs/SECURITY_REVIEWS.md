@@ -318,3 +318,40 @@ with its reason, and three that it did not say were written down.
 | Links | A web page can play a named channel | low | Written down: **A link to a channel plays without a question** |
 | Third parties | TMDB sees the titles looked up; the built-in key can be read from the app | medium/low | Written down: **TMDB learns what is looked up**; Provider artwork, TMDB off asks it nothing; the key is public by nature |
 | Media libraries | mpv's and FFmpeg's parsers and their own requests | medium | Written down: **Bugs in the media libraries are theirs**, **The player and the recorder look names up themselves**, **A hostile source can make the app work up to its ceilings** |
+
+## November 2026 - an independent AI review of 1.6.11 (testing at cb79269)
+
+The maintainer gave the review kit (20 parts, the code at `cb79269`, part
+20 the changes since 1.6.10) to ChatGPT. It scored the whole 6/10, found
+no critical weakness and no way past the signed updates, and ranked what
+to close first: logins out of process arguments and receivers' addresses,
+the phone remote's first page and the home network's plain http,
+certificates checked by default, the bounded name registry, backups and
+report cleaning. This round closes in code what can be closed without
+risking playback; what stays is written down with its reason.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | An Xtream address - its login - in the recorder's and an external player's command line, readable by every account on Linux | high | Fixed: a recording over its own connection is read by the app (`dvr_ingest.Ingest`, its route, reconnects and landing check) and handed to ffmpeg/mpv on their input (`recording.Feed`, `piped`; `-protocol_whitelist pipe`); an external player gets an http(s) address in a 0600 playlist file (`players.handoff_file`). What stays - an HLS recording, a cast's converter, server mode's HLS copy - is written down under **Programs started by the app show their arguments** |
+| Logins | Nerd's bridge key in the recorder's arguments | high | Fixed: in its environment only (`net_bridge.recorder_env`) |
+| Certificates | Strict TLS only opt-in; an https stream's certificate unchecked on older libraries | high | Fixed: every internet https stream's certificate checked in the player and the recorder, Nerd or not (`nerd.checks_certificate`, `_apply_tls`); one that does not check out is said (`diag_certificate`) and asked about once per source (`MainWindow._tls_offer`), the answer the source's own `tls_unchecked`, taken back on its page, a risky setting for sync and restore (`backup.RISKY_SOURCE`). Written down: **Every internet stream's certificate is checked** |
+| Network boundary | The 8 192-name registry lets an early name go | medium | Fixed: it fails closed - past the bound every public name counts as an outsider's but the person's own and Plex's (`dest_guard._FULL`) |
+| Network boundary | A proxied connection is the proxy's; mpv and FFmpeg resolve and redirect themselves | medium | Answered, written down: **The player and the recorder look names up themselves**; a recording over its own connection now goes through `dest_guard` (above) |
+| Reports | A login of one or two characters stayed in free text | medium | Fixed: a login however short hidden as a word of its own (`report.SHORT_SECRET`, as `core/log.py` does) |
+| Private viewing | A TMDB lookup queued before its title turned private still went | low | Fixed: asked again on the worker just before the request, nothing kept (`metadata._PRIVATE`) |
+| Private viewing | A cast's converter on the disk stopped only at the next second's look | medium | Fixed: turning private viewing on wakes both bridges' watches at once (`privacy.wait_change`) |
+| LAN servers | The remote API had no per-client budget or lock-out | medium | Fixed: a request budget per address and ten wrong tokens a minute shut it out for ten minutes, never this computer (`RemoteServer.limits`) |
+| LAN servers | Plain http: a reader takes tokens, a changer the phone remote's page; the shared playlist redirects to Xtream addresses | high | Written down: **The home network's servers speak plain http** - a page on the home network cannot be authenticated without a certificate the phone trusts; server mode restreams instead of redirecting |
+| LAN servers | The tuner's token-free endpoints; optional browser headers | medium | Answered: off by default since 1.6.9 (`home_server.OPEN_OFF`), the devices let in named by the person |
+| LAN servers | Any private address counts as home | medium | Answered, written down: **Home means any private address** - the token, the signatures and the Host check are the lock; server mode keeps to this computer's own networks |
+| Casting | A device can take a name; a direct cast hands the receiver the address | high/medium | Answered, written down: **A cast hands the TV the stream address**; a device known by more than its name is not preselected (`ui/cast_dialog._is_stranger`) |
+| Logins | Plain text in the settings files, not a keyring | high | Written down: **Logins are in the settings files, not a keyring** |
+| Backups | An unencrypted export | high | Answered: a backup without a password is made only after a warning whose default is Cancel (`MainWindow._backup_without_password_ok`); written down: **A backup's password is as strong as the password** |
+| Profiles | A four-digit PIN can be guessed offline; kids filtering trusts the provider's categories | medium | Written down: **A PIN can be short**, **A kids profile holds only with a grown-up's PIN** |
+| Updates | An older but newer signed release; a compromised signing key or builder | medium/high | Written down: **What dopeiptv.org keeps is its word**, **Builds are not yet reproducible**, **The build key signs in jobs that run other people's code** |
+| Sync, Watch together | A new computer cannot tell an older copy; the relay sees who is in a room and can hold messages back | medium | Written down: **The sync server can hold a copy back**, **The Watch together relay sees who is in a room** |
+| Statistics | A day's visits linkable; keys in memory | low/medium | Written down on the transparency page (part 10); the server's swap is encrypted and watched (`swap_state`) |
+| Guides | 2 GiB of guide is still work | medium | Written down: **A hostile source can make the app work up to its ceilings** |
+| yt-dlp | Checked by its hash, not at the moment it runs | low | Answered: whoever can change it runs as the person already (outside the model) |
+| Poster cache | A picture let go is asked for again | low | Answered: the same host, the same picture; **Provider artwork, TMDB off** asks TMDB nothing |
+| Third parties, update checks, links | TMDB sees titles; an update check shows the system; a web page can offer a stream | low | Written down: **TMDB learns what is looked up**, what an update check sends, the question before an address from a link (`mw_commands._ask_link_play`) |

@@ -16,6 +16,7 @@ playback stopped. The time counted for the viewing statistics
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime
 from typing import Any
@@ -29,6 +30,10 @@ CHANNEL_KINDS = frozenset({"live", "catchup"})
 TITLE_KINDS = frozenset({"movie", "episode", "series", "vod", "recording", "local"})
 
 _private = False
+# Woken as private viewing is turned on or off: the cast and AirPlay
+# bridges' watchers (wait_change) stop a converter writing to the disk the
+# moment it begins, not at their next look a second later.
+_changed = threading.Condition()
 
 
 def set_private(on: bool) -> None:
@@ -36,6 +41,15 @@ def set_private(on: bool) -> None:
     if on != _private:
         log.info("private viewing %s", "on" if on else "off")
     _private = bool(on)
+    with _changed:
+        _changed.notify_all()
+
+
+def wait_change(timeout: float) -> None:
+    """Wait *timeout* seconds, or less: until private viewing is turned on
+    or off."""
+    with _changed:
+        _changed.wait(timeout)
 
 
 def private() -> bool:

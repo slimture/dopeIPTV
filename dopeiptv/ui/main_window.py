@@ -3023,9 +3023,46 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._show_stream_error(reason)
             if reason == tr("diag_not_started"):
                 self._offer_upcoming_actions(it)
+            elif reason == tr("diag_certificate"):
+                self._tls_offer(lp)
 
         run_async(self.pool, lambda: diagnose_stream(url, self.client),
                   show, lambda _e: show(tr("diag_generic")))
+
+    #: What plays from a source - a station, a web page, a file or a
+    #: recording is none's, and has nothing to let play unchecked.
+    _TLS_NO_SOURCE = frozenset({"radio", "web", "local", "recording"})
+
+    def _tls_offer(self, lp: dict | None) -> None:
+        """A stream of the source in use whose certificate did not check out
+        (the player checks every internet stream's: core/nerd.
+        checks_certificate): asked once, on the decision card, whether the
+        source may play without it - stored as the source's own option
+        (nerd.TLS_UNCHECKED, taken back on its page), and the stream tried
+        again. Nothing is played unchecked without that answer."""
+        from ..core import nerd
+        pl = self.playlist_store.active() if self.playlist_store else None
+        if (not pl or not lp or lp.get("kind") in self._TLS_NO_SOURCE
+                or nerd.tls_unchecked(pl.get("options"))):
+            return
+        pid = str(pl.get("id") or "")
+        name = str(pl.get("name") or pl.get("server") or "")
+
+        def go() -> None:
+            now = self.playlist_store.get(pid) if self.playlist_store else None
+            if not now:
+                return
+            options = dict(now.get("options") or {}, **{nerd.TLS_UNCHECKED: "true"})
+            self.playlist_store.update(pid, options=options)
+            nerd.set_source(dict(now, options=options))
+            log.info("tls: the person let a source play without its certificate checked")
+            self._diag_shown = False
+            self._stream_retries = 0
+            self._retry_last_stream()
+
+        self._show_action_toast(tr("tls_offer", name=name), 0, go,
+                                label=tr("tls_offer_go"), decide=True,
+                                key=f"tls-offer-{pid}")
 
     def _style_media_info(self) -> None:
         """The detail panel's info box, in the theme's colours and corners."""

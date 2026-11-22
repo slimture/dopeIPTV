@@ -341,9 +341,10 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_timeout"), timeout, tr("nerd_timeout_hint"))
     recon = Stepper(lo=1, hi=60, value=n.num("nerd_reconnect_max", 5) or 5, width=130)
     c.row(tr("nerd_reconnect"), recon, tr("nerd_reconnect_hint"))
-    # The player's and the recorder's own certificate check (core/nerd.py,
-    # STRICT_TLS): off by default - many providers' certificates do not
-    # check out, and mpv's default is the library's.
+    # The player's and the recorder's certificate check for a server at
+    # home too (core/nerd.py, STRICT_TLS): every internet stream's is
+    # checked already (checks_certificate); off by default - a box's or a
+    # media server's certificate is often its own.
     tls_strict = c.toggle(tr("nerd_tls_strict"), n.flag("nerd_tls_strict"), tr("nerd_tls_strict_hint"))
     c.note(tr("nerd_applies_conn"))
 

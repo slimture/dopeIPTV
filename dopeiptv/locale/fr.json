@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Enregistrer sans mot de passe",
   "set_feedback_tip_card": "Avis et pourboires",
   "nerd_tls_strict": "Vérifier le certificat de chaque flux",
-  "nerd_tls_strict_hint": "Le lecteur et les enregistrements vérifient le certificat d'un flux https, comme le font toujours les requêtes de l'app. Un fournisseur dont le certificat ne passe pas – expiré, auto-signé ou émis pour un autre nom – ne lit alors plus rien : désactivez cette option, ou faites confiance à ce certificat sur la page de sa source.",
+  "nerd_tls_strict_hint": "Chaque flux venant d'Internet est déjà vérifié. Ceci vérifie aussi un serveur à la maison – un serveur au certificat auto-signé ne lira alors rien : faites confiance à ce certificat sur la page de sa source.",
   "playlist_http_note": "http simple : l'identifiant passe en clair dans chaque adresse, lisible par n'importe qui en chemin. Utilisez https si le fournisseur le propose.",
   "subs_private_ask": "Ceci est lu en privé : rien n'est demandé à OpenSubtitles tant que vous n'appuyez pas sur Rechercher – les mots du champ lui sont alors envoyés.",
   "set_card_app_icon": "Icône de l'app",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Coucher de soleil",
   "icon_grape": "Raisin",
   "icon_round": "Rond",
-  "icon_retro": "Télé rétro"
+  "icon_retro": "Télé rétro",
+  "diag_certificate": "Le certificat du fournisseur n'a pas pu être vérifié : il a expiré, il est auto-signé ou il a été émis pour un autre nom.",
+  "tls_offer": "Le certificat de {name} n'a pas pu être vérifié : il a expiré, il est auto-signé ou il a été émis pour un autre nom. N'importe qui sur le trajet pourrait alors lire ce qui est envoyé, y compris l'identifiant dans ses adresses. Lire {name} sans vérification ?",
+  "tls_offer_go": "Lire sans vérification",
+  "src_tls_unchecked": "Lire sans vérifier le certificat",
+  "src_tls_unchecked_hint": "Ses flux sont lus même si leur certificat n'est pas valide. N'importe qui sur le trajet pourrait alors les lire, ainsi que l'identifiant dans leurs adresses. Désactivé, chaque flux venant d'Internet est vérifié."
 }

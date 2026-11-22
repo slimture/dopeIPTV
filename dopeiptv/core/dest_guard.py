@@ -51,13 +51,21 @@ _ANSWERS_MAX = 16
 
 #: Public names a source on the internet named for the app to fetch itself
 #: (its lists' pictures, its playlist's guide): such a name never leads to
-#: the home network (``note_outside``). The newest kept, at most this many.
+#: the home network (``note_outside``). At most this many kept; once a
+#: source has named more, every public name is taken for one of them
+#: (``_FULL``) - a list of thousands of picture hosts could otherwise push
+#: an early name out before it is fetched, and that name would then reach
+#: the home network.
 OUTSIDE_MAX = 8192
 #: Names the person gave themselves - a source's own server and its backup
 #: addresses (``note_own``): theirs to resolve as they like, a server at
 #: home by its public name among them.
 _OUTSIDE: dict[str, None] = {}
 _OWN: set[str] = set()
+#: Set once more than OUTSIDE_MAX names were noted, until the app closes:
+#: from then on no public name but the person's own (``note_own``) and
+#: Plex's leads home - it fails closed rather than forget a name.
+_FULL = [False]
 _NAMES_LOCK = threading.Lock()
 #: Plex's names for a server's own addresses ("192-168-1-5.<id>.plex.direct"
 #: answers 192.168.1.5): a server at home, by design.
@@ -99,9 +107,10 @@ def note_outside(address: str) -> None:
     with _NAMES_LOCK:
         if name in _OUTSIDE:
             return
+        if len(_OUTSIDE) >= OUTSIDE_MAX:
+            _FULL[0] = True
+            return
         _OUTSIDE[name] = None
-        while len(_OUTSIDE) > OUTSIDE_MAX:
-            del _OUTSIDE[next(iter(_OUTSIDE))]
 
 
 def note_own(address: str) -> None:
@@ -118,7 +127,7 @@ def _outside_name(host: str) -> bool:
     if not name or name.endswith(_HOME_BY_DESIGN):
         return False
     with _NAMES_LOCK:
-        return name in _OUTSIDE and name not in _OWN
+        return name not in _OWN and (_FULL[0] or name in _OUTSIDE)
 
 
 def forget_names() -> None:
@@ -126,6 +135,7 @@ def forget_names() -> None:
     with _NAMES_LOCK:
         _OUTSIDE.clear()
         _OWN.clear()
+        _FULL[0] = False
 
 
 def ip_kind(address: str) -> str:

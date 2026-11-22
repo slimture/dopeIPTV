@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Simpan tanpa kata sandi",
   "set_feedback_tip_card": "Masukan dan tip",
   "nerd_tls_strict": "Periksa sertifikat setiap stream",
-  "nerd_tls_strict_hint": "Pemutar dan rekaman memeriksa sertifikat stream https, seperti yang selalu dilakukan permintaan aplikasi sendiri. Penyedia yang sertifikatnya tidak lolos pemeriksaan – kedaluwarsa, ditandatangani sendiri, atau dibuat untuk nama lain – lalu tidak memutar apa pun: matikan lagi opsi ini, atau percayai sertifikat itu di halaman sumbernya.",
+  "nerd_tls_strict_hint": "Setiap siaran dari internet sudah diperiksa sertifikatnya. Ini juga memeriksa server di rumah – server dengan sertifikat yang ditandatangani sendiri tidak akan memutar apa pun: percayai sertifikat itu di halaman sumbernya.",
   "playlist_http_note": "http biasa: login dikirim tanpa enkripsi di setiap alamat dan bisa dibaca siapa pun di sepanjang jalan. Gunakan https jika penyedia menyediakannya.",
   "subs_private_ask": "Ini diputar secara pribadi, jadi OpenSubtitles tidak ditanya apa pun sampai Anda menekan Cari – lalu kata-kata di kotak dikirim ke sana.",
   "set_card_app_icon": "Ikon aplikasi",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Matahari terbenam",
   "icon_grape": "Anggur",
   "icon_round": "Bulat",
-  "icon_retro": "TV retro"
+  "icon_retro": "TV retro",
+  "diag_certificate": "Sertifikat penyedia tidak dapat diperiksa: sudah kedaluwarsa, ditandatangani sendiri, atau dibuat untuk nama lain.",
+  "tls_offer": "Sertifikat {name} tidak dapat diperiksa: sudah kedaluwarsa, ditandatangani sendiri, atau dibuat untuk nama lain. Siapa pun di jalur itu dapat membaca apa yang dikirim, termasuk login di alamatnya. Putar {name} tanpa pemeriksaan?",
+  "tls_offer_go": "Putar tanpa pemeriksaan",
+  "src_tls_unchecked": "Putar tanpa memeriksa sertifikat",
+  "src_tls_unchecked_hint": "Siarannya tetap diputar meski sertifikatnya tidak valid. Siapa pun di jalur itu dapat membacanya, beserta login di alamatnya. Jika mati, setiap siaran dari internet diperiksa."
 }

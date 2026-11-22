@@ -399,6 +399,35 @@ def test_tmdb_is_not_asked_about_what_plays_privately(tmp_path):
         metadata.run_async = orig
 
 
+def test_a_lookup_queued_before_a_title_turned_private_is_not_sent(tmp_path):
+    """The pool may hold a lookup while its title begins to play privately:
+    asked again on the worker, just before the request, it is not sent -
+    and nothing is kept, so it is looked up as ever afterwards."""
+    from unittest.mock import MagicMock
+
+    from PyQt6.QtCore import QSettings, QThreadPool
+
+    from dopeiptv.providers import metadata
+    queued: list = []
+    orig = metadata.run_async
+    metadata.run_async = lambda pool, fetch, done, fail: queued.append((fetch, done))
+    try:
+        s = QSettings(str(tmp_path / "c.ini"), QSettings.Format.IniFormat)
+        client = MagicMock()
+        r = metadata.PosterResolver(QThreadPool(), s, client)
+        privacy.playback_started("movie", 8)
+        told: list = []
+        assert r.get_full("Late Film", "movie", told.append) is None
+        fetch, done = queued[0]
+        _began_private("movie", 9, "Late Film")
+        done(fetch())
+        client.fetch_details.assert_not_called()
+        assert told == [{}]
+        assert "movie:late film" not in r._cache and "movie:late film" not in r._failed
+    finally:
+        metadata.run_async = orig
+
+
 def test_the_series_page_keeps_no_season_for_a_series_played_privately():
     from dopeiptv.ui.mw_series_page import _SeriesPageMixin
     f = SimpleNamespace(_sp_ctx={"series_id": 7})

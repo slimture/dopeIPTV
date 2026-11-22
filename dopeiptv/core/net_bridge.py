@@ -400,13 +400,23 @@ def checks_pin(source: dict | None, url: str, n: object = None) -> bool:
 
 
 def recorder_options(kind: str, address: str, pinned: bool) -> list[str]:
-    """What a recorder (ffmpeg or mpv) is told to go through the bridge at
-    *address*; *pinned*: it checks the stream's pinned certificate."""
-    if not address:
+    """What a recorder (ffmpeg or mpv) going through the bridge at *address*
+    is told in its command line: only that the bridge checks the stream's
+    pinned certificate (*pinned*). The bridge's address - its key in it -
+    goes in the recorder's environment (``recorder_env``), which only this
+    user can read: every account on a Linux computer reads a process's
+    command line, and with the key one could use the bridge."""
+    if not address or not pinned:
         return []
-    if kind == "ffmpeg":
-        return ["-http_proxy", address, *(["-tls_verify", "0"] if pinned else [])]
-    return [f"--http-proxy={address}", *(["--tls-verify=no"] if pinned else [])]
+    return ["-tls_verify", "0"] if kind == "ffmpeg" else ["--tls-verify=no"]
+
+
+def recorder_env(address: str) -> dict[str, str]:
+    """The environment a recorder goes through the bridge at *address* by:
+    ffmpeg's http and tls read ``http_proxy`` (and mpv's FFmpeg with them)
+    when no proxy option is given; ``no_proxy`` emptied so no host of the
+    stream is let past it. {} without a bridge."""
+    return {"http_proxy": address, "no_proxy": ""} if address else {}
 
 
 def address_for(source: dict | None, url: str, n: object = None) -> str:

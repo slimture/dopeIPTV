@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Zapisz bez hasła",
   "set_feedback_tip_card": "Opinie i napiwki",
   "nerd_tls_strict": "Sprawdzaj certyfikat każdego strumienia",
-  "nerd_tls_strict_hint": "Odtwarzacz i nagrania sprawdzają certyfikat strumienia https, tak jak zawsze robią to zapytania aplikacji. Dostawca, którego certyfikat nie przechodzi kontroli – wygasły, samopodpisany albo wystawiony na inną nazwę – nic wtedy nie odtwarza: wyłącz to z powrotem albo zaufaj temu certyfikatowi na stronie jego źródła.",
+  "nerd_tls_strict_hint": "Każdy strumień z internetu jest już sprawdzany. To sprawdza też serwer w domu – taki z certyfikatem podpisanym przez siebie nic wtedy nie odtworzy: zaufaj temu certyfikatowi na stronie jego źródła.",
   "playlist_http_note": "Zwykłe http: dane logowania idą niezaszyfrowane w każdym adresie i każdy po drodze może je odczytać. Użyj https, jeśli dostawca je oferuje.",
   "subs_private_ask": "To jest odtwarzane prywatnie, więc OpenSubtitles nie dostaje żadnego zapytania, dopóki nie naciśniesz Szukaj – wtedy trafiają tam słowa z pola.",
   "set_card_app_icon": "Ikona aplikacji",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Zachód słońca",
   "icon_grape": "Winogrono",
   "icon_round": "Okrągła",
-  "icon_retro": "Retro TV"
+  "icon_retro": "Retro TV",
+  "diag_certificate": "Nie udało się sprawdzić certyfikatu dostawcy: wygasł, jest podpisany przez siebie lub wystawiony dla innej nazwy.",
+  "tls_offer": "Nie udało się sprawdzić certyfikatu {name}: wygasł, jest podpisany przez siebie lub wystawiony dla innej nazwy. Każdy po drodze mógłby wtedy odczytać to, co wysyła, także dane logowania w adresach. Odtwarzać {name} bez sprawdzania?",
+  "tls_offer_go": "Odtwarzaj bez sprawdzania",
+  "src_tls_unchecked": "Odtwarzaj bez sprawdzania certyfikatu",
+  "src_tls_unchecked_hint": "Strumienie grają nawet wtedy, gdy certyfikat się nie zgadza. Każdy po drodze mógłby je odczytać, razem z danymi logowania w ich adresach. Wyłączone: każdy strumień z internetu jest sprawdzany."
 }

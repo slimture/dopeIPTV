@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Guardar sin contraseña",
   "set_feedback_tip_card": "Comentarios y propinas",
   "nerd_tls_strict": "Comprobar el certificado de cada stream",
-  "nerd_tls_strict_hint": "El reproductor y las grabaciones comprueban el certificado de un stream https, como siempre hacen las peticiones de la app. Un proveedor cuyo certificado no pasa la comprobación – caducado, autofirmado o emitido para otro nombre – no reproduce nada: desactiva esta opción o confía en ese certificado en la página de su fuente.",
+  "nerd_tls_strict_hint": "Cada emisión de Internet ya tiene su certificado comprobado. Esto también comprueba un servidor en casa: uno con certificado autofirmado no reproducirá nada; confía en ese certificado en la página de su fuente.",
   "playlist_http_note": "http sin cifrar: el inicio de sesión va sin cifrar en cada dirección y cualquiera puede leerlo por el camino. Usa https si el proveedor lo ofrece.",
   "subs_private_ask": "Esto se reproduce en privado, así que no se pregunta nada a OpenSubtitles hasta que pulses Buscar; entonces se le envían las palabras del cuadro.",
   "set_card_app_icon": "Icono de la app",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Atardecer",
   "icon_grape": "Uva",
   "icon_round": "Redondo",
-  "icon_retro": "Tele retro"
+  "icon_retro": "Tele retro",
+  "diag_certificate": "No se pudo comprobar el certificado del proveedor: ha caducado, está autofirmado o se emitió para otro nombre.",
+  "tls_offer": "No se pudo comprobar el certificado de {name}: ha caducado, está autofirmado o se emitió para otro nombre. Cualquiera en el camino podría leer lo que envía, también el inicio de sesión de sus direcciones. ¿Reproducir {name} sin comprobarlo?",
+  "tls_offer_go": "Reproducir sin comprobar",
+  "src_tls_unchecked": "Reproducir sin comprobar el certificado",
+  "src_tls_unchecked_hint": "Sus emisiones se reproducen aunque su certificado no sea válido. Cualquiera en el camino podría leerlas, y el inicio de sesión de sus direcciones. Desactivado, se comprueba cada emisión de Internet."
 }

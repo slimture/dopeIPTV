@@ -15,10 +15,31 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   the name is looked up and before a byte is sent. The source's own server
   names (its server, list, guide, portal and backup addresses) and Plex's
   `*.plex.direct` are left alone (`core/dest_guard.note_outside`).
-- Nerd > Network has "Check every stream's certificate" (off by default):
-  the player and recordings check an https stream's certificate against the
-  usual authorities. A source with a trusted certificate keeps its own
-  check, and a `tls-verify` typed into mpv's options wins.
+- Every https stream from the internet has its certificate checked, in the
+  player and in recordings, whether Nerd is on or not. One that does not
+  check out - expired, self-signed, made for another name - plays nothing,
+  says why, and the app asks once whether that source may play without the
+  check; the answer is the source's own, taken back on its page (Advanced),
+  and sync never turns it on by itself. A server at home is checked as the
+  player's own default does, unless Nerd > Network, "Check every stream's
+  certificate", asks for it too.
+- A recording over its own connection no longer puts the stream's address
+  - an Xtream login in it - on the recorder's command line, which every
+  account on a Linux computer can read: the app reads the stream itself and
+  hands it to ffmpeg or mpv on their input, and ffmpeg may then open no
+  network protocol at all. An HLS stream still goes the old way. An
+  external player gets an http(s) address in a private playlist file, and
+  Nerd's bridge key goes to the recorder in its environment.
+- The list of picture hosts an internet source named no longer forgets the
+  oldest: past 8 192 names every public name is treated as an outsider's
+  (it fails closed).
+- An error report hides a login of one or two characters too, as a word of
+  its own.
+- Turning private viewing on stops a cast's converter writing to the disk
+  at once, not at its next look a second later; a TMDB lookup that waited
+  while its title began to play privately is not sent.
+- The remote API holds back a device that asks too often, and shuts out
+  one that tries ten wrong tokens in a minute for ten minutes.
 - The app's own yt-dlp is hashed again once a run, and whenever its file
   changes, before it is run; a copy whose bytes no longer match is not run.
 - The subtitle search opened while viewing privately waits for Search

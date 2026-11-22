@@ -123,7 +123,9 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   `epg_delay_min`), `picons` (Enigma2), `cloud_guide` (HDHomeRun); picons →
   Nerd › Boxes and lists (shared: `nerd_picon_dir`); channel numbers
   (`nerd_chno_<source id>`) → Nerd › Boxes and lists; a channel's guide by hand
-- Advanced: `refresh`; Nerd: `radio`, `recordings` (Enigma2, Tvheadend),
+- Advanced: `refresh`; `tls_unchecked` (its streams play without their
+  certificate checked - the answer when one did not check out, asked once;
+  off); Nerd: `radio`, `recordings` (Enigma2, Tvheadend),
   `show_drm`, `hd_group` (HDHomeRun), `radio`, `recordings` (VDR, NextPVR),
   `favourites`, `recordings` (DVBViewer), `recordings` (MythTV);
   `home_addresses` (a list on the internet may name devices at home; off)
@@ -242,7 +244,8 @@ while Nerd is on, and so are the link rows that lead to them.
 - Who the app says it is: `nerd_user_agent`, `nerd_referer`, `nerd_headers`
 - Proxy: `nerd_proxy`, `nerd_proxy_player`
 - Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`,
-  `nerd_tls_strict` (check every https stream's certificate in the player and recordings)
+  `nerd_tls_strict` (check a server at home's certificate too - every
+  internet stream's is checked already)
 - Own DNS: `nerd_dns`, `nerd_dns_url`, `nerd_dns_fallback`
 - VPN guard: `nerd_vpn_guard`, `nerd_vpn_iface`, `nerd_vpn_lan`
 - Other networks (VLANs): `nerd_other_networks` (the parts of a split home

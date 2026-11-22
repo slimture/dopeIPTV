@@ -433,6 +433,13 @@ class SourceFields:
         }
         options = (self.nerd_panel.values() if self.nerd_panel is not None
                    else dict(self._options))
+        # A source's page: whether it plays without its certificate checked
+        # (core/nerd.TLS_UNCHECKED) - the quick form has no such switch.
+        tls = getattr(self, "tls_box", None)
+        if tls is not None:
+            options.pop("tls_unchecked", None)
+            if tls.isChecked():
+                options["tls_unchecked"] = "true"
         if out["kind"] == "satip":
             options = self._satip_options(options)
         if out["kind"] in MEDIA_KINDS:

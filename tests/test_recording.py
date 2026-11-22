@@ -130,8 +130,10 @@ def test_ffmpeg_records_with_the_players_user_agent(tmp_path, monkeypatch):
                         staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
     live = "http://h.tv:8080/live/u/p/1.ts"
     arch = "http://h.tv:8080/timeshift/u/p/60/2026-09-27:20-00/1.ts"
+    # The way the recorder reads an address itself: an HLS playlist, or an
+    # address the app could not read (core/recording.Feed's classic).
     for url in (live, arch):
-        rm._spawn({"url": url, "title": "T", "stop": None})
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
     cmd_live, cmd_arch = seen
     i = cmd_live.index("-i")
     assert cmd_live[i + 1] == live
@@ -146,8 +148,64 @@ def test_ffmpeg_records_with_the_players_user_agent(tmp_path, monkeypatch):
     seen.clear()
     monkeypatch.setattr(RecordingManager, "recorder",
                         staticmethod(lambda: ("mpv", "/usr/bin/mpv")))
-    rm._spawn({"url": live, "title": "T", "stop": None})
+    rm._spawn({"url": live, "title": "T", "stop": None, "_classic": True})
     assert f"--user-agent={RECORD_UA}" in seen[0]
+
+
+def test_a_recordings_address_is_never_in_its_command_line(tmp_path, monkeypatch):
+    """Every account on a Linux computer can read a process's command line
+    (/proc/<pid>/cmdline): an Xtream address there was its login. The app
+    reads the stream and hands it over on the recorder's input; ffmpeg then
+    may open no network protocol at all."""
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core import recording
+    from dopeiptv.core.recording import RecordingManager
+
+    s = QSettings("dopeIPTV-test", "recpipe")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    rm = RecordingManager(s)
+    seen, fed = [], []
+
+    class FakeProc:
+        stdin = None
+
+        def __init__(self, cmd, **kw):
+            seen.append((cmd, kw))
+
+        def poll(self):
+            return None
+
+    class FakeFeed:
+        def __init__(self, proc, url, src, live=True, strict=False, **_kw):
+            fed.append((url, live))
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(recording.subprocess, "Popen", FakeProc)
+    monkeypatch.setattr(recording, "Feed", FakeFeed)
+    live = "http://h.tv:8080/live/user/secretpass/1.ts"
+    arch = "https://h.tv/timeshift/user/secretpass/60/2026-09-27:20-00/1.ts"
+    for kind, exe in (("ffmpeg", "/usr/bin/ffmpeg"), ("mpv", "/usr/bin/mpv")):
+        monkeypatch.setattr(RecordingManager, "recorder",
+                            staticmethod(lambda k=kind, e=exe: (k, e)))
+        for url in (live, arch):
+            seen.clear()
+            rm._spawn({"url": url, "title": "T", "stop": None})
+            cmd, kw = seen[0]
+            assert not any("secretpass" in a for a in cmd), cmd
+            assert kw["stdin"] == recording.subprocess.PIPE
+            if kind == "ffmpeg":
+                assert cmd[cmd.index("-i") + 1] == "pipe:0"
+                assert cmd[cmd.index("-protocol_whitelist") + 1] == "pipe"
+            else:
+                assert cmd[-2:] == ["--", "-"]
+    assert fed == [(live, True), (arch, False)] * 2      # an archive's stretch: one connection
+    # What the recorder must fetch itself keeps the old way.
+    for url in ("http://h.tv/live/u/p/1.m3u8", "rtsp://192.168.1.5/?src=1", "/tmp/x.ts"):
+        assert not recording.piped(url)
+    assert recording.piped(live) and recording.piped(arch)
 
 
 def test_a_rename_or_move_never_replaces_another_recording(tmp_path):

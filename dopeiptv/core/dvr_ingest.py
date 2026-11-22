@@ -151,11 +151,18 @@ class Ingest:
     CONTEST_WINDOW = 60.0
 
     def __init__(self, url: str, store: SegmentStore,
-                 opener: Callable[..., Any] | None = None
+                 opener: Callable[..., Any] | None = None,
+                 reconnects: bool = True,
                  ) -> None:
         self.url = url
         self.store = store
         self._open = opener or self._default_open
+        # False: one connection, and the end of it is the end (an archive's
+        # stretch, which a new connection would start again from its top).
+        self.reconnects = reconnects
+        # The last thing that ended a connection (a recording falls back on
+        # it: core/recording.Feed).
+        self.last_error: BaseException | None = None
         self._stop = threading.Event()
         self._resp: Any = None
         self._lock = threading.Lock()
@@ -335,6 +342,7 @@ class Ingest:
                              "stream - given up, not asked again", e,
                              self._content_type(resp) or "no type")
             except Exception as e:
+                self.last_error = e
                 if not self._stop.is_set():
                     detail = str(e).strip().replace("\n", " ")[:160]
                     log.info("DVR ingest: %s after %.0f s and %.1f MB%s",
@@ -362,6 +370,9 @@ class Ingest:
                 self._end_run()
                 resume = False
                 self._append(bytes(head))
+            if not self.reconnects:
+                self.state = "stopped" if got else "failed"
+                return
             streamed = got >= self.GOOD_BYTES or (
                 got > 0 and answered is not None
                 and time.monotonic() - answered >= self.SHORT_RUN)
@@ -405,6 +416,11 @@ class Ingest:
     @property
     def alive(self) -> bool:
         return self._thread.is_alive()
+
+    def join(self, timeout: float | None = None) -> None:
+        """Wait - *timeout* seconds at most - for the thread to end."""
+        if self._thread.is_alive():
+            self._thread.join(timeout)
 
     @property
     def contested(self) -> bool:

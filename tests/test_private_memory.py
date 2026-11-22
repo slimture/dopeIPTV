@@ -358,6 +358,26 @@ def test_private_viewing_begun_mid_cast_stops_a_run_on_the_disk_by_itself(tmp_pa
         bridge.stop()
 
 
+def test_a_casts_work_on_the_disk_stops_the_moment_private_viewing_begins(tmp_path, monkeypatch):
+    """Not at the watch's next look a second later: turning private viewing
+    on wakes it (privacy.wait_change), so nothing more is written."""
+    import time
+    cb, disk = _private_cast(monkeypatch, tmp_path, str(tmp_path / "memory"))
+    monkeypatch.setattr(cb, "WATCH_EVERY", 30.0)
+    privacy.set_private(False)
+    bridge = cb.CastBridge()
+    try:
+        bridge.start("http://h/live/1.ts", ["eac3"], subs=2, sub_codec="subrip")
+        assert bridge.on_disk()
+        time.sleep(0.1)                         # its watch is waiting now
+        began = time.monotonic()
+        privacy.set_private(True)
+        assert _until(lambda: bridge._server is None and bridge._tmp is None, 2.0)
+        assert time.monotonic() - began < 2.0 and bridge.private_stopped
+    finally:
+        bridge.stop()
+
+
 @pytest.mark.parametrize("how", ["start", "seek", "recast", "reconnect"])
 def test_every_way_a_cast_is_sent_is_stopped_or_kept_in_memory_as_privacy_turns(
         tmp_path, monkeypatch, how):

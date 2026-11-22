@@ -33,7 +33,7 @@ from ..i18n import tr
 from .box_finder import MEDIA_KINDS
 from .dialogs import SourceFields
 from .nav_widgets import source_initials
-from .settings_ui import PAGE_MAX_WIDTH, SettingsCard, Stepper, align_controls
+from .settings_ui import PAGE_MAX_WIDTH, SettingsCard, Stepper, ToggleSwitch, align_controls
 from .theme import P, _mix, ink_on
 from .widgets import plain_text
 
@@ -664,6 +664,12 @@ class SourcePage(SourceFields, QScrollArea):
     def _build_advanced(self) -> None:
         c = self._card("adv")
         c.row(tr("playlist_auto_refresh"), self.refresh)
+        # Asked once, when one of its streams' certificates did not check
+        # out (the window's _tls_offer): here it is taken back, or given.
+        self.tls_box = ToggleSwitch(nerd.tls_unchecked(self._options))
+        self.tls_box.setAccessibleName(tr("src_tls_unchecked"))
+        c.row(tr("src_tls_unchecked"), self.tls_box, tr("src_tls_unchecked_hint"),
+              search="certificate tls https check expired self-signed security")
         if self.nerd_panel is not None:
             nc = self._card("adv", tr("nerd_page"), nerd_only=True)
             self._switch_rows(nc, None)

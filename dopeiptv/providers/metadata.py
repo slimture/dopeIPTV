@@ -64,6 +64,11 @@ def bundled_tmdb_key() -> str:
         return ""
 
 
+
+#: A lookup's answer when its title began to play privately before the
+#: request went: nothing was asked.
+_PRIVATE: dict = {"private": True}
+
 class TmdbClient:
     """Thin wrapper around the TMDB v3 search/details endpoints."""
 
@@ -732,10 +737,25 @@ class PosterResolver(QObject):
         cleaned, year = self.clean_title(title)
         search_query = cleaned or title
 
-        def fetch(t=search_query, k=kind, y=year):
+        def fetch(t=search_query, k=kind, y=year, raw=title):
+            # Asked again on the worker, just before the request: a title
+            # that began to play privately while this one waited in the
+            # pool is not sent (privacy.title_private).
+            if privacy.title_private(raw):
+                return _PRIVATE
             return self.client.fetch_details(t, k, y)
 
         def done(details, key=key, raw=title, q=search_query):
+            if details is _PRIVATE:
+                # Not asked, and nothing kept: the title is looked up as
+                # ever once it no longer plays privately.
+                self._pending.discard(key)
+                for cb in self._waiting.pop(key, []):
+                    try:
+                        cb({})
+                    except RuntimeError:
+                        pass
+                return
             # Never overwrite a manual pick with an auto-search result. This
             # can happen if the cache entry gets evicted and re-fetched.
             existing = self._cache.get(key) or {}

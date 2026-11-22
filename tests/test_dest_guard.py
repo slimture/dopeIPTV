@@ -208,16 +208,26 @@ def test_the_persons_own_names_and_plex_stay_reachable_at_home():
         g.forget_names()
 
 
-def test_the_noted_names_are_bounded():
+def test_the_noted_names_are_bounded_and_fail_closed():
+    """A list naming more picture hosts than are kept never pushes an early
+    one out to reach the home network: past the bound every public name is
+    taken for an outsider's, but the person's own and Plex's."""
     g.forget_names()
     try:
+        g.note_own("https://my-server.example:8080")
         for i in range(g.OUTSIDE_MAX + 50):
             g.note_outside(f"https://h{i}.example/p.png")
         assert len(g._OUTSIDE) == g.OUTSIDE_MAX
-        assert g.peer_refusal("h0.example", "192.168.1.1") == ""         # the oldest let go
+        assert g.peer_refusal("h0.example", "192.168.1.1") == g.HOME          # never let go
         assert g.peer_refusal(f"h{g.OUTSIDE_MAX + 49}.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("never-noted.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("my-server.example", "192.168.1.1") == ""
+        assert g.peer_refusal("192-168-1-5.abc.plex.direct", "192.168.1.5") == ""
+        assert g.peer_refusal("nas.local", "192.168.1.9") == ""
+        assert g.peer_refusal("never-noted.example", "93.184.216.34") == ""
     finally:
         g.forget_names()
+    assert g.peer_refusal("never-noted.example", "192.168.1.1") == ""     # a new run
 
 
 def test_an_internet_sources_lists_note_their_pictures_and_its_server_is_its_own():

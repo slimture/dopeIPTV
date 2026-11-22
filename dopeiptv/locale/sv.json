@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Spara utan lösenord",
   "set_feedback_tip_card": "Feedback och dricks",
   "nerd_tls_strict": "Kontrollera varje ströms certifikat",
-  "nerd_tls_strict_hint": "Spelaren och inspelningarna kontrollerar en https-ströms certifikat, som appens egna förfrågningar alltid gör. En leverantör vars certifikat inte håller – utgånget, självsignerat eller utfärdat för ett annat namn – spelar då ingenting: stäng av det här igen, eller lita på certifikatet på källans sida.",
+  "nerd_tls_strict_hint": "Varje ström från internet får redan sitt certifikat kontrollerat. Det här kontrollerar även en server hemma – en vars certifikat signerar sig självt spelar då ingenting: lita på certifikatet på källans sida.",
   "playlist_http_note": "Vanlig http: inloggningen går okrypterad i varje adress och kan läsas av vem som helst på vägen. Använd https om leverantören erbjuder det.",
   "subs_private_ask": "Det här spelas privat, så ingenting frågas av OpenSubtitles förrän du trycker på Sök – då skickas orden i rutan dit.",
   "set_card_app_icon": "Appikon",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Solnedgång",
   "icon_grape": "Vindruva",
   "icon_round": "Rund",
-  "icon_retro": "Retro-tv"
+  "icon_retro": "Retro-tv",
+  "diag_certificate": "Leverantörens certifikat kunde inte kontrolleras – det har gått ut, signerar sig självt eller är utfärdat för ett annat namn.",
+  "tls_offer": "Certifikatet för {name} kunde inte kontrolleras: det har gått ut, signerar sig självt eller är utfärdat för ett annat namn. Vem som helst på vägen kan då läsa det som skickas, även inloggningen i adresserna. Spela {name} utan kontroll?",
+  "tls_offer_go": "Spela utan kontroll",
+  "src_tls_unchecked": "Spela utan att kontrollera certifikatet",
+  "src_tls_unchecked_hint": "Strömmarna spelas även när certifikatet inte håller. Vem som helst på vägen kan då läsa dem, och inloggningen i deras adresser. Avstängt kontrolleras varje ström från internet."
 }

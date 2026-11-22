@@ -175,7 +175,7 @@ SIGN_INS = ("trakt_access_token", "simkl_access_token")
 #: A playlist's own options that do the same for its connections (its
 #: backup addresses, a certificate trusted for it, its own DNS server).
 RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
-                "backup_servers", "dns_url", "cert_pin")
+                "backup_servers", "dns_url", "cert_pin", "tls_unchecked")
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.

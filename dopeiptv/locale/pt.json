@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Salvar sem senha",
   "set_feedback_tip_card": "Feedback e gorjetas",
   "nerd_tls_strict": "Verificar o certificado de cada stream",
-  "nerd_tls_strict_hint": "O player e as gravações verificam o certificado de um stream https, como as requisições do app sempre fazem. Um provedor cujo certificado não passa na verificação – expirado, autoassinado ou emitido para outro nome – não reproduz nada: desligue esta opção ou confie nesse certificado na página da fonte.",
+  "nerd_tls_strict_hint": "Toda transmissão da internet já tem o certificado verificado. Isto também verifica um servidor em casa – um com certificado autoassinado não reproduz nada: confie nesse certificado na página da fonte.",
   "playlist_http_note": "http sem criptografia: o login vai sem criptografia em cada endereço, e qualquer um no caminho pode lê-lo. Use https se o provedor oferecer.",
   "subs_private_ask": "Isto está tocando no modo privado, então nada é pedido ao OpenSubtitles até você tocar em Pesquisar – aí as palavras da caixa vão para ele.",
   "set_card_app_icon": "Ícone do app",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Pôr do sol",
   "icon_grape": "Uva",
   "icon_round": "Redondo",
-  "icon_retro": "TV retrô"
+  "icon_retro": "TV retrô",
+  "diag_certificate": "Não foi possível verificar o certificado do provedor: ele expirou, é autoassinado ou foi emitido para outro nome.",
+  "tls_offer": "Não foi possível verificar o certificado de {name}: ele expirou, é autoassinado ou foi emitido para outro nome. Qualquer pessoa no caminho poderia ler o que ele envia, inclusive o login nos endereços. Reproduzir {name} sem verificar?",
+  "tls_offer_go": "Reproduzir sem verificar",
+  "src_tls_unchecked": "Reproduzir sem verificar o certificado",
+  "src_tls_unchecked_hint": "As transmissões tocam mesmo quando o certificado não confere. Qualquer pessoa no caminho poderia lê-las, e o login nos endereços delas. Desligado, toda transmissão da internet é verificada."
 }

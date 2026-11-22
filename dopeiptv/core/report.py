@@ -103,15 +103,22 @@ class Secret(str):
     it stands, with the word around it."""
 
 
+#: A login this short is hidden where it stands as a word of its own, as a
+#: name is: inside other words ("a" in every word that has one) it would
+#: blank the whole report out. core/log.py draws the same line (_short).
+SHORT_SECRET = 3
+
+
 def _own_value(value: str, secret: bool) -> str:
     """The pattern one of the person's values is hidden by. A name - a
     source's, a channel's, a title, a server - only where it stands as a
     word of its own: hidden inside another word it told what it was ("not
     st<private>d yet" with a channel called Arte), and that word was never
     it. A login wherever it stands, with the whole word around it, so no
-    part of a word is left to tell where it began."""
+    part of a word is left to tell where it began - one of SHORT_SECRET
+    characters or fewer as a word of its own, however short."""
     body = re.escape(value)
-    if secret:
+    if secret and len(value) > SHORT_SECRET:
         return rf"\w*{body}\w*"
     head = r"(?<!\w)" if re.match(r"\w", value) else ""
     tail = r"(?!\w)" if re.search(r"\w$", value) else ""
@@ -126,7 +133,9 @@ def scrub(text: str, personal: Iterable[str] = ()) -> str:
     kinds: dict[str, bool] = {}
     for v in personal:
         value = v.strip() if v else ""
-        if len(value) >= 3:
+        # A name of one or two characters is a word anyone writes ("TV",
+        # "a"); a login is hidden however short it is.
+        if len(value) >= 3 or (value and isinstance(v, Secret)):
             kinds[value] = kinds.get(value, False) or isinstance(v, Secret)
     for value in sorted(kinds, key=len, reverse=True):
         out = re.sub(_own_value(value, kinds[value]), "<private>", out, flags=re.IGNORECASE)

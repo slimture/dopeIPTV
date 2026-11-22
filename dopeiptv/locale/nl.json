@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Opslaan zonder wachtwoord",
   "set_feedback_tip_card": "Feedback en fooien",
   "nerd_tls_strict": "Certificaat van elke stream controleren",
-  "nerd_tls_strict_hint": "De speler en opnames controleren het certificaat van een https-stream, zoals de eigen verzoeken van de app altijd doen. Een aanbieder van wie het certificaat niet klopt – verlopen, zelf ondertekend of voor een andere naam uitgegeven – speelt dan niets af: zet dit weer uit, of vertrouw dat certificaat op de pagina van de bron.",
+  "nerd_tls_strict_hint": "Elke stream van internet wordt al gecontroleerd. Dit controleert ook een server thuis – een met een zelfondertekend certificaat speelt dan niets: vertrouw dat certificaat op de pagina van de bron.",
   "playlist_http_note": "Gewone http: de inlog gaat onversleuteld mee in elk adres en is onderweg voor iedereen leesbaar. Gebruik https als de aanbieder dat biedt.",
   "subs_private_ask": "Dit speelt privé af, dus er wordt niets aan OpenSubtitles gevraagd tot je op Zoeken drukt – dan gaan de woorden in het vak ernaartoe.",
   "set_card_app_icon": "App-pictogram",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Zonsondergang",
   "icon_grape": "Druif",
   "icon_round": "Rond",
-  "icon_retro": "Retro-tv"
+  "icon_retro": "Retro-tv",
+  "diag_certificate": "Het certificaat van de aanbieder kon niet worden gecontroleerd: het is verlopen, ondertekent zichzelf of is gemaakt voor een andere naam.",
+  "tls_offer": "Het certificaat van {name} kon niet worden gecontroleerd: het is verlopen, ondertekent zichzelf of is gemaakt voor een andere naam. Iedereen onderweg kan dan meelezen wat het verstuurt, ook de inloggegevens in de adressen. {name} zonder controle afspelen?",
+  "tls_offer_go": "Zonder controle afspelen",
+  "src_tls_unchecked": "Afspelen zonder het certificaat te controleren",
+  "src_tls_unchecked_hint": "De streams spelen ook als hun certificaat niet klopt. Iedereen onderweg kan ze dan meelezen, en de inloggegevens in hun adressen. Uit: elke stream van internet wordt gecontroleerd."
 }

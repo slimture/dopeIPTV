@@ -51,7 +51,38 @@ def test_launch_player_starts_that_command(monkeypatch):
                 "ytdl://https://www.youtube.com/watch?v=x"):
         seen.clear()
         players.launch_player("mpv", url, "T")
-        assert seen == [players.player_command("mpv", "/usr/bin/mpv", url, "T")], url
+        if url.startswith("http"):
+            # An http(s) address in a playlist file of the user's own,
+            # never in the command line others can read.
+            assert len(seen) == 1 and url not in seen[0]
+            handoff = seen[0][-1].split("=", 1)[1]
+            assert seen[0][-1] == "--playlist=" + handoff
+            with open(handoff, encoding="utf-8") as fh:
+                assert url in fh.read().splitlines()
+            import os
+            import stat
+            assert stat.S_IMODE(os.stat(handoff).st_mode) == 0o600
+            os.remove(handoff)
+        else:
+            assert seen == [players.player_command("mpv", "/usr/bin/mpv", url, "T")], url
+
+
+def test_a_handoff_file_holds_one_line_and_goes(tmp_path, monkeypatch):
+    """No line break in an address or a title reaches the playlist file as
+    a second entry, and the file is deleted once its player had time."""
+    monkeypatch.setattr(players, "HANDOFF_S", 0.05)
+    assert players.handoff_file("http://h.invalid/1.ts\nfile:///etc/passwd", "T",
+                                str(tmp_path)) == ""
+    path = players.handoff_file("http://h.invalid/1.ts", "A\nfile:///etc/passwd",
+                                str(tmp_path))
+    with open(path, encoding="utf-8") as fh:
+        lines = fh.read().splitlines()
+    assert lines == ["#EXTM3U", "#EXTINF:-1,Afile:///etc/passwd", "http://h.invalid/1.ts"]
+    import time
+    time.sleep(0.3)
+    assert not (tmp_path / path.rsplit("/", 1)[-1]).exists()
+    vlc = players.player_command("vlc", "/usr/bin/vlc", "http://h.invalid/1.ts", "T", path)
+    assert vlc[-2:] == ["--", path] and "http://h.invalid/1.ts" not in vlc
 
 
 NOT_STREAMS = (*EVIL, "concat:/etc/passwd|/etc/hosts", "subfile,,start,0,end,9,,:/etc/passwd",
@@ -119,7 +150,15 @@ def _recorder(tmp_path, monkeypatch, kind, name):
         def poll(self):
             return None
 
+    class FakeFeed:                 # the app's own reading of the stream: none here
+        def __init__(self, *_a, **_k):
+            pass
+
+        def start(self):
+            pass
+
     monkeypatch.setattr(recording.subprocess, "Popen", FakeProc)
+    monkeypatch.setattr(recording, "Feed", FakeFeed)
     monkeypatch.setattr(RecordingManager, "recorder",
                         staticmethod(lambda: (kind, "/usr/bin/" + kind)))
     return rm, seen
@@ -129,11 +168,13 @@ def test_the_mpv_recorder_takes_the_address_after_its_options(tmp_path, monkeypa
     """The recorder without ffmpeg is mpv: the address last, after "--"."""
     rm, seen = _recorder(tmp_path, monkeypatch, "mpv", "recdash")
     url = "http://h.invalid/live/u/p/1.ts"
-    rm._spawn({"url": url, "title": "T", "stop": 9e12})
-    cmd = seen[0]
-    assert cmd[-2:] == ["--", url] and url not in cmd[:-2]
-    assert any(a.startswith("--stream-record=") for a in cmd[:-2])
-    assert any(a.startswith("--length=") for a in cmd[:-2])
+    for job, last in (({}, "-"), ({"_classic": True}, url)):
+        seen.clear()
+        rm._spawn({"url": url, "title": "T", "stop": 9e12, **job})
+        cmd = seen[0]
+        assert cmd[-2:] == ["--", last] and url not in cmd[:-2]
+        assert any(a.startswith("--stream-record=") for a in cmd[:-2])
+        assert any(a.startswith("--length=") for a in cmd[:-2])
 
 
 @pytest.mark.parametrize("kind", ["ffmpeg", "mpv"])
@@ -152,10 +193,15 @@ def test_ffmpeg_records_a_stream_with_a_streams_protocols_only(tmp_path, monkeyp
     from dopeiptv.core.player_exec import FFMPEG_PROTOCOLS
 
     rm, seen = _recorder(tmp_path, monkeypatch, "ffmpeg", "recproto")
+    seen.clear()
+    rm._spawn({"url": "http://h.invalid/live/u/p/1.ts", "title": "T", "stop": None})
+    cmd = seen[0]                   # read by the app: its input, and nothing else
+    assert cmd[cmd.index("-i") + 1] == "pipe:0"
+    assert cmd[cmd.index("-protocol_whitelist") + 1] == "pipe"
     for url in ("http://h.invalid/live/u/p/1.ts", "https://h.invalid/x.m3u8",
                 "rtsp://box.invalid/?src=1", "udp://@239.0.0.1:1234"):
         seen.clear()
-        rm._spawn({"url": url, "title": "T", "stop": None})
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
         cmd = seen[0]
         i = cmd.index("-i")
         assert cmd[i + 1] == url

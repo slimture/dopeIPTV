@@ -21,6 +21,7 @@ work (the window hands it to its own thread), and *share* - an object with
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import json
 import secrets
 import socket
@@ -106,6 +107,13 @@ class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
         log.info("remote: a request failed (%s)", exc)
 
 
+def _loopback(address: str) -> bool:
+    try:
+        return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
+    except ValueError:
+        return False
+
+
 class RemoteServer:
     """The server; *remote* and *share* say which half answers."""
 
@@ -119,6 +127,12 @@ class RemoteServer:
         self.calendar = calendar
         self._httpd: _Server | None = None
         self._thread: threading.Thread | None = None
+        # Per client address: a request budget (a device at home cannot keep
+        # the window's thread busy), and ten wrong tokens in a minute shut it
+        # out for ten minutes - never this computer, whose scripts ask by
+        # loopback (phone_remote.RateLimiter).
+        from .phone_remote import RateLimiter
+        self.limits = RateLimiter()
 
     @property
     def running(self) -> bool:
@@ -250,8 +264,12 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             return params
 
         def _handle(self, method: str) -> None:
-            if not server.client_ok(str(self.client_address[0]), _own(self)):
+            who = str(self.client_address[0])
+            if not server.client_ok(who, _own(self)):
                 self._json(403, {"error": "only this computer and the home network"})
+                return
+            if server.limits.blocked(who) or not server.limits.allow(who):
+                self._json(429, {"error": "too many requests - try again later"})
                 return
             host = self.headers.get("Host")
             if host and not home_net.home_host(host):
@@ -271,6 +289,8 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             if not server.authorized(self._given_token(query)):
                 # A wrong token is slowed a little; the right one is 32
                 # random characters, so this is manners, not the lock.
+                if not _loopback(who):
+                    server.limits.failed(who)
                 time.sleep(0.25)
                 self._json(401, {"error": "unauthorized", "hint": "the token is in Settings > Nerd"})
                 return

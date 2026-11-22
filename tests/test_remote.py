@@ -108,6 +108,28 @@ def test_every_request_needs_the_token(served):
     assert code == 401 and b"unauthorized" in raw
 
 
+def test_a_client_that_asks_too_often_or_guesses_is_held_back(served, monkeypatch):
+    """A device at home gets a request budget, and ten wrong tokens in a
+    minute shut it out - this computer's own scripts never shut out."""
+    monkeypatch.setattr(remote_api.time, "sleep", lambda _s: None)
+    srv = served()
+    port = srv.port
+    from dopeiptv.core.phone_remote import RateLimiter
+    clock = [0.0]
+    srv.limits = RateLimiter(rate=1.0, burst=3.0, clock=lambda: clock[0])
+    assert [ask(port, "GET", "/")[0] for _ in range(4)] == [200, 200, 200, 429]
+    clock[0] += 10.0
+    assert ask(port, "GET", "/")[0] == 200
+    for _ in range(12):                                    # loopback: wrong, never locked
+        clock[0] += 5.0
+        assert ask(port, "GET", "/", token="wrong")[0] == 401
+    clock[0] += 5.0
+    assert ask(port, "GET", "/")[0] == 200
+    for _ in range(10):                                    # a device at home: shut out
+        srv.limits.failed("192.168.1.20")
+    assert srv.limits.blocked("192.168.1.20") and not srv.limits.blocked("127.0.0.1")
+
+
 def test_a_client_that_says_nothing_is_let_go(served, monkeypatch):
     """A connection opened and left silent - or a request never finished -
     is closed after a while instead of holding one of the server's threads

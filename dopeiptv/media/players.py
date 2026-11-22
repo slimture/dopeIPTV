@@ -300,8 +300,10 @@ def teletext_decoder() -> bool | None:
 _system_env = system_env
 
 
-def player_command(player: str, exe: str, url: str, title: str) -> list[str]:
-    """The external player's command line for *url*.
+def player_command(player: str, exe: str, url: str, title: str,
+                   handoff: str = "") -> list[str]:
+    """The external player's command line for *url* - or, given *handoff*,
+    for the playlist file that holds it (``handoff_file``).
 
     The address comes after "--", which ends the options for mpv and VLC
     alike. A playlist's line is whatever its author wrote, and one that
@@ -311,10 +313,72 @@ def player_command(player: str, exe: str, url: str, title: str) -> list[str]:
     mpv's whole configuration from a stranger's server. After "--" such a
     line is a file that does not open, and nothing else."""
     if player == "mpv":
-        return [exe, "--force-media-title=" + title,
-                "--user-agent=dopeIPTV/1.0", "--", url]
+        head = [exe, "--force-media-title=" + title, "--user-agent=dopeIPTV/1.0"]
+        return [*head, "--playlist=" + handoff] if handoff else [*head, "--", url]
     return [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0",
-            "--", url]
+            "--", handoff or url]
+
+
+#: How long a handoff file waits for its player before it is deleted: the
+#: player reads it as it starts.
+HANDOFF_S = 60.0
+_HANDOFF_PREFIX = "dopeiptv-play-"
+
+
+def _handoff_dir() -> str | None:
+    """Where a handoff file is made: on Linux the user's own runtime folder
+    (in memory, 0700, theirs), else the system's temporary folder, where
+    the file is made 0600 under a name nobody can guess."""
+    run = os.environ.get("XDG_RUNTIME_DIR") or ""
+    if sys.platform.startswith("linux") and os.path.isabs(run):
+        try:
+            st = os.stat(run)
+            if st.st_uid == os.getuid() and not st.st_mode & 0o077:
+                return run
+        except OSError:
+            pass
+    return None
+
+
+def handoff_file(url: str, title: str, folder: str | None = None) -> str:
+    """A one-entry playlist holding *url*, this user's alone (0600, a name
+    nobody can guess), deleted once its player has had HANDOFF_S to read
+    it; "" when it cannot be made. An http(s) address goes to an external
+    player this way, never as an argument: every account on a Linux
+    computer can read a process's command line (/proc/<pid>/cmdline), and
+    an Xtream address there is its login."""
+    import tempfile
+    import threading
+    import time
+    if any(c in url for c in "\r\n"):
+        return ""
+    name = "".join(c for c in title if c.isprintable()) or "dopeIPTV"
+    where = folder if folder is not None else _handoff_dir()
+    try:
+        for old in os.listdir(where or tempfile.gettempdir()):
+            path = os.path.join(where or tempfile.gettempdir(), old)
+            if (old.startswith(_HANDOFF_PREFIX)
+                    and time.time() - os.path.getmtime(path) > 10 * HANDOFF_S):
+                os.remove(path)             # one a crash left behind
+    except OSError:
+        pass
+    try:
+        fd, path = tempfile.mkstemp(prefix=_HANDOFF_PREFIX, suffix=".m3u", dir=where)
+    except OSError as e:
+        log.warning("external player: no playlist file for its address (%s)", e)
+        return ""
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(f"#EXTM3U\n#EXTINF:-1,{name}\n{url}\n")
+
+    def gone() -> None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    timer = threading.Timer(HANDOFF_S, gone)
+    timer.daemon = True
+    timer.start()
+    return path
 
 
 def allowed_page(player: str, url: str) -> bool:
@@ -343,11 +407,13 @@ def launch_player(player: str, url: str, title: str | None = None,
         QMessageBox.warning(parent, name, tr("open_address_bad"))
         return
     exe = find_player_executable(player)
-    cmd = player_command(player, exe, url, title) if exe else None
-    if not cmd:
+    if not exe:
         QMessageBox.warning(parent, tr("status_player_not_found"),
                             tr("status_player_not_found_msg", name=name))
         return
+    handoff = (handoff_file(url, title)
+               if address_scheme(url) in ("http", "https") else "")
+    cmd = player_command(player, exe, url, title, handoff)
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, env=_system_env())
 

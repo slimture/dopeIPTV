@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Sačuvaj bez lozinke",
   "set_feedback_tip_card": "Povratne informacije i napojnice",
   "nerd_tls_strict": "Proveravaj sertifikat svakog strima",
-  "nerd_tls_strict_hint": "Plejer i snimci proveravaju sertifikat https strima, kao što to uvek rade zahtevi aplikacije. Provajder čiji sertifikat ne prolazi proveru – istekao, samopotpisan ili izdat za drugo ime – tada ništa ne reprodukuje: ponovo isključite ovo ili verujte tom sertifikatu na stranici njegovog izvora.",
+  "nerd_tls_strict_hint": "Sertifikat svakog strima sa interneta se već proverava. Ovo proverava i server kod kuće – onaj sa samopotpisanim sertifikatom tada ništa ne pušta: verujte tom sertifikatu na stranici izvora.",
   "playlist_http_note": "Običan http: prijava ide nešifrovana u svakoj adresi i svako usput može da je pročita. Koristite https ako ga provajder nudi.",
   "subs_private_ask": "Ovo se reprodukuje privatno, pa se OpenSubtitles ništa ne pita dok ne pritisnete Pretraga – tada mu idu reči iz polja.",
   "set_card_app_icon": "Ikona aplikacije",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Zalazak sunca",
   "icon_grape": "Grožđe",
   "icon_round": "Okrugla",
-  "icon_retro": "Retro TV"
+  "icon_retro": "Retro TV",
+  "diag_certificate": "Sertifikat provajdera nije mogao da se proveri: istekao je, sam sebe potpisuje ili je izdat za drugo ime.",
+  "tls_offer": "Sertifikat za {name} nije mogao da se proveri: istekao je, sam sebe potpisuje ili je izdat za drugo ime. Svako usput bi mogao da pročita ono što šalje, i prijavu u adresama. Pustiti {name} bez provere?",
+  "tls_offer_go": "Pusti bez provere",
+  "src_tls_unchecked": "Puštaj bez provere sertifikata",
+  "src_tls_unchecked_hint": "Strimovi se puštaju i kada sertifikat nije ispravan. Svako usput bi mogao da ih pročita, zajedno sa prijavom u adresama. Isključeno, svaki strim sa interneta se proverava."
 }

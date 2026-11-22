@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Parolasız kaydet",
   "set_feedback_tip_card": "Geri bildirim ve bahşiş",
   "nerd_tls_strict": "Her yayının sertifikasını denetle",
-  "nerd_tls_strict_hint": "Oynatıcı ve kayıtlar, uygulamanın kendi istekleri hep yaptığı gibi bir https yayınının sertifikasını denetler. Sertifikası denetimden geçmeyen – süresi dolmuş, kendinden imzalı ya da başka bir ad için verilmiş – bir sağlayıcı o zaman hiçbir şey oynatmaz: bunu yeniden kapatın ya da o sertifikaya kaynağının sayfasında güvenin.",
+  "nerd_tls_strict_hint": "İnternetten gelen her yayının sertifikası zaten doğrulanıyor. Bu, evdeki bir sunucuyu da doğrular – kendinden imzalı sertifikası olan sunucu hiçbir şey oynatmaz: o sertifikaya kaynağın sayfasında güvenin.",
   "playlist_http_note": "Düz http: giriş bilgileri her adreste şifrelenmeden gider ve yoldaki herkes okuyabilir. Sağlayıcı sunuyorsa https kullanın.",
   "subs_private_ask": "Bu gizli olarak oynatılıyor, bu yüzden siz Ara'ya basana kadar OpenSubtitles'a hiçbir şey sorulmaz – o zaman kutudaki sözcükler ona gider.",
   "set_card_app_icon": "Uygulama simgesi",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Gün batımı",
   "icon_grape": "Üzüm",
   "icon_round": "Yuvarlak",
-  "icon_retro": "Retro TV"
+  "icon_retro": "Retro TV",
+  "diag_certificate": "Sağlayıcının sertifikası doğrulanamadı: süresi dolmuş, kendinden imzalı ya da başka bir ad için verilmiş.",
+  "tls_offer": "{name} sertifikası doğrulanamadı: süresi dolmuş, kendinden imzalı ya da başka bir ad için verilmiş. Yoldaki herkes gönderdiklerini, adreslerindeki giriş bilgilerini de okuyabilir. {name} doğrulanmadan oynatılsın mı?",
+  "tls_offer_go": "Doğrulamadan oynat",
+  "src_tls_unchecked": "Sertifikayı doğrulamadan oynat",
+  "src_tls_unchecked_hint": "Yayınlar sertifikaları geçersiz olsa da oynar. Yoldaki herkes bunları ve adreslerindeki giriş bilgilerini okuyabilir. Kapalıyken internetten gelen her yayın doğrulanır."
 }

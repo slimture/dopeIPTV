@@ -625,10 +625,13 @@ def _bridge_case(servers, tmp_path, pin_right=True):
 
 
 def _recorder(bridge, source, url):
-    """ffmpeg as the recorder runs it through the bridge."""
+    """ffmpeg as the recorder runs it through the bridge: its command, and
+    the environment that holds the bridge's address."""
     pinned = net_bridge.checks_pin(source, url, on())
-    return ["ffmpeg", "-loglevel", "error", *net_bridge.recorder_options("ffmpeg", bridge.address, pinned),
-            "-i", url, "-c", "copy", "-f", "null", "-"]
+    import os
+    env = {**os.environ, **net_bridge.recorder_env(bridge.address)}
+    return (["ffmpeg", "-loglevel", "error", *net_bridge.recorder_options("ffmpeg", bridge.address, pinned),
+             "-i", url, "-c", "copy", "-f", "null", "-"], env)
 
 
 def test_what_the_recorder_is_told_for_the_bridge():
@@ -639,11 +642,14 @@ def test_what_the_recorder_is_told_for_the_bridge():
     assert not net_bridge.checks_pin({}, "https://nas.example:8443/s/2.ts", on())
     assert not net_bridge.checks_pin(pin, "https://nas.example:8443/s/2.ts",
                                      nerd.Nerd(S(nerd_enabled="false")))
-    px = "http://127.0.0.1:5"
-    assert net_bridge.recorder_options("ffmpeg", px, True) == ["-http_proxy", px, "-tls_verify", "0"]
-    assert net_bridge.recorder_options("ffmpeg", px, False) == ["-http_proxy", px]
-    assert net_bridge.recorder_options("mpv", px, True) == [f"--http-proxy={px}", "--tls-verify=no"]
+    px = "http://dopeiptv:key@127.0.0.1:5"
+    # The bridge's address - its key in it - never in the command line.
+    assert net_bridge.recorder_options("ffmpeg", px, True) == ["-tls_verify", "0"]
+    assert net_bridge.recorder_options("ffmpeg", px, False) == []
+    assert net_bridge.recorder_options("mpv", px, True) == ["--tls-verify=no"]
     assert net_bridge.recorder_options("mpv", "", True) == []
+    assert net_bridge.recorder_env(px) == {"http_proxy": px, "no_proxy": ""}
+    assert net_bridge.recorder_env("") == {}
 
 
 def test_ffmpeg_through_the_bridge_http_and_https_with_the_name_kept(servers, tmp_path):
@@ -654,7 +660,8 @@ def test_ffmpeg_through_the_bridge_http_and_https_with_the_name_kept(servers, tm
     bridge, plain, home, source = _bridge_case(servers, tmp_path)
     try:
         for url in (f"http://provider.example:{plain.port}/live/1.ts", f"https://nas.example:{home.port}/s/2.ts"):
-            r = subprocess.run(_recorder(bridge, source, url), capture_output=True, timeout=60)
+            cmd, env = _recorder(bridge, source, url)
+            r = subprocess.run(cmd, capture_output=True, timeout=60, env=env)
             assert r.returncode == 0, r.stderr[-400:]
         assert plain.requests[0] == {"path": "/live/1.ts", "host": f"provider.example:{plain.port}"}
         assert home.requests[0]["host"] == f"nas.example:{home.port}" and "nas.example" in home.sni
@@ -667,8 +674,8 @@ def test_a_changed_certificate_stops_the_bridge(servers, tmp_path):
         pytest.skip("no ffmpeg here")
     bridge, _plain, home, source = _bridge_case(servers, tmp_path, pin_right=False)
     try:
-        r = subprocess.run(_recorder(bridge, source, f"https://nas.example:{home.port}/s/2.ts"),
-                           capture_output=True, timeout=60)
+        cmd, env = _recorder(bridge, source, f"https://nas.example:{home.port}/s/2.ts")
+        r = subprocess.run(cmd, capture_output=True, timeout=60, env=env)
         assert r.returncode != 0 and home.requests == []
         assert any("changed" in f for f in bridge.failures)
         assert cert_pin.mismatch("nas.example", home.port) is not None
@@ -751,8 +758,8 @@ def test_a_redirect_from_the_pinned_host_goes_no_further_unchecked(servers, tmp_
     ca, route, source, home, other, cdn = _pinned_and_others(servers, tmp_path, redirect_to=to)
     bridge = net_bridge.Bridge(route, cafile=ca[0])
     try:
-        r = subprocess.run(_recorder(bridge, source, f"https://nas.example:{home.port}/live/5.ts"),
-                           capture_output=True, timeout=60)
+        cmd, env = _recorder(bridge, source, f"https://nas.example:{home.port}/live/5.ts")
+        r = subprocess.run(cmd, capture_output=True, timeout=60, env=env)
         assert home.requests and home.requests[0]["path"] == "/live/5.ts"
         if plays:
             assert r.returncode == 0, r.stderr[-400:]
@@ -783,13 +790,16 @@ def test_real_mpv_plays_through_the_bridge(servers, tmp_path):
         while time.monotonic() < end and not home.requests:
             time.sleep(0.1)
         assert home.requests and "nas.example" in home.sni
-        # The next stream is not to the pinned host: the core's own check.
+        # The next stream is not to the pinned host: one on the internet is
+        # checked (core/nerd.checks_certificate), one at home as the core does.
         nerd.apply_stream(m, source, True, url="https://provider.example/live/4.ts")
+        assert m["tls-verify"] is True
+        nerd.apply_stream(m, source, True, url="https://192.168.1.5/live/4.ts")
         assert m["tls-verify"] == own
         nerd.apply_stream(m, source, True, url=url)
         nerd.install(S(nerd_enabled="false"))
         nerd.apply_stream(m, source, True, url=url)
-        assert m["tls-verify"] == own and m["http-proxy"] == ""
+        assert m["tls-verify"] is True and m["http-proxy"] == ""
     finally:
         m.terminate()
         for b in list(net_bridge._bridges.values()):
@@ -807,40 +817,45 @@ def test_a_recording_goes_through_the_bridge(monkeypatch, tmp_path):
     nerd.install(S(nerd_enabled="true", nerd_dns="google"))
     nerd.set_source({"kind": "xtream", "options": {}})
     mgr = recording.RecordingManager(qs)
-    calls = []
+    calls, envs = [], []
 
     class P:
         def __init__(self, cmd, **kw):
             calls.append(cmd)
+            envs.append(kw.get("env") or {})
 
         def poll(self):
             return None
     monkeypatch.setattr(recording.RecordingManager, "recorder", staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
     monkeypatch.setattr(recording.subprocess, "Popen", P)
+    # The old way, the recorder reading the address itself (an HLS playlist,
+    # or what the app could not read): through the bridge, its key in the
+    # environment alone.
     job = {"id": "1", "url": "http://provider.example/live/u/p/1.ts", "title": "News",
-           "stop": time.time() + 60, "status": "scheduled"}
+           "stop": time.time() + 60, "status": "scheduled", "_classic": True}
     mgr._spawn(job)
     cmd = calls[-1]
-    i = cmd.index("-http_proxy")
-    assert _is_the_bridge(cmd[i + 1]) and cmd.index("-i") > i
+    assert "-http_proxy" not in cmd and _is_the_bridge(envs[-1]["http_proxy"])
+    assert not any(envs[-1]["http_proxy"] in a for a in cmd)
     assert "-tls_verify" not in cmd                     # the stream's own check
     # A pinned home server: the bridge checks the pin, the recorder not the chain.
     nerd.set_source({"kind": "xtream", "options": cert_pin.pin_options("nas.example", 8443, "ab" * 32)})
     pinned = dict(job, id="p", url="https://nas.example:8443/live/u/p/1.ts")
     mgr._spawn(pinned)
     cmd = calls[-1]
-    i = cmd.index("-http_proxy")
-    assert cmd[i + 2:i + 4] == ["-tls_verify", "0"] and cmd.index("-i") == i + 4
+    i = cmd.index("-tls_verify")
+    assert cmd[i + 1] == "0" and cmd.index("-i") > i and _is_the_bridge(envs[-1]["http_proxy"])
     monkeypatch.setattr(recording.RecordingManager, "recorder", staticmethod(lambda: ("mpv", "/usr/bin/mpv")))
     mgr._spawn(dict(pinned, id="m"))
-    assert "--tls-verify=no" in calls[-1] and any(a.startswith("--http-proxy=") for a in calls[-1])
+    assert "--tls-verify=no" in calls[-1] and not any(a.startswith("--http-proxy=") for a in calls[-1])
+    assert _is_the_bridge(envs[-1]["http_proxy"])
     mgr._spawn(dict(job, id="n"))
     assert "--tls-verify=no" not in calls[-1]
     monkeypatch.setattr(recording.RecordingManager, "recorder", staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
     nerd.set_source({"kind": "xtream", "options": {}})
     nerd.install(S(nerd_enabled="false", nerd_dns="google"))
     mgr._spawn(dict(job, id="2"))
-    assert "-http_proxy" not in calls[-1]
+    assert "http_proxy" not in (envs[-1] or {}) or not _is_the_bridge(envs[-1].get("http_proxy", ""))
     nerd.set_source(None)
 
 

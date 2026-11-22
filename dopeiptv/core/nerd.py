@@ -779,21 +779,56 @@ def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = ""
     was, the defaults go back. Returns whether Nerd is in force. *opened*:
     the address mpv opens, when not *url* (the rewind buffer's)."""
     n = current()
-    if not n.on and not was_applied:
-        return False
-    for key, value in n.stream_options(source, url, opened).items():
-        try:
-            mpv[key] = value
-        except Exception as e:
-            log.debug("nerd: %s not set: %s", key, e)
-    pinned = n.player_route(source, url, opened)[1]
-    _trust_pin(mpv, pinned and not n.typed_tls())
+    pinned = False
+    if n.on or was_applied:
+        for key, value in n.stream_options(source, url, opened).items():
+            try:
+                mpv[key] = value
+            except Exception as e:
+                log.debug("nerd: %s not set: %s", key, e)
+        pinned = n.player_route(source, url, opened)[1]
+    # The certificate, for everyone, whether Nerd is on or not.
+    _apply_tls(mpv, source, opened or url, pinned, n)
     return n.on
 
 
 #: Nerd: check every https stream's certificate in the player and the
-#: recorder (the setting; off by default).
+#: recorder - a server at home's too (the setting; off by default). A
+#: stream from the internet is checked whatever it says (checks_certificate).
 STRICT_TLS = "nerd_tls_strict"
+#: A source's own option: its streams play without their certificate
+#: checked - the person's answer when one did not check out (asked once,
+#: the window's _tls_offer), and theirs to take back on its page.
+TLS_UNCHECKED = "tls_unchecked"
+
+
+def tls_unchecked(source: dict | None) -> bool:
+    return str((source or {}).get(TLS_UNCHECKED) or "").lower() in ("1", "true", "yes")
+
+
+def checks_certificate(source: dict | None, url: str, n: "Nerd | None" = None) -> bool:
+    """Whether the player and the recorder check *url*'s certificate: an
+    https stream on the internet, as the app's own requests always are -
+    a provider taken over on the way, or a network that pretends to be
+    it, then gets nothing, the login in an Xtream address least of all.
+    Not for a source the person let play unchecked (TLS_UNCHECKED), and
+    for a server at home only with Nerd's strict check (its certificate is
+    often its own). A host whose certificate the source pins is the
+    bridge's to check (_apply_tls)."""
+    n = n or current()
+    text = str(url or "")
+    if not text.lower().startswith("https://") or tls_unchecked(source):
+        return False
+    if n.strict_tls():
+        return True
+    from urllib.parse import urlsplit
+
+    from .dest_guard import named_kind
+    try:
+        host = urlsplit(text).hostname or ""
+    except ValueError:
+        return False
+    return bool(host) and named_kind(host) == ""
 
 
 def ca_file() -> str:
@@ -814,21 +849,28 @@ def strict_tls_mpv() -> list[tuple[str, str]]:
     return [("tls-verify", "yes"), *([("tls-ca-file", ca)] if ca else [])]
 
 
-def strict_tls_recorder(kind: str, url: str = "") -> list[str]:
-    """The recorder's (ffmpeg or mpv) arguments for a checked certificate
-    while Nerd's strict check is on; [] otherwise - and for ffmpeg only for
-    an https address (an input option no protocol takes stops ffmpeg)."""
-    if not current().strict_tls():
+def strict_tls_recorder(kind: str, url: str = "", source: dict | None = None) -> list[str]:
+    """The recorder's (ffmpeg or mpv) arguments for *url*'s certificate, as
+    the player checks it (checks_certificate): checked, or - for a source
+    the person let play unchecked - not checked, said outright (a newer
+    mpv checks by default). [] when it changes nothing, and for ffmpeg
+    always for an address that is not https (an input option no protocol
+    takes stops ffmpeg)."""
+    https = str(url or "").lower().startswith("https://")
+    if kind == "ffmpeg" and not https:
         return []
-    if kind == "ffmpeg" and not str(url or "").lower().startswith("https://"):
-        return []
-    ca = ca_file()
-    if kind == "ffmpeg":
-        return ["-tls_verify", "1", *(["-ca_file", ca] if ca else [])]
-    return ["--tls-verify=yes", *([f"--tls-ca-file={ca}"] if ca else [])]
+    if checks_certificate(source, url):
+        ca = ca_file()
+        if kind == "ffmpeg":
+            return ["-tls_verify", "1", *(["-ca_file", ca] if ca else [])]
+        return ["--tls-verify=yes", *([f"--tls-ca-file={ca}"] if ca else [])]
+    if https and tls_unchecked(source):
+        return ["-tls_verify", "0"] if kind == "ffmpeg" else ["--tls-verify=no"]
+    return []
 
 
-# What tls-verify each core had before a stream to a pinned host turned it off.
+# What tls-verify and tls-ca-file each core had of its own, before a stream
+# set them (_apply_tls).
 _tls_own: dict[int, Any] = {}
 _tls_watched: set[int] = set()
 
@@ -838,37 +880,40 @@ def _forget_tls(key: int) -> None:
     _tls_watched.discard(key)
 
 
-def _trust_pin(mpv: Any, pinned: bool) -> None:
-    """A stream to a host whose certificate the source pins goes through the
-    bridge, which checks the certificate against the pin before the tunnel
-    opens (core/net_bridge.py): that check is the trust, so mpv does not
-    check the chain itself for that stream - a pinned home server's
-    certificate is its own, signed by no authority mpv knows, and a newer
-    mpv checks by default (0.42 here; 0.37 did not). Any other stream gets
-    the core's own setting back. A tls-verify typed in Nerd's mpv options
-    is the user's and left alone."""
-    key = id(mpv)
-    if pinned:
-        if key not in _tls_own:
-            try:
-                _tls_own[key] = mpv["tls-verify"]
-            except Exception as e:
-                log.debug("nerd: tls-verify not read: %s", e)
-                return
-            if key not in _tls_watched:
-                try:
-                    weakref.finalize(mpv, _forget_tls, key)
-                    _tls_watched.add(key)
-                except TypeError:
-                    pass
-        try:
-            mpv["tls-verify"] = False
-        except Exception as e:
-            log.debug("nerd: tls-verify not set: %s", e)
+def _apply_tls(mpv: Any, source: dict | None, address: str, pinned: bool, n: "Nerd") -> None:
+    """tls-verify (and the authorities to check against) for the stream mpv
+    opens next at *address*: checked where checks_certificate says; off for
+    a host whose certificate the source pins - the bridge checks it against
+    the pin before the tunnel opens (core/net_bridge.py), a pinned home
+    server's certificate signed by no authority mpv knows - and for a
+    source the person let play unchecked; else the core's own setting
+    (0.37 checks nothing by default, a newer mpv everything). A tls-verify
+    typed in Nerd's mpv options is the person's and left alone."""
+    if n.typed_tls():
         return
-    if key in _tls_own:
-        value = _tls_own.pop(key)
+    key = id(mpv)
+    if key not in _tls_own:
         try:
-            mpv["tls-verify"] = value
+            _tls_own[key] = (mpv["tls-verify"], mpv["tls-ca-file"])
         except Exception as e:
-            log.debug("nerd: tls-verify not put back: %s", e)
+            log.debug("nerd: tls-verify not read: %s", e)
+            return
+        if key not in _tls_watched:
+            try:
+                weakref.finalize(mpv, _forget_tls, key)
+                _tls_watched.add(key)
+            except TypeError:
+                pass
+    own_verify, own_ca = _tls_own[key]
+    https = str(address).lower().startswith("https://")
+    if pinned or (https and tls_unchecked(source)):
+        verify, ca = False, own_ca
+    elif checks_certificate(source, address, n):
+        verify, ca = True, (ca_file() or own_ca)
+    else:
+        verify, ca = own_verify, own_ca
+    for prop, value in (("tls-verify", verify), ("tls-ca-file", ca)):
+        try:
+            mpv[prop] = value
+        except Exception as e:
+            log.debug("nerd: %s not set: %s", prop, e)

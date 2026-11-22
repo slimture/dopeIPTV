@@ -195,7 +195,8 @@ provider.
 |---|---|
 | Changing what dopeiptv.org sends | https to dopeiptv.org itself only (`core/build_check.secure`), no redirect followed; an update installs only what the signed list names (`selfupdate.signed_asset`), and its download follows redirects only over https (`selfupdate._get_https`) |
 | Reading or changing a third party's answers (TMDB, Trakt, Simkl, OpenSubtitles, Plex.tv, radio-browser.info, GitHub...) | https with the certificate checked; `verify=False` is nowhere - `core/cert_pin.py` reads a certificate unchecked only to show it before it is pinned, and a pinned server is checked by its fingerprint instead (`core/net_adapter.py`) |
-| The app's own requests to an https provider (its lists, guide, logos, the rewind buffer's connection) | The certificate checked against the system's authorities, or Nerd's pin for that one server (`core/net_adapter.py`) |
+| The app's own requests to an https provider (its lists, guide, logos, the rewind buffer's connection, a recording's own connection) | The certificate checked against the system's authorities, or Nerd's pin for that one server (`core/net_adapter.py`) |
+| The player's and recorder's https streams from the internet | The certificate checked against certifi's authorities (`nerd.checks_certificate`), unless the person let that source play unchecked when asked |
 | Changing DNS answers | Nerd's own DNS over HTTPS, the presets reached by IP (`core/doh.py`) |
 | Watching while a VPN has dropped | Nerd's VPN guard starts nothing while it is down (`core/nerd.py`, `vpn_blocks`) |
 | Reading the MQTT broker's traffic | TLS on 8883, the broker's certificate checked (`core/mqtt.py`) |
@@ -203,7 +204,8 @@ provider.
 **What is left.**
 
 - A provider on plain http: [below](#a-provider-on-plain-http).
-- The player checks certificates only as its libraries do: [below](#the-player-checks-certificates-only-as-its-libraries-do).
+- A source the person let play without its certificate checked, and a
+  server at home checked only as mpv's own default does: [below](#every-internet-streams-certificate-is-checked-since-1611).
 - The app's servers speak plain http on the home network: [below](#the-home-networks-servers-speak-plain-http).
 - Searches for devices (SSDP, mDNS, broadcasts) are plain by their nature,
   and a webhook goes over whatever address the person typed.
@@ -513,34 +515,35 @@ themselves, and a cast through the converter costs the computer's
 processor and starts later. The TV is one the person chose to cast to;
 the app says which device a name stands for (`casting.where`).
 
-### The player checks certificates only as its libraries do
+### Every internet stream's certificate is checked (since 1.6.11)
 
-By default the app does not set the certificate check of mpv and FFmpeg
-for a stream (`tls-verify`, `tls_verify`): it is their own default. Older versions -
-such as Ubuntu's, which the AppImage and the .deb carry - check nothing;
-newer ones check against the system's authorities (`core/net_bridge.py`,
-`docs/DEVELOPER_NOTES.md`). Where they check nothing, someone on the
-network path can answer an https stream with a certificate of their own,
-and the address - an Xtream login in it - goes to them. The app's own
-requests to the same provider - its lists, its guide, the login - are
-checked.
+The player and the recorder check the certificate of every https stream on
+the internet against certifi's authorities, as the app's own requests
+always did, whether Nerd is on or not (`nerd.checks_certificate`,
+`nerd._apply_tls` before every stream - the docked player and each
+multiview cell -, `nerd.strict_tls_recorder` for a recorder that reads the
+address itself). Someone on the network path who answers with a
+certificate of their own gets nothing - the login in an Xtream address
+least of all. A server at home is checked as mpv's own default does (0.37
+nothing, a newer mpv everything) - its certificate is often its own -
+unless Nerd's strict check asks for it too (Nerd > Network, "Check every
+stream's certificate", `nerd_tls_strict`). A host whose certificate the
+source pins is the bridge's to check (below); a `tls-verify` the person
+typed into mpv's options or mpv.conf wins (`Nerd.typed_tls`).
 
-*Why:* a stream that plays in mpv plays here. Many providers' certificates
-do not check out (expired, self-signed, made for another name), and a
-check turned on everywhere would stop their channels. Kept as it is: the
-maintainer's decision - playback first.
+**One that does not check out.** The stream plays nothing, its diagnosis
+says why (`diagnostics._probe_url`: "the provider's certificate could not
+be checked"), and the window asks once, on the decision card, whether that
+source may play without the check (`MainWindow._tls_offer`). Only that
+answer stores the source's own option `tls_unchecked`; its page has the
+switch to take it back (Advanced, "Play without checking the certificate").
+It is a connection setting like a proxy: sync never takes it unasked and a
+restored backup names it first (`backup.RISKY_SOURCE`).
 
-**Nerd's strict check (since 1.6.11).** Nerd > Network, "Check every
-stream's certificate" (`nerd_tls_strict`, off by default): the player is
-given `tls-verify=yes` with certifi's authorities (`nerd.strict_tls_mpv`,
-in the core's options while it is on), the recorder FFmpeg's `-tls_verify 1
--ca_file` for an https address - only https, since an option no protocol
-reads can stop FFmpeg - or mpv's options (`nerd.strict_tls_recorder`). A
-source with a trusted certificate keeps its pin's check instead (the
-bridge's); a `tls-verify` the person typed into mpv's options or mpv.conf
-wins (`Nerd.typed_tls`). Its limits: only while Nerd is on; https only; a
-provider whose certificate does not check out then plays nothing, and the
-switch's hint says so.
+*What stays:* a person who answers "Play without checking" accepts the risk
+for that source; a cast's receiver checks as it does itself; an external
+player checks as its own defaults do; and a stream on plain http has no
+certificate to check ([below](#a-provider-on-plain-http)).
 
 **What Nerd's trusted certificate does.** For one source and one server
 (host and port), the person sees the certificate first and pins exactly
@@ -592,7 +595,9 @@ address either, checked on the socket after it connects: the source's own
 server names (`note_own`, from `make_client`: its server, list, guide,
 portal and backup addresses - split-horizon DNS for one's own server is
 common) and Plex's `*.plex.direct` (a home address by design) excepted. At
-most `OUTSIDE_MAX` names are kept, the oldest let go.
+most `OUTSIDE_MAX` names are kept; a list that names more makes every
+public name count as an outsider's until the app closes (`dest_guard._FULL`)
+- it fails closed rather than let an early name go and reach home.
 
 *Why:* a box's picons and a media server's artwork are at home addresses,
 and a playlist on a server at home is common - those are home sources.
@@ -657,22 +662,32 @@ maintainer's decision.
 
 ### Programs started by the app show their arguments
 
-A recording over its own connection, a cast's converter, server mode's
-copy of an HLS channel and an external player are started with the
-stream's address as an argument (`core/recording.py`: `-i` and the
-address; `providers/cast_bridge.py`, `core/restream.ffmpeg_opener`,
-`media/players.py`), and a
-recording through Nerd's bridge with the bridge's address and key
-(`net_bridge.recorder_options`). On Linux, by default, every account on
-the computer can read another's program arguments (`ps`,
-`/proc/<pid>/cmdline`); an Xtream address carries the login. The docked
-player and multiview are libmpv inside the app, not a program of their
-own.
+On Linux, by default, every account on the computer can read another's
+program arguments (`ps`, `/proc/<pid>/cmdline`), and an Xtream address
+carries the login. Since 1.6.11:
 
-*Why:* ffmpeg, mpv and VLC take a stream's address on their command line,
-and a proxy of the app's in front of every recording and external player
-would be one more thing that can fail; it matters only with other
-accounts on the same computer. Kept as it is: the maintainer's decision.
+* **A recording over its own connection** is read by the app itself - the
+  rewind buffer's way in, with its reconnects, its route and its check of
+  where it lands (`core/dvr_ingest.Ingest`) - and handed to ffmpeg or mpv
+  on their standard input (`core/recording.Feed`, `piped`): the recorder's
+  command line has `-i pipe:0` and `-protocol_whitelist pipe`, no address,
+  and ffmpeg may open no network protocol at all.
+* **An external player** gets an http(s) address in a one-entry playlist
+  file of the user's own (0600, a name nobody can guess, in
+  `$XDG_RUNTIME_DIR` on Linux, deleted a minute later:
+  `players.handoff_file`).
+* **Nerd's bridge** is given to a recorder in its environment, which only
+  the same user can read (`net_bridge.recorder_env`), never as an argument.
+
+*What stays:* an HLS playlist the recorder must fetch itself, segment by
+segment - an address ending in .m3u8, or one the app found to be a
+playlist -, and a stream whose certificate the app cannot check while the
+player would play it unchecked (a server at home, a source let play
+unchecked), go to the recorder the old way, as an argument
+(`Feed.classic`); so do a cast's converter (`providers/cast_bridge.py`)
+and server mode's copy of an HLS channel (`core/restream.ffmpeg_opener`).
+The docked player and multiview are libmpv inside the app, not a program
+of their own.
 
 ### The cache and the logs keep the folder modes the system gives
 

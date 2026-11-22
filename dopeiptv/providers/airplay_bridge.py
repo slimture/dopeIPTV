@@ -710,7 +710,7 @@ class AirPlayBridge:
         which ffmpeg stops."""
         from ..core import privacy
         while True:
-            time.sleep(WATCH_EVERY)
+            privacy.wait_change(WATCH_EVERY)     # at once as it begins
             with self._run_lock:
                 if self._run != run or self._server is None:
                     return

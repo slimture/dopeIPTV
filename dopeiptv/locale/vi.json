@@ -3134,7 +3134,7 @@
   "backup_no_pw_go": "Lưu không có mật khẩu",
   "set_feedback_tip_card": "Góp ý và tiền tip",
   "nerd_tls_strict": "Kiểm tra chứng chỉ của mọi luồng",
-  "nerd_tls_strict_hint": "Trình phát và các bản ghi kiểm tra chứng chỉ của luồng https, như các yêu cầu của chính ứng dụng luôn làm. Nhà cung cấp có chứng chỉ không qua được kiểm tra – hết hạn, tự ký hoặc cấp cho tên khác – khi đó sẽ không phát gì: hãy tắt lại tùy chọn này, hoặc tin cậy chứng chỉ đó trên trang của nguồn.",
+  "nerd_tls_strict_hint": "Mọi luồng từ internet đều đã được kiểm tra chứng chỉ. Tùy chọn này kiểm tra cả máy chủ tại nhà – máy chủ dùng chứng chỉ tự ký sẽ không phát gì: hãy tin cậy chứng chỉ đó trên trang của nguồn.",
   "playlist_http_note": "http thường: thông tin đăng nhập đi không mã hóa trong mọi địa chỉ, ai ở dọc đường cũng đọc được. Hãy dùng https nếu nhà cung cấp có.",
   "subs_private_ask": "Nội dung này đang phát riêng tư, nên không hỏi gì OpenSubtitles cho đến khi bạn nhấn Tìm kiếm – khi đó các từ trong ô mới được gửi đi.",
   "set_card_app_icon": "Biểu tượng ứng dụng",
@@ -3149,5 +3149,10 @@
   "icon_sunset": "Hoàng hôn",
   "icon_grape": "Nho",
   "icon_round": "Tròn",
-  "icon_retro": "TV cổ điển"
+  "icon_retro": "TV cổ điển",
+  "diag_certificate": "Không thể kiểm tra chứng chỉ của nhà cung cấp: đã hết hạn, tự ký hoặc được cấp cho tên khác.",
+  "tls_offer": "Không thể kiểm tra chứng chỉ của {name}: đã hết hạn, tự ký hoặc được cấp cho tên khác. Bất kỳ ai trên đường truyền đều có thể đọc những gì được gửi, cả thông tin đăng nhập trong địa chỉ. Phát {name} mà không kiểm tra?",
+  "tls_offer_go": "Phát không kiểm tra",
+  "src_tls_unchecked": "Phát không kiểm tra chứng chỉ",
+  "src_tls_unchecked_hint": "Các luồng vẫn phát dù chứng chỉ không hợp lệ. Bất kỳ ai trên đường truyền đều có thể đọc chúng, cùng thông tin đăng nhập trong địa chỉ. Khi tắt, mọi luồng từ internet đều được kiểm tra."
 }

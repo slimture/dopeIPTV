@@ -641,3 +641,14 @@ def test_a_name_is_hidden_as_a_word_and_a_login_with_the_word_around_it():
     # A name that begins or ends with something else than a letter.
     assert report.scrub("[SE] Kanal 5 froze", ["[SE] Kanal 5"]) == "<private> froze"
     assert report.scrub("x[SE] Kanal 5y", ["[SE] Kanal 5"]) == "x[SE] Kanal 5y"
+
+
+def test_a_short_login_is_hidden_as_a_word_of_its_own():
+    """A password of one or two characters is still a login: hidden where it
+    stands as a word, never blanking the words that merely hold it."""
+    from dopeiptv.core.report import Secret, scrub
+    out = scrub("login failed for x, password ab - a cab and abc stay",
+                [Secret("ab"), Secret("x"), "TV"])
+    assert "password <private>" in out and "for <private>," in out
+    assert "a cab and abc stay" in out
+    assert scrub("TV channel", ["TV"]) == "TV channel"      # a short name is no login
