@@ -130,6 +130,106 @@ def test_a_client_that_asks_too_often_or_guesses_is_held_back(served, monkeypatc
     assert srv.limits.blocked("192.168.1.20") and not srv.limits.blocked("127.0.0.1")
 
 
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1:8080/x.ts", "http://127.1/x", "http://2130706433/x", "http://0x7f000001/x",
+    "http://0177.0.0.1/x", "http://localhost/x", "http://LOCALHOST./x", "http://a.localhost/x",
+    "http://0.0.0.0:9981/x", "http://0/x", "http://[::1]/x", "http://[::ffff:127.0.0.1]/x",
+    "http://[::]/x", "rtsp://127.0.0.1/cam", "srt://localhost:9000", "http://:8080/x",
+    "http://169.254.169.254/latest/meta-data/", "http://[fe80::1%25eth0]/x",
+    "http://metadata.google.internal/computeMetadata/v1/", "http://100.100.100.200/x",
+    "http://user:pw@127.0.0.1/x", "http://127.0.0.1:6878/other", "https://127.0.0.1:6878/ace/getstream",
+    "http://localhost:6879/ace/getstream?id=x",
+])
+def test_the_remote_api_plays_nothing_of_this_computer_or_link_local(url):
+    assert remote_api.play_refusal(url, resolve=lambda _h: []), url
+
+
+@pytest.mark.parametrize("url", [
+    "http://192.168.1.20:9981/stream/channel/1", "http://nas.local/x.ts", "http://tvheadend:9981/x",
+    "https://cdn.example.com/live/1.m3u8", "udp://@239.0.0.1:1234", "udp://@:1234", "rtp://@:5004",
+    "http://10.0.0.5/x", "http://[fd00::5]/x",
+    # AceStream's engine on this computer, as a playlist names it.
+    "http://127.0.0.1:6878/ace/getstream?id=abc", "http://localhost:6878/ace/manifest.m3u8?id=abc",
+])
+def test_the_remote_api_plays_the_home_network_and_the_internet(url):
+    assert remote_api.play_refusal(url, resolve=lambda _h: ["93.184.216.34"]) == "", url
+
+
+def test_a_name_that_resolves_to_this_computer_or_link_local_is_refused():
+    answers = {"rebind.example": ["93.184.216.34", "127.0.0.1"], "meta.example": ["169.254.169.254"],
+               "mapped.example": ["::ffff:127.0.0.1"], "fine.example": ["93.184.216.34"],
+               "home.example": ["192.168.1.20"], "gone.example": []}
+    look = answers.__getitem__
+    assert remote_api.play_refusal("http://rebind.example/x", look) == "this computer"
+    assert remote_api.play_refusal("http://meta.example/x", look) == "a link-local host"
+    assert remote_api.play_refusal("http://mapped.example/x", look) == "this computer"
+    for ok in ("fine.example", "home.example", "gone.example"):
+        assert remote_api.play_refusal(f"http://{ok}/x", look) == "", ok
+    # The system's resolver by default: localhost is this computer however it is asked.
+    assert remote_api.play_refusal("http://localhost/x") == "this computer"
+
+
+def test_the_window_answers_a_device_with_the_refusal_and_lets_this_computer_play(monkeypatch):
+    """The window's gate, on the server's thread: a device at home that
+    asks to play an address of this computer gets a 400 with the reason;
+    a script on this computer, which reaches it itself, plays it."""
+    from types import SimpleNamespace
+
+    from dopeiptv.ui.mw_remote import _RemoteMixin
+    handed = []
+    win = SimpleNamespace(_remote_bridge=SimpleNamespace(
+        call=lambda action, params: handed.append((action, params)) or {"ok": True}))
+    monkeypatch.setattr(remote_api, "asker", lambda: "192.168.1.30")
+    for url in ("http://127.0.0.1:631/admin", "http://169.254.169.254/latest/"):
+        with pytest.raises(ValueError) as e:
+            _RemoteMixin._remote_call(win, "play", {"url": url})
+        assert "not played" in str(e.value)
+    assert handed == []
+    _RemoteMixin._remote_call(win, "play", {"url": "http://192.168.1.20:9981/x.ts"})
+    _RemoteMixin._remote_call(win, "play", {"url": "http://127.0.0.1:6878/ace/getstream?id=1"})
+    _RemoteMixin._remote_call(win, "play", {"channel": "SVT1"})
+    monkeypatch.setattr(remote_api, "asker", lambda: "127.0.0.1")
+    _RemoteMixin._remote_call(win, "play", {"url": "http://127.0.0.1:631/x"})
+    assert [p.get("url") or p.get("channel") for _a, p in handed] == [
+        "http://192.168.1.20:9981/x.ts", "http://127.0.0.1:6878/ace/getstream?id=1", "SVT1",
+        "http://127.0.0.1:631/x"]
+
+
+def test_the_server_tells_who_asks_only_while_it_answers(served, window):
+    seen = []
+    window.answers["status"] = None
+    srv = served()
+    orig = srv.call
+
+    def call(action, params):
+        seen.append(remote_api.asker())
+        return orig(action, params)
+    srv.call = call
+    assert ask(srv.port, "GET", "/api/status")[0] == 200
+    assert seen == ["127.0.0.1"] and remote_api.asker() == ""
+
+
+def test_the_whole_server_has_a_budget_so_many_addresses_cannot_take_it_down(served):
+    """Beside each address's own: every address together, so a device that
+    asks from address after address gets 429 once the whole is spent. This
+    computer, never counted in it nor shut out."""
+    from dopeiptv.core import phone_remote
+    from dopeiptv.core.phone_remote import RateLimiter
+    srv = served()
+    assert srv.limits.total_rate == phone_remote.SERVER_RATE
+    assert srv.limits.total_burst == phone_remote.SERVER_BURST
+    hits = [srv.limits.allow(f"192.168.{i // 250}.{i % 250 + 1}") for i in range(400)]
+    assert sum(hits) <= phone_remote.SERVER_BURST + 2 and not hits[-1]
+    assert srv.limits.allow("127.0.0.1"), "this computer still gets in"
+    port = srv.port
+    srv.limits = RateLimiter(rate=100.0, burst=100.0, total_rate=0.001, total_burst=3)
+    codes = [ask(port, "GET", "/")[0] for _ in range(5)]
+    assert codes[:3] == [200] * 3 and set(codes[3:]) == {429}
+    srv.limits = RateLimiter(rate=100.0, burst=100.0, total_rate=0.001, total_burst=1,
+                             spare=phone_remote.this_computer)
+    assert [ask(port, "GET", "/")[0] for _ in range(5)] == [200] * 5
+
+
 def test_a_client_that_says_nothing_is_let_go(served, monkeypatch):
     """A connection opened and left silent - or a request never finished -
     is closed after a while instead of holding one of the server's threads

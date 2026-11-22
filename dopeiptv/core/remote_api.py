@@ -107,6 +107,17 @@ class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
         log.info("remote: a request failed (%s)", exc)
 
 
+#: The client whose request a server thread answers (``asker``).
+_ASKER = threading.local()
+
+
+def asker() -> str:
+    """The address of the client whose request this thread is answering -
+    for *call* to tell this computer from a device at home; "" outside a
+    request."""
+    return str(getattr(_ASKER, "who", "") or "")
+
+
 def _loopback(address: str) -> bool:
     try:
         return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
@@ -130,9 +141,12 @@ class RemoteServer:
         # Per client address: a request budget (a device at home cannot keep
         # the window's thread busy), and ten wrong tokens in a minute shut it
         # out for ten minutes - never this computer, whose scripts ask by
-        # loopback (phone_remote.RateLimiter).
-        from .phone_remote import RateLimiter
-        self.limits = RateLimiter()
+        # loopback (phone_remote.RateLimiter). Every other address together
+        # has a budget too: a device that asks from address after address
+        # cannot take the server down (429).
+        from .phone_remote import SERVER_BURST, SERVER_RATE, RateLimiter, this_computer
+        self.limits = RateLimiter(total_rate=SERVER_RATE, total_burst=SERVER_BURST,
+                                  spare=this_computer)
 
     @property
     def running(self) -> bool:
@@ -264,6 +278,13 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             return params
 
         def _handle(self, method: str) -> None:
+            _ASKER.who = str(self.client_address[0])
+            try:
+                self._answer(method)
+            finally:
+                _ASKER.who = ""
+
+        def _answer(self, method: str) -> None:
             who = str(self.client_address[0])
             if not server.client_ok(who, _own(self)):
                 self._json(403, {"error": "only this computer and the home network"})
@@ -397,6 +418,60 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
 
 def stream_path(source_id: str, stream_id: Any) -> str:
     return f"/stream/{quote(str(source_id), safe='')}/{quote(str(stream_id), safe='')}"
+
+
+# -- an address the remote API is asked to play --------------------------------------
+
+#: The most addresses a name's answer is looked through.
+_ANSWERS_MAX = 16
+#: Schemes whose address names no host when it listens here (udp://@:1234).
+_LISTENING = ("udp", "rtp")
+
+
+def _resolved(host: str) -> list[str]:
+    """The addresses *host* resolves to now; [] when it does not."""
+    try:
+        answers = socket.getaddrinfo(host, None, 0, socket.SOCK_STREAM)
+    except (OSError, UnicodeError, ValueError):
+        return []
+    return [str(a[4][0]) for a in answers[:_ANSWERS_MAX]]
+
+
+def play_refusal(url: str, resolve: Callable[[str], list[str]] | None = None) -> str:
+    """Why the remote API does not play *url*: "this computer" or "a
+    link-local host" (a router's own address, a cloud's metadata service)
+    when the address names one - loopback in any spelling, localhost, this
+    computer's name, 0.0.0.0, an IPv4 one inside IPv6, an empty host - or
+    its name resolves to one now (*resolve*: the system's resolver). "" when
+    it may be played. The home network stays: whoever asks is on it already.
+    AceStream's engine on this computer (127.0.0.1:6878/ace/) is the one
+    address of this computer played, as from a playlist. Never on the
+    window's thread: a name is looked up."""
+    from . import dest_guard, stream_address
+    text = str(url or "").strip()
+    if stream_address.acestream(text):
+        return ""
+    why = stream_address.host_refusal(text)
+    if why:
+        return why
+    try:
+        parts = urlsplit(text)
+        host = (parts.hostname or "").rstrip(".")
+    except ValueError:
+        return dest_guard.THIS_COMPUTER
+    if not host:
+        # An empty host is this computer's to FFmpeg (http://:8080/).
+        return "" if parts.scheme.lower() in _LISTENING else dest_guard.THIS_COMPUTER
+    kind = dest_guard.named_kind(host)
+    if kind in (dest_guard.THIS_COMPUTER, dest_guard.LINK_LOCAL):
+        return kind
+    if stream_address._ip(host) is not None:
+        return ""
+    for address in (resolve or _resolved)(host):
+        kind = dest_guard.ip_kind(address)
+        if kind in (dest_guard.THIS_COMPUTER, dest_guard.LINK_LOCAL):
+            return kind
+    return ""
 
 
 # -- the Nerd page's line -----------------------------------------------------------
