@@ -248,3 +248,95 @@ def test_an_internet_sources_lists_note_their_pictures_and_its_server_is_its_own
         assert g.peer_refusal("img2.provider.example", "192.168.1.1") == ""
     finally:
         g.forget_names()
+
+
+# -- through a proxy: the name looked up here first (best effort) ------------------------
+
+def _answers(monkeypatch, table):
+    looked = []
+    real = socket.getaddrinfo
+
+    def fake(host, port, *a, **kw):
+        if host == "127.0.0.1":
+            return real(host, port, *a, **kw)       # the proxy itself
+        looked.append(host)
+        if host not in table:
+            raise socket.gaierror("no such name here")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port)) for ip in table[host]]
+    monkeypatch.setattr(socket, "getaddrinfo", fake)
+    return looked
+
+
+def test_a_proxied_requests_name_is_judged_by_what_it_resolves_to_here(monkeypatch):
+    g.forget_names()
+    try:
+        looked = _answers(monkeypatch, {
+            "rebind.example.com": ["93.184.216.34", "127.0.0.1"],
+            "meta.example.com": ["169.254.169.254"], "fine.example.com": ["93.184.216.34"],
+            "img.provider.example": ["192.168.1.1"], "my-server.example": ["192.168.1.5"],
+            "nas.local": ["192.168.1.9"]})
+        assert g.proxied_refusal("http://rebind.example.com/x") == g.THIS_COMPUTER
+        assert g.proxied_refusal("https://meta.example.com/latest") == g.LINK_LOCAL
+        assert g.proxied_refusal("https://fine.example.com/a.png") == ""
+        # Home only for a public name a source on the internet named; the
+        # person's own server and a home name stay theirs.
+        g.note_outside("https://img.provider.example/a.png")
+        g.note_own("https://my-server.example")
+        assert g.proxied_refusal("https://img.provider.example/a.png") == g.HOME
+        assert g.proxied_refusal("https://my-server.example/player_api.php") == ""
+        assert g.proxied_refusal("http://nas.local/x") == ""
+        # An address as written is as it is; a name not resolved here is the
+        # proxy's to look up.
+        n = len(looked)
+        assert g.proxied_refusal("http://10.0.0.5/x") == ""
+        assert g.proxied_refusal("http://unknown.example/x") == ""
+        assert len(looked) == n + 1
+        # Kept a moment: thousands of pictures, one lookup.
+        for _ in range(5):
+            g.proxied_refusal("https://fine.example.com/b.png")
+        assert looked.count("fine.example.com") == 1
+    finally:
+        g.forget_names()
+
+
+def test_a_proxied_request_to_this_computer_is_never_sent(monkeypatch, local_server):
+    """Through a proxy - the person's own, or one in the environment - the
+    proxy connects, so check_peer sees only it: the request is refused
+    before anything goes, and one that may go reaches the proxy."""
+    g.forget_names()
+    try:
+        _answers(monkeypatch, {"rebind.example.com": ["127.0.0.1"],
+                               "fine.example.com": ["93.184.216.34"]})
+        for var in ("NO_PROXY", "no_proxy"):
+            monkeypatch.delenv(var, raising=False)
+        proxy = {"http": f"http://127.0.0.1:{local_server}",
+                 "https": f"http://127.0.0.1:{local_server}"}
+        with pytest.raises(requests.DestinationRefused):
+            requests.get("http://rebind.example.com/secret", proxies=proxy, timeout=5)
+        assert issubclass(requests.DestinationRefused, requests.ConnectionError)
+        assert _Seen.hits == [], "nothing reached the proxy"
+        s = requests.Session()
+        with pytest.raises(requests.DestinationRefused):
+            s.get("http://rebind.example.com/secret", proxies=proxy, timeout=5)
+        # One that may go is sent to the proxy, as it always was.
+        assert requests.get("http://fine.example.com/ok", proxies=proxy, timeout=5).text == "ok"
+        assert _Seen.hits == ["http://fine.example.com/ok"]
+    finally:
+        g.forget_names()
+
+
+def test_a_route_s_adapter_checks_a_proxied_request_too(monkeypatch, local_server):
+    from dopeiptv.core import net_adapter, net_route
+    g.forget_names()
+    try:
+        _answers(monkeypatch, {"rebind.example.com": ["127.0.0.1"]})
+        route = net_route.Route(family="ipv4")
+        a = net_adapter.adapter(route)
+        s = requests.Session()
+        s.mount("http://", a)
+        with pytest.raises(requests.DestinationRefused):
+            s.get("http://rebind.example.com/x", timeout=5,
+                  proxies={"http": f"http://127.0.0.1:{local_server}"})
+        assert _Seen.hits == []
+    finally:
+        g.forget_names()

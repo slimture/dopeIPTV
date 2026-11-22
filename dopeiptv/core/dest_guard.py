@@ -10,7 +10,10 @@ should not go:
   after it connects and before a byte is sent (``peer_refusal``,
   ``check_peer``) - so a name whose DNS answer changes between a check and
   the connection (DNS rebinding) is caught at the connection. Through a
-  proxy the proxy connects; there the name is not checked here. A public
+  proxy the proxy connects: there the request's name is looked up here
+  first and judged by the same rule (``proxied_refusal``, from
+  core/_lazy_requests.py's adapter) - best effort, since the proxy's own
+  lookup, and where it then connects, are the proxy's. A public
   name a source on the internet named for the app to fetch itself - a
   picture of its lists, its playlist's guide (``note_outside``) - never
   reaches the home network either, unless the person gave that name
@@ -33,6 +36,7 @@ import functools
 import ipaddress
 import socket
 import threading
+import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -136,6 +140,7 @@ def forget_names() -> None:
         _OUTSIDE.clear()
         _OWN.clear()
         _FULL[0] = False
+        _proxied.clear()
 
 
 def ip_kind(address: str) -> str:
@@ -221,6 +226,46 @@ def _resolved(host: str, port: int) -> list[str]:
     except (OSError, UnicodeError, ValueError):
         return []
     return [str(a[4][0]) for a in answers[:_ANSWERS_MAX]]
+
+
+#: A proxied request's target looked up here (``proxied_refusal``): kept
+#: this long per host and port, at most _PROXIED_MAX - pictures through a
+#: proxy are thousands of requests to a few hosts.
+PROXIED_TTL = 30.0
+_PROXIED_MAX = 1024
+_proxied: dict[tuple[str, int], tuple[float, str]] = {}
+
+
+def proxied_refusal(url: str) -> str:
+    """Why a request for *url* that goes through a proxy may not be sent:
+    its host looked up here first and judged as ``peer_refusal`` judges a
+    connection - this computer for a name that is not this computer's,
+    link-local or a cloud's metadata service, and, for a public name a
+    source on the internet named (``note_outside``), the home network.
+    Any of its answers counts. "" when it may - also when the name does not
+    resolve here: best effort, since the proxy looks the name up itself
+    and connects where its own answer says (that lookup is the proxy's)."""
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").rstrip(".").lower()
+        port = parts.port or (443 if parts.scheme.lower() == "https" else 80)
+    except ValueError:
+        return "an address that cannot be read"
+    if not host:
+        return ""
+    if stream_address._ip(host) is not None:
+        return ""                           # an address as written: as it is
+    now = time.monotonic()
+    with _NAMES_LOCK:
+        hit = _proxied.get((host, port))
+    if hit is not None and now - hit[0] < PROXIED_TTL:
+        return hit[1]
+    why = next((w for w in (peer_refusal(host, a) for a in _resolved(host, port)) if w), "")
+    with _NAMES_LOCK:
+        if len(_proxied) >= _PROXIED_MAX:
+            _proxied.clear()
+        _proxied[(host, port)] = (now, why)
+    return why
 
 
 def redirect_refusal(origin: str, target: str, resolve: bool = True) -> str:
