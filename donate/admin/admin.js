@@ -834,7 +834,7 @@
   function badge(text, cls) { return mk("span", "badge" + (cls ? " " + cls : ""), text); }
   // How long single visits are kept (donate.py: STATS_VISITS_DAYS), in words.
   function keptFor() {
-    const n = (data && data.visits_days) || 14;
+    const n = (data && data.visits_days) || 7;
     return n < 60 ? n + " days" : Math.round(n / 30.44) + " months";
   }
   // From iOS 26 Safari says iOS 18 for every newer system; its own version is
@@ -1218,7 +1218,7 @@
     const people = new Set(counted.map((v) => v.id)).size;
     let span = "";
     if (f) {
-      const kept = (data && data.visits_days) || 14;
+      const kept = (data && data.visits_days) || 7;
       span = !days || days > kept ? " in the last " + keptFor() + " (single visits are kept that long)"
                                   : " in the last " + days + " days";
     }

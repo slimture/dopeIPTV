@@ -1188,9 +1188,9 @@ class Handler(BaseHTTPRequestHandler):
             body["dl"] = admin.download_counts(stats_dir, downloads_json)
             try:
                 import stats_collect
-                body["visits_days"] = int(getattr(stats_collect, "VISITS_DAYS", 14))
+                body["visits_days"] = int(getattr(stats_collect, "VISITS_DAYS", 7))
             except ImportError:
-                body["visits_days"] = 14
+                body["visits_days"] = 7
             try:
                 import analysis
                 body["help"] = analysis.help_questions(admin.SITE)
@@ -2000,7 +2000,7 @@ def start_statistics() -> str:
     swap_said = {"none": "no swap", "encrypted": "swap encrypted",
                  "plain": "SWAP NOT ENCRYPTED (" + ", ".join(swap["plain"]) + ") - see the server's runbook",
                  "unknown": "swap could not be asked"}[swap["state"]]
-    asked = CONF.get("STATS_VISITS_DAYS", "14")
+    asked = CONF.get("STATS_VISITS_DAYS", "7")
     cut = f" (STATS_VISITS_DAYS {asked} cut to {stats_collect.VISITS_DAYS_MAX})" \
         if asked.strip().isdigit() and int(asked) > stats_collect.VISITS_DAYS_MAX else ""
     print(f"[donate] statistics: lines from nginx at {path} ({how}), counted every {STATS_EVERY} s, "

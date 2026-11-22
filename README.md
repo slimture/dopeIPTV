@@ -114,7 +114,7 @@ The same service serves the admin page, `/admin/` for its admins only
 and an authenticator code, and invites for a new admin:
 `donate/admin_auth.py`): unique visitors, how they found the
 site, countries, browsers and devices, downloads and tips by day,
-week, month and year, and every visit of the last 13 months one by one -
+week, month and year, and every visit of the last 7 days one by one -
 sorted, grouped and filtered as wanted (`donate/admin/logtools.js`) - and an
 Analysis tab (`donate/admin/analysis.js`, `donate/analysis.py`) that breaks
 those visits down by any data point, split by a second, with patterns,

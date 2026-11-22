@@ -2,7 +2,7 @@
 """The statistics' promises kept by the code, not by habit (stats_collect.py,
 admin.py, donate.py):
 
-- a day's visits are kept 14 days at the most, whatever STATS_VISITS_DAYS
+- a day's visits are kept 7 days at the most, whatever STATS_VISITS_DAYS
   says;
 - what should be gone is looked for after every run and deleted again; what
   cannot be deleted is said once in the log and on the admin page until it
@@ -45,19 +45,30 @@ def _module(extra: str = ""):
     return stats_collect, stats
 
 
-def test_visits_are_never_kept_past_fourteen_days():
+def test_visits_are_never_kept_past_seven_days():
     sc, _dir = _module("STATS_VISITS_DAYS=60\n")
-    assert sc.VISITS_DAYS_MAX == 14 and sc.VISITS_DAYS == 14
-    sc, _dir = _module("STATS_VISITS_DAYS=7\n")
-    assert sc.VISITS_DAYS == 7, "shorter is allowed"
+    assert sc.VISITS_DAYS_MAX == 7 and sc.VISITS_DAYS == 7
+    sc, _dir = _module("STATS_VISITS_DAYS=14\n")
+    assert sc.VISITS_DAYS == 7, "the two weeks of before are cut to it"
+    sc, _dir = _module("STATS_VISITS_DAYS=3\n")
+    assert sc.VISITS_DAYS == 3, "shorter is allowed"
     sc, _dir = _module("STATS_VISITS_DAYS=0\n")
     assert sc.VISITS_DAYS == 1
     sc, _dir = _module("STATS_VISITS_DAYS=forever\n")
-    assert sc.VISITS_DAYS == 14
+    assert sc.VISITS_DAYS == 7
+    sc, _dir = _module()
+    assert sc.VISITS_DAYS == 7, "without the setting"
     # The admin page and the start line take the cut value, not the file's.
     src = open(os.path.join(HERE, "donate.py"), encoding="utf-8").read()
-    assert 'body["visits_days"] = int(getattr(stats_collect, "VISITS_DAYS", 14))' in src
-    assert 'CONF.get("STATS_VISITS_DAYS", "14") or 14' not in src
+    assert 'body["visits_days"] = int(getattr(stats_collect, "VISITS_DAYS", 7))' in src
+    assert 'CONF.get("STATS_VISITS_DAYS", "7") or 7' not in src
+    assert '"14"' not in src.split("def start_statistics", 1)[-1].split("\ndef ", 1)[0]
+    # The admin page says how long single visits are kept from what it is
+    # told, and its own word before that is the same.
+    js = open(os.path.join(HERE, "admin", "admin.js"), encoding="utf-8").read()
+    assert "data.visits_days) || 7" in js and "data.visits_days) || 14" not in js
+    page = open(os.path.join(HERE, "admin", "index.html"), encoding="utf-8").read()
+    assert '<span id="kept">7 days</span>' in page
     assert "visits kept {stats_collect.VISITS_DAYS} days" in src
 
 
@@ -177,9 +188,9 @@ def test_swap_is_asked_of_the_system():
     assert "swap = stats_collect.swap_state()" in src and "SWAP NOT ENCRYPTED" in src
 
 
-def test_fourteen_days_means_fourteen_dates():
-    # Today and the 13 days before it are kept; the 14th day back is gone at
-    # the first run that day - a visit is never kept past 14 days.
+def test_seven_days_means_seven_dates():
+    # Today and the 6 days before it are kept; the 7th day back is gone at
+    # the first run that day - a visit is never kept past 7 days.
     sc, _dir = _module()
     os.makedirs(sc.VISITS_DIR)
     today = date.today()

@@ -65,7 +65,7 @@ can open while the key is in its memory - so that a visit can go on after a
 restart. A payment is never on a visit, only in the day's count: the
 visit's time, country and browser beside the payment service's record of
 who paid would tie the two together. A visit ends after 30 minutes without
-a page. After STATS_VISITS_DAYS days (14, and never more: VISITS_DAYS_MAX)
+a page. After STATS_VISITS_DAYS days (7, and never more: VISITS_DAYS_MAX)
 a day's visits are deleted, every one: no row of a visit is kept past them,
 in detail or made anonymous. Every run then looks for what should be gone
 (left_behind) and deletes it again; what cannot be deleted is said in the
@@ -202,11 +202,11 @@ VISITS_DIR = os.path.join(STATS_DIR, "visits")
 ANON_DIR = os.path.join(STATS_DIR, "visits-anon")
 UPDATES_DIR = os.path.join(STATS_DIR, "updates")
 #: A day's visits in detail are kept this many days at most, whatever
-#: STATS_VISITS_DAYS says: the privacy policy promises 14, so a larger value
+#: STATS_VISITS_DAYS says: the privacy policy promises 7, so a larger value
 #: is cut to it (said at the start, donate.start_statistics).
-VISITS_DAYS_MAX = 14
+VISITS_DAYS_MAX = 7
 try:
-    VISITS_DAYS = min(VISITS_DAYS_MAX, max(1, int(CONF.get("STATS_VISITS_DAYS", "14"))))
+    VISITS_DAYS = min(VISITS_DAYS_MAX, max(1, int(CONF.get("STATS_VISITS_DAYS", "7"))))
 except ValueError:
     VISITS_DAYS = VISITS_DAYS_MAX
 #: The app's updates one by one, each at its hour, for the visitor log; the
@@ -1959,8 +1959,8 @@ def fold_day(stats: dict, day: str) -> None:
 def _forget_old(stats: dict | None = None) -> None:
     """Visits of STATS_VISITS_DAYS days ago and older: their day's counts
     per way in kept (funnel_of), then the day's file deleted - no row of a
-    visit stays. Today and the 13 days before it are the 14 kept, so a
-    visit is gone 14 days after its day began, at the first run then. The
+    visit stays. Today and the 6 days before it are the 7 kept, so a
+    visit is gone 7 days after its day began, at the first run then. The
     day's lists of who came are folded with it (fold_day)."""
     cutoff = (datetime.now(timezone.utc).date() - timedelta(days=VISITS_DAYS)).isoformat()
     for f in sorted(glob.glob(os.path.join(VISITS_DIR, "*.json"))):

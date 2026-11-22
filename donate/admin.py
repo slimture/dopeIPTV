@@ -457,8 +457,9 @@ def data(days: int, stats_dir: str, downloads_json: str, key: str, api_version: 
 
 def by_channel(stats_dir: str, first: str, last: str) -> list:
     """Per way in (search, social...): visits, and how many of them read more
-    than one page, downloaded, opened the donate dialog - from the visits of
-    the last two weeks and, before them, the days' own counts of them."""
+    than one page, downloaded, opened the donate dialog - from the visits
+    kept in detail (STATS_VISITS_DAYS) and, before them, the days' own
+    counts of them."""
     rows: dict = {}
 
     def add(channel: str, pages: int, secs: int, downloaded: bool, donate: bool, timed: bool) -> None:

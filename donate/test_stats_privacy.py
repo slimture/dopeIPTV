@@ -380,8 +380,8 @@ def test_no_row_of_a_visit_is_kept_past_its_days():
     the support dialog."""
     from datetime import date, timedelta
     sc, stats = _module()
-    assert sc.VISITS_DAYS == 14
-    old = (date.today() - timedelta(days=20)).isoformat()
+    assert sc.VISITS_DAYS == 7
+    old = (date.today() - timedelta(days=10)).isoformat()
     recent = (date.today() - timedelta(days=2)).isoformat()
     os.makedirs(sc.VISITS_DIR)
     rows = [{"id": "a", "start": 0, "pages": [[0, "/", 20], [30, "/help/", 40]], "time": 60,
@@ -395,7 +395,7 @@ def test_no_row_of_a_visit_is_kept_past_its_days():
     data = {"days": {old: {"views": 3}, recent: {"views": 3}}}
     sc._forget_old(data)
     assert not os.path.exists(os.path.join(sc.VISITS_DIR, old + ".json")), "its visits gone"
-    assert os.path.exists(os.path.join(sc.VISITS_DIR, recent + ".json")), "two weeks in detail"
+    assert os.path.exists(os.path.join(sc.VISITS_DIR, recent + ".json")), "a week in detail"
     assert data["days"][old]["funnel"] == {"Search": [1, 1, 60, 1, 1, 1], "": [1, 0, 0, 0, 0, 0]}
     assert "Lynx" not in json.dumps(data) and "IS" not in json.dumps(data)
     assert not os.path.exists(sc.ANON_DIR)

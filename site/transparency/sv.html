@@ -602,7 +602,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <section class="tp-part tp-i-website">
 <h2 id="website">10. Spårar den här webbplatsen mig?</h2>
 <p class="tp-promise tp-promise-ico">Vi räknar besök utan kakor, utan externa tjänster – och utan att din IP-adress någonsin skrivs ned, inte ens i en logg.</p>
-<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att någon besökte sidan – från vilket land, med vilken webbläsare och vilket system, vilka sidor och hur länge, vad som laddades ned och vilken webbplats som länkade hit – i 14 dagar som ett besök, därefter bara som antal. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
+<p class="tp-know tp-know-ico"><b>Det här kan vi veta:</b> att någon besökte sidan – från vilket land, med vilken webbläsare och vilket system, vilka sidor och hur länge, vad som laddades ned och vilken webbplats som länkade hit – i 7 dagar som ett besök, därefter bara som antal. Din IP-adress sparas aldrig: den passerar serverns minne i högst en minut.</p>
 <details class="tp-fold tp-how">
 <summary><span class="tp-fold-t">Så fungerar det</span></summary>
 <div class="tp-fold-body">
@@ -610,10 +610,10 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>Webbservern</b> skriver ingenting: den lämnar varje sidvisning direkt till en liten tjänst – med IP-adressen, och av adressen du bad om bara sidan, aldrig det en länk lade till.</li>
 <li><b>Inom en minut</b> räknar tjänsten den, i sitt minne: adressen blir ett land (uppslaget på vår egen server) och ett besökarmärke, och glöms. Ingen logg, ingen fil och ingen säkerhetskopia innehåller den någonsin.</li>
 <li><b>Det som skrivs</b> är besöket utan adressen och med märket bara förseglat: besökaren namngiven för den dagen, tiden på en halvtimme när, vilken sorts skärm, aldrig dess storlek.</li>
-<li><b>Efter 14 dagar</b> – aldrig längre – raderas dagens besök, vartenda ett, och tjänsten kontrollerar att de verkligen är borta. Det som finns kvar är antal: hur många besök, sidor och nedladdningar, och listor som inte nämner något land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen – resten är "övrigt", och ingen lista lägger ihop dagar igen under ett namn.</li>
+<li><b>Efter 7 dagar</b> – aldrig längre – raderas dagens besök, vartenda ett, och tjänsten kontrollerar att de verkligen är borta. Det som finns kvar är antal: hur många besök, sidor och nedladdningar, och listor som inte nämner något land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen – resten är "övrigt", och ingen lista lägger ihop dagar igen under ett namn.</li>
 </ol>
 <p>Besökarmärket är en <strong>nyckelhash</strong>: IP-adressen och webbläsarens namn körs genom HMAC-SHA256 med en nyckel för månaden. Nyckeln finns bara i minnet, aldrig på en disk eller i en säkerhetskopia, och glöms efter två månader. Inom en månad får samma besökare samma märke, så att vi kan räkna unika och återkommande besökare. Ett sparat besök har märket med sig bara förseglat med månadens nyckel: för den som har en kopia av diskarna är det slumpade tecken, och inget annat i besöket knyter ihop två dagar. Men tjänsten själv kan öppna det medan nyckeln finns – så räknar den en besökare som kommer tillbaka – och kan alltså se att två av de sparade besöken var samma besökares. När nyckeln är glömd, efter två månader, kan ingen det längre.</p>
-<p>Hur länge varje del sparas: din IP-adress – aldrig; i högst en minut i minnet. Varje besök i detalj – landet, webbläsaren och dess huvudversion, systemet och sortens enhet och skärm, sidans språk och webbläsarens utan sitt land, sidorna och tiden på dem, nedladdningar och det som klickades, webbplatsen som länkade under sitt registrerade namn, tiden på en halvtimme när och det som hände på tio sekunder när – 14 dagar, sedan raderat; ingen rad av ett besök sparas efter det, inte ens en anonym. Räkningen av olika besökare – skisser utan något märke, bara i minnet – tills månaden efter är slut, sedan bara antalet olika besökare den månaden och dess veckor. Dagens summor för alltid – per väg in (sök, sociala medier…) också hur många besök som läste vidare, laddade ned eller öppnade stödrutan – utan land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen. En betalning noteras aldrig på ett besök – dricks räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
+<p>Hur länge varje del sparas: din IP-adress – aldrig; i högst en minut i minnet. Varje besök i detalj – landet, webbläsaren och dess huvudversion, systemet och sortens enhet och skärm, sidans språk och webbläsarens utan sitt land, sidorna och tiden på dem, nedladdningar och det som klickades, webbplatsen som länkade under sitt registrerade namn, tiden på en halvtimme när och det som hände på tio sekunder när – 7 dagar, sedan raderat; ingen rad av ett besök sparas efter det, inte ens en anonym. Räkningen av olika besökare – skisser utan något märke, bara i minnet – tills månaden efter är slut, sedan bara antalet olika besökare den månaden och dess veckor. Dagens summor för alltid – per väg in (sök, sociala medier…) också hur många besök som läste vidare, laddade ned eller öppnade stödrutan – utan land, språk, version, webbplats eller märkning som färre än fem besökare hade den dagen. En betalning noteras aldrig på ett besök – dricks räknas bara i dagens summa – så ett besök kan inte kopplas till betaltjänstens uppgifter om vem som betalade.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -624,7 +624,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:ex website log-->
 <p class="tp-ex-h">Det statistiken sparar av det besöket – ingen IP-adress, inget märke, tiden på en halvtimme när:</p>
 <!--tp:ex website visit-->
-<p class="tp-ex-h">Det som finns kvar av det efter 14 dagar – ett antal bland dagens, per väg in (besök, läste vidare, sekunder, tidsatta, laddade ned, stödrutan):</p>
+<p class="tp-ex-h">Det som finns kvar av det efter 7 dagar – ett antal bland dagens, per väg in (besök, läste vidare, sekunder, tidsatta, laddade ned, stödrutan):</p>
 <!--tp:ex website anon-->
 <p class="fine">Framtaget genom att köra webbplatsens egen kod, med en påhittad nyckel.</p>
 <h3>Koden</h3>
@@ -634,7 +634,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code website sketch-->
 <p>Hur länge besöken sparas, och det enda ställe där dricks räknas – per dag, aldrig på besöket:</p>
 <!--tp:code website kept-->
-<p>Var skisserna sparas, det som finns kvar av en dags besök efter 14 dagar, dagens listor då, och kontrollen att det som borde vara borta är borta:</p>
+<p>Var skisserna sparas, det som finns kvar av en dags besök efter 7 dagar, dagens listor då, och kontrollen att det som borde vara borta är borta:</p>
 <!--tp:code website anon-->
 <h3>Kontrollera det själv</h3>
 <p>Här kan du kontrollera mer än koden. Öppna webbläsarens utvecklarverktyg på valfri sida på webbplatsen:</p>
@@ -654,7 +654,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Till skillnad från appen kan du inte granska vår server: du får lita på att den kör den här koden, och att webbservern och dess loggar är inställda så som del 11 säger – den inställningen visar vi inte här. Det du själv kan kontrollera är vad din webbläsare laddar och sparar.</li>
 <li>Medan tjänsten körs passerar din adress dess minne, och månadens nyckel finns där. Den som tog över den körande servern skulle kunna se anropen när de kommer, som på vilken webbserver som helst – det som finns på dess diskar, nu eller i en säkerhetskopia, leder inte tillbaka till dig.</li>
 <li>Månadens nyckel finns bara i minnet. Flyttade servern ut minne till swap på en okrypterad disk skulle nyckeln kunna hamna där. Vår swap är krypterad med en nyckel som glöms vid omstart, och tjänsten kontrollerar det och varnar oss om det inte stämmer – men slutar inte räkna.</li>
-<li>Ett besök som sparas i 14 dagar säger vad som gjordes under det, på en halvtimme när. Den som redan visste att du besökte sidan ungefär då – och vad du gjorde – skulle kunna plocka ut det besöket bland dagens, och en lugn dag säger även summorna att en besökare kom från ett visst land. Det gör det mycket svårare, inte omöjligt, att veta vem som besökte sidan; mer än så lovar vi inte.</li>
+<li>Ett besök som sparas i 7 dagar säger vad som gjordes under det, på en halvtimme när. Den som redan visste att du besökte sidan ungefär då – och vad du gjorde – skulle kunna plocka ut det besöket bland dagens, och en lugn dag säger även summorna att en besökare kom från ett visst land. Det gör det mycket svårare, inte omöjligt, att veta vem som besökte sidan; mer än så lovar vi inte.</li>
 </ul>
 </div>
 </details>

@@ -30,6 +30,11 @@ OBSOLETE = {
         "until we clean it out",                     # the error logs are turned over
         "not turned over by themselves",
         "Neither is turned over by itself",
+        "for 14 days",                               # visits are kept 7 days since November 2026
+        "For 14 days in detail",
+        "After 14 days",
+        "after 14 days",
+        "– 14 days, then deleted",
     ],
     "sv": [
         "statistikens två serverloggar",
@@ -39,6 +44,11 @@ OBSOLETE = {
         "tills vi rensar bort den",
         "byts inte av sig själva",
         "Ingen av dem byts av sig själv",
+        "i 14 dagar",
+        "I 14 dagar i detalj",
+        "Efter 14 dagar",
+        "efter 14 dagar",
+        "– 14 dagar, sedan raderat",
     ],
 }
 
@@ -61,10 +71,10 @@ def test_no_sentence_of_before_is_left():
 def test_the_numbers_are_the_codes():
     with open(os.path.join(HERE, "stats_collect.py"), encoding="utf-8") as fh:
         src = fh.read()
-    assert re.search(r"^VISITS_DAYS_MAX = 14$", src, re.M)
+    assert re.search(r"^VISITS_DAYS_MAX = 7$", src, re.M)
     assert re.search(r"^KEPT_MONTHS = 2\b", src, re.M)
-    say = {"en": ("14 days", "two months", "a week at the most"),
-           "sv": ("14 dagar", "två månader", "högst en vecka")}
+    say = {"en": ("7 days", "two months", "a week at the most"),
+           "sv": ("7 dagar", "två månader", "högst en vecka")}
     for lang, words in say.items():
         policy = _pages(lang)["legal/" + lang + "/privacy.html"]
         for w in words:

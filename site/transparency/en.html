@@ -602,7 +602,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <section class="tp-part tp-i-website">
 <h2 id="website">10. Does this website track me?</h2>
 <p class="tp-promise tp-promise-ico">We count visits without cookies, without outside services – and without your IP address ever being written down, not even in a log.</p>
-<p class="tp-know tp-know-ico"><b>What we can know:</b> that someone visited – from which country, with which browser and system, which pages and for how long, what was downloaded and which site linked here – for 14 days as a visit, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
+<p class="tp-know tp-know-ico"><b>What we can know:</b> that someone visited – from which country, with which browser and system, which pages and for how long, what was downloaded and which site linked here – for 7 days as a visit, after that only as counts. Your IP address is never kept: it passes the server's memory for a minute at most.</p>
 <details class="tp-fold tp-how">
 <summary><span class="tp-fold-t">How it works</span></summary>
 <div class="tp-fold-body">
@@ -610,10 +610,10 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li><b>The web server</b> writes nothing: it hands each page view straight to a small service – with the IP address, and of the address you asked for only the page, never what a link added to it.</li>
 <li><b>Within a minute</b> the service counts it, in its memory: the address becomes a country (looked up on our own server) and a visitor mark, and is forgotten. No log, no file and no backup ever holds it.</li>
 <li><b>What is written</b> is the visit without the address and with the mark only sealed: its visitor named for that day, its time to the half hour, the kind of screen, never its size.</li>
-<li><b>After 14 days</b> – never more – the day's visits are deleted, every one, and the service checks that they really are gone. What stays is counts: how many visits, pages and downloads, and lists that name no country, language, version, site or tag fewer than five visitors had that day – the rest is "other", and no list adds days up again under a name.</li>
+<li><b>After 7 days</b> – never more – the day's visits are deleted, every one, and the service checks that they really are gone. What stays is counts: how many visits, pages and downloads, and lists that name no country, language, version, site or tag fewer than five visitors had that day – the rest is "other", and no list adds days up again under a name.</li>
 </ol>
 <p>The visitor mark is a <strong>keyed hash</strong>: the IP address and the browser's name run through HMAC-SHA256 with a key for the month. The key is only in memory, never on a disk or in a backup, and is forgotten after two months. Within a month the same visitor gets the same mark, so we can count unique and returning visitors. A visit kept carries the mark only sealed with the month's key: to someone with a copy of the disks it is random characters, and nothing else in the visit ties two days together. But the service itself can open it while the key is there – that is how it counts a visitor who comes back – and so can tell that two of the visits kept were one visitor's. Once the key is forgotten, after two months, no one can.</p>
-<p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – the country, the browser and its main version, the system and the kind of device and screen, the page's language and the browser's without its country, the pages and the time on them, downloads and what was clicked, the site that linked by its registered name, its time to the half hour and what happened in it to ten seconds – 14 days, then deleted; no row of a visit is kept after that, not even an anonymous one. The count of different visitors – sketches that hold no mark, in memory alone – until the month after has ended, then only the number of different visitors in that month and its weeks. The day's counts for good – per way in (search, social…) how many visits read on, downloaded or opened the support dialog, too – with no country, language, version, site or tag fewer than five visitors had that day. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
+<p>How long each part is kept: your IP address – never; a minute in memory at the most. Each visit in detail – the country, the browser and its main version, the system and the kind of device and screen, the page's language and the browser's without its country, the pages and the time on them, downloads and what was clicked, the site that linked by its registered name, its time to the half hour and what happened in it to ten seconds – 7 days, then deleted; no row of a visit is kept after that, not even an anonymous one. The count of different visitors – sketches that hold no mark, in memory alone – until the month after has ended, then only the number of different visitors in that month and its weeks. The day's counts for good – per way in (search, social…) how many visits read on, downloaded or opened the support dialog, too – with no country, language, version, site or tag fewer than five visitors had that day. A payment is never noted on a visit – a tip counts only in the day's total – so a visit cannot be tied to the payment service's record of who paid.</p>
 </div>
 </details>
 <details class="tp-proof">
@@ -624,7 +624,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:ex website log-->
 <p class="tp-ex-h">What the statistics keep of that visit – no IP address, no mark, its time to the half hour:</p>
 <!--tp:ex website visit-->
-<p class="tp-ex-h">What is left of it after 14 days – a count among the day's, per way in (visits, read on, seconds, timed, downloaded, support dialog):</p>
+<p class="tp-ex-h">What is left of it after 7 days – a count among the day's, per way in (visits, read on, seconds, timed, downloaded, support dialog):</p>
 <!--tp:ex website anon-->
 <p class="fine">Made by running the site's own code, with a made-up key.</p>
 <h3>The code</h3>
@@ -634,7 +634,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <!--tp:code website sketch-->
 <p>How long the visits are kept, and the one place a tip is counted – per day, never on the visit:</p>
 <!--tp:code website kept-->
-<p>Where the sketches are kept, what is left of a day's visits after 14 days, a day's lists then, and the check that what should be gone is gone:</p>
+<p>Where the sketches are kept, what is left of a day's visits after 7 days, a day's lists then, and the check that what should be gone is gone:</p>
 <!--tp:code website anon-->
 <h3>Check it yourself</h3>
 <p>Here you can check more than the code. Open your browser's developer tools on any page of this site:</p>
@@ -654,7 +654,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Unlike the app, our server is not something you can inspect: you have to trust that it runs this code, and that the web server and its logs are set up as part 11 says – that setup we do not show here. What you can check yourself is what your browser loads and keeps.</li>
 <li>While the service runs, your address passes its memory and the month's key is there. Someone who took over the running server could watch requests as they come, as on any web server – what is on its disks, now or in a backup, does not lead back to you.</li>
 <li>The month's key is only in memory. Were the server to move memory out to swap on an unencrypted disk, the key could land there. Our swap is encrypted with a key that a restart forgets, and the service checks this and warns us if it is not so – but does not stop counting.</li>
-<li>A visit kept for 14 days says what was done in it, to the half hour. Someone who already knew that you visited at about that time – and what you did – could pick that visit out among the day's, and on a quiet day the counts too say that one visitor came from a country. That makes it much harder, not impossible, to tell who visited; we do not claim more.</li>
+<li>A visit kept for 7 days says what was done in it, to the half hour. Someone who already knew that you visited at about that time – and what you did – could pick that visit out among the day's, and on a quiet day the counts too say that one visitor came from a country. That makes it much harder, not impossible, to tell who visited; we do not claim more.</li>
 </ul>
 </div>
 </details>
