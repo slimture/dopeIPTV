@@ -94,11 +94,15 @@ def test_a_network_address_with_a_login_goes_in_a_handoff_file(monkeypatch):
     seen = []
     monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/mpv")
     monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: seen.append(cmd))
-    for url in ("rtsp://cam:pw@cam.invalid/live", "srt://h.invalid:9000?passphrase=pw",
-                "rtmp://h.invalid/app/x?token=pw"):
+    # A login no random file name can hold by chance ("pw" once failed a
+    # run: the handoff file's own random name had those two letters).
+    for url in ("rtsp://cam:s3cr3tword@cam.invalid/live",
+                "srt://h.invalid:9000?passphrase=s3cr3tword",
+                "rtmp://h.invalid/app/x?token=s3cr3tword"):
         seen.clear()
         players.launch_player("mpv", url, "T")
-        assert not any("pw" in a for a in seen[0]) and seen[0][-1].startswith("--playlist=")
+        assert not any("s3cr3tword" in a for a in seen[0])
+        assert seen[0][-1].startswith("--playlist=")
         import os
         os.remove(seen[0][-1].split("=", 1)[1])
     assert players.handed_over("https://h/x") and players.handed_over("rtsp://192.168.1.5/?src=1")
