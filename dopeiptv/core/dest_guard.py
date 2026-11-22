@@ -119,7 +119,16 @@ def note_outside(address: str) -> None:
 
 def note_own(address: str) -> None:
     """*address* (or its host) is one the person gave: a source's own
-    server or backup address. Never refused for leading home."""
+    server or backup address. Never refused for leading home - a server at
+    home by its public name (split-horizon DNS) answers there. Whoever runs
+    that name's DNS can point it home too, and the app's requests to it -
+    its lists, and the pictures and guide it names on that name - then
+    reach a device at home: a GET of their choosing, unanswered to them,
+    never this computer or a link-local host (peer_refusal holds those for
+    every name). Not narrowed: told apart from a server that is at home by
+    its public name, it is not - by its port, its paths or when it changes
+    (a laptop coming home flips the answer too, and the rewind buffer's
+    connection is one of these requests). docs/SECURITY.md says so."""
     name = _name_of(address)
     if name:
         with _NAMES_LOCK:

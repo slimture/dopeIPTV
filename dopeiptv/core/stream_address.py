@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import functools
 import ipaddress
+import re
 import socket
 import unicodedata
 from typing import Any
@@ -402,25 +403,32 @@ def refusal(address: str, remote: bool = True, internet: bool = False,
     return where + _INTERNET if where else ""
 
 
+#: A relay's address exactly as udpxy (and msd_lite, astra's relay) has it:
+#: http(s), a home address as written, its port, ``/udp/`` or ``/rtp/``, a
+#: multicast group with its port - and nothing else: no login, no other
+#: path, no query, no fragment, no percent-escape, nothing a reader could
+#: take another host or path from.
+_RELAY = re.compile(
+    r"(?i:https?)://(?P<host>[0-9]{1,3}(?:\.[0-9]{1,3}){3}|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?"
+    r"/(?:udp|rtp)/@?(?P<group>[0-9]{1,3}(?:\.[0-9]{1,3}){3}|\[[0-9A-Fa-f:.]+\])"
+    r"(?::[0-9]{1,5})?/?")
+
+
 def udpxy(address: str) -> bool:
     """Whether *address* is a multicast group through a relay on the home
     network (udpxy on the router: http://192.168.1.1:4022/udp/239.0.0.1:1234)
     - what an operator's playlist on the internet names for its own
-    channels. It asks the relay for a group and nothing else."""
-    try:
-        parts = urlsplit(address)
-        host = parts.hostname or ""
-    except ValueError:
+    channels. Only that shape (_RELAY): a private address of the home
+    written as one, and the path a group and its port alone - so it asks
+    the relay for a group and nothing else, never another page of the
+    device that answers there (a router's own pages, ``/udp/x/../..``)."""
+    m = _RELAY.fullmatch(address or "")
+    if m is None:
         return False
-    if parts.scheme not in ("http", "https") or parts.username or parts.password:
+    ip, gip = _ip(m.group("host")), _ip(m.group("group"))
+    if ip is None or gip is None or not gip.is_multicast:
         return False
-    ip = _ip(host)
-    if ip is None or not ip.is_private:
-        return False
-    kind, _sep, group = parts.path.lstrip("/").partition("/")
-    group_host = group.lstrip("@").rsplit(":", 1)[0]
-    gip = _ip(group_host)
-    return kind in ("udp", "rtp") and gip is not None and gip.is_multicast
+    return ip.is_private and not (ip.is_loopback or ip.is_link_local or ip.is_unspecified)
 
 
 #: Each refusal is said once a session: a list asks for its addresses often.

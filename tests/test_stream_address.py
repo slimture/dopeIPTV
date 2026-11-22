@@ -305,7 +305,8 @@ STILL_FROM_THE_INTERNET = (
     "rtsp://cam.example/1", "rtmp://live.example/app playpath=x live=1", "udp://@239.0.0.1:1234",
     "rtp://@239.1.1.1:5000", "srt://relay.example:9000?streamid=x", "rist://relay.example:1968",
     "mms://radio.example/a", "http://192.168.1.1:4022/udp/239.0.0.1:1234",
-    "http://10.0.0.1:4022/rtp/@232.1.1.1:5000",
+    "http://10.0.0.1:4022/rtp/@232.1.1.1:5000", "HTTP://192.168.1.1:4022/udp/239.0.0.1",
+    "http://192.168.1.1:4022/udp/239.0.0.1:1234/", "http://[fd00::1]:4022/udp/[ff38::1]:1234",
     "http://tv.example/x.ts|Referer=http://127.0.0.1/", "http://127.0.0.1.tv.example/x.ts")
 #: A device of the home network: never from a source on the internet unless
 #: the person let that source in (its option home_addresses).
@@ -313,7 +314,15 @@ HOME_FROM_THE_INTERNET = (
     "http://10.0.0.5:8080/x.ts", "http://[fd00::5]:8096/x", "http://172.16.4.2/x.ts",
     "http://192.168.1.1/", "http://router/admin", "http://nas.local:5000/x.ts",
     "http://kodi.lan:8080/jsonrpc", "http://192.168.1.1:4022/status",
-    "http://192.168.1.1:4022/udp/192.168.1.5:80")
+    "http://192.168.1.1:4022/udp/192.168.1.5:80",
+    # A relay's shape and nothing else: never another page of the device
+    # that answers there.
+    "http://192.168.1.1/udp/239.0.0.1:1234/../../cgi-bin/reboot",
+    "http://192.168.1.1/udp/239.0.0.1:1234/x", "http://192.168.1.1:4022/udp/239.0.0.1:1234?a=1",
+    "http://192.168.1.1:4022/udp/239.0.0.1:1234#x", "http://192.168.1.1:4022/udp/%32%33%39.0.0.1:1",
+    "http://admin:pw@192.168.1.1:4022/udp/239.0.0.1:1234",
+    "http://router.lan:4022/udp/239.0.0.1:1234", "http://192.168.1.1:4022/udp//239.0.0.1:1234",
+    "http://192.168.1.1:4022/UDP/239.0.0.1:1234/")
 
 
 def test_a_source_on_the_internet_hands_out_media_streams_and_never_this_computer():
