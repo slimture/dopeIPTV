@@ -195,7 +195,7 @@
     "help_cast_outside_q": "能从脚本、快捷方式或链接启动频道吗？",
     "help_cast_outside_a": "<p>能：从命令行、桌面快捷方式、脚本或网页上的链接都可以：</p><pre><code>dopeiptv --channel \"My Channel\"\ndopeiptv --play https://example.com/live.m3u8\ndopeiptv --tv</code></pre><p><code>--channel</code> 按名称播放当前来源的频道，<code>--play</code> 播放一个流或文件，<code>--tv</code> 打开电视模式。<code>dopeiptv://</code> 链接在浏览器中做同样的事：<code>dopeiptv://channel/My%20Channel</code>、<code>dopeiptv://play?url=…</code>（只能是流，不能是文件）或 <code>dopeiptv://open</code>。</p><p>如果 dopeIPTV 已经打开，命令会发给那个窗口，而不会再开一个副本。</p>",
     "help_personal_backup_q": "怎样备份设置，或把它们搬到新电脑上？",
-    "help_personal_backup_a": "<p><b>设置 → 常规 → 备份 → 备份…</b> 会把你会想念的一切存进一个文件：带登录信息的来源、收藏、历史、提醒、频道编号、所有档案以及你的设置。缓存和窗口位置不包括在内。</p><p><b>恢复…</b> 会显示文件里有什么，并让你选择：用它覆盖全部（在下次打开应用时），或只把其中的来源添加到你现有的来源旁边。</p><p class=\"tip\">文件中含有你的登录信息：请放在安全的地方。想让两台电脑始终一致，用同步更省事。</p>",
+    "help_personal_backup_a": "<p><b>设置 → 常规 → 备份 → 备份…</b> 会把你会想念的一切存进一个文件：带登录信息的来源、收藏、历史、提醒、频道编号、所有档案以及你的设置。缓存和窗口位置不包括在内。</p><p><b>恢复…</b> 会显示文件里有什么，并让你选择：用它覆盖全部（在下次打开应用时），或只把其中的来源添加到你现有的来源旁边。</p><p class=\"tip\">设置密码后，整个文件会被加密并包含你的登录信息；不设密码时，登录信息不会放进去。想让两台电脑始终一致，用同步更省事。</p>",
     "help_personal_themes_q": "能改变应用的外观吗？",
     "help_personal_themes_a": "<p>能，在 <b>设置 → 外观</b> 中：</p><ul><li>25 种主题，有浅色也有深色，以及任意 <b>强调色</b>，</li><li><b>跟随桌面的浅色和深色模式</b>：白天一个主题，晚上另一个，</li><li><b>文字和控件大小</b>，以及圆角的弧度，</li><li><b>各栏目显示的内容</b>：从侧栏去掉栏目、隐藏列表上方的行，或选择 <b>仅列表</b>。</li></ul><p>每个档案都有自己的外观。</p>",
     "help_personal_discord_q": "Discord 能显示我在看什么吗？",
