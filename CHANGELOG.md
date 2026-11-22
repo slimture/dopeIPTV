@@ -27,9 +27,30 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   - an Xtream login in it - on the recorder's command line, which every
   account on a Linux computer can read: the app reads the stream itself and
   hands it to ffmpeg or mpv on their input, and ffmpeg may then open no
-  network protocol at all. An HLS stream still goes the old way. An
-  external player gets an http(s) address in a private playlist file, and
-  Nerd's bridge key goes to the recorder in its environment.
+  network protocol at all. An external player gets an http(s) address in a
+  private playlist file, or is not started, and Nerd's bridge key goes to
+  the recorder in its environment.
+- No program the app starts is handed a provider's address any more. A
+  recording of an HLS playlist, a cast's converter and its probe, the
+  pieces of a cast's archive or rewind buffer, AirPlay's converter and
+  server mode's HLS copy read an alias that names nothing of it - not the
+  host, the folders, the login or the query - and works only through the
+  app's bridge, whose key is in their environment alone. An rtsp, srt or
+  rtmp address with a login goes in a private file; a token header stays
+  out of the command line. Without the bridge or the file, nothing starts
+  and the app says why.
+- Every connection the bridge opens is judged before a byte is sent - by
+  its address as written and then on the connected socket, so a name that
+  turns into this computer's address (DNS rebinding) is caught too. The
+  in-app player (and each multiview cell, and a radio station) reads every
+  stream of a source on the internet through it, Nerd on or off, and so do
+  the programs above: an HLS playlist's segments, keys and redirects can no
+  longer reach this computer, a link-local or cloud-metadata host or the
+  home network. The stream's own server stays reachable; a home source is
+  left as it was. Nerd's or the system's http proxy is chained behind it.
+- A stream whose certificate must be checked is not opened when the player
+  cannot check it, and the video says why; it is never handed to another
+  player instead.
 - The list of picture hosts an internet source named no longer forgets the
   oldest: past 8 192 names every public name is treated as an outsider's
   (it fails closed).
@@ -39,9 +60,38 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   at once, not at its next look a second later; a TMDB lookup that waited
   while its title began to play privately is not sent.
 - The remote API holds back a device that asks too often, and shuts out
-  one that tries ten wrong tokens in a minute for ten minutes.
-- The app's own yt-dlp is hashed again once a run, and whenever its file
-  changes, before it is run; a copy whose bytes no longer match is not run.
+  one that tries ten wrong tokens in a minute for ten minutes; the phone
+  remote and the remote API also have a budget for every device together.
+  The remote API plays no address that leads to this computer or a
+  link-local host.
+- The app's own yt-dlp is hashed against its pinned SHA-256 before every
+  run, and mpv's hook runs it through a wrapper that hashes it first.
+- A login is masked in the log and in reports in its encoded forms too -
+  percent-encoded, JSON-escaped and as HTTP Basic base64.
+- The second-start socket fails closed: a folder that cannot be made this
+  user's alone is never listened in.
+- A computer joining sync is asked before it takes a copy last saved more
+  than 30 days ago. A report sends exactly what its window shows. Updates
+  are offered and installed only when strictly newer.
+- A Kodi's login is never sent over plain http unasked: once per Kodi,
+  "Send anyway" or "Use HTTPS" (tried first), Cancel the default.
+- Server mode's tuner, kept open to every device from before 1.6.9, is
+  said once, with "Close it"; `--server` logs it at every start. A
+  `dopeiptv://channel` link is asked about first.
+- Restoring a backup brings nothing that runs something, lets others in or
+  sends connections elsewhere unless it is ticked.
+- Kids profiles can see "Only what a grown-up allows": only the categories
+  picked per source. Profile PINs can be 4 to 12 digits.
+- Requests through a proxy are checked against this computer, link-local
+  and the home network by name first; udpxy relays are accepted only in
+  their own shape; an address with no host counts as this computer.
+- Watch together: every request to the relay carries the room's
+  credential, of which the relay keeps only a hash - a room's id alone no
+  longer posts, takes a seat or reads; the relay limits messages per
+  member, rooms per address and a room's life. A member since 1.6.11 is
+  taken only from its first message that names this stay's own id, so
+  nothing said before joining is replayed after a restart.
+- A recording stops while a gibibyte is still free where it is written.
 - The subtitle search opened while viewing privately waits for Search
   before it asks OpenSubtitles anything.
 - The add-a-source form and a source's page say so under the address when
@@ -56,6 +106,7 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
+- A decision card's words show whole with a click on them.
 - Pick the app's icon under Settings > Appearance > App icon: the blue
   one, a heart, one in your accent colour (it follows the accent),
   midnight, paper, ocean, forest, sunset, grape, a round one or a retro

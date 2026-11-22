@@ -355,3 +355,43 @@ risking playback; what stays is written down with its reason.
 | yt-dlp | Checked by its hash, not at the moment it runs | low | Answered: whoever can change it runs as the person already (outside the model) |
 | Poster cache | A picture let go is asked for again | low | Answered: the same host, the same picture; **Provider artwork, TMDB off** asks TMDB nothing |
 | Third parties, update checks, links | TMDB sees titles; an update check shows the system; a web page can offer a stream | low | Written down: **TMDB learns what is looked up**, what an update check sends, the question before an address from a link (`mw_commands._ask_link_play`) |
+
+## November 2026 - a second independent AI review of 1.6.11 (testing at cb28ead)
+
+The maintainer gave the 21-part kit (the code at `cb28ead`, part 21 the
+fixes after the first review) to ChatGPT. It scored the whole 7/10 (from
+6/10), found no unauthenticated critical weakness, no way past the signed
+updates and no way for the server to read sync, and named what stood
+between 7 and 8: logins in the arguments of the programs the app starts in
+every mode, the media engines' own requests (an HLS playlist's segments,
+keys and redirects) outside the app's destination guard, a certificate
+check that did not fail closed, and Kodi's and the home network's plain
+http. This round answers the whole table, most of it in code; four
+agents and a second pass worked on it, each change with real tests (real
+ffmpeg, real mpv, `/proc/<pid>/cmdline` read while they run).
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | The recorder still got the address for an HLS playlist, the certificate fallback and RTSP; an external player fell back to the address | high | Fixed: no program the app starts is handed a provider's address. The recorder, a cast's converter and probe, the cast's archive and buffer readers, AirPlay's converter and server mode's HLS copy read an alias (`net_bridge.Bridge.alias`: a `.stream.invalid` host under a 192-bit token, the path's shape alone, mapped back segment by segment so relative HLS addresses work) through the bridge, its key in their environment alone (`child_env`); an rtsp/srt/rtmp address with a login goes in a 0600 file (ffmpeg's concat list, mpv's playlist); an external player gets its 0600 playlist or is not started; a token header never in argv (`tests/test_security_rules.py` fails on `-http_proxy` or an unfiltered `-headers` anywhere) |
+| Network boundary | FFmpeg/mpv fetch nested HLS resources, keys and redirects outside the app's guard (SSRF) | medium | Fixed: the bridge judges every connection it opens - by the host as written, then on the connected socket before a byte is sent (DNS rebinding) - by where the stream's source is (`Policy`): a source on the internet's never this computer, link-local, a metadata service or the home network, but the stream's own server, the person's own names and `.plex.direct`. The in-app player (docked, multiview, radio) reads every stream of an internet source through it, Nerd on or off (`nerd.player_proxy`); every program above too. A home source is left as it was (written down) |
+| Certificates | A refused `tls-verify` was logged and playback went on | high (conditional) | Fixed: the stream is not opened and the video says why (`nerd.CertificateUnchecked`); never handed to another player instead. An https alias's certificate is checked by the bridge as the player checks it |
+| Network boundary | A proxied request is the proxy's; the source's own names and udpxy are exceptions | medium | Fixed in part: a request through a proxy has its name looked up here first (`dest_guard.proxied_refusal`); udpxy only in its own shape; an address with no host counts as this computer. Answered: `note_own` stays (a server at home by its public name), its reason in `dest_guard` |
+| LAN servers | The remote API plays any network address for a token holder; a global budget | medium/low | Fixed: no address that leads to this computer or a link-local host (`remote_api.play_refusal`); a budget for every device together beside each address's (`RateLimiter`) |
+| LAN servers | The tuner open to the home network, carried over from before 1.6.9 | medium | Fixed: said once on a card with "Close it" (only the devices that used it), `--server` logs it at every start, Settings says what the tuner is open to |
+| Casting | Kodi's login over plain http | high | Fixed: asked once per Kodi before a login goes over http - "Send anyway", "Use HTTPS" (tried first), Cancel the default (`kodi.KodiPlainLogin`) |
+| Links | A `dopeiptv://` link changes the channel unasked | low | Fixed: asked first, the channel's name in plain text |
+| Backups | Risky settings restored when the restore is approved | medium | Fixed: every risky thing a box of its own, none ticked; what is not ticked stays as it is here |
+| Profiles | Kids filtering trusts the provider's categories; short PINs | medium | Fixed: "Only what a grown-up allows" (per source, off by default); PINs of 4 to 12 digits with a hint |
+| Reports and logs | An encoded login escapes redaction; the outgoing report not editable | medium | Fixed: percent-encoded, JSON-escaped and Basic base64 forms masked; the report sends exactly what its window shows |
+| Sync | A new computer can be handed an older copy | medium | Fixed in part: a copy last saved more than 30 days ago is asked about before a joining computer takes it (`sync.saved_at`, `STALE_DAYS`); a server that withholds stays written down |
+| Watch together | The relay cannot tell members from anyone who knows a room id; replay after a restart | medium | Fixed (app and website): a room credential the relay keeps only a hash of binds the room; limits per member, address and day; a member since 1.6.11 taken only from its first message naming this stay's own id |
+| Updates | Nightly-to-stable at the same three numbers offered automatically | low | Fixed: only for the build the person left Test builds on; else strictly newer |
+| yt-dlp | Checked by size and time between hashes | low | Fixed: hashed before every run; mpv's hook through a wrapper that hashes it first |
+| Instance socket | The folder's error path went on | low | Fixed: fails closed (`instance._folder_refusal`) |
+| Recordings | A stream with no end fills the disk | medium | Fixed: a recording stops while a gibibyte is still free (`recording.DISK_FLOOR`) |
+| Website statistics | Visit-level retention; raw server logs | medium/low | Fixed: single visits 7 days (was 14); the service warns on the admin page while an old log with addresses is on the disk; the servers' configuration is checked by hand (written down) |
+| Release signing | A compromised signing environment | high | Answered: the update key lives only in GitHub environments of its own (`release-signing`: a required reviewer, `main` and `v*` tags only, administrators may not bypass; `nightly-signing`: `testing` only) - nothing else reads it |
+| Logins at rest | The settings file, not a keyring | medium | Answered: a keyring is planned as a round of its own after 1.6.11 (it touches every login); written down |
+| Third parties, metadata | TMDB sees titles; the update check shows the build | low | Answered: Posters & info can turn TMDB off; written down |
+| Crypto | An own ChaCha20-Poly1305 | low (unproven) | Answered: RFC 8439 test vectors in the tests; written down |
+| Casting | A device can claim another's identity | medium | Answered: discovery is unauthenticated by design of those protocols; a device known by more than its name is not preselected |

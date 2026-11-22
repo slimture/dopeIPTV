@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Leave a tip** takes the place of Support dopeIPTV in the menu, in About and on the heart by the logo. A tip on dopeiptv.org is a voluntary thank-you for the app - once, any amount you choose - and nothing is given for it: the app is the same for everyone.
+- **Leave a tip** takes the place of Support dopeIPTV in the menu, in About and on the heart by the logo. A tip on dopeiptv.org is a voluntary thank-you for the app - any amount you choose, never a subscription - and nothing is given for it: the app is the same for everyone.
 - **Aurora and Dawn**, the two themes a supporter key opened, are everyone's now, and so is the **heart icon** for the app: switch it on under Settings → General. A supporter key from before goes on working and keeps its icon.
 
 ### Security and privacy
