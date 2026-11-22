@@ -159,7 +159,10 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
         m.setattr(recording.subprocess, "Popen", FakeProc)
         m.setattr(RecordingManager, "recorder",
                   staticmethod(lambda: ("ffmpeg", shutil.which("ffmpeg"))))
-        rm._spawn({"url": url, "title": "T", "stop": None})
+        # The recorder reading the address itself - an HLS playlist's way,
+        # and the way back for what the app cannot read (Feed.classic); a
+        # stream the app reads and pipes over is tests/test_recording_feed.py's.
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
     return seen[0]
 
 
