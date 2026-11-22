@@ -504,6 +504,12 @@ class _ReportMixin:
         # A modified build sends nothing: its reports go to whoever made it,
         # and the window offers the text to copy instead.
         copy_only = not build_check.allowed()
+        # What the window shows is what goes: its boxes scrubbed with the
+        # person's own values on Send, anything more hidden shown first.
+        personal = self._personal_values()
+
+        def scrub(text: str) -> str:
+            return report.scrub(text, personal)
         if kind == "feedback":
             import time
             sent = report.sent_times(settings.value("feedback_sent", "") if settings else "")
@@ -513,7 +519,8 @@ class _ReportMixin:
                 return
             answered = self._answered()
             fd = FeedbackDialog(self, self._feedback_details, has_log_file=os.path.isfile(log_file()),
-                                answers=answered, all_answers=self.open_answers, copy_only=copy_only)
+                                answers=answered, all_answers=self.open_answers, copy_only=copy_only,
+                                scrub=scrub)
             if answered:                               # shown now: no longer new
                 self._answers_mark_seen()
             if not fd.exec():
@@ -521,20 +528,19 @@ class _ReportMixin:
             fields = fd.fields()
             if fd.answers.isChecked() and not copy_only:
                 code, fields["reply"] = report.new_code()
-            payload = report.scrub(fd.payload(), self._personal_values())
+            payload = scrub(fd.payload())
             words = report.text_hash(fd.message.toPlainText())
-            first_words = " ".join(report.scrub(fd.message.toPlainText(), self._personal_values()).split())[:90]
+            first_words = " ".join(scrub(fd.message.toPlainText()).split())[:90]
             if not copy_only and settings is not None \
                     and words == str(settings.value("feedback_last", "") or ""):
                 self._show_toast(tr("fb_same"), 5000)
                 return
         else:
-            text = report.build(kind, trace=trace, personal=self._personal_values(), with_log=True)
-            d = ReportDialog(self, kind, text, intro, copy_only=copy_only)
+            text = report.build(kind, trace=trace, personal=personal, with_log=True)
+            d = ReportDialog(self, kind, text, intro, copy_only=copy_only, scrub=scrub)
             if not d.exec():
                 return
-            payload = report.scrub(d.payload(), self._personal_values())
-        personal = self._personal_values()
+            payload = scrub(d.payload())
         if not payload.strip():
             return
         if copy_only:
