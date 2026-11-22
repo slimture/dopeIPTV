@@ -278,12 +278,20 @@ def parse_probe(text: str) -> dict[str, Any]:
     return out
 
 
+#: A quick look (probe's *quick*): the codecs are in a transport stream's
+#: program map, in its first packets - a quarter of a megabyte, not the
+#: seconds a conversion's settings need.
+QUICK_PROBE = ["-probesize", "262144", "-analyzeduration", "500000"]
+
+
 def probe(source: str, net: list[str] | None = None, exe: str | None = None,
-          timeout: float = 20.0, headers: dict[str, str] | None = None) -> dict[str, Any]:
+          timeout: float = 20.0, headers: dict[str, str] | None = None,
+          quick: bool = False) -> dict[str, Any]:
     """The stream's codecs and length, from ffmpeg; empty on any failure -
     not knowing is a reason to copy, never to refuse. An http(s) *source*
     is read as an alias through the app's bridge (hand_over), *headers*
-    (the source's own) added there."""
+    (the source's own) added there. *quick*: only what decides the way -
+    a zap waits on it (QUICK_PROBE)."""
     exe = exe or ffmpeg_path()
     if not exe:
         return parse_probe("")
@@ -292,7 +300,8 @@ def probe(source: str, net: list[str] | None = None, exe: str | None = None,
         return parse_probe("")
     try:
         res = subprocess.run(
-            [exe, "-hide_banner", "-nostdin", *_probe_limits(source),
+            [exe, "-hide_banner", "-nostdin",
+             *(QUICK_PROBE if quick else _probe_limits(source)),
              *(net or []), *ffmpeg_protocols(way.address, bridged=way.bridged),
              "-i", way.address],
             capture_output=True, timeout=timeout, env=way.env, creationflags=NO_WINDOW)

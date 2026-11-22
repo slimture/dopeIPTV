@@ -873,9 +873,11 @@ class AirPlayReceiver(QObject):
                    req: dict[str, Any]) -> tuple[list[str], dict[str, Any] | None]:
         """What the stream at *target* holds - remembered from this session,
         else asked of ffmpeg - as codecs ([] when it cannot be told) and
-        ffmpeg's answer (None when remembered). On a zap the stream on the
-        TV lets go first: paused, a moment for the provider, then the look -
-        one connection to the account at a time."""
+        ffmpeg's answer (None when remembered). A quick look - the program
+        map, a quarter of a megabyte - so a zap stays as quick as it was. On
+        a zap the stream on the TV lets go first: paused - as quick as the
+        TV's own swap to the next channel - or, through the bridge, ffmpeg
+        stopped and the provider given its moment, as before."""
         key = hashlib.sha256((address or "").encode("utf-8", "replace")).hexdigest()
         known = self._seen.get(key)
         if known:
@@ -883,13 +885,16 @@ class AirPlayReceiver(QObject):
             return list(known), None
         if req.get("settle"):
             if self.bridge.running():
+                # ffmpeg held the provider's connection: it goes first, and
+                # the provider has its moment, as a zap through the bridge.
                 self.bridge.stop()
+                time.sleep(SETTLE_S)
+                req["settle"] = False       # let go once: not again before the bridge
             done = threading.Event()
             self._gui("let_go", done)
             done.wait(OPEN_WAIT_S)
-            time.sleep(SETTLE_S)
-            req["settle"] = False           # let go once: not again before the bridge
-        found = ab.probe(target, net, self.bridge.exe, headers=self._headers())
+        found = ab.probe(target, net, self.bridge.exe, headers=self._headers(),
+                         quick=True)
         codecs = [c for c in [str(found.get("video") or "")]
                   + [str(a) for a in found.get("audio") or []] if c]
         self._remember(address, codecs)

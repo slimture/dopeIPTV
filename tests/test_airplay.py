@@ -1008,12 +1008,22 @@ def test_a_zap_to_an_unknown_stream_looks_into_it_once_the_tv_let_go(
     from dopeiptv.core import privacy
     am, _ = macos
     seen = fake_ffmpeg(4, "live")
-    monkeypatch.setattr(am, "SETTLE_S", 0.0)
+    monkeypatch.setattr(am, "SETTLE_S", 0.001)
+    order, probed = [], []
+    real_sleep = time.sleep
+
+    def sleep(s):
+        if s == am.SETTLE_S:
+            order.append(("wait",))
+        real_sleep(s)
+
+    monkeypatch.setattr(am, "time", types.SimpleNamespace(
+        monotonic=time.monotonic, time=time.time, sleep=sleep))
     what = {"http://p/live/u/pw/1.m3u8": "h264", "http://p/live/u/pw/2.m3u8": "hevc",
             "http://p/live/u/pw/3.m3u8": "h264"}
-    order, probed = [], []
 
     def probe(url, *a, **k):
+        assert k.get("quick") is True                    # the program map, no more
         probed.append(url)
         order.append(("probe", _plays(_Player.made[-1])[-1:] if _Player.made else []))
         return {"video": what[url], "audio": ["aac"], "duration": 0.0}
@@ -1045,8 +1055,10 @@ def test_a_zap_to_an_unknown_stream_looks_into_it_once_the_tv_let_go(
     _pump(qapp)
     _settle(am, rx)
     assert _plays(p)[-1] == "play"
+    order.clear()
     cast("http://p/live/u/pw/2.m3u8", settle=True)       # a zap to HEVC
-    assert order[-1] == ("probe", ["pause"])             # the TV let go first
+    # The TV let go first - paused, no wait: as quick as its own swap.
+    assert order[0] == ("probe", ["pause"]), order
     assert rx.bridged() and rx.plan.hevc and rx.plan.video == "copy"
     assert seen["plan"].hevc and p.item.url == rx.bridge.url
     assert len(_Player.made) == 1 and len(_NSPanel.made) == 1
@@ -1055,9 +1067,12 @@ def test_a_zap_to_an_unknown_stream_looks_into_it_once_the_tv_let_go(
     assert not rx.bridged() and p.item.url == "http://p/live/u/pw/1.m3u8"
     cast("http://p/live/u/pw/2.m3u8", settle=True)       # HEVC known: the bridge
     assert len(probed) == 2 and rx.bridged() and rx.plan.hevc
-    # Watched privately: looked into, never remembered.
+    # Watched privately: looked into, never remembered. From the bridge,
+    # ffmpeg goes first and the provider has its moment before the look.
     monkeypatch.setattr(privacy, "playing_private", lambda: True)
+    order.clear()
     cast("http://p/live/u/pw/3.m3u8", settle=True)
+    assert order[0] == ("wait",) and order[1][0] == "probe", order
     cast("http://p/live/u/pw/3.m3u8", settle=True)
     assert probed[2:] == ["http://p/live/u/pw/3.m3u8"] * 2
     assert all(len(k) == 64 and "u/pw" not in k for k in rx._seen)

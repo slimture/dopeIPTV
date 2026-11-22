@@ -148,11 +148,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   segments it plays HEVC in only as fMP4. HEVC now goes through the
   bridge, copied into fMP4 and tagged hvc1 - nothing is converted
   (`airplay_bridge.plan`). A stream nothing is known of - a zap during
-  the cast, a cast from a list - is looked into before it goes to the TV,
-  on a zap once the TV has paused the last channel and the provider had
-  its moment, so the account sees one connection at a time; what was found
-  is remembered for the session by the address's hash, never while
-  watching privately (`airplay_macos._look_into`).
+  the cast, a cast from a list - is looked into before it goes to the TV:
+  a quick look at its program map, a quarter of a megabyte, on a zap once
+  the TV has paused the last channel (from the bridge, once ffmpeg has
+  stopped and the provider had its moment), so a zap stays as quick as it
+  was; what was found is remembered for the session by the address's
+  hash, never while watching privately (`airplay_macos._look_into`,
+  `airplay_bridge.QUICK_PROBE`).
 - The app closed at start when it had been left on Radio: building the
   window filtered Radio's list before any of its rows was picked.
 - Posters went blank after a while in Movies, Series, Mine, Search, a
