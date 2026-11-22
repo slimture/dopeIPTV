@@ -792,7 +792,7 @@
 
   // The buttons over an open report or problem.
   function actions(r, key, group) {
-    const bar = mk("div", "fb-actions");
+    const bar = mk("div", "fb-actions fb-marks");
     // The same plain text, fenced, to paste into a conversation about a fix.
     bar.append(copyButton("Copy for a bug fix", "btn", () => "```\n" + (r.copy || r.text || "").replace(/\n+$/, "") + "\n```\n"));
     [["seen", "Mark seen"], ["fixed", "Mark fixed"], ["new", "Mark new"]].forEach(([state, label]) => {

@@ -1599,4 +1599,38 @@
       }
     }, { passive: true });
   })();
+
+  // On a phone the bar over the page - the name, the sections, the period -
+  // took a third of the screen all the way down a long list. It gives that
+  // back while the page is scrolled down and comes back as soon as it is
+  // scrolled up, at the top, or when something in it has the focus.
+  (function barAway() {
+    const bar = document.querySelector(".top");
+    const phone = window.matchMedia && window.matchMedia("(max-width: 600px)");
+    if (!bar || !phone) { return; }
+    let last = window.scrollY, away = false, queued = false;
+    const set = (on) => {
+      if (on === away) { return; }
+      away = on;
+      bar.classList.toggle("away", on);
+      document.documentElement.classList.toggle("top-away", on);
+    };
+    const look = () => {
+      queued = false;
+      const y = Math.max(0, window.scrollY), d = y - last;
+      if (!phone.matches || y <= bar.offsetHeight || bar.contains(document.activeElement)) {
+        set(false);
+        last = y;
+        return;
+      }
+      if (Math.abs(d) < 8) { return; }
+      set(d > 0);
+      last = y;
+    };
+    window.addEventListener("scroll", () => {
+      if (!queued) { queued = true; window.requestAnimationFrame(look); }
+    }, { passive: true });
+    bar.addEventListener("focusin", () => set(false));
+    if (phone.addEventListener) { phone.addEventListener("change", look); }
+  })();
 })();

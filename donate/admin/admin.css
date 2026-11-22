@@ -872,3 +872,65 @@ tr:last-child td { border-bottom: 0; }
 .chip.b-source { color: color-mix(in srgb, var(--s2) 78%, var(--text)); background: color-mix(in srgb, var(--s2) 14%, transparent); }
 .copy-buffer { position: fixed; top: 0; left: 0; width: 1px; height: 1px; margin: 0; padding: 0; border: 0;
   opacity: 0; font-size: 16px; pointer-events: none; }
+
+/* -- phones and touch screens ------------------------------------------------
+   Every field at 16px: iOS zooms the page in on a smaller one as it is
+   focused, and the page zoomed in then scrolls sideways - answering
+   feedback on a phone was a fight. Nothing reaches past the screen's edge. */
+@media (max-width: 600px), (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+}
+@media (max-width: 600px) {
+  body { overflow-x: clip; }
+  main { padding: 14px 12px 40px; gap: 14px; }
+  .tab { gap: 14px; }
+  /* The bar gives the screen back while the page is scrolled down and
+     comes back as soon as it is scrolled up (admin.js barAway). */
+  .top { transition: transform .22s ease, box-shadow .22s ease; }
+  .top.away { transform: translateY(-100%); }
+  html.top-away .fb-pick-bar.on { top: 0; }
+  .fb-pick-bar.on { transition: top .22s ease; }
+
+  /* The visitor log's day: the spans across, the day between its arrows,
+     what it holds under them. */
+  .daybar { gap: 8px; padding: 10px; }
+  .daybar .spans { flex: 1 0 100%; }
+  .daybar .spans button { flex: 1; padding: 6px 4px; }
+  .daybar select { flex: 1 1 0; padding: 7px 8px; }
+  .daybar .step { flex: none; width: 40px; height: 40px; }
+  .daybar .muted { flex: 1 0 100%; margin: 0 2px; }
+  .dl-cell span { white-space: normal; overflow: visible; line-height: 1.3; }
+  .lt-top { gap: 8px; }
+  .lt-top .lt-ctl { flex: 1 1 150px; }
+  .lt-top .lt-ctl select { flex: 1; max-width: none; }
+  /* A visit's time whole, "03:34 PM" too: its column as wide as it is. */
+  .visit summary, .visit.with-day summary { grid-template-columns: minmax(52px, max-content) minmax(0, 1fr); }
+  .visit summary > .v-time { overflow: visible; }
+
+  /* Feedback: a row's marks on one line, its words on their own under them
+     (two lines at most) - not cut to a word or two beside the chips. */
+  .fb-head { flex-wrap: wrap; gap: 6px 8px; padding: 6px; }
+  .fb-head .sig { flex: 1 0 100%; order: 1; white-space: normal; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .fb-meta { padding-inline-end: 0; }
+  .fb-controls { gap: 8px; }
+  .fb-chips { margin-inline-end: 0; }
+  .fb-controls .fb-select { flex: 1 1 140px; min-width: 0; padding: 8px 10px; }
+  .fb-body { padding: 8px 0 4px; }
+  /* The marks over an open report: two to a row, the copy across them. */
+  .fb-marks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .fb-marks > .btn:first-child { grid-column: 1 / -1; }
+  .fb-marks .btn { padding: 10px 8px; }
+  .fb-marks .btn.quiet { background: color-mix(in srgb, var(--text) 5%, transparent); }
+  .fb-text { font-size: 13px; max-height: 60vh; padding: 10px; }
+  .fb-answer { padding: 12px 10px; margin: 10px 0 12px; }
+  .fb-answer-head, .fb-said, .fb-reply-text { overflow-wrap: anywhere; }
+  .fb-answer .fb-chips .chip-f { padding: 8px 12px; }
+  .fb-version, .fb-words-in { width: 100%; padding: 10px 12px; }
+  .fb-words-in { min-height: 120px; }
+  .fb-answer .fb-actions .btn { flex: 1 1 100%; padding: 12px 16px; }
+  .fb-entry.answer, .fb-entry.reply { padding: 8px 10px; }
+}
+@media (max-width: 600px) and (prefers-reduced-motion: reduce) {
+  .top, .fb-pick-bar.on { transition: none; }
+}
