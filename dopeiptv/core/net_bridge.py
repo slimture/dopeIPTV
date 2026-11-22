@@ -747,7 +747,9 @@ class Bridge:
             if first:
                 self._said.add(key)
         if first:
-            log.warning("net bridge: %s - not connected", e)
+            hint = ("; if it is your own list, let it in: the source's settings > Advanced > "
+                    "Addresses on my home network" if e.internet and e.why == dest_guard.HOME else "")
+            log.warning("net bridge: %s - not connected%s", e, hint)
 
     def _open(self, host: str, port: int) -> socket.socket:
         """A connection to *host*:*port* on this bridge's route, where its
@@ -1070,6 +1072,17 @@ def guard_for(source: dict | None, url: str, n: object = None) -> Bridge | None:
     except OSError as e:
         log.warning("net bridge: not started (%s)", e)
         return None
+
+
+def proxy_for(source: dict | None, url: str, n: object = None) -> str:
+    """The in-app player's http-proxy for a stream of *source* at *url*:
+    guard_for's bridge's address with its key - set on the mpv core inside
+    the app's own process, an option and no program's argument. "" for an
+    address that is no http(s) one, or when the bridge could not start: the
+    player then connects itself, as it always did (no stream left unplayed
+    for want of a bridge)."""
+    bridge = guard_for(source, url, n)
+    return bridge.address if bridge is not None else ""
 
 
 def address_for(source: dict | None, url: str, n: object = None) -> str:

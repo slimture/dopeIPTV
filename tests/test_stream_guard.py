@@ -390,10 +390,12 @@ def test_a_refusal_is_said_once_per_host_and_reason(bridges, caplog):
     with caplog.at_level(logging.INFO, logger="dopeiptv"):
         for _ in range(3):
             _ask(b, "GET http://127.0.0.1:9/a/u/p/1.ts?token=x HTTP/1.1\r\nHost: x\r\n\r\n")
+        _ask(b, "GET http://192.168.1.1:9/x HTTP/1.1\r\nHost: x\r\n\r\n")
     said = [r.getMessage() for r in caplog.records if "net bridge" in r.getMessage()]
-    assert len(said) == 1 and "this computer (127.0.0.1:9)" in said[0]
+    assert len(said) == 2 and "this computer (127.0.0.1:9)" in said[0]
     assert "token" not in said[0] and "/u/p/" not in said[0]      # never the address
-    assert b.guarded == 3
+    # A device at home: where the person lets their own list in is said.
+    assert "Addresses on my home network" in said[1] and b.guarded == 4
 
 
 def test_dns_rebinding_is_caught_on_the_socket(servers, bridges, monkeypatch):
@@ -466,6 +468,10 @@ def test_an_https_alias_is_checked_as_the_player_checks_it(servers, bridges, tmp
 
 # -- the API for what the app starts -----------------------------------------------
 
+def _no_bridge(*_a, **_k):
+    raise OSError("no port to bind")
+
+
 def test_guard_for_child_env_and_the_bridges_kept(monkeypatch):
     monkeypatch.setattr(net_bridge, "_bridges", type(net_bridge._bridges)())
     monkeypatch.setattr(net_bridge, "MAX_BRIDGES", 3)
@@ -483,6 +489,13 @@ def test_guard_for_child_env_and_the_bridges_kept(monkeypatch):
         # whose alias a recorder reads stays.
         assert not b.closed and others[0].closed and len(net_bridge._bridges) == 3
         assert _get(b, held).startswith(b"HTTP/1.1 ")
+        # The in-app player's: the same bridge's address, key and all; none
+        # for what is no http(s) address (it plays as it always did).
+        assert net_bridge.proxy_for(src, "http://provider.example/live/1.m3u8") == b.address
+        assert net_bridge.proxy_for(src, "udp://@239.0.0.1:1234") == ""
+        monkeypatch.setattr(net_bridge, "Bridge", _no_bridge)
+        assert net_bridge.guard_for(src, "http://elsewhere.example/1.ts") is None
+        assert net_bridge.proxy_for(src, "http://elsewhere.example/1.ts") == ""
     finally:
         for kept in list(net_bridge._bridges.values()):
             kept.close()
