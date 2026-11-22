@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from .. import VERSION
 from ..core import build_check, macupdate, selfupdate, winupdate
 from ..core.log import log
-from ..core.updates import GITHUB_REPO, fetch_update, offered
+from ..core.updates import GITHUB_REPO, fetch_update, is_nightly, leave_nightly, offered
 from ..core.xdg import link_ok, open_url
 from ..core.workers import run_async
 from ..i18n import tr
@@ -97,12 +97,41 @@ def _updater():
     return None
 
 
+#: The update channel as the window last saw it, and the test build that
+#: ran when the person left Test builds for Releases (core/updates.
+#: leave_nightly) - this computer's.
+K_CHANNEL_SEEN = "update_channel_seen"
+K_LEFT_NIGHTLY = "update_left_nightly"
+
+
+def channel_seen(settings, channel: str, version: str = VERSION) -> None:
+    """The channel *channel* noted: a switch from Test builds to Releases
+    while *version*, a test build, runs is kept as that build's - the one
+    time the release it carries the number of is offered over it
+    (updates.offered) - and told to core/updates; anything else forgets it."""
+    seen = str(settings.value(K_CHANNEL_SEEN, "") or "")
+    if seen != channel:
+        if seen == "nightly" and channel == "stable" and is_nightly(version):
+            settings.setValue(K_LEFT_NIGHTLY, version)
+        elif channel == "nightly":
+            settings.remove(K_LEFT_NIGHTLY)
+        settings.setValue(K_CHANNEL_SEEN, channel)
+    left = str(settings.value(K_LEFT_NIGHTLY, "") or "")
+    leave_nightly(left if channel == "stable" and left == version else "")
+
+
 class _UpdatesMixin:
     """MainWindow mixin: the startup update check and its status-row link."""
     def _update_channel(self) -> str:
-        """Settings -> General: "stable", or "nightly" for the test builds."""
+        """Settings -> General: "stable", or "nightly" for the test builds -
+        and a switch from one to the other noted (channel_seen)."""
         ch = self.settings.value("update_channel", "stable")
-        return "nightly" if ch == "nightly" else "stable"
+        channel = "nightly" if ch == "nightly" else "stable"
+        try:
+            channel_seen(self.settings, channel)
+        except Exception:
+            log.debug("update: the channel's switch not noted", exc_info=True)
+        return channel
 
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the

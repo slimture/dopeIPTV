@@ -153,19 +153,88 @@ def test_the_appimage_of_a_nightly_is_found_by_its_version(github):
     assert asset["name"] == "dopeIPTV-1.4.0.15-x86_64.AppImage"
 
 
-def test_back_on_releases_the_release_is_offered_to_a_test_build():
+@pytest.fixture
+def left():
+    updates.leave_nightly("")
+    yield updates.leave_nightly
+    updates.leave_nightly("")
+
+
+def test_an_update_is_strictly_newer_on_either_channel(left):
     # On Test builds a release never "downgrades" a newer build...
     assert not offered("v1.4.0", "1.4.0.12", "nightly")
     assert offered("v1.4.0.13", "1.4.0.12", "nightly")
-    # ...back on Releases, the release the build carries the number of is
-    # offered, and anything after it; an older release is not.
-    assert offered("v1.4.0", "1.4.0.12", "stable")
+    assert not offered("v1.4.0.12", "1.4.0.12", "nightly")
+    # ...and on Releases a test build gets only what is newer than it: the
+    # release it carries the number of sorts below it.
+    assert not offered("v1.4.0", "1.4.0.12", "stable")
     assert offered("v1.4.1", "1.4.0.12", "stable")
     assert not offered("v1.3.0", "1.4.0.12", "stable")
-    # A release is compared as before; nothing offered without a tag.
+    # A release is compared as ever; nothing offered without a tag.
     assert offered("v1.4.1", "1.4.0", "stable")
     assert not offered("v1.4.0", "1.4.0", "stable")
+    assert not offered("v1.3.9", "1.4.0", "stable")
     assert not offered("", "1.4.0.12", "stable")
+
+
+def test_the_one_exception_only_when_the_person_left_test_builds_on_this_build(left):
+    """Back on Releases from a test build - switched there by the person -
+    the release that build carries the number of is offered too, so the
+    channel means releases again; never as an offer made by itself, never
+    an older release, never on Test builds, never for another build."""
+    left("1.4.0.12")
+    assert offered("v1.4.0", "1.4.0.12", "stable")
+    assert offered("v1.4.1", "1.4.0.12", "stable")
+    assert not offered("v1.3.9", "1.4.0.12", "stable")
+    assert not offered("v1.4.0", "1.4.0.12", "nightly")
+    assert not offered("v1.4.0.11", "1.4.0.12", "stable")       # a test build: newer only
+    assert not offered("v1.4.0", "1.4.0.13", "stable"), "left on another build"
+    assert not offered("v1.4.0", "1.4.0", "stable")              # a release is no test build
+    assert offered("v1.4.0", "1.4.0.12", "stable", left=True)
+    assert not offered("v1.4.0", "1.4.0.12", "stable", left=False)
+    left("")
+    assert not offered("v1.4.0", "1.4.0.12", "stable")
+
+
+def test_every_installer_refuses_what_is_not_offered(left, monkeypatch):
+    """selfupdate.refuse_older - the AppImage's, Windows' and the Mac's -
+    holds to the same: strictly newer, the one exception only once left."""
+    monkeypatch.setattr(selfupdate, "VERSION", "1.4.0.12")
+    for tag in ("v1.4.0", "v1.3.0", "v1.4.0.12", "v1.4.0.11", ""):
+        with pytest.raises(selfupdate.UpdateError):
+            selfupdate.refuse_older(tag)
+    selfupdate.refuse_older("v1.4.1")
+    selfupdate.refuse_older("v1.4.0.13")
+    left("1.4.0.12")
+    selfupdate.refuse_older("v1.4.0")
+    with pytest.raises(selfupdate.UpdateError):
+        selfupdate.refuse_older("v1.3.0")
+
+
+def test_the_window_notes_a_switch_from_test_builds_to_releases(left, tmp_path):
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.ui.mw_updates import K_LEFT_NIGHTLY, channel_seen
+    s = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    # A first look, on Releases: nothing was left.
+    channel_seen(s, "stable", "1.4.0.12")
+    assert s.value(K_LEFT_NIGHTLY) is None and not updates.left_nightly("1.4.0.12")
+    # On Test builds, then back on Releases while the test build runs.
+    channel_seen(s, "nightly", "1.4.0.12")
+    channel_seen(s, "stable", "1.4.0.12")
+    assert s.value(K_LEFT_NIGHTLY) == "1.4.0.12" and updates.left_nightly("1.4.0.12")
+    assert offered("v1.4.0", "1.4.0.12", "stable")
+    # Kept over a restart of the same build; another build is not it.
+    channel_seen(s, "stable", "1.4.0.12")
+    assert updates.left_nightly("1.4.0.12")
+    channel_seen(s, "stable", "1.4.1")
+    assert not updates.left_nightly("1.4.1") and not offered("v1.4.1", "1.4.1", "stable")
+    # Test builds again: forgotten.
+    channel_seen(s, "nightly", "1.4.0.12")
+    assert s.value(K_LEFT_NIGHTLY) is None and not updates.left_nightly("1.4.0.12")
+    # A release's copy switched back: no test build to leave.
+    channel_seen(s, "stable", "1.4.0")
+    assert s.value(K_LEFT_NIGHTLY) is None
 
 
 def test_a_test_build_comes_from_the_site_too_fetched_through_it(github):

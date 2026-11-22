@@ -249,15 +249,42 @@ def is_nightly(version: str) -> bool:
     return len(_parse(version)) > 3
 
 
-def offered(latest_tag: str, current: str, channel: str = "stable") -> bool:
-    """Whether *latest_tag* is an update for *current* on *channel*.
+#: The test build the person left for Releases (Settings > General >
+#: Update channel), as the window found it: the version running then
+#: (``leave_nightly``). The one exception to "strictly newer" holds only
+#: while that very build runs.
+_LEFT = [""]
 
-    Back on Releases from a test build, the release that build carries the
-    number of is offered too - 1.4.0 to 1.4.0.12, which sorts above it - so
-    that the channel means releases again from the next one out."""
+
+def leave_nightly(version: str) -> None:
+    """The window says the person switched from Test builds to Releases
+    while *version* ran (a test build's), or "" for no such switch."""
+    _LEFT[0] = str(version or "").strip().lstrip("vV")
+
+
+def left_nightly(current: str) -> bool:
+    """Whether the person left Test builds for Releases while *current*, a
+    test build, runs (leave_nightly)."""
+    bare = str(current or "").strip().lstrip("vV")
+    return bool(_LEFT[0]) and _LEFT[0] == bare and is_nightly(bare)
+
+
+def offered(latest_tag: str, current: str, channel: str = "stable",
+            left: bool | None = None) -> bool:
+    """Whether *latest_tag* is an update for *current* on *channel*: it is
+    strictly newer - monotonic, whoever offers it and on either channel.
+
+    One exception, explicit: the person left Test builds for Releases while
+    this test build runs (*left*; None asks left_nightly) - then the release
+    the build carries the number of is offered too, 1.4.0 over 1.4.0.12,
+    which sorts above it, so the channel means releases again. Never as an
+    offer made by itself: a test build on Releases that was never switched
+    there waits for the next release."""
     if not latest_tag:
         return False
-    if channel != "nightly" and is_nightly(current) \
-            and not is_nightly(latest_tag):
-        return _parse(latest_tag)[:3] >= _parse(current)[:3]
-    return is_newer(latest_tag, current)
+    if is_newer(latest_tag, current):
+        return True
+    if left is None:
+        left = left_nightly(current)
+    return (channel != "nightly" and left and is_nightly(current) and not is_nightly(latest_tag)
+            and _parse(latest_tag)[:3] == _parse(current)[:3])
