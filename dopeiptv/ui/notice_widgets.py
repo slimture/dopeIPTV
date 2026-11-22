@@ -884,9 +884,10 @@ class _MessageRow(QWidget):
 class DecisionCard(QFrame):
     """What needs a decision now, one at a time: a small card of the
     sidebar's width right above the activity line - its mark, its words in
-    two lines at most (the whole of them in its tooltip), one action, a
-    dismiss, and "+N" when more wait behind it. In the sidebar's layout, so
-    the categories above it only get shorter."""
+    two lines at most (a click on them shows them whole, another folds them
+    again; the whole of them in its tooltip too), one action, a dismiss, and
+    "+N" when more wait behind it. In the sidebar's layout, so the
+    categories above it only get shorter."""
 
     def __init__(self, hub: NoticeHub, parent: QWidget | None = None, *,
                  floating: bool = False) -> None:
@@ -896,6 +897,8 @@ class DecisionCard(QFrame):
         self._floating = floating
         self._msg: Message | None = None
         self._words = ""
+        #: Its words shown whole (a click on them) - for this message alone.
+        self._whole = False
         self.fader = _Fader(self)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setMinimumWidth(0)
@@ -912,6 +915,8 @@ class DecisionCard(QFrame):
         self.label.setObjectName("NoticeDecisionText")
         self.label.setTextFormat(Qt.TextFormat.PlainText)
         self.label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.label.mousePressEvent = self._toggle_whole
         top.addWidget(self.label, 1)
         self.close_btn = QToolButton()
         self.close_btn.setObjectName("NoticeDismiss")
@@ -945,8 +950,11 @@ class DecisionCard(QFrame):
             self.hide()
             return False
         m = waiting[0]
+        if m is not self._msg:
+            self._whole = False
         self._msg = m
-        self._words = m.title + (" " + m.body if m.body else "")
+        # The title and its words apart, as the panel shows them in two.
+        self._words = m.title + (" - " + m.body if m.body else "")
         self.setToolTip(plain_text(self._words))
         self.setAccessibleName(self._words)
         self.setAccessibleDescription(tr("notice_" + m.level))
@@ -966,7 +974,29 @@ class DecisionCard(QFrame):
         return self._words
 
     def _wrap(self) -> None:
-        self.label.setText(two_lines(self._words, self._text_font(), self._room()))
+        if self._whole:
+            self.label.setWordWrap(True)
+            self.label.setText(self._words)
+        else:
+            self.label.setWordWrap(False)
+            self.label.setText(two_lines(self._words, self._text_font(), self._room()))
+        if self._whole:
+            self.label.setFixedHeight(self.label.heightForWidth(self._room()))
+        else:
+            self.label.setMinimumHeight(0)
+            self.label.setMaximumHeight(16777215)      # QWIDGETSIZE_MAX: as it was
+        self.updateGeometry()
+
+    def cut(self) -> bool:
+        """Whether two lines cannot hold its words (a click shows them whole)."""
+        shown = two_lines(self._words, self._text_font(), self._room())
+        return " ".join(shown.split()) != " ".join(self._words.split())
+
+    def _toggle_whole(self, e) -> None:
+        if e.button() != Qt.MouseButton.LeftButton or (not self._whole and not self.cut()):
+            return
+        self._whole = not self._whole
+        self._wrap()
 
     def _room(self) -> int:
         """The words' width: the card's less its margins, the mark and the
