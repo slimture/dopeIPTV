@@ -134,7 +134,9 @@ Where the lines come from:
   GEO_DB        STATS_DIR/dbip-country-lite.mmdb
   STATS_LOG, DL_LOG  the log files of before; until they are deleted
                 (the server's runbook) what is left of them is read once, from where
-                the last run stopped
+                the last run stopped - and, since they hold addresses, while one
+                of them (or a copy newsyslog made) is on the disk the log and the
+                admin page say so, louder when nginx still writes it (address_logs)
 
 Anyone can send the page's signal, as often as the web server lets them,
 with any browser name and any page to have come from. So nothing a line
@@ -1695,6 +1697,7 @@ def collect(with_fetch: bool = False, lines: list | None = None) -> None:
         _forget_old_updates(state)
         _forget_old(stats)
         sweep_left(today)
+        _say_address_logs()
         if sketches_path:
             _keep_sketches(sketches_path, sketches)
         _save(stats_path, stats)
@@ -2151,11 +2154,57 @@ def swap_state(now: float | None = None) -> dict:
     return dict(answer)
 
 
+#: A log of before written this recently (seconds): nginx still writes it.
+STILL_WRITTEN = 3600
+_SAID_LOGS: set = set()
+
+
+def address_logs(now: float | None = None) -> list:
+    """The logs of before that held each visitor's address (STATS_LOG,
+    DL_LOG: nginx's own, from before the socket) and the copies newsyslog
+    turned them over into, still on this machine - none should be (the
+    privacy policy). Each "written lately" when it changed within
+    STILL_WRITTEN - its access_log line is still in nginx's file - else
+    "holds addresses"; "could not be asked" when the file cannot be looked
+    at. They are nginx's files: deleting them is the server's runbook's,
+    not this service's. Asked after every run, never assumed."""
+    now = time.time() if now is None else now
+    out = []
+    for base in (STATS_LOG, DL_LOG):
+        if not base:
+            continue
+        for p in [base] + sorted(set(glob.glob(glob.escape(base) + ".*")) - {base}):
+            try:
+                st = os.stat(p)
+            except FileNotFoundError:
+                continue
+            except OSError:
+                out.append({"what": "log", "path": p, "why": "could not be asked"})
+                continue
+            if os.path.isdir(p):
+                continue
+            why = "written lately" if now - st.st_mtime < STILL_WRITTEN else "holds addresses"
+            out.append({"what": "log", "path": p, "why": why})
+    return out
+
+
+def _say_address_logs() -> None:
+    """Each log of before still there said in the service's log - once for
+    each path and what is wrong with it."""
+    for t in address_logs():
+        if (t["path"], t["why"]) not in _SAID_LOGS:
+            _SAID_LOGS.add((t["path"], t["why"]))
+            print(f"[stats] {t['path']}: a log of before that holds visitors' addresses is still "
+                  f"there ({t['why']}) - the server's runbook says how it goes", flush=True)
+
+
 def trouble() -> list:
     """What the admin page warns about: each file that should be gone and is
-    not, with why - and swap that keeps what it is given, or that could not
-    be asked (nothing is taken on trust)."""
+    not, with why - the logs of before with addresses among them
+    (address_logs) - and swap that keeps what it is given, or that could
+    not be asked (nothing is taken on trust)."""
     out = [{"what": "delete", "path": p, "why": why} for p, why in sorted(TROUBLE.items())]
+    out += address_logs()
     swap = swap_state()
     if swap["state"] == "plain":
         out.append({"what": "swap", "path": ", ".join(swap["plain"]), "why": "not encrypted"})

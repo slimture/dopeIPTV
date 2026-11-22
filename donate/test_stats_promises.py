@@ -147,6 +147,43 @@ def test_a_file_that_cannot_be_deleted_is_said_and_tried_again():
     assert sc.sweep_left() == [] and sc.TROUBLE == {} and sc.trouble() == []
 
 
+def test_a_log_of_before_with_addresses_is_said_until_it_is_gone():
+    """The logs nginx wrote before the socket held every visitor's address:
+    while one of them, or a copy newsyslog made of it, is on the disk the
+    log and the admin page say so - louder while nginx still writes it."""
+    import time
+    sc, _dir = _module()
+    sc._SWAP.clear()
+    sc._SWAP.update(at=1e18, answer={"state": "none", "plain": []})
+    assert sc.address_logs() == [] and sc.trouble() == []
+    old_copy = sc.STATS_LOG + ".0"
+    for path in (sc.STATS_LOG, old_copy, sc.DL_LOG + ".1.gz"):
+        with open(path, "w") as fh:
+            fh.write('{"ip": "203.0.113.7"}\n')
+    long_ago = time.time() - 2 * sc.STILL_WRITTEN
+    os.utime(old_copy, (long_ago, long_ago))
+    os.utime(sc.DL_LOG + ".1.gz", (long_ago, long_ago))
+    got = {t["path"]: t["why"] for t in sc.address_logs()}
+    assert got == {sc.STATS_LOG: "written lately", old_copy: "holds addresses",
+                   sc.DL_LOG + ".1.gz": "holds addresses"}
+    assert all(t["what"] == "log" for t in sc.trouble()) and len(sc.trouble()) == 3
+    said = io.StringIO()
+    with contextlib.redirect_stdout(said):
+        sc._say_address_logs()
+        sc._say_address_logs()
+    assert said.getvalue().count("holds visitors' addresses") == 3, "once for each"
+    assert "203.0.113.7" not in said.getvalue()
+    # Said at the top of the admin page, and asked after every run.
+    js = open(os.path.join(HERE, "admin", "admin.js"), encoding="utf-8").read()
+    assert 't.what === "log"' in js and "still writes visitors' addresses" in js
+    src = open(os.path.join(HERE, "stats_collect.py"), encoding="utf-8").read()
+    assert src.index("sweep_left(today)") < src.index("_say_address_logs()") < src.index("_save(stats_path")
+    # Gone: nothing said any more.
+    for path in (sc.STATS_LOG, old_copy, sc.DL_LOG + ".1.gz"):
+        os.unlink(path)
+    assert sc.address_logs() == [] and sc.trouble() == []
+
+
 def test_every_deletion_of_the_statistics_goes_through_the_check():
     # No delete of what should be gone is silent: every one is _gone's.
     sc, _dir = _module()

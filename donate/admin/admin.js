@@ -697,6 +697,22 @@
         " still there (" + files.slice(0, 3).map((t) => t.path + ": " + t.why).join("; ") +
         (files.length > 3 ? "; …" : "") + "). Tried again every run - delete by hand if it stays.");
     }
+    // The logs of before that held visitors' addresses (stats_collect.address_logs).
+    const logs = T.filter((t) => t.what === "log"), lp = (L) => L.slice(0, 3).map((t) => t.path).join(", ");
+    const writing = logs.filter((t) => t.why === "written lately");
+    const lying = logs.filter((t) => t.why === "holds addresses"), unasked = logs.filter((t) => t.why === "could not be asked");
+    if (writing.length) {
+      said.push("nginx still writes visitors' addresses to a log of before (" + lp(writing) + "): take its access_log " +
+        "line out of the content server's nginx file, then delete the files (the server's runbook).");
+    }
+    if (lying.length) {
+      said.push((lying.length === 1 ? "A log of before that holds visitors' addresses is" : lying.length +
+        " logs of before that hold visitors' addresses are") + " still on the disk (" + lp(lying) +
+        (lying.length > 3 ? ", …" : "") + "): delete " + (lying.length === 1 ? "it" : "them") + " (the server's runbook).");
+    }
+    if (unasked.length) {
+      said.push("Whether the logs of before are gone could not be asked (" + lp(unasked) + "): check by hand.");
+    }
     if (swap && swap.why === "could not be asked") {
       said.push("Whether swap is encrypted could not be asked of the system: check swapctl -l on the host (the server's runbook, encrypted swap).");
     } else if (swap) {
