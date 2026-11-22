@@ -1,16 +1,33 @@
-## dopeIPTV 1.6.10
+## dopeIPTV 1.6.11
 
-**A tip is a plain thank-you now - every theme and the heart icon are for everyone - and updates, the log and private viewing are tightened further.**
+**Pick the app's icon and a calmer TV list - and a large round of security work: no stream address or login on another program's command line, every internet stream's certificate checked, and a backup without a password holds no login.**
 
-### Changed
+### Added
 
-- **Leave a tip** takes the place of Support dopeIPTV in the menu, in About and on the heart by the logo. A tip on dopeiptv.org is a voluntary thank-you for the app - any amount you choose, never a subscription - and nothing is given for it: the app is the same for everyone.
-- **Aurora and Dawn**, the two themes a supporter key opened, are everyone's now, and so is the **heart icon** for the app: switch it on under Settings → General. A supporter key from before goes on working and keeps its icon.
+- **App icon:** pick it under Settings → Appearance → App icon - the blue one, a heart, one in your accent colour (it follows the accent), midnight, paper, ocean, forest, sunset, grape, a round one or a retro TV.
+- **Show channel numbers** under Settings → Appearance. The TV list shows no numbers by default now, with more room for the names; typing a number still zaps to its channel.
+- A notice's words show in full when you click them.
 
 ### Security and privacy
 
-- **Updates:** an update is installed only when its signed file names the very version offered, so nobody can pass off an older release - one with a known fault - as a newer one.
-- **The log:** a line the app cannot mask is left out, never written as it was.
-- **Private viewing:** a channel recorded or cast while you watch privately no longer keeps its rewind buffer on the disk once the recording or cast ends.
-- **Error reports** take out every form of IPv6 address, and the report window says what goes beside your text: the app's version, the system and what you picked.
-- Every secure connection the app makes itself asks for TLS 1.2 at least, and the app's own copy of yt-dlp can be run by your user alone.
+- **Nothing on a command line:** a recording, a cast's converter, AirPlay and server mode never hand another program a provider's address, login or token. They read the stream through the app's own bridge, or from a private file only your user can read - another account on the computer sees nothing of it.
+- **The bridge guards every connection** a stream makes - its segments, keys and redirects - so a playlist from the internet cannot reach this computer, the router or a device at home. The in-app player reads every internet stream through it, Nerd on or off; your own proxy goes behind it.
+- **Certificates:** every https stream from the internet has its certificate checked, in the player and in recordings. One that does not check out plays nothing and says why, and the app asks once whether that source may play without the check - an answer you can take back on the source's page.
+- **Backups:** a backup without a password holds no login, and putting it back keeps the logins already on the computer. With a password the whole file is encrypted, as before. A restore brings nothing that runs something, lets others in or sends connections elsewhere unless you tick it.
+- **Kodi:** its login is never sent over plain http without asking - Send anyway, Use HTTPS (tried first) or Cancel.
+- **Kids profiles** can be kept to the categories a grown-up picks, and PINs can be 4 to 12 digits.
+- **Watch together:** every request to the relay carries the room's credential, and nothing said before you joined is played back after a restart.
+- **Sync:** a computer joining is asked before it takes a copy saved more than 30 days ago.
+- The remote API and the phone remote hold back a device that asks too often or guesses tokens; the app's own yt-dlp is checked before every run; a login is masked in the log in its encoded forms too; the subtitle search waits for Search while you watch privately; and adding an Xtream server or portal on plain http says the login travels unencrypted.
+
+### Removed
+
+- **The supporter key**, everywhere. The heart icon is one of the icons to pick.
+
+### Fixed
+
+- The app closed at start when it had been left on Radio.
+- Posters went blank after a while in long lists, and stayed so until the app started again.
+- The app could crash as Settings opened on a system that writes numbers with a decimal comma (Swedish, German...).
+- On Windows, an update installer that Windows would not start - Smart App Control, an antivirus or a policy - was reported as a crash; the update window now says what stopped it and how to install by hand.
+- Updating to 1.6.10 could switch the app to the heart icon by itself.

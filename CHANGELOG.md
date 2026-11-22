@@ -7,6 +7,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.11]
+
 ### Security
 
 - A backup made without a password holds no login any more: playlist
