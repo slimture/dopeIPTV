@@ -564,3 +564,30 @@ def test_the_header_its_switch_and_recently_watched(app):
     _spin(app)
     assert top.header.switch.isVisible()
     host.close()
+
+
+def test_without_numbers_a_row_gives_the_number_no_room(app):
+    """Settings > Appearance, "Show channel numbers" (off by default): no
+    number painted and no column kept for one - the logo starts where the
+    number did."""
+    from PyQt6.QtCore import QRect
+
+    from dopeiptv.ui.media_cards import channel_parts
+    rect = QRect(0, 0, 900, 56)
+    with_n = channel_parts(rect, "compact", False)
+    without = channel_parts(rect, "compact", False, numbers=False)
+    assert with_n["num"].width() > 0 and not without["num"].isValid()
+    assert without["logo"].left() < with_n["logo"].left()
+    assert without["name"].left() < with_n["name"].left()
+    rtl = channel_parts(rect, "compact", True, numbers=False)
+    assert rtl["logo"].right() > with_n["logo"].right()
+
+
+def test_the_channel_numbers_switch_is_off_until_turned_on(tmp_path):
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.ui.channel_list import CHANNEL_NUMBERS_KEY, channel_numbers_shown
+    s = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    assert channel_numbers_shown(None) is False and channel_numbers_shown(s) is False
+    s.setValue(CHANNEL_NUMBERS_KEY, "true")
+    assert channel_numbers_shown(s) is True

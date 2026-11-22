@@ -98,6 +98,10 @@ def last_first(names: list[str], last: str) -> list[str]:
     return list(names)
 
 
+#: The device list's least width: the window's 400 less its margins.
+MIN_LIST_W = 364
+
+
 def cast_button_text(name: str | None) -> str:
     """The cast window's button for the device picked: "Cast to Living room
     TV" (a long name cut), or plain "Cast"."""
@@ -171,7 +175,9 @@ class CastDialog(QDialog):
         # for the person, and said (_note_stranger).
         self._strangers: set[str] = set()
         self.setWindowTitle(tr("cast_title"))
-        self.setMinimumWidth(400)
+        # The width it starts from on the list, never on the window: a
+        # window given a minimum of its own leaves its layout's out, and
+        # "Cast to AirPlay (Apple TV)" was cut to its middle on the button.
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 18, 18, 18)
         lay.setSpacing(10)
@@ -181,6 +187,7 @@ class CastDialog(QDialog):
         lay.addWidget(self.status)
 
         self.list = QListWidget()
+        self.list.setMinimumWidth(MIN_LIST_W)
         self.list.itemDoubleClicked.connect(lambda _i: self._cast())
         lay.addWidget(self.list, 1)
         # A Kodi that mDNS does not find (another subnet, announcing off), or
@@ -598,6 +605,13 @@ class CastDialog(QDialog):
         if not item:
             return
         name = item.text()
+        # A Kodi whose login would go over plain http: asked first, before
+        # the player here lets go of anything (mw_cast._kodi_plain_ask).
+        ask = getattr(self.window, "_kodi_plain_ask", None)
+        kodi = ask(name) if self._is_kodi(name) and callable(ask) else "send"
+        if not kodi:
+            self._set_status(tr("cast_err_kodi_plain", name=name))
+            return
         self._set_status(tr("cast_starting", name=name))
 
         # Free the provider connection BEFORE the receiver goes for the
@@ -668,19 +682,21 @@ class CastDialog(QDialog):
                        audio=audio, subs=subs, duration=self.duration,
                        tracks={"audio": self.audio_list,
                                "subtitle": self.subs_list})
-        run_async(self.window.pool,
-                  lambda: self.window.cast.cast(name, self.url,
-                                                 self.stream_title,
-                                                 self.codecs, audio, subs,
-                                                 self.start, self.duration,
-                                                 settle, self.source,
-                                                 "original" if (
-                                                     self._is_dlna(name) or
-                                                     self._is_airplay(name))
-                                                 else self.quality(),
-                                                 self.height,
-                                                 self.fps, dvr, **more),
-                  done, failed)
+        quality = ("original" if self._is_dlna(name) or self._is_airplay(name)
+                   else self.quality())
+
+        def work():
+            if kodi == "https":
+                # "Use HTTPS": that Kodi tried over https first - kept so once
+                # it answers, else nothing is sent to it.
+                self.window.cast.kodi.use_https(name)
+            return self.window.cast.cast(name, self.url, self.stream_title,
+                                         self.codecs, audio, subs,
+                                         self.start, self.duration,
+                                         settle, self.source, quality,
+                                         self.height, self.fps, dvr, **more)
+
+        run_async(self.window.pool, work, done, failed)
 
     def _add_by_address(self) -> None:
         """Add a Chromecast, a TV or a Kodi by its address - or forget the

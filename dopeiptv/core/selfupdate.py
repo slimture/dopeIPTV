@@ -116,9 +116,11 @@ def refuse_older(tag: str) -> None:
     Every installer (this one, the Windows and the Mac one) asks here
     before it fetches anything, whatever offered the release: a release
     signed long ago stays signed, so a site taken over could hand out an
-    old one, with the faults fixed since. Newer than this copy it must be -
-    or, as on the Releases channel today, the release a test build carries
-    the number of (1.4.0 over 1.4.0.12: updates.offered)."""
+    old one, with the faults fixed since. Strictly newer than this copy it
+    must be - the one exception the release a test build carries the
+    number of (1.4.0 over 1.4.0.12), and only while the person has left
+    Test builds for Releases on this very build (updates.offered,
+    left_nightly)."""
     if offered(tag, VERSION, "stable"):
         return
     log.error("update: %s is not newer than the running %s - not installed", tag or "(no version)", VERSION)

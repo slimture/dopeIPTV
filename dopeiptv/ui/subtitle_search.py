@@ -155,7 +155,13 @@ class SubtitleSearchDialog(QDialog):
         bottom.addWidget(close)
         lay.addLayout(bottom)
         self._sync()
-        self._search()
+        from ..core import privacy
+        if privacy.playing_private():
+            # Private viewing: nothing goes to OpenSubtitles until the
+            # person asks for it - the box's words go when they press Search.
+            self._say(tr("subs_private_ask"))
+        else:
+            self._search()
 
     # -- state ------------------------------------------------------------------
 

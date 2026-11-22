@@ -1,6 +1,6 @@
 """About: the app's name and version, the update check with the release
-notes cut to what is new to the one reading them, the links, the
-supporter's line, TMDB's credit and who makes it.
+notes cut to what is new to the one reading them, the links, TMDB's
+credit and who makes it.
 
 ``show_about(win)`` opens it over the window (Help > About) or over
 Settings (General's About row); seven taps on the version turn Nerd on.
@@ -183,24 +183,6 @@ def show_about(win: Any, *, parent: QWidget | None = None) -> None:
     give.setStyleSheet(link_css.replace(P["muted"], HEART, 1))
     links.addWidget(give)
     lay.addLayout(links)
-    # A supporter's thank-you, and where a key goes (mw_donate).
-    from ..core import supporter as _supporter
-    from .qt_i18n import format_month
-    mine = _supporter.stored(getattr(win, "settings", None))
-    sup_row = QHBoxLayout()
-    if mine is not None:
-        mark = QLabel(f"<span style='color:{HEART}'>\u2665</span>&nbsp; "
-                      + tr("supporter_tip", date=format_month(mine["since"])))
-        mark.setStyleSheet(f"color:{P['text2']}; font-size:12px; font-weight:600;")
-        sup_row.addWidget(mark)
-    if hasattr(win, "open_supporter"):
-        key_link = link(tr("supporter_menu") + "…", "")
-        key_link.clicked.disconnect()
-        key_link.clicked.connect(lambda: (d.accept(), win.open_supporter()))
-        sup_row.addWidget(key_link)
-    sup_row.addStretch(1)
-    lay.addLayout(sup_row)
-
     credit = QLabel(tr("about_tmdb_credit"))
     credit.setWordWrap(True)
     credit.setOpenExternalLinks(True)

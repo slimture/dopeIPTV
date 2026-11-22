@@ -16,7 +16,9 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ..i18n import english, tr
 
-from ..core.player_exec import address_scheme, fetchable, find_player_executable
+from ..core.player_exec import HANDOFF_S as _HANDOFF_S
+from ..core.player_exec import (address_scheme, carries_login, fetchable,
+                                find_player_executable, handed_privately, private_file)
 
 _libmpv_error: str | None = None
 
@@ -75,10 +77,37 @@ except Exception as _e:
     _libmpv_error = f"{type(_e).__name__}: {_e}"
 
 
+def numeric_c() -> bool:
+    """Whether LC_NUMERIC is "C" now - set so first when it is not.
+
+    libmpv makes no core under another numeric locale: mpv_create() says
+    "Non-C locale detected" and hands back NULL, and python-mpv passes that
+    NULL straight on to mpv_set_option_string - a segfault (crash report
+    a8f41ba99eed: Nerd's check of the mpv options made its core on a
+    worker before the player had made one, on a system in Swedish). Qt's
+    QApplication sets every category from the environment on Unix - a
+    LC_ALL there wins over the LC_NUMERIC the start puts beside it - and a
+    native file dialog can again, so every core is made after this; Qt and
+    Python format numbers without the C locale, so nothing else changes.
+    Asked first and set only when it is not "C": the locale is the whole
+    process's, and a worker should not write it while nothing needs it."""
+    import locale
+    try:
+        was = locale.setlocale(locale.LC_NUMERIC)
+        if was == "C":
+            return True
+        locale.setlocale(locale.LC_NUMERIC, "C")
+        log.info("LC_NUMERIC was %s: set to C for libmpv", was)
+        return locale.setlocale(locale.LC_NUMERIC) == "C"
+    except locale.Error as e:
+        log.warning("could not set LC_NUMERIC=C: %s", e)
+        return False
+
+
 def throwaway_mpv():
     """A core that shows and plays nothing, to try options on (Nerd's
-    checks); None without libmpv."""
-    if _libmpv is None:
+    checks); None without libmpv, or where libmpv would make none."""
+    if _libmpv is None or not numeric_c():
         return None
     return _libmpv.MPV(vo="null", ao="null", terminal=False, idle=True)
 
@@ -273,8 +302,10 @@ def teletext_decoder() -> bool | None:
 _system_env = system_env
 
 
-def player_command(player: str, exe: str, url: str, title: str) -> list[str]:
-    """The external player's command line for *url*.
+def player_command(player: str, exe: str, url: str, title: str,
+                   handoff: str = "") -> list[str]:
+    """The external player's command line for *url* - or, given *handoff*,
+    for the playlist file that holds it (``handoff_file``).
 
     The address comes after "--", which ends the options for mpv and VLC
     alike. A playlist's line is whatever its author wrote, and one that
@@ -282,12 +313,50 @@ def player_command(player: str, exe: str, url: str, title: str) -> list[str]:
     "--log-file=~/.bashrc" overwrote that file with mpv's log - the title,
     also the playlist's, written into it - and "--include=http://..." took
     mpv's whole configuration from a stranger's server. After "--" such a
-    line is a file that does not open, and nothing else."""
+    line is a file that does not open, and nothing else.
+
+    With a handoff the title is the playlist's own line (#EXTINF), which
+    both players show, and stands nowhere in the command line: every
+    account on a Linux computer reads that, and a title watched privately
+    is not theirs to read. A file's path is there anyway, so a file keeps
+    its title beside it."""
     if player == "mpv":
-        return [exe, "--force-media-title=" + title,
-                "--user-agent=dopeIPTV/1.0", "--", url]
-    return [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0",
-            "--", url]
+        if handoff:
+            return [exe, "--user-agent=dopeIPTV/1.0", "--playlist=" + handoff]
+        return [exe, "--force-media-title=" + title, "--user-agent=dopeIPTV/1.0", "--", url]
+    if handoff:
+        return [exe, "--http-user-agent=dopeIPTV/1.0", "--", handoff]
+    return [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0", "--", url]
+
+
+#: How long a handoff file waits for its player before it is deleted: the
+#: player reads it as it starts.
+HANDOFF_S = _HANDOFF_S
+_HANDOFF_PREFIX = "dopeiptv-play-"
+
+
+def handoff_file(url: str, title: str, folder: str | None = None) -> str:
+    """A one-entry playlist holding *url*, this user's alone (0600, a name
+    nobody can guess, in their runtime folder on Linux), deleted once its
+    player has had HANDOFF_S to read it; "" when it cannot be made. An
+    http(s) address, and any other with a login in it, goes to an external
+    player this way, never as an argument: every account on a Linux
+    computer can read a process's command line (/proc/<pid>/cmdline), and
+    an Xtream address there is its login."""
+    if any(c in url for c in "\r\n"):
+        return ""
+    name = "".join(c for c in title if c.isprintable()) or "dopeIPTV"
+    return private_file(f"#EXTM3U\n#EXTINF:-1,{name}\n{url}\n", _HANDOFF_PREFIX, ".m3u",
+                        folder, keep=HANDOFF_S)
+
+
+def handed_over(url: str) -> bool:
+    """Whether *url* goes to an external player in a handoff file: an
+    http(s) address, any other network address but a multicast group's,
+    and a group's with a login in it (player_exec.handed_privately)."""
+    scheme = address_scheme(url)
+    return scheme in ("http", "https") or handed_privately(url) or (
+        scheme not in ("", "file") and carries_login(url))
 
 
 def allowed_page(player: str, url: str) -> bool:
@@ -316,11 +385,18 @@ def launch_player(player: str, url: str, title: str | None = None,
         QMessageBox.warning(parent, name, tr("open_address_bad"))
         return
     exe = find_player_executable(player)
-    cmd = player_command(player, exe, url, title) if exe else None
-    if not cmd:
+    if not exe:
         QMessageBox.warning(parent, tr("status_player_not_found"),
                             tr("status_player_not_found_msg", name=name))
         return
+    handoff = handoff_file(url, title) if handed_over(url) else ""
+    if handed_over(url) and not handoff:
+        # Never the address in its command line instead, where every
+        # account on this computer could read it: not started, and said.
+        log.warning("external %s not started: no private file for its address", name)
+        QMessageBox.warning(parent, name, tr("status_player_no_handoff", name=name))
+        return
+    cmd = player_command(player, exe, url, title, handoff)
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, env=_system_env())
 

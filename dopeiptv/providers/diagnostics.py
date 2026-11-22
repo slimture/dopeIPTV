@@ -126,6 +126,11 @@ def _probe_url(url: str) -> str:
             pass
     except requests.Timeout:
         return tr("diag_timeout")
+    except requests.exceptions.SSLError:
+        # Its certificate does not check out (expired, self-signed, made
+        # for another name): the player, which checks an internet stream's
+        # as this request does, played nothing (core/nerd.checks_certificate).
+        return tr("diag_certificate")
     except requests.ConnectionError:
         return tr("diag_unreachable")
     except Exception as e:

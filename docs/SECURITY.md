@@ -18,13 +18,17 @@ disagree, the code is what runs and the sentence is a bug: report it.
   password, an M3U address with a token in it, a portal's MAC, a box's or
   a media server's login or token -, Trakt's and Simkl's sign-ins,
   OpenSubtitles' login, the sync code, a Watch together room's code, the
-  tokens of the app's own servers and the supporter key. They stay in the
+  tokens of the app's own servers. They stay in the
   settings files (`core/settings_files.py`), and out of the log
-  (`core/log.py`: each value the app holds masked wherever it appears, one
-  of three characters or fewer as a word of its own, so a short password
-  is masked without every "abc" in the log; a line that could not be
-  masked is withheld, never written as it was), error reports
-  (`core/report.py`) and any address that is logged.
+  (`core/log.py`: each value the app holds masked wherever it appears -
+  as written, percent-encoded in either case of hex, JSON-escaped, and a
+  user name with its password as HTTP Basic's base64, padded or not, or any
+  base64 that reads as text holding one (`encoded_forms`, `basic_forms`,
+  `base64_masked`) -, one of three characters or fewer as a word of its
+  own, so a short password is masked without every "abc" in the log; a line
+  that could not be masked is withheld, never written as it was), error
+  reports (`core/report.py`, the same forms) and any address that is
+  logged.
 - **What a person watches.** History, resume points, watched marks and
   the viewing statistics stay on the computer (`core/viewing_stats.py`
   is never synced), and dopeiptv.org never learns them: sync carries watch
@@ -55,9 +59,10 @@ disagree, the code is what runs and the sentence is a bug: report it.
 - **The update path.** Only what dopeIPTV's release key signed is
   installed, only a signed file that names the release offered - an
   older release's file under a newer tag is refused, since the
-  signature covers the file and not the tag - and never a version older
-  than the one running (`core/selfupdate.py`, `signed_asset`,
-  `names_version`).
+  signature covers the file and not the tag - and only a version strictly
+  newer than the one running (`core/selfupdate.py`, `signed_asset`,
+  `names_version`, `refuse_older`; the one exception
+  [below](#a-test-build-left-for-releases)).
 
 Outside the model: a program that runs as the person (it can read what
 they can), an administrator of the computer, someone at the unlocked
@@ -78,9 +83,10 @@ change a playlist file on its web server.
 | They could try | What stops it |
 |---|---|
 | A channel address that is no stream: `av://lavfi` (a filter graph can write a file of the sender's choice), `edl://`, `memory://`, `gopher://` to a port of this computer, `fd`, a line that starts with `-` | `core/stream_address.py`: an address from the network plays only over a network media protocol (`NETWORK`), never one of `NEVER`, the `lavfi` device, an option or a control character; checked where a client hands its addresses out (`providers/client.py`, `providers/stalker.py`) and once more in the docked player and each multiview cell (`media/embedded.py`, `ui/multiview_cell.py`) |
-| From a source on the internet: an `smb://` address (on Windows a sign-in there with the person's account), raw `tcp://` or `tls://` to any service, ftp, WebDAV, a gateway - or an address on this computer or a link-local one (the printer's page, a local engine, a cloud's metadata service) | `core/stream_address.py`: a source whose own address is on the internet (`on_internet`, its backup addresses too) hands out only the media protocols (`MEDIA`), never a host on this computer or link-local in any spelling (`host_refusal`: 127.1, 2130706433, `::ffff:127.0.0.1`, localhost, this computer's name, 0.0.0.0, 169.254/16, fe80::/10); a private address of the home network stays. A home network's source and a playlist file as before; what the person's rewrite rules or udpxy make is theirs |
+| From a source on the internet: an `smb://` address (on Windows a sign-in there with the person's account), raw `tcp://` or `tls://` to any service, ftp, WebDAV, a gateway - or an address on this computer or a link-local one (the printer's page, a local engine, a cloud's metadata service) | `core/stream_address.py`: a source whose own address is on the internet (`on_internet`, its backup addresses too) hands out only the media protocols (`MEDIA`), never a host on this computer or link-local in any spelling (`host_refusal`: 127.1, 2130706433, `::ffff:127.0.0.1`, localhost, this computer's name, 0.0.0.0, 169.254/16, fe80::/10, and no host at all - `http://:8080/`, `http:///x`, which FFmpeg opens here: `empty_host`); a private address of the home network stays. An address with no host is no address from any source, but a socket listening here (`udp://@:1234`, `_LISTEN`) from a playlist file or the home network A home network's source and a playlist file as before; what the person's rewrite rules or udpxy make is theirs |
 | From a source on the internet: a logo or poster on this computer or a link-local host, so the app itself sends requests there | `providers/client._pictures_kept`: such a picture is taken out of that source's lists and pages by the same rule (`stream_address.picture_refusal`) |
-| A public name whose DNS answer is this computer or a link-local host (DNS rebinding), or a redirect from the internet to this computer, a link-local host or the home network - for the app's own requests (guides, pictures, the APIs, the rewind buffer, a cast's address) | `core/dest_guard.py`: every request through `core/_lazy_requests.py` and `core/net_adapter.py` is checked on its socket after it connects and before a byte is sent (`check_peer`: this computer only for a name that says so, link-local only for a link-local or home name, a cloud's metadata service only by its address); every redirect requests follows, and each one the cast follows by hand, judged by its target as written and as it resolves (`redirect_refusal`: http(s) only, never from the internet inward, the same host again allowed) |
+| A public name whose DNS answer is this computer or a link-local host (DNS rebinding), or a redirect from the internet to this computer, a link-local host or the home network - for the app's own requests (guides, pictures, the APIs, the rewind buffer, a cast's address) | `core/dest_guard.py`: every request through `core/_lazy_requests.py` and `core/net_adapter.py` is checked on its socket after it connects and before a byte is sent (`check_peer`: this computer only for a name that says so, link-local only for a link-local or home name, a cloud's metadata service only by its address); every redirect requests follows, and each one the cast follows by hand, judged by its target as written and as it resolves (`redirect_refusal`: http(s) only, never from the internet inward, the same host again allowed); a request through a proxy - whose connection is the proxy's - has its name looked up here first and judged the same way before anything is sent (`proxied_refusal`, `DestinationRefused`): best effort, the proxy's own lookup is the proxy's |
+| An HLS playlist whose segments, keys or redirects send the player or a program the app starts (FFmpeg, mpv) to this computer's services, a link-local or metadata host or a device at home - by an address, or by a public name that resolves there | `core/net_bridge.py`: the in-app player (the docked one and each multiview cell) for every http(s) stream of a source on the internet, Nerd on or off (`player_proxy`), and every program the app starts on such a stream - the recorder, a cast's converter and its probe, the pieces of a cast's archive, AirPlay's converter, server mode's HLS copy (`hand_over`) - go out only through the app's bridge, which judges every connection it opens - each segment, key and redirect hop, CONNECT or plain http - by its host as written and then on its socket, before a byte is sent (`Policy`, `written`, `landed`): a source on the internet's never this computer, link-local, a metadata service or the home network, but the stream's own server (`entry`: AceStream's engine, udpxy at home, what `home_addresses` lets in), the person's own names and `.plex.direct`; a home source's by `dest_guard`'s rule. A refusal is a 502, said once per host and reason ([below](#what-the-in-app-player-opens-itself)) |
 | A line read as an option of an external mpv or VLC, or of the recorder (`--log-file=`, `--include=`) | The address after `--`, and nothing but a stream's address or a file's path handed over (`media/players.py`, `core/recording.py`) |
 | ffmpeg reading `concat:`, `subfile:`, `unix:` or a local file behind an address | `core/player_exec.ffmpeg_protocols`: `-protocol_whitelist` with a stream's protocols wherever ffmpeg or ffprobe is started for a stream |
 | A picture that names a file: `/dev/zero`, or `\\host\share\x.png` (on Windows a login at that host) | `core/picture_files.py`: a file is read as a picture only inside the app's own picture folders, only a plain file, at most 64 MB |
@@ -96,7 +102,7 @@ change a playlist file on its web server.
 - The ceilings are far above any real answer, so a hostile source can still
   make the app read and work up to them.
 - A list chooses where its pictures come from: [below](#a-list-chooses-where-its-pictures-come-from).
-- The player and the recorder look names up themselves: [below](#the-player-and-the-recorder-look-names-up-themselves).
+- What a TV that fetches a stream itself, a source at home's stream and a web page through yt-dlp open: [below](#what-the-in-app-player-opens-itself).
 - A provider on plain http: [below](#a-provider-on-plain-http).
 - A stream's own bytes are decoded by FFmpeg and libmpv: [below](#bugs-in-the-media-libraries-are-theirs).
 
@@ -112,11 +118,14 @@ requests they send it.
 | They could try | What stops it |
 |---|---|
 | A device description that sends the app's requests, and the stream's address with them, somewhere else | `providers/dlna.py`: the control address on the description's own host (`same_host`), no redirect followed, sizes capped, no DTD or entity (`_parse_xml`); Kodi's and the probes' requests follow no redirect (`providers/kodi.py`, `providers/lan_scan.py`) |
+| Reading a Kodi's login on its way: HTTP's basic login is the password in the clear | `providers/kodi.py`: a login over plain http goes to a Kodi only once the person said so for that Kodi, asked before anything is sent - in the cast window, and on the phone or in TV mode when a cast is run from there (`asks_first`, `KodiPlainLogin`, `ui/mw_cast._kodi_plain_ask`); "Use HTTPS" asks that Kodi over https first, its certificate checked, and keeps it so once it answers (`use_https`); the answer is kept with that Kodi (`plain_ok`), never logged |
 | A large or looping mDNS answer | `providers/mdns.py`: `MAX_PACKET`, `MAX_PACKETS`, `_MAX_JUMPS` |
 | Taking a known TV's name to get the next cast | `providers/casting.py`: a device known by its kind, its own id and its address (`ident`); one answering to the name as another is not cast to until it is picked, its address in sight |
 | A box's XML with a DOCTYPE | `providers/boxes.parse_xml` drops it; a SAT>IP description with an entity is refused (`providers/satip.parse_description`) |
 | A stream address in a box's list | The same `core/stream_address.py` rules as a provider's |
 | Guessing a token of the app's servers | 192 bits from `secrets` for the phone remote, the remote API and server mode, compared with `hmac.compare_digest`; a token bucket per address and a lock-out after wrong tries (`core/phone_remote.RateLimiter`, server mode the same) |
+| Taking the phone remote or the remote API down from address after address, each with a fresh bucket | A budget for every address together beside each one's own (`RateLimiter`'s *total_rate*: 60 requests a second, 360 at once; a list's pictures 120 and 900), 429 once it is spent; lock-outs stay per address, and this computer is neither shut out nor counted (`this_computer`) |
+| Sending the player, through the remote API, to a service on this computer or to a link-local host (a router's page, a cloud's metadata service) | `core/remote_api.play_refusal`, on the server's thread: an address that names this computer - loopback in any spelling, localhost, 0.0.0.0, an IPv4 address inside IPv6, an empty host - or a link-local or metadata host, or whose name resolves to one now, is refused with the reason (400); AceStream's engine at `127.0.0.1:6878/ace/` and the home network stay, and a script on this computer, which reaches them itself, plays as before (`remote_api.asker`) |
 | Opening connections by the thousand, or holding them open | `core/exclusive_bind.py`: 256 at once, 64 per address (`ConnectionLimitMixin`), a client that says nothing let go (`IdleTimeoutMixin`) |
 | Reaching the app's servers from the internet | `core/home_net.is_home_client`: loopback, the private ranges, link-local and IPv6 ULA, never a public address |
 | Making a playlist's addresses name a host of its choosing, so the token goes there | `home_net.host_for_addresses` (`core/remote_api.py`, `services/home_server.py`) |
@@ -126,6 +135,10 @@ requests they send it.
 
 - Anything on the network can announce itself under a familiar name. The
   app shows each device's address; it cannot prove what a device is.
+- A Kodi the person let send its login over plain http ("Send anyway")
+  gets it in the clear on every request, as HTTP's basic login is; Kodi's
+  own HTTPS needs a certificate the system trusts, which Kodi does not
+  make for itself.
 - A Jellyfin or Emby server found on the network is sent the name and
   password typed into its sign-in (once, never kept,
   `ui/media_signin.py`): a fake one gets them. Plex signs in at plex.tv.
@@ -145,7 +158,7 @@ rebinding).
 |---|---|
 | A `dopeiptv://` link with a quote in it that adds `--server`, `--play` or Qt's `-platformpluginpath` | `core/commands.own_arguments`: nothing after a link is read, by the app or by Qt (`app.py` hands Qt the program's name alone) |
 | A link that plays an address | Asked first in the window, with the server and the whole address shown (`ui/mw_commands._ask_link_play`), one question at a time; a stream only, never a file (`commands.stream_url_ok`) |
-| A link with a supporter key | Shown in the supporter window, never taken silently |
+| A link that tunes a channel (`dopeiptv://channel/<name>`) | Since 1.6.11 asked first too, once the channel is found - its name in plain text, Cancel the default, one question at a time (`ui/mw_commands._ask_link_channel`); only a channel the lists show, never one of a hidden or locked category (`_play_channel_named`), and through the same questions as a zap. The person's own `--channel`, the remote API and Home Assistant are no links and play as asked |
 | A request to the phone remote, the remote API, server mode, the rewind buffer or a cast | A token in every address that the page cannot know; the phone remote never counts a web page's guesses and refuses its changes (`cross_site`: `Sec-Fetch-Site`, `Origin`) |
 | Someone on the home network who reads the phone remote's traffic | Its key never crosses the network: it is after the `#` of the code's address (`/r/#key`, which no browser sends) and kept on the phone; every request is signed with it - HMAC-SHA256 over the method, the address, the time, a nonce and the body (`core/phone_remote.signature`, the page's own SHA-256 since `crypto.subtle` needs https) - within a minute of this computer's clock, each nonce once (`SIGN_WINDOW_MS`, `NONCES_MAX`): one seen on the way can be neither changed nor sent again. A picture's address is signed until a quarter of an hour on (`PICTURE_TTL_MS`). An address of before, with the key in its path, makes a new key at once (`leaked`, `on_leaked`). The calendar app, which cannot sign, gets a key of its own that opens the calendar alone (`calendar_token`) |
 | Someone on the home network who saw a converted cast's address | The converter serves only the receiver it was started for (`providers/cast_bridge.receiver_addresses`, 403 for any other address), a new token each run; the Apple TV's bridge, which is not told the Apple TV's address (Apple's menu picks it), serves this computer and the first other address that asks for the run's stream alone - the Apple TV, within seconds of being told -, 403 for any other (`providers/airplay_bridge.admits`) |
@@ -157,9 +170,8 @@ rebinding).
 
 **What is left.**
 
-- A link to a channel plays without a question: [below](#a-link-to-a-channel-plays-without-a-question).
 - A page can bring the window forward (`dopeiptv://open`) and open the
-  link's question or the supporter window.
+  link's question.
 
 ### Another user or program on the same computer
 
@@ -170,8 +182,9 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 | They could try | What stops it |
 |---|---|
 | Reading the settings files (every login, the sync code, the tokens) from another account | `core/settings_files.protect`: each file 0600 and the app's folder 0700, set at start before anything writes them, and only ever narrowed; on Windows the registry and the user's own profile. Where the drive keeps no permissions (FAT, exFAT, some shares) the app starts all the same, logs the file by name and says once where it is (`not_private`, `ui/mw_settings._tell_settings_not_private`) |
-| Handing the running app a command | `core/instance.py`: a socket in `$XDG_RUNTIME_DIR` or a 0700 folder of the user's own, never the shared /tmp, nor a folder another account owns; on Windows a random word in the pipe's name (`_pipe_key`) |
-| Using the loopback proxy to go out as the person, through their route | A key made for each run (`core/net_bridge.py`) |
+| Handing the running app a command | `core/instance.py`: a socket in `$XDG_RUNTIME_DIR` or a 0700 folder of the user's own, never the shared /tmp, nor a folder another account owns; a folder that could not be made, read or narrowed to the user alone is never listened in - the app starts without the second start's handoff, said once (`_folder_refusal`); on Windows a random word in the pipe's name (`_pipe_key`) |
+| Using the loopback proxy to go out as the person, through their route | A key made for each run (`core/net_bridge.py`), and its guard: from it nothing reaches what the stream's source may not (`Policy`) |
+| Reading a provider's address - an Xtream login, a token - Nerd's proxy with its login or a header that holds a token from the command line of a program the app starts (`ps`, `/proc/<pid>/cmdline`) | `core/recording.py`: never an address in a recorder's arguments - the app reads the stream and hands it over on its input (`Feed`), or the recorder reads an alias through the bridge that names nothing of it (`net_bridge.Bridge.alias`: a `.stream.invalid` host under a 192-bit token, the path's shape alone), or - another address with a login, `rtsp://user:pw@` - a 0600 file (ffmpeg's concat list, mpv's playlist). A cast's converter and ffprobe, the readers of a cast's archive and rewind buffer (the buffer's token too), AirPlay's converter and probe and server mode's HLS copy read an alias the same way (`net_bridge.hand_over`); a proxy is the bridge's to go through, a header that may hold a token the bridge's to add - only the user agent and the headers that open nothing are arguments (`net_bridge.split_headers`; `tests/test_security_rules.py` fails on a `-http_proxy`); the bridge's key in the program's environment alone (`net_bridge.child_env`), which only the same user reads. An external player gets a 0600 playlist file, or is not started (`players.handoff_file`) |
 | Reading the rewind buffer's stream | A 144-bit token, loopback only (`core/dvr_server.py`) |
 | Catching the Trakt sign-in's redirect | Its port never shared (`core/exclusive_bind.ExclusiveBindMixin`, `SO_EXCLUSIVEADDRUSE` on Windows), and the code it carries useless without the PKCE verifier that stays in the app (`providers/trakt.py`) |
 | A socket of its own where Discord or lircd would be | `core/discord_rpc.py`: a socket this user owns only; `core/tv_input.lirc_socket_ok`: lircd's when root or this user owns it, or in a folder nobody else can write to |
@@ -181,7 +194,7 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 **What is left.**
 
 - A program running as the person reads what the person can: [below](#logins-are-in-the-settings-files-not-a-keyring).
-- Another account can see the arguments of the programs the app starts: [below](#programs-started-by-the-app-show-their-arguments).
+- An address that is not http(s) and holds a login the app does not see as one, and the page yt-dlp is given, are still arguments: [below](#programs-started-by-the-app-show-their-arguments).
 - The cache and the logs keep the system's folder modes: [below](#the-cache-and-the-logs-keep-the-folder-modes-the-system-gives).
 - Any program on the session bus can drive the app: [below](#any-program-on-the-session-bus-can-drive-the-app).
 - An administrator of the computer can read and change everything.
@@ -196,7 +209,8 @@ provider.
 |---|---|
 | Changing what dopeiptv.org sends | https to dopeiptv.org itself only (`core/build_check.secure`), no redirect followed; an update installs only what the signed list names (`selfupdate.signed_asset`), and its download follows redirects only over https (`selfupdate._get_https`) |
 | Reading or changing a third party's answers (TMDB, Trakt, Simkl, OpenSubtitles, Plex.tv, radio-browser.info, GitHub...) | https with the certificate checked; `verify=False` is nowhere - `core/cert_pin.py` reads a certificate unchecked only to show it before it is pinned, and a pinned server is checked by its fingerprint instead (`core/net_adapter.py`) |
-| The app's own requests to an https provider (its lists, guide, logos, the rewind buffer's connection) | The certificate checked against the system's authorities, or Nerd's pin for that one server (`core/net_adapter.py`) |
+| The app's own requests to an https provider (its lists, guide, logos, the rewind buffer's connection, a recording's own connection) | The certificate checked against the system's authorities, or Nerd's pin for that one server (`core/net_adapter.py`) |
+| The player's and recorder's https streams from the internet | The certificate checked against certifi's authorities (`nerd.checks_certificate`), unless the person let that source play unchecked when asked - a player whose core will not take the check plays nothing and says so (`nerd.CertificateUnchecked`); a program reading an alias has the bridge make the TLS connection, with that same check (`net_bridge.Alias.trust`) |
 | Changing DNS answers | Nerd's own DNS over HTTPS, the presets reached by IP (`core/doh.py`) |
 | Watching while a VPN has dropped | Nerd's VPN guard starts nothing while it is down (`core/nerd.py`, `vpn_blocks`) |
 | Reading the MQTT broker's traffic | TLS on 8883, the broker's certificate checked (`core/mqtt.py`) |
@@ -204,7 +218,8 @@ provider.
 **What is left.**
 
 - A provider on plain http: [below](#a-provider-on-plain-http).
-- The player checks certificates only as its libraries do: [below](#the-player-checks-certificates-only-as-its-libraries-do).
+- A source the person let play without its certificate checked, and a
+  server at home checked only as mpv's own default does: [below](#every-internet-streams-certificate-is-checked-since-1611).
 - The app's servers speak plain http on the home network: [below](#the-home-networks-servers-speak-plain-http).
 - Searches for devices (SSDP, mDNS, broadcasts) are plain by their nature,
   and a webhook goes over whatever address the person typed.
@@ -213,7 +228,7 @@ provider.
 
 The site serves the app the update feed and downloads, feedback and its
 answers, settings sync, the Watch together relay and the Trakt sign-in's
-redirect, and signs supporter keys. Its code is on the `website` branch
+redirect. Its code is on the `website` branch
 (`donate/sync.py`, `donate/together.py`, `donate/feedback.py`,
 `donate/release_sums.py`). A modified build uses none of these services
 (`build_check.allowed`, `refuse`), and the site refuses one that says it
@@ -230,7 +245,9 @@ is.
   together messages, and see who is in a room
   ([below](#the-watch-together-relay-sees-who-is-in-a-room)).
 - Read the feedback and error reports the person sends - they are for it -
-  as the person saw them before Send, scrubbed (`core/report.py`).
+  exactly as the person saw them before Send: the window scrubs its boxes
+  with the person's own values on Send and shows anything more it hid
+  before it sends (`ui/feedback_dialogs._ShownIsSent`, `core/report.py`).
 - See the Trakt sign-in's one-time code pass through `/trakt/callback`.
 
 **What it could not do.**
@@ -241,16 +258,21 @@ is.
   message is signed by its member's own key (`core/ed25519.py`) and an
   unsigned one is dropped, so no member speaks as another; an earlier copy is
   told to a computer that has
-  seen a later one (`counter`, `RoundResult.older`); an old message out of
-  its time is not acted on (`Room.receive`).
+  seen a later one (`counter`, `RoundResult.older`), and a copy last saved
+  more than a month ago is not taken by a computer that joins until the
+  person says so (`saved_at`, `STALE_DAYS`); nor make an old room
+  message new: a member since 1.6.11 is taken only from its first message
+  that names this computer's id for this stay in the room, whatever time
+  the relay says - after a restart too (`Room.receive`, `PROTO`); an older
+  member's message out of its time is not acted on.
 - Install anything: an update must be on a checksum list signed with a key
   that is never on the web server (`core/update_keys.py`,
   `selfupdate.signed_asset`), and the site mirrors a release's files only
   once that signature holds (`donate/release_sums.py`). An older signed
   release is refused too, under its own tag or a newer one
   (`selfupdate.names_version`).
-- Tell who someone is from what the app sends: no account, name, e-mail,
-  supporter key or id the app makes up and keeps. A sync slot and its
+- Tell who someone is from what the app sends: no account, name, e-mail
+  or id the app makes up and keeps. A sync slot and its
   credential come from the sync code (`auth_of`); feedback's answers are
   asked for by the hash of a random code kept on the computer
   (`report.new_code`).
@@ -295,15 +317,22 @@ GitHub Action, a build runner, GitHub itself - or the release key.
 
 ### Someone with a backup or the sync code
 
-**A backup** holds every setting a person would miss, logins included -
-playlists' passwords, Trakt's and OpenSubtitles' sign-ins, the sync code -
-and every profile with its PIN as kept (`core/backup.py`). Without a
-password they are plain text in it; with one the file is encrypted
-([below](#a-backups-password)). The app says so where the file is made, and
-writes it readable only by its owner where the system has such a thing.
-Left out: the remote API's, the phone remote's and server mode's tokens,
-the media servers' device id, where the windows sit, caches. Whoever has a
-file without a password has those logins.
+**A backup** holds every setting a person would miss and every profile
+with its PIN as kept (`core/backup.py`). Its logins - playlists'
+passwords, tokens and box MACs, a login in their addresses, proxy and
+headers, Trakt's, Simkl's and OpenSubtitles' sign-ins, the sync code, a
+Kodi's password, MQTT's and the webhooks' - go in only with a password,
+and then the file is encrypted ([below](#a-backups-password)). Without
+one they are left out (`backup.without_logins`, `LOGIN_SETTINGS`,
+`LOGIN_FIELDS`): the file says so, and putting it back keeps the logins of
+the computer it is put back on - a playlist that is there too keeps its
+own (`_logins_from_here`). The honest limit: a login written into an
+address's path (`/live/user/pass/`, a playlist's own form) cannot be told
+from a folder and stays; a source's server holds none. The file is
+written readable only by its owner where the system has such a thing.
+Left out either way: the remote API's, the phone remote's and server
+mode's tokens, the media servers' device id, where the windows sit,
+caches.
 
 **A backup someone else made** is outside input. Before it is put back,
 the window names what would run something, let others in or send the
@@ -314,8 +343,15 @@ MQTT broker and a DNS server (`RISKY`); the remote API, sharing, MQTT's
 commands and server mode switched on, and adult channels through it
 (`RISKY_ON`); a sync code to join; and each playlist's proxy, headers,
 rewrite, udpxy, catch-up address, backup addresses, own DNS and trusted
-certificate (`RISKY_SOURCE`). A restore over everything waits for the
-next start (`stage`, `apply_pending`). A colour from it is used only as
+certificate (`RISKY_SOURCE`). Since 1.6.11 none of these is brought
+unless the person ticks it - one box each, none ticked, over everything or
+as playlists beside the ones here (`backup.risky_choices`, `without`): a
+setting not ticked stays as it is on this computer, with what is one
+setting with it (server mode's reach with its switch, a sync's own with its
+code, a watch history's whole sign-in with its token - `_WITH`;
+`Backup.keep`, kept in a staged restore), and a playlist not ticked comes
+without those options and their companions. A restore over everything
+waits for the next start (`stage`, `apply_pending`). A colour from it is used only as
 `#rrggbb`.
 
 **The sync code** reads and writes the household's copy: favorites,
@@ -331,7 +367,16 @@ computer, deleting the synced copy when asked, and starting again on one.
 
 **A room code** lets its holder into the room: the display names, what
 plays, and play, pause and seek for everyone, within bounds
-(`MEMBERS_MAX`, `VER_JUMP`, never past a title's end). **The phone
+(`MEMBERS_MAX`, `VER_JUMP`, never past a title's end). **A room's id**
+without the code opens nothing since 1.6.11: every request to the relay
+carries the room's credential (`together.auth_of`, `AUTH_HEADER`: HKDF of
+the stretched code under a label of its own), of which the relay keeps
+only a SHA-256; the first request binds the room, and from then on a
+request without it - a message, a seat, reading the sealed messages,
+leaving - is turned down, compared in constant time (`donate/together.py`,
+`Relay._admit`). The relay also holds a room to `MAX_MEMBERS` seats,
+`MAX_PER_MINUTE` messages a member, `ROOMS_PER_ADDR` rooms an address has
+made (an IPv6 address by its /64), 2 KB a message and a day's life. **The phone
 remote's address** is the remote for whoever is on the home network with
 it; New address shuts out every phone that had the old one. **Server
 mode's playlist** carries its token, which watches but changes nothing: [below](#server-modes-playlist-token-lets-a-device-watch-all-it-serves).
@@ -342,8 +387,9 @@ The design behind a backup's optional password, with its test vectors
 (AGENTS.md rule 9; its line on the transparency page belongs to the
 `website` branch's `tools/transparency.py`). A person
 may give the backup a password where it is made (Settings > General >
-Backup, a field and its repeat). Without one the file is exactly what a
-backup always was, and a plain or an old file restores as before.
+Backup, a field and its repeat). Without one the file leaves every login
+out (`without_logins`, above), and a plain or an old file restores as
+before.
 
 **The file** (`core/backup.py`: `seal`, `lock`, `for_file`) is one JSON
 object, written as every backup is (`backup.write`: whole or not at all,
@@ -449,7 +495,10 @@ the phone, and a changed page can read the key the phone keeps: they can
 then drive the remote (play, stop, record, the volume) until New address,
 though never reach a login, a file or anything beyond what the remote does.
 Server mode's and the remote API's tokens are in their addresses, so such a
-reader can use them; a converted cast serves only its receiver's address -
+reader can use them - and the remote API's shared playlist hands each
+stream on as a redirect to the source's own address, an Xtream login in it
+(`core/remote_api._redirect_stream`), so its token reaches those logins
+too; server mode restreams instead and hands out none. A converted cast serves only its receiver's address -
 or, where that is not known, the first that asks for its own address -,
 which another device on the network could take.
 
@@ -459,7 +508,8 @@ accept - and a changed page would come with a warning just as the real one
 does, so it would protect nothing; a trusted one needs a public name per
 computer and a service handing out certificates (Plex runs one), which puts
 every computer in the public certificate logs. A TV, Kodi or VLC given a
-playlist cannot sign. What holds them is
+playlist cannot sign, and neither can Home Assistant's plain REST calls,
+which is what the remote API is for. What holds them is
 the home network, a 192-bit token, the lock-out and New address.
 
 ### Server mode's playlist token lets a device watch all it serves
@@ -487,7 +537,17 @@ in without the token (`nerd_server_open`): only the addresses listed
 1.6.0 to 1.6.8 did, and what a server set up then keeps until it is
 changed - every device on this computer's own networks. A device let in
 watches within the channels at once and at 10 requests a second per
-address (`TUNER_RATE`), and the person is told what that means.
+address (`TUNER_RATE`), and the person is told what that means: the
+server's Settings card says what the tuner is open to now, in plain words,
+for each choice (`home_server.exposure`). Since 1.6.11 a server that kept
+the open tuner from before 1.6.9 unasked keeps working and is told so
+once, while it runs, on a decision card (`open_untold`,
+`ui/mw_server._server_tell_open`): "Close it" lets in, by their addresses
+alone, only the devices that used the tuner without its token this run -
+or, when none did, nobody, with a message that says where a device is let
+in (`closed_mode`, `note_open_use`); dismissed, it is kept and not said
+again (`nerd_server_open_told`). `dopeiptv --server` says it in the log at
+every start (`headless.open_note`).
 
 *Why:* a device let in by its address is trusted by its address; on the
 home network another device could take that address. Never a web page
@@ -503,30 +563,64 @@ stream for the TV - a sound or picture it cannot play, a chosen track,
 subtitle or quality, the archive or the rewind buffer in pieces
 (`providers/cast_bridge.py`, `providers/cast_feed.py`,
 `providers/airplay_bridge.py`) - does the TV get an address of the app's
-own under a token, the provider's staying here. A Chromecast is Google's
-device running Google's receiver.
+own under a token, the provider's staying here, and what the converter
+fetches goes through the app's guard
+([below](#what-the-in-app-player-opens-itself)); what a TV fetches itself
+is the TV's. A Chromecast is Google's device running Google's receiver.
 
 *Why:* a DLNA TV, a Kodi and an Apple TV are made to fetch a stream
 themselves, and a cast through the converter costs the computer's
-processor and starts later. The TV is one the person chose to cast to;
-the app says which device a name stands for (`casting.where`).
+processor and starts later. Sending every cast through the computer
+instead would keep the computer awake and in the path for the whole cast,
+which makes a cast less dependable than the TV fetching the stream itself.
+To a Chromecast or an Apple TV the person can have one cast go through
+the app: choosing a quality, a sound track or a subtitle in the cast window
+converts it. The TV is one
+the person chose to cast to; the app says which device a name stands for
+(`casting.where`).
 
-### The player checks certificates only as its libraries do
+### Every internet stream's certificate is checked (since 1.6.11)
 
-The app does not set the certificate check of mpv and FFmpeg for a stream
-(`tls-verify`, `tls_verify`): it is their own default. Older versions -
-such as Ubuntu's, which the AppImage and the .deb carry - check nothing;
-newer ones check against the system's authorities (`core/net_bridge.py`,
-`docs/DEVELOPER_NOTES.md`). Where they check nothing, someone on the
-network path can answer an https stream with a certificate of their own,
-and the address - an Xtream login in it - goes to them. The app's own
-requests to the same provider - its lists, its guide, the login - are
-checked.
+The player and the recorder check the certificate of every https stream on
+the internet against certifi's authorities, as the app's own requests
+always did, whether Nerd is on or not (`nerd.checks_certificate`,
+`nerd._apply_tls` before every stream - the docked player and each
+multiview cell -, `nerd.strict_tls_recorder` for mpv as a recorder; a
+recorder reading an alias has the bridge make the TLS connection to the
+stream's server itself, checked the same way - `net_bridge.Alias.trust`:
+`CHECKED` with the authorities the player is given, `PINNED` by the pin,
+`UNCHECKED` only where the player and the recorder would not check either,
+the trust the recorder had when it read the address itself). Someone on
+the network path who answers with a certificate of their own gets nothing - the login in an Xtream address
+least of all. A server at home is checked as mpv's own default does (0.37
+nothing, a newer mpv everything) - its certificate is often its own -
+unless Nerd's strict check asks for it too (Nerd > Network, "Check every
+stream's certificate", `nerd_tls_strict`). A host whose certificate the
+source pins is the bridge's to check (below); a `tls-verify` the person
+typed into mpv's options or mpv.conf wins (`Nerd.typed_tls`).
 
-*Why:* a stream that plays in mpv plays here. Many providers' certificates
-do not check out (expired, self-signed, made for another name), and a
-check turned on everywhere would stop their channels. Kept as it is: the
-maintainer's decision - playback first.
+**A player that cannot check it.** Where the certificate is to be checked
+and the player's core does not take the check - `tls-verify` or
+`tls-ca-file` refused, or `tls-verify` not on when read back - the stream
+is not opened at all, the one before it stops, and the video says why
+("This player cannot check this stream's certificate, so it was not
+opened"): `nerd.CertificateUnchecked`, `EmbeddedPlayer.refusal`, a
+multiview cell's title. Such a stream is never handed to an external
+player instead, as play()'s other failures are (`main_window._start_playback`).
+
+**One that does not check out.** The stream plays nothing, its diagnosis
+says why (`diagnostics._probe_url`: "the provider's certificate could not
+be checked"), and the window asks once, on the decision card, whether that
+source may play without the check (`MainWindow._tls_offer`). Only that
+answer stores the source's own option `tls_unchecked`; its page has the
+switch to take it back (Advanced, "Play without checking the certificate").
+It is a connection setting like a proxy: sync never takes it unasked and a
+restored backup names it first (`backup.RISKY_SOURCE`).
+
+*What stays:* a person who answers "Play without checking" accepts the risk
+for that source; a cast's receiver checks as it does itself; an external
+player checks as its own defaults do; and a stream on plain http has no
+certificate to check ([below](#a-provider-on-plain-http)).
 
 **What Nerd's trusted certificate does.** For one source and one server
 (host and port), the person sees the certificate first and pins exactly
@@ -541,16 +635,20 @@ system's authorities before its tunnel opens. A changed certificate is
 noted and offered for review (`cert_pin.PinMismatch`,
 `cert_trust.offer_review`). Its limits: it holds only while Nerd is on
 (`net_route.route_for`); it covers https, not rtmp, rtsp or udp; with a
-proxy of Nerd's for the player the stream goes through that proxy, not the
-bridge (`nerd.player_route`); and a cast cannot carry it - the app asks
-first (`ui/mw_cast._cast_pin_ok`).
+proxy of Nerd's for the player the stream goes through that proxy and the
+guard's bridge, not the route's - the pin is not checked there
+(`nerd.player_route`); and a cast cannot carry it - the app asks first
+(`ui/mw_cast._cast_pin_ok`).
 
 ### A provider on plain http
 
 A provider whose address is http sends its lists and streams in the clear,
 and an Xtream login travels in every address (`player_api.php?username=…`,
 `/live/<user>/<pass>/…`). Test connection says so ("Plain http - nothing is
-encrypted", `core/conn_test.py`).
+encrypted", `core/conn_test.py`), and since 1.6.11 so does the address
+field itself while an Xtream server or a portal on the internet is typed
+at http:// or with no scheme (`SourceFields.plain_http`,
+`playlist_http_note`) - a note, nothing refused.
 
 *Why:* it is the provider's choice; the app can only use what it offers.
 
@@ -564,10 +662,31 @@ home ending - for its streams, its pictures or its guide
 person let that source in (its own option `home_addresses`: a list of
 their own, on the internet, of their boxes). The one shape still taken is a
 multicast group through a relay at home (udpxy: `/udp/<group>`), which an
-operator's list names. A source of the home network's, or a playlist file,
+operator's list names - since 1.6.11 only as udpxy has it: a private
+address written as one, its port, `/udp/` or `/rtp/`, a multicast group and
+its port, and nothing after it, no query, login or escape
+(`stream_address._RELAY`), so a list cannot reach another page of the
+device that answers there. A source of the home network's, or a playlist file,
 names what it likes. A public name that resolves to a home address is not
-caught for the player (mpv looks names up itself); the app's own requests
-are caught for this computer and link-local hosts only (`dest_guard`).
+caught for the player (mpv looks names up itself). The app's own requests
+are caught for this computer and link-local hosts whatever the name
+(`dest_guard`), and since 1.6.11 a name a source on the internet named for
+its pictures or its guide (`dest_guard.note_outside`, from
+`client._pictures_kept` and `M3UClient._guide_ok`) never reaches a home
+address either, checked on the socket after it connects: the source's own
+server names (`note_own`, from `make_client`: its server, list, guide,
+portal and backup addresses - split-horizon DNS for one's own server is
+common) and Plex's `*.plex.direct` (a home address by design) excepted.
+Whoever runs a source's own name's DNS - its provider - can point it home
+as well, and the app's requests to that name (its lists, and the pictures
+and guide it names there) then reach a device at home: a GET of its
+choosing whose answer it never sees, never this computer or a link-local
+host. That is not narrowed: a server at home by its public name looks the
+same in every way the app could tell - its port, its paths, the moment its
+answer changes (a laptop coming home flips it too, and the rewind buffer's
+connection is one of these requests). At most `OUTSIDE_MAX` names are kept; a list that names more makes every
+public name count as an outsider's until the app closes (`dest_guard._FULL`)
+- it fails closed rather than let an early name go and reach home.
 
 *Why:* a box's picons and a media server's artwork are at home addresses,
 and a playlist on a server at home is common - those are home sources.
@@ -588,31 +707,78 @@ the provider chose where it is.
 *Why:* posters and details are what most people want from a list of
 films; turning them off is one choice away, said where it is chosen.
 
-### The player and the recorder look names up themselves
+### What the in-app player opens itself
+
+(Before 1.6.11: "The player and the recorder look names up themselves".)
 
 The app's own requests are checked where they land (`core/dest_guard.py`).
-What mpv and FFmpeg open themselves - a stream, an HLS playlist's segments,
-a subtitle - is judged by its address as written
-(`core/stream_address.host_refusal`): a public name whose DNS answer is
-127.0.0.1, a redirect there inside the stream, or an HLS playlist whose
-segments are there, is theirs to follow. FFmpeg reads only a stream's
-protocols there (`ffmpeg_protocols`), so what such a request can reach is
-a web service on this computer or the home network, not a file.
+FFmpeg and mpv fetch an HLS playlist's segments, its keys and the redirects
+they meet themselves, so the app hands every stream it does not read itself
+to the app's bridge (`core/net_bridge.py`):
+
+* **The in-app player** - the docked player and each multiview cell, libmpv
+  inside the app - for every http(s) stream of a source on the internet,
+  Nerd on or off: its `http-proxy` is the bridge (`net_bridge.player_proxy`,
+  set in `nerd.apply_stream` - an option of the core in the app's own
+  process, no program's argument), put back to none for the next stream
+  that needs none. On a Nerd route (own DNS, IP version, a pinned
+  certificate) the route's own bridge, which guards the same way. A radio
+  station is judged as what it is, no source's.
+* **Every program the app starts on a stream** - the recorder, a cast's
+  converter and ffprobe, the readers of a cast's archive and rewind buffer,
+  AirPlay's converter and probe, server mode's HLS copy - reads an alias
+  through it (`net_bridge.hand_over`); with no bridge it is not started.
+
+Every connection FFmpeg or mpv makes there - each segment, key and redirect
+hop - is judged by its host as written and on its socket before a byte is
+sent (`Policy`), so a public name whose DNS answer is 127.0.0.1, a redirect
+there, or a playlist whose segments or key are on this computer, a
+link-local host or - for a source on the internet - the home network, gets
+a 502 and nothing is sent. Nerd's proxy, where it takes streams, is
+chained behind the bridge (an http proxy: `upstream`; a socks one FFmpeg
+never went through, nor does the bridge), and without one the environment's
+`http_proxy` as FFmpeg itself takes it (`system_proxy`): the way out stays
+the person's. A connection the client has left is closed at once, so a
+stalled provider's is not held against the account's one connection
+(`pipe`). With no bridge to be had the player plays as before and says so
+once in the log - never no playback.
+
+*What is left:*
+
+- **A source of the home network, a playlist file, this computer's own
+  servers.** Their streams in the player go out as before, judged by the
+  address as written (`core/stream_address.host_refusal`); a home source is
+  the person's own network, and its programs' aliases are judged by
+  `dest_guard`'s rule (a name an internet source named never at home).
+  The rewind buffer's own server and AceStream's engine on this computer
+  are not bridged at all.
+- **A TV that fetches the stream itself.** A Chromecast on a direct cast, a
+  DLNA TV, a Kodi and an Apple TV given the original address open what it
+  names on their own; that is outside the app
+  ([A cast hands the TV the stream address](#a-cast-hands-the-tv-the-stream-address)).
+- **A web page through yt-dlp.** The person's own web streams (YouTube,
+  Twitch and the like) are left out (`apply_stream`'s *guard*): yt-dlp is
+  a program of its own that opens the page and resolves it itself, which
+  the bridge does not see, and an address the person typed is no
+  provider's; what it resolves to is played as it always was.
+- **Through Nerd's proxy** only the address as written is judged - the
+  proxy connects. On such a stream the player goes through the guard's
+  bridge, not a route's, so a pinned certificate is not checked there.
+- **An external player** is the person's own program.
+- **What it costs.** Every such stream is copied through the app's process,
+  and a plain http request through the bridge is a connection of its own
+  (`Connection: close`, so each is looked up for its own host): an HLS
+  segment over plain http opens a new connection where it might have
+  reused one.
+- **A public name of the stream's own server** that the home's DNS answers
+  with a home address is let in (split-horizon DNS for one's own server),
+  and so are the person's own names and `.plex.direct` (`Policy.entry`,
+  `dest_guard.note_own`).
 
 *Why:* the libraries resolve and connect inside themselves; the app cannot
-see the socket. Routing every stream through the app's own proxy would put
-a copy of each stream through Python.
-
-### A link to a channel plays without a question
-
-A web page can open `dopeiptv://channel/<name>`: the window comes forward
-and plays that channel of the person's own source, as a typed number
-would - only a channel the lists show, never one of a hidden or locked
-category (`ui/mw_commands._play_channel_named`), and through the same
-questions as a zap (a recording in the way, `_guard_stream_switch`).
-
-*Why:* such a link names a channel of the person's own and can only change
-what plays; a link that names an address is asked about first.
+see their sockets, only what they ask a proxy for - so the proxy is the
+app's, and every stream from the internet goes through it, at the cost of
+a copy of each through the app's process.
 
 ### Logins are in the settings files, not a keyring
 
@@ -632,22 +798,88 @@ maintainer's decision.
 
 ### Programs started by the app show their arguments
 
-A recording over its own connection, a cast's converter, server mode's
-copy of an HLS channel and an external player are started with the
-stream's address as an argument (`core/recording.py`: `-i` and the
-address; `providers/cast_bridge.py`, `core/restream.ffmpeg_opener`,
-`media/players.py`), and a
-recording through Nerd's bridge with the bridge's address and key
-(`net_bridge.recorder_options`). On Linux, by default, every account on
-the computer can read another's program arguments (`ps`,
-`/proc/<pid>/cmdline`); an Xtream address carries the login. The docked
-player and multiview are libmpv inside the app, not a program of their
-own.
+On Linux, by default, every account on the computer can read another's
+program arguments (`ps`, `/proc/<pid>/cmdline`), and an Xtream address
+carries the login. No program the app starts on a stream - a recorder, a
+cast's converter, an external player - is given a provider's address, Nerd's
+proxy or a header that may hold a token as an argument:
 
-*Why:* ffmpeg, mpv and VLC take a stream's address on their command line,
-and a proxy of the app's in front of every recording and external player
-would be one more thing that can fail; it matters only with other
-accounts on the same computer. Kept as it is: the maintainer's decision.
+* **A recording over its own connection** is read by the app itself - the
+  rewind buffer's way in, with its reconnects, its route and its check of
+  where it lands (`core/dvr_ingest.Ingest`) - and handed to ffmpeg or mpv
+  on their standard input (`core/recording.Feed`, `piped`): the recorder's
+  command line has `-i pipe:0` and `-protocol_whitelist pipe`, no address,
+  and ffmpeg may open no network protocol at all.
+* **An HLS playlist**, which the recorder must fetch itself segment by
+  segment, and a stream whose certificate the app cannot check while the
+  player would play it unchecked (`Feed.classic`), are read through the
+  app's bridge under an alias (`net_bridge.Bridge.alias`): an address such
+  as `http://<192-bit token>.stream.invalid/~/~/~/~.m3u8`, which names
+  neither the host, the folders, the login nor the query, resolves nowhere
+  and works through the bridge alone. A request to it is mapped back by
+  position, so a playlist's relative addresses resolve as against the real
+  one (`real_target`); the bridge sends the source's login and makes the
+  TLS connection with the stream's own check. ffmpeg reads only what that
+  needs (`player_exec.BRIDGED_PROTOCOLS`); the alias is forgotten as the
+  recording ends; with no bridge there is no recording (`NO_BRIDGE`).
+* **A cast's converter and ffprobe** (`providers/cast_bridge.py`), the
+  **readers of a cast's archive and rewind buffer** (`providers/cast_feed.py`
+  - the buffer's own token in its address kept out too), **the Apple TV's
+  converter and probe** (`providers/airplay_bridge.py`) and **server mode's
+  copy of an HLS channel** (`core/restream.ffmpeg_opener`) read an alias the
+  same way (`net_bridge.hand_over`): the options are still chosen by the
+  real address (live or an archive window), ffmpeg reads
+  `BRIDGED_PROTOCOLS` alone, the alias is forgotten as the run ends, and
+  with no bridge nothing is started - the cast says so
+  (`cast_err_no_bridge`), server mode's channel is not copied
+  (`restream.NO_PRIVATE_WAY`).
+* **The bridge's address and key** are in the program's environment,
+  which only the same user can read (`net_bridge.child_env`), never in its
+  arguments.
+* **Nerd's proxy** is the bridge's to go through (`stream_proxy`,
+  `upstream`), never `-http_proxy`; **Nerd's headers** are the bridge's to
+  add to every request it reads - one to the alias and any plain http one -
+  and only those that open nothing (`net_bridge.SAFE_HEADERS`: Referer,
+  Origin, Accept... - a value with a login in it never) are ffmpeg's
+  `-headers` (`split_headers`). `tests/test_security_rules.py` fails on a
+  `-http_proxy` or an unsplit `-headers` anywhere in the app.
+* **Every other network address but a multicast group's** - rtsp, rtmp,
+  srt and the rest, with a login the app sees (`player_exec.carries_login`)
+  or not, since a token may stand in an address's path or under a query
+  word of its own (`player_exec.handed_privately`) - is put in a 0600 file:
+  the recorder's concat list (its input's options in it from ffmpeg 5) or
+  mpv playlist (`recording.concat_list`, `player_exec.private_file`), and a
+  cast's converter's, ffprobe's and the Apple TV's converter's concat list
+  (`player_exec.private_list`, read as `ffmpeg_protocols` says, gone with
+  the run, `net_bridge.Handoff.listed`). With none to be made nothing is
+  started (`NO_PRIVATE_FILE`, `cast_err_no_bridge`). A multicast group
+  (udp, rtp: an address and a port) with no login stays an argument, and so
+  do two more: a SAT>IP tuning, which holds the tuning and nothing else,
+  and, for the recorder, an address an ffmpeg older than 5 would read
+  without its options.
+* **An external player** gets an http(s) address, and every other network
+  address but a multicast group's, in a one-entry playlist file of the
+  user's own (0600, a name nobody can guess, in `$XDG_RUNTIME_DIR` on
+  Linux, deleted a minute later: `players.handoff_file`) - the title too,
+  as that file's own line, never `--force-media-title` or `--meta-title`;
+  with none to be made it is not started, and the person is told
+  (`status_player_no_handoff`).
+
+*What stays:* a header that may hold a token does not reach an https host
+other than the stream's own server - a segment on a CDN of its own, which
+the bridge only tunnels - from a program the app starts: it would have to
+be an argument (FFmpeg's `-/opt <file>` reads only its own options' values
+from a file, not an input's, so there is no private way to hand it over);
+the log says once which headers were left out of such hops, by name. The
+in-app player, which takes no arguments, still sends them everywhere it
+did. yt-dlp is given the page it opens. A SAT>IP tuning, a multicast
+group, and for the recorder an address an ffmpeg older than 5 would read
+without its options, go as an argument (above). A local file's title stands
+beside its path, which is there anyway. An alias's token is in the program's arguments: it is
+of no use without the bridge's key. A playlist that names an absolute path
+whose folder is itself "~" is read under the real folder at that place
+(`real_target`'s one difference from the real address). The docked player and multiview are
+libmpv inside the app, not a program of their own.
 
 ### The cache and the logs keep the folder modes the system gives
 
@@ -696,7 +928,12 @@ is not made at all (`core/memory_safe.py`):
   that needs converting is refused with the reason (`cast_err_private_memory`
   - the converter of the stream before goes first), a subtitle reaches mpv
   as bytes in its address (`hex://`), no file. A copy of a subtitle without
-  stray right-to-left marks is not made.
+  stray right-to-left marks is not made. A subtitle search opened while
+  what plays is private asks nothing as it opens: the words in its box -
+  the title playing, filled in - go to OpenSubtitles only when the person
+  presses Search, and on each search after (`ui/subtitle_search.py`,
+  `subs_private_ask`): what the person asks for right then goes (rule 3).
+  Otherwise it searches at once, as it always did.
 - **Turned on midway.** Private viewing turned on while a channel plays
   from a buffer on the disk - the app's or mpv's - opens it again, in
   memory or with none, and the disk buffer goes (`private_reopen_needed`,
@@ -752,9 +989,11 @@ Settings > General.
 
 ### A PIN can be short
 
-A profile's PIN is 4 to 8 digits and the parental lock's at least 4
-characters (`core/profiles.valid_pin`, `ParentalControl.SHORTEST`): four
-digits are 10 000 PINs. They are kept by PBKDF2 with 600 000 rounds and a
+A profile's PIN is 4 to 12 digits (since 1.6.11; it was 4 to 8) and the
+parental lock's at least 4 characters - 12 digits or a passphrase too
+(`core/profiles.valid_pin`, `PIN_LONGEST`, `ParentalControl.SHORTEST`);
+where either is set the app says six digits or more are much harder to
+guess. Four digits are 10 000 PINs. They are kept by PBKDF2 with 600 000 rounds and a
 salt each, and after two wrong tries each further one waits, 5 s growing to
 a minute (`core/pins.py`). A copy of the settings file - a backup - is slow
 to try, not hard, and whoever can change the file can take the PIN out of
@@ -762,7 +1001,7 @@ it.
 
 *Why:* a PIN keeps a family member out, not someone with the computer
 (`core/pins.py` says so); a remote types digits, so a longer PIN is the
-person's choice, not a rule.
+person's choice, not a rule - and an old PIN of four goes on working.
 
 ### A kids profile holds only with a grown-up's PIN
 
@@ -774,10 +1013,26 @@ profile and opens Settings only with a grown-up's PIN. A new one is made
 only once a grown-up's PIN exists; one made before 1.6.9, in a household
 with no grown-up's PIN, is left freely so nobody is locked in, until a
 grown-up sets one. A provider that files a channel for adults under an
-ordinary category, unmarked, is not seen.
+ordinary category, unmarked, is not seen - unless the kids profile sees
+**only what a grown-up allows** (since 1.6.11, off by default, its window
+behind a grown-up's PIN as the rest: `core/profiles.only_allowed`,
+`allowed_for`, `ui/profiles_ui.AllowedPicker`): then only the categories a
+grown-up ticked for each source are shown or played, and nothing else -
+no other category, no radio. Rows and categories go through one rule
+(`ui/mw_profiles.KidsFilter`, its `category_ok`): the lists, the category
+column and its search, the favourites, Mine, History and Continue, the
+guide, the phone remote's lists and sections, the remote API, Home
+Assistant, multiview, the command palette and TV mode; the search across
+sources takes each source's own (`services/search_sources.Plan.allowed`,
+`core/search_all.visible`, which since 1.6.11 also leaves out what a kids
+profile's lists leave out - a row of no category, or of one the source
+does not list). A channel of another source - failover's, the Search
+page's - is not played for a kids profile at all (the door,
+`_kids_may_play`, has no row of the source in use to judge it by), and
+server mode is the household's, never a profile's.
 
-*Why:* the app knows a category by its name and a row by what the
-provider says of it.
+*Why:* without the mode the app knows a category by its name and a row by
+what the provider says of it; with it, by a grown-up's choice.
 
 ### A backup's password is as strong as the password
 
@@ -812,7 +1067,14 @@ office, a hotel, a guest Wi-Fi - that is everyone on it. The token still
 holds.
 
 *Why:* a home split in VLANs has its phones on another part than its
-computer, and an address cannot tell a home from an office.
+computer, and an address cannot tell a home from an office. Narrowing the
+phone remote and the remote API to this computer's own networks (as server
+mode's tuner is: `home_net.LocalNetworks`, the one place that takes no
+token) would shut out every phone and Home Assistant on another part of the
+network until the person listed it under Nerd, a feature the remote is not.
+Every request still needs the token or the phone's signature, a few wrong
+tries lock the address out, and a request from a public address is refused
+before anything is read.
 
 ### The Watch together relay sees who is in a room
 
@@ -821,20 +1083,69 @@ the sealed messages and the addresses they come from - so who is in a room
 with whom, and when. It keeps rooms in memory only and logs nothing
 (`donate/together.py`; the site's privacy policy). Whoever has the code is
 in the room: a code is 10 characters (about 50 bits, 600 000 PBKDF2 rounds
-before the relay could test a guess); 1.6.7's codes of 8 and 1.6.8's
-unsigned members are refused.
+before the relay could test a guess - from the room id or from the hash of
+the room's credential alike); 1.6.7's codes of 8 and 1.6.8's unsigned
+members are refused.
 
-*Why:* a relay has to know where to pass a message on.
+What the credential leaves:
+
+- A room only apps before 1.6.11 use is not bound: its id is all it takes
+  to post or read there, as before. Once a newer member binds it, the
+  older ones already seated keep their seat while they keep asking; an
+  older one who comes later is turned down - their app says the room is
+  full - and the others are told once that someone on an older app was
+  left out (`Polled.older`).
+- Whoever learns a room's id while the relay does not keep the room -
+  before its first request, or once it was forgotten - could bind it
+  first. The members are then turned down, are told so
+  (`together_refused`), and start a new room.
+- An older member's messages are judged by time alone (`JOIN_SLACK_MS`):
+  after a restart, a relay that says the wrong time could hand an old
+  message of theirs again.
+
+*Why:* a relay has to know where to pass a message on; it cannot check
+what it cannot open, and it cannot tell an older app from someone without
+the code.
 
 ### The sync server can hold a copy back
 
-The sealed counter tells a computer that has seen a later copy; a computer
-that has never synced cannot tell an earlier one, and the server can keep
-a copy back or lose it (`core/sync.py`, `counter`). A slot that only an app
-up to 1.6.8 has written is not bound to its credential until a newer app
-writes it.
+The sealed counter tells a computer that has seen a later copy. A computer
+that has never synced - one that joins, or joins again after a restore -
+has seen no counter. Since 1.6.11 every copy also carries, sealed, when it
+was put there (`core/sync.saved_at`; an unchanged copy is put back once a
+week, `REFRESH_DAYS`, so the time says when a computer last synced), and a
+joining computer handed one last saved more than 30 days ago is asked
+before anything is merged, put back or applied: "This copy was last saved
+N days ago - another computer may have a newer one. Use it anyway?", No
+the default, sync then left off (`STALE_DAYS`, `round_trip`'s *stale_ok*,
+`ui/mw_sync._sync_ask_stale`; the welcome's Bring step the same). The join
+says how old the copy it took was.
+
+*What stays:* a copy handed back from within the month is taken by a
+joining computer without a question, and the server can keep a copy back
+or lose it altogether. An app up to 1.6.10 does not stamp its uploads, so
+a household whose only changes come from such an app is judged by its
+entries' own times. A slot that only an app up to 1.6.8 has written is not
+bound to its credential until a newer app writes it.
 
 *Why:* inherent to a server that stores; written on the transparency page.
+
+### A test build left for Releases
+
+An update is offered and installed only when it is strictly newer than
+the copy running, on either channel and whoever offers it
+(`core/updates.offered`, `selfupdate.refuse_older` for every installer).
+The one exception: a person who switched from Test builds to Releases
+while a test build runs (1.4.0.12) is offered the release that build
+carries the number of (1.4.0), which sorts below it, so the channel means
+releases again. It holds only for that very build and only once the
+window saw the switch (`updates.leave_nightly`, `ui/mw_updates.channel_seen`);
+a test build on Releases that was never switched there waits for the next
+release.
+
+*Why:* without it a person leaving Test builds would stay on one until the
+next release; the release is signed as every one is, and the step is the
+person's choice.
 
 ### Builds are not yet reproducible
 
@@ -890,7 +1201,22 @@ The yt-dlp the app may download is the release the build pinned: its
 SHA-256s in the app's signed release (`core/ytdlp_pin.py`). A release of
 yt-dlp's that is itself bad - its key or its build taken over - is not
 seen, and it runs as the person. A new yt-dlp comes only with the next
-release of the app.
+release of the app. The copy is checked against that SHA-256 when it is
+installed and then known by its mark - the SHA-256, its size and time - in
+the user's own 0700 folder. Since 1.6.11 its bytes are hashed against the
+mark right before every run the app starts (`ytdlp.own_copy`, `_may_run`:
+finding it for a page, `resolve`, `version_of`), so a file swapped under
+the same size and time is not run either, and the log says so. mpv's ytdl
+hook runs it by itself - for a page, and as a fallback for a stream that
+would not open -, so on Linux and macOS mpv is handed a small wrapper that
+hashes the copy with the system's sha256sum, shasum or openssl before each
+of those runs and refuses it on a mismatch (`hook_path`, `_hasher`).
+
+*What stays:* on Windows, and where the system has none of those
+programs, mpv is handed the copy itself, hashed before each page the app
+opens but not before mpv's own fallback runs. Whoever could change the
+file between the hash and the run - milliseconds - could as well change
+the app itself.
 
 *Why:* an old yt-dlp is the usual reason a stream stops opening. The app's
 copy can be turned off (`ytdlp_managed`): then only the system's is used.
@@ -951,13 +1277,18 @@ person outside the project is recorded there yet.
   `test_picture_safety.py`, `test_response_cap.py`,
   `test_epg_index_safe.py`, `test_epg_limits.py`, `test_commands.py`,
   `test_commands_outside.py`, `test_local_servers.py`,
-  `test_net_bridge_key.py`, `test_exclusive_bind.py`,
+  `test_net_bridge_key.py`, `test_stream_guard.py`, `test_player_guard.py`,
+  `test_exclusive_bind.py`,
   `test_phone_remote.py`, `test_server_mode.py`, `test_dvr_server.py`,
   `test_settings_files.py`, `test_pins.py`, `test_rec_extras.py`,
   `test_recording_safety.py`, `test_privacy.py`,
-  `test_privacy_playback.py`, `test_privacy_logs.py`, `test_report.py`,
+  `test_privacy_playback.py`, `test_privacy_logs.py`, `test_log_redaction.py`,
+  `test_report.py`, `test_feedback_fit.py`, `test_remote.py`,
+  `test_update_channel.py`, `test_welcome_sync.py`,
   `test_sync.py`, `test_sync_edges.py`, `test_together.py`,
-  `test_backup.py`, `test_backup_lock.py`, `test_build_check.py`, `test_selfupdate.py`,
+  `test_backup.py`, `test_backup_lock.py`, `test_restore_choices.py`,
+  `test_kodi_plain_login.py`, `test_kids_allowed.py`, `test_dest_guard.py`,
+  `test_build_check.py`, `test_selfupdate.py`,
   `test_winupdate.py`, `test_macupdate.py` and `test_ytdlp.py`. CI runs
   them on every push, with the audit of the shipped packages.
 - **The review kit before every release** (AGENTS.md rule 13): on the

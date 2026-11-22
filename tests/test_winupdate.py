@@ -132,3 +132,31 @@ def test_cleanup_removes_this_versions_and_the_older_versions_folder(monkeypatch
     assert not (local / "dopeiptv" / "dopeIPTV" / "update").exists()
     assert not (temp / "dopeIPTV-update").exists()
     assert (local / "dopeiptv" / "dopeIPTV" / "cache").is_dir()      # nothing else of the app's
+
+
+def test_windows_refusing_the_installer_is_said_not_a_crash():
+    """Error report a48a3a90ef4e: Smart App Control stopped the downloaded
+    installer (WinError 4551) and the app reported a crash. Windows' own
+    refusals are told apart from a missing file, and the update window says
+    which - the start of the installer is never left uncaught."""
+    from dopeiptv.i18n import set_language, tr
+    from dopeiptv.ui import mw_updates
+
+    def refused(code):
+        e = OSError(f"[WinError {code}] blocked")
+        e.winerror = code
+        return e
+    for code in (4551, 4556, 4559, 1260, 225):
+        assert winupdate.blocked_by_policy(refused(code)), code
+    for code in (2, 5, 193):
+        assert not winupdate.blocked_by_policy(refused(code)), code
+    assert not winupdate.blocked_by_policy(FileNotFoundError("gone"))
+
+    set_language("en")
+    assert mw_updates.start_refused(refused(4551)) == tr("update_blocked_windows")
+    other = mw_updates.start_refused(refused(2))
+    assert other.endswith(tr("update_nothing_changed")) and "WinError 2" in other
+    src = Path(mw_updates.__file__).read_text(encoding="utf-8")
+    at = src.index("updater.restart_into(new)")
+    assert src.rfind("try:", 0, at) > src.rfind("def chosen", 0, at)
+    assert "except OSError" in src[at:at + 200]

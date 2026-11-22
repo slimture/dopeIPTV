@@ -32,6 +32,17 @@ from .tv_place import (
 FAV_DRAG_MIME = "application/x-dopeiptv-favorites"
 
 
+#: Settings > Appearance, "Show channel numbers": the TV list's numbers.
+CHANNEL_NUMBERS_KEY = "list_channel_numbers"
+
+
+def channel_numbers_shown(settings) -> bool:
+    """Whether the TV list shows its channels' numbers - off unless turned on."""
+    if settings is None:
+        return False
+    return str(settings.value(CHANNEL_NUMBERS_KEY, "false")).lower() in ("true", "1")
+
+
 def _is_fav_drag(e) -> bool:
     return e.mimeData().hasFormat(FAV_DRAG_MIME)
 
@@ -603,6 +614,9 @@ class ChannelDelegate(QStyledItemDelegate):
         # for the minute - asked only for the rows that paint.
         self.tv_density = "compact"
         self._tv_info = False
+        #: The TV list's channel numbers shown (Settings > Appearance; off
+        #: by default - zapping by number works either way).
+        self.tv_numbers = False
         self._tv_pics: Pictures | None = None
         self._nn: dict = {}
         self._nn_stamp: tuple | None = None
@@ -615,7 +629,9 @@ class ChannelDelegate(QStyledItemDelegate):
         self.row_h, self.logo_sz, self.name_pt, self.sub_pt = \
             self.DENSITIES[self.level]
         from ..core.stream_info import enabled
-        self._tv_info = bool(enabled(getattr(self.window, "settings", None)))
+        settings = getattr(self.window, "settings", None)
+        self._tv_info = bool(enabled(settings))
+        self.tv_numbers = channel_numbers_shown(settings)
         if self._tv_info:
             self.row_h += self.sub_pt + 10
         self.cell_w, self.cell_h, self.grid_logo, self.grid_name_pt = \
@@ -738,7 +754,8 @@ class ChannelDelegate(QStyledItemDelegate):
             self.tv_density, option.direction == Qt.LayoutDirection.RightToLeft,
             hover=bool(option.state & QStyle.StateFlag.State_MouseOver),
             selected=bool(option.state & QStyle.StateFlag.State_Selected),
-            pictures=self._tv_pics, name_w=self._tv_name_w(index.model()))
+            pictures=self._tv_pics, name_w=self._tv_name_w(index.model()),
+            numbers=self.tv_numbers)
 
     @staticmethod
     def _scaled_logo(pm: QPixmap, url: str, size: int) -> QPixmap:

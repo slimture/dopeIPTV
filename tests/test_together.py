@@ -1353,3 +1353,251 @@ def test_back_after_a_while_without_the_relay_the_window_says_hello_again():
         assert len(hub.msgs) == 2
     finally:
         _close(w)
+
+
+# -- the room's credential at the relay ---------------------------------------------------
+
+
+def test_the_rooms_credential_comes_from_the_stretched_code_and_is_none_of_the_others():
+    from dopeiptv.core.log import redact
+    code = "K7PQM-2XDH9"
+    room, key = together.derive(code)
+    auth = together.auth_of(code)
+    assert len(auth) == 64 and all(c in "0123456789abcdef" for c in auth)
+    assert auth not in (room, key.hex())
+    assert together.auth_of("k7pqm 2xdh9") == auth and together.auth_of("K7PQM-2XDHA") != auth
+    # From the code after its rounds, never the code itself: what the relay
+    # keeps of it costs a guess as much as the room id does.
+    assert auth != together.hkdf(b"K7PQM2XDH9", together._SALT, b"auth", 32).hex()
+    assert auth not in redact("together: sent " + auth)
+    with pytest.raises(ValueError):
+        together.auth_of("K7PQ-M2XD")
+
+
+def test_every_request_to_the_relay_carries_the_rooms_credential():
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    seen: list = []
+    answer = {"status": 200, "body": b'{"seq": 0, "now": 5, "n": 1, "msgs": []}'}
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _reply(self):
+            seen.append((self.command, self.headers))
+            n = int(self.headers.get("Content-Length") or 0)
+            if n:
+                self.rfile.read(n)
+            body = answer["body"]
+            self.send_response(answer["status"])
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = do_POST = do_DELETE = _reply
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    endpoint = f"http://127.0.0.1:{httpd.server_address[1]}/together/"
+    auth = together.auth_of("ABCDE-FGHJK")
+    try:
+        relay = together.Relay(ROOM, "c3" * 20, endpoint=endpoint, auth=auth)
+        relay.post(b"x" * 40)
+        assert not relay.poll(0, 0).older
+        relay.leave()
+        assert [m for m, _h in seen] == ["POST", "GET", "DELETE"]
+        assert all(h.get(together.AUTH_HEADER) == auth for _m, h in seen)
+        # The relay turned down someone without it lately: said in its answer.
+        answer["body"] = b'{"seq": 0, "now": 5, "n": 1, "msgs": [], "older": true}'
+        assert relay.poll(0, 0).older
+        # Turned down itself: the room is held for another credential - or full.
+        answer.update(status=403, body=b'{"error": "refused"}')
+        with pytest.raises(together.RelayError) as err:
+            relay.poll(0, 0)
+        assert err.value.kind == "refused"
+        for body in (b'{"error": "full", "most": 8}', b"not json", b"[]"):
+            answer["body"] = body
+            with pytest.raises(together.RelayError) as err:
+                relay.post(b"x" * 40)
+            assert err.value.kind == "full", body
+        relay.close()
+        # A link's own relay carries it too, on every thread.
+        seen.clear()
+        answer.update(status=200, body=b'{"seq": 0, "now": 5, "n": 1, "msgs": []}')
+        link = together.Link(ROOM, KEY, "c3" * 20, together.Clock(), on_message=lambda m: None,
+                             on_status=lambda k, n: None, endpoint=endpoint, auth=auth)
+        link.start()
+        assert _wait(lambda: link._polled.is_set())
+        link.send({"k": "ka", "f": "c3" * 20, "n": 1, "t": 5})
+        assert _wait(lambda: any(m == "POST" for m, _h in seen))
+        link.close(wait=3.0)
+        assert _wait(lambda: any(m == "DELETE" for m, _h in seen))
+        assert seen and all(h.get(together.AUTH_HEADER) == auth for _m, h in seen)
+        # Made without one (as an older app asks), none is sent.
+        seen.clear()
+        bare = together.Relay(ROOM, "c3" * 20, endpoint=endpoint)
+        bare.poll(0, 0)
+        assert together.AUTH_HEADER not in seen[0][1]
+        bare.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_the_relay_turning_down_an_older_member_is_told_once():
+    import dataclasses
+
+    class Tells(FakeRelay):
+        def poll(self, after, wait):
+            return dataclasses.replace(super().poll(after, min(wait, 0.2)), older=True)
+
+    hub, told = Hub(), []
+    link = together.Link(ROOM, KEY, "a1" * 20, together.Clock(), on_message=lambda m: None,
+                         on_status=lambda k, n: None, relay_for=lambda r, m: Tells(hub, m),
+                         on_older=lambda: told.append(1))
+    link.start()
+    try:
+        assert _wait(lambda: told)
+        time.sleep(0.5)
+        assert told == [1]
+    finally:
+        link.close()
+
+
+def test_a_room_held_for_another_credential_is_left_and_said():
+    _qapp()
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import mw_together
+    code = "ABCDE-FGHJK"
+    assert mw_together._derive(3, code) == (3, code, ROOM, KEY, together.auth_of(code))
+    Win = _window_class()
+    w = Win(FakeClient(), Hub())
+    try:
+        assert w.together_start("Anna") is None
+        assert _spin(lambda: w._together_link is not None)
+        link = w._together_link
+        w._together_on_status(w._together_lid, "refused", 0)
+        assert w._together_room is None and link.closed
+        assert tr("together_refused") in w.toasts and tr("together_refused") != "together_refused"
+        for t in link._threads:
+            t.join(10)
+    finally:
+        _close(w)
+
+
+# -- nothing said before this stay is taken, whatever the clock -----------------------------
+
+
+def _msg2(kind, sender, n, t, **kw):
+    """A message of an app since 1.6.11 (PROTO), its signature checked."""
+    return _msg(kind, sender, n, t, p=together.PROTO, **kw)
+
+
+def _heard(d):
+    """What a Room made, as the other side's Room receives it."""
+    import dataclasses
+    return dataclasses.replace(together.parse(d), signed=True)
+
+
+def test_an_old_frame_handed_again_after_a_restart_is_ignored_whatever_the_relays_clock():
+    """A restart forgets every number taken, and the relay says the time:
+    one that says it is the moment of an old seek again would have it taken
+    by time alone. A member since 1.6.11 is taken only from its first
+    message that names this stay's own id - which no old message can."""
+    bob, me_before, me_now = "bb" * 20, "a1" * 20, "a2" * 20
+    clock = _Known()
+    room = together.Room("ABCDE-FGHJK", me_before, "Me", clock)
+    answer = _msg2("hi", bob, 3, clock.ms, name="Bob", re=True, to=me_before)
+    seek = _msg2("st", bob, 7, clock.ms, st=_state_wire(v=5, b=bob, x=600.0, t=clock.ms))
+    assert room.receive(answer, now=1.0)[0][0] == "joined"
+    assert room.receive(seek, now=1.0)[-1][0] == "state"
+    lied = _Known(clock.ms, joined=clock.ms - 1_000)
+    again = together.Room("ABCDE-FGHJK", me_now, "Me", lied)
+    for old in (answer, seek):
+        assert all(kind == "answer" for kind, _ in again.receive(old, now=2.0))
+    assert again.state is None and again.members == {} and again._last_n == {}
+    # Bob's answer to this stay's hello names it: from there on he is taken...
+    now_hi = _msg2("hi", bob, 9, lied.ms, name="Bob", re=True, to=me_now,
+                   st=_state_wire(v=6, b=bob, t=lied.ms))
+    assert [k for k, _ in again.receive(now_hi, now=3.0)] == ["joined", "state"]
+    # ...and nothing he said before it, handed again.
+    assert again.receive(seek, now=4.0) == [] and again.state.ver == 6
+    # An older app's message (no "p") is still judged by time alone.
+    cleo = "cc" * 20
+    legacy = _msg("st", cleo, 7, lied.ms, st=_state_wire(v=7, b=cleo, t=lied.ms))
+    assert again.receive(legacy, now=5.0)[-1][0] == "state"
+
+
+def test_two_members_take_each_other_in_through_their_answers():
+    clock = _Known()
+    anna = together.Room("ABCDE-FGHJK", "a1" * 20, "Anna", clock)
+    bob = together.Room("ABCDE-FGHJK", "b2" * 20, "Bob", clock)
+    film = together.Media("movie", "Dune", "Dune", 2021)
+    anna.publish(film, True, 600.0)
+    # Bob joins: his hello is answered, naming him - not yet taken.
+    hi = bob.hello()
+    assert hi["p"] == together.PROTO and "to" not in hi
+    assert anna.receive(_heard(hi), now=1.0) == [("answer", bob.me)] and anna.members == {}
+    ans = anna.hello(answer=True, to=bob.me)
+    assert ans["to"] == bob.me and ans["ask"] is True
+    assert [k for k, _ in bob.receive(_heard(ans), now=1.1)] == ["joined", "state", "answer"]
+    assert bob.state.media == film
+    back = bob.hello(answer=True, to=anna.me)
+    assert back["to"] == anna.me and "ask" not in back       # Anna is taken: nothing more asked
+    assert [k for k, _ in anna.receive(_heard(back), now=1.2)] == ["joined"]
+    assert anna.names() == ["Bob"] and bob.names() == ["Anna"]
+    # From then on each takes what the other says, and nothing is answered.
+    ev = bob.receive(_heard(anna.publish(film, False, 610.0)), now=2.0)
+    assert [k for k, _ in ev] == ["state"] and not bob.state.playing
+    assert anna.receive(_heard(bob.keepalive()), now=2.0) == []
+    # A hello that answers nobody names nobody.
+    assert "to" not in anna.hello(to=bob.me) and "ask" not in anna.hello(to=bob.me)
+
+
+def test_a_lost_answer_is_asked_for_again():
+    clock = _Known()
+    anna = together.Room("ABCDE-FGHJK", "a1" * 20, "Anna", clock)
+    bob = together.Room("ABCDE-FGHJK", "b2" * 20, "Bob", clock)
+    anna.receive(_heard(bob.hello()), now=1.0)
+    lost = anna.hello(answer=True, to=bob.me)            # never arrives
+    # Bob hears Anna speak without naming him: he asks, once in a while.
+    assert bob.receive(_heard(anna.keepalive()), now=2.0) == [("answer", anna.me)]
+    assert bob.receive(_heard(anna.keepalive()), now=3.0) == []
+    ask = bob.hello(answer=True, to=anna.me)
+    assert ask["ask"] is True
+    assert [k for k, _ in anna.receive(_heard(ask), now=10.0)] == ["joined", "answer"]
+    ev = bob.receive(_heard(anna.hello(answer=True, to=bob.me)), now=11.0)
+    assert [k for k, _ in ev] == ["joined"] and bob.names() == ["Anna"]
+    # Her lost answer, should it come after all, has an old number.
+    assert bob.receive(_heard(lost), now=12.0) == []
+    # Asked again later (what Bob sent was lost this time): answered again.
+    again = anna.hello(answer=True, to=bob.me)
+    again["ask"] = True
+    assert bob.receive(_heard(again), now=20.0) == [("answer", anna.me)]
+
+
+def test_senders_not_taken_yet_cost_little():
+    clock = _Known()
+    room = together.Room("ABCDE-FGHJK", "aa" * 20, "Me", clock)
+    answers = 0
+    for i in range(500):
+        answers += len(room.receive(_msg2("hi", f"{i:040x}", 1, clock.ms, name=f"M{i}"), now=1.0))
+    assert answers == together.SENDERS_MAX
+    assert room.members == {} and room._last_n == {} and len(room._answered) == together.SENDERS_MAX
+    # One sender's flood of hellos: answered once in a while.
+    room = together.Room("ABCDE-FGHJK", "aa" * 20, "Me", clock)
+    bob = "bb" * 20
+    asked = sum(len(room.receive(_msg2("hi", bob, i, clock.ms, name="Bob"), now=10.0 + i * 0.01))
+                for i in range(1, 51))
+    assert asked == 1
+    # A name to someone else proves nothing; a state of theirs is not taken.
+    other = _msg2("hi", bob, 60, clock.ms, re=True, to="cc" * 20, st=_state_wire(b=bob, t=clock.ms))
+    assert all(k == "answer" for k, _ in room.receive(other, now=40.0)) and room.state is None
+    # The longest names still fit, an answer's name and ask with them.
+    me = together.new_identity()
+    big = together.Room("ABCDE-FGHJK", me.id, "Ж" * together.NAME_MAX, clock)
+    long = "Ж" * together.TEXT_MAX
+    big.publish(together.Media("episode", long, long, 2021, 438631, 12, 345, long), True, 9999.999)
+    assert len(together.seal(KEY, ROOM, big.hello(answer=True, to=bob), me)) <= together.MAX_FRAME

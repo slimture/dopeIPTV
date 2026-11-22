@@ -45,6 +45,7 @@ from dataclasses import dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
+from ..core import net_bridge
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
 from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
@@ -52,6 +53,7 @@ from . import cast_feed
 from .cast_bridge import (PRIVATE_CAP, WATCH_EVERY, _endless, _hls_file, _hls_name_ok,
                           _timeshift, cast_cache_dir, folder_bytes, ffmpeg_path, lan_address,
                           private_cap, private_cast_dir, video_encoder)
+from .cast_bridge import hand_over as cast_hand_over
 
 # What an Apple TV plays out of an HLS stream: these are copied untouched.
 COPY_VIDEO = frozenset({"h264", "hevc"})
@@ -159,12 +161,18 @@ def plan(url: str, source: str = "", codecs: list[str] | tuple[str, ...] = (),
     video, audio = split_codecs(codecs)
     v_ok = all(c in COPY_VIDEO for c in video)
     a_ok = all(c in COPY_AUDIO for c in audio)
-    if v_ok and a_ok and audio_track == 0 and not own_network:
+    # HEVC never goes as it is: an Apple TV plays HEVC in HLS only in fMP4
+    # segments tagged hvc1, and a provider's HLS is MPEG-TS - the sound
+    # plays, the picture stays black. The bridge copies it into fMP4 with
+    # that tag; no picture is converted.
+    hevc = "hevc" in video
+    if v_ok and a_ok and audio_track == 0 and not own_network and not hevc:
         for cand in (url, source):
             if cand and direct_ok(cand):
                 return Plan(True, cand, live, why="already HLS or MP4")
     reasons = [r for r, bad in (
         (f"picture {','.join(video)} to h264", not v_ok),
+        ("HEVC copied into fMP4, the only HLS an Apple TV plays it in", v_ok and hevc),
         (f"sound {','.join(audio)} to aac", not a_ok),
         (f"sound track {audio_track}", audio_track > 0),
         ("the source's own user agent, headers or proxy", own_network))
@@ -198,24 +206,25 @@ def refine(p: Plan, probed: dict[str, Any]) -> Plan:
 # -- reading the provider -------------------------------------------------------
 
 def input_options(source: str, user_agent: str = "",
-                  headers: dict[str, str] | None = None,
-                  proxy: str = "") -> list[str]:
-    """ffmpeg's input options for *source*: the user agent, headers and
-    proxy the source plays with (core/nerd.py), and reconnects for a live
-    channel. Only for http(s): ffmpeg refuses an http option on a file or
-    a UDP stream before it opens anything. No reconnect for an archive
-    window, which a reconnect starts over from its beginning."""
+                  headers: dict[str, str] | None = None) -> list[str]:
+    """ffmpeg's input options for *source*: the user agent the source plays
+    with (core/nerd.py), its headers that open nothing (net_bridge
+    .split_headers - the rest, and Nerd's proxy, are the app's bridge's to
+    add: never in ffmpeg's arguments, which every account on the computer
+    reads), and reconnects for a live channel. Only for http(s): ffmpeg
+    refuses an http option on a file or a UDP stream before it opens
+    anything. No reconnect for an archive window, which a reconnect starts
+    over from its beginning."""
     if not source.lower().startswith(("http://", "https://")):
         return []
     opts: list[str] = []
     if user_agent:
         opts += ["-user_agent", user_agent]
-    lines = "".join(f"{k}: {v}\r\n" for k, v in (headers or {}).items()
+    safe, _held = net_bridge.split_headers(headers)
+    lines = "".join(f"{k}: {v}\r\n" for k, v in safe.items()
                     if k and "\r" not in k + v and "\n" not in k + v)
     if lines:
         opts += ["-headers", lines]
-    if proxy:
-        opts += ["-http_proxy", proxy]
     if not _timeshift(source):
         opts += ["-reconnect", "1", "-reconnect_streamed", "1",
                  "-reconnect_on_network_error", "1",
@@ -269,30 +278,56 @@ def parse_probe(text: str) -> dict[str, Any]:
     return out
 
 
+#: A quick look (probe's *quick*): the codecs are in a transport stream's
+#: program map, in its first packets - a quarter of a megabyte, not the
+#: seconds a conversion's settings need.
+QUICK_PROBE = ["-probesize", "262144", "-analyzeduration", "500000"]
+
+
 def probe(source: str, net: list[str] | None = None, exe: str | None = None,
-          timeout: float = 20.0) -> dict[str, Any]:
+          timeout: float = 20.0, headers: dict[str, str] | None = None,
+          quick: bool = False) -> dict[str, Any]:
     """The stream's codecs and length, from ffmpeg; empty on any failure -
-    not knowing is a reason to copy, never to refuse."""
+    not knowing is a reason to copy, never to refuse. An http(s) *source*
+    is read as an alias through the app's bridge (hand_over), *headers*
+    (the source's own) added there. *quick*: only what decides the way -
+    a zap waits on it (QUICK_PROBE)."""
     exe = exe or ffmpeg_path()
     if not exe:
         return parse_probe("")
+    way = hand_over(source, headers)
+    if way is None:
+        return parse_probe("")
     try:
         res = subprocess.run(
-            [exe, "-hide_banner", "-nostdin", *_probe_limits(source),
-             *(net or []), *ffmpeg_protocols(source), "-i", source],
-            capture_output=True, timeout=timeout, creationflags=NO_WINDOW)
+            [exe, "-hide_banner", "-nostdin",
+             *(QUICK_PROBE if quick else _probe_limits(source)),
+             *(net or []), *ffmpeg_protocols(way.address, bridged=way.bridged),
+             "-i", way.address],
+            capture_output=True, timeout=timeout, env=way.env, creationflags=NO_WINDOW)
         found = parse_probe(res.stderr.decode("utf-8", "replace"))
     except Exception as e:
         log.info("airplay: could not look into the stream (%s)", e)
         return parse_probe("")
+    finally:
+        way.close()
     log.info("airplay: the stream is %s with %s sound", found["video"] or "?",
              ",".join(found["audio"]) or "no")
     return found
 
 
+def hand_over(url: str, headers: dict[str, str] | None = None) -> net_bridge.Handoff | None:
+    """What AirPlay's ffmpeg reads the stream at *url* by: cast_bridge
+    .hand_over's way - an alias through the app's bridge, the source's own
+    *headers* added there."""
+    return cast_hand_over(url, headers)
+
+
 def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
-                net: list[str] | None = None, feed: bool = False) -> list[str]:
+                net: list[str] | None = None, feed: bool = False,
+                read: str = "") -> list[str]:
     """The command that writes *p* as HLS into the folder it runs in.
+    *read*: what ffmpeg reads in *p.url*'s place - its alias (hand_over).
 
     Every name is relative and ffmpeg runs with the folder as its working
     directory, so the playlist, the init segment and the segments land side
@@ -306,9 +341,11 @@ def ffmpeg_args(exe: str, p: Plan, start: float = 0.0,
     if feed:
         src, opts = cast_feed.INPUT, list(cast_feed.INPUT_OPTIONS)
     else:
-        src = p.url if "://" in p.url else os.path.abspath(p.url)
+        real = p.url if "://" in p.url else os.path.abspath(p.url)
+        src = read or real
         # ffmpeg_protocols: what the address leads to stays a stream's.
-        opts = [*_probe_limits(src), *(net or []), *ffmpeg_protocols(src),
+        opts = [*_probe_limits(real), *(net or []),
+                *ffmpeg_protocols(src, bridged=src != real),
                 *(["-ss", f"{start:.3f}"] if start > 0 else [])]
     if p.video == "copy":
         video = ["-c:v", "copy", *(["-tag:v", "hvc1"] if p.hevc else [])]
@@ -513,6 +550,9 @@ class AirPlayBridge:
         self.cap = 0
         #: The pieces ffmpeg reads (the archive, the rewind buffer), if any.
         self.feed: cast_feed.Feed | None = None
+        #: How ffmpeg reads an http(s) stream: its alias through the app's
+        #: bridge (hand_over), for the run.
+        self._way: net_bridge.Handoff | None = None
         self._own: set[str] = set()
         #: The one address besides this computer's own that is served: the
         #: first that asked for this run's stream - the Apple TV (admits).
@@ -551,19 +591,22 @@ class AirPlayBridge:
     def start(self, p: Plan, start: float = 0.0,
               net: list[str] | None = None,
               feed: cast_feed.Feed | None = None,
-              net_for: cast_feed.NetFor | None = None) -> str:
+              net_for: cast_feed.NetFor | None = None,
+              headers: dict[str, str] | None = None) -> str:
         """Begin converting *p* and serving it (_start); returns the
         playlist's address on the LAN - and watch the run while it lasts
-        (_watch)."""
+        (_watch). *headers*: the source's own (Nerd's), which the app's
+        bridge adds to what ffmpeg reads."""
         with self._run_lock:
-            url = self._start(p, start, net, feed, net_for)
+            url = self._start(p, start, net, feed, net_for, headers)
             run = self._run
         threading.Thread(target=self._watch, args=(run,), name="airplay-watch",
                          daemon=True).start()
         return url
 
     def _start(self, p: Plan, start: float, net: list[str] | None,
-               feed: cast_feed.Feed | None, net_for: cast_feed.NetFor | None) -> str:
+               feed: cast_feed.Feed | None, net_for: cast_feed.NetFor | None,
+               headers: dict[str, str] | None = None) -> str:
         """Begin converting *p* and serving it; returns the playlist's
         address on the LAN. ffmpeg starts at once: by the time someone has
         picked their Apple TV, the first segments are there. With *feed*,
@@ -587,6 +630,16 @@ class AirPlayBridge:
                      "disk's reach for its work")
             from ..i18n import LocalizedError
             raise LocalizedError("cast_err_private_memory")
+        if feed is None and "://" in p.url:
+            # Its address, Nerd's proxy and the headers that may hold a
+            # token never in ffmpeg's arguments: an alias through the app's
+            # bridge, which keeps what a playlist names off this computer
+            # and the home network too (core/net_bridge.py).
+            way = hand_over(p.url, headers)
+            if way is None:
+                from ..i18n import LocalizedError
+                raise LocalizedError("cast_err_no_bridge")
+            self._way = way
         self.plan, self.error, self.remote_seen = p, "", False
         self._peer, self._refused_told, self.private_stopped = None, False, False
         self._private_cap = private_cap(private_dir, PRIVATE_CAP) if private_dir else 0
@@ -606,19 +659,22 @@ class AirPlayBridge:
         self._own = {"127.0.0.1", "::1", "::ffff:127.0.0.1", host,
                      f"::ffff:{host}"}
         self.url = f"http://{host}:{server.server_address[1]}{self.prefix}{PLAYLIST}"
-        args = ffmpeg_args(exe, p, start, net, feed=feed is not None)
+        way = self._way
+        args = ffmpeg_args(exe, p, start, net, feed=feed is not None,
+                           read=way.address if way is not None else "")
         try:
             self._proc = subprocess.Popen(
                 args, cwd=self.folder,
                 stdin=subprocess.PIPE if feed is not None else subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                env=way.env if way is not None else None,
                 creationflags=NO_WINDOW)
         except OSError as e:
             self.stop()
             raise RuntimeError(f"ffmpeg did not start ({e})") from e
         if feed is not None and self._proc.stdin is not None:
             self.feed = feed
-            feed.attach(self._proc.stdin, exe, net_for, audio=p.audio_track)
+            feed.attach(self._proc.stdin, exe, net_for, audio=p.audio_track, headers=headers)
         # Its pid beside its files: a run that crashes leaves ffmpeg pulling
         # the channel - one of the account's connections - and the next
         # start ends it (sweep_leftovers).
@@ -710,7 +766,7 @@ class AirPlayBridge:
         which ffmpeg stops."""
         from ..core import privacy
         while True:
-            time.sleep(WATCH_EVERY)
+            privacy.wait_change(WATCH_EVERY)     # at once as it begins
             with self._run_lock:
                 if self._run != run or self._server is None:
                     return
@@ -772,6 +828,7 @@ class AirPlayBridge:
             server, self._server = self._server, None
             folder, self.folder = self.folder, None
             feed, self.feed = self.feed, None
+            way, self._way = self._way, None
         if feed is not None:
             # Done with, unless it is the one being started again.
             feed.detach() if feed is keep else feed.close()
@@ -792,6 +849,8 @@ class AirPlayBridge:
             log.info("airplay bridge: stopped")
         if folder:
             shutil.rmtree(folder, ignore_errors=True)
+        if way is not None:
+            way.close()
         self.prefix, self.url = None, ""
 
 

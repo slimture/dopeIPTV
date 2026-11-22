@@ -395,13 +395,18 @@ class _ListsMixin:
             # and is never asked for the PIN of the rest (mw_profiles).
             kids = self._profile_kids()
             from ..core.profiles import adult_category
+            cat_ok = getattr(self, "_kids_cat_ok", None)
             for c in self._raw_categories:
                 cid = c.get("category_id")
                 if self.overrides.is_hidden(self.mode, cid):
                     continue
                 name = self.overrides.display_name(
                     self.mode, cid, c.get("category_name", "?"))
-                if kids and adult_category(name, c.get("category_name")):
+                # Nothing for adults - and with "Only what a grown-up
+                # allows", only what one chose (mw_profiles).
+                if kids and (adult_category(name, c.get("category_name"))
+                             or (callable(cat_ok)
+                                 and not cat_ok(self.mode, cid, name, c.get("category_name")))):
                     continue
                 if (self.overrides.is_locked(self.mode, cid)
                         and not self.parental.session_unlocked):

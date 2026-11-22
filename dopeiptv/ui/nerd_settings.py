@@ -75,7 +75,7 @@ PART_KEYS = {
     "net": ("nerd_user_agent", "nerd_referer", "nerd_headers", "nerd_proxy", "nerd_proxy_player",
             "nerd_ip_family", "nerd_net_timeout", "nerd_reconnect_max", "nerd_vpn_guard",
             "nerd_vpn_iface", "nerd_vpn_lan", "nerd_dns", "nerd_dns_url", "nerd_dns_fallback",
-            "nerd_other_networks"),
+            "nerd_other_networks", "nerd_tls_strict"),
     "boxes": ("nerd_picon_dir", "nerd_picon_override", "nerd_udpxy", "nerd_failover", "nerd_numbers_keep"),
     "player": ("nerd_spdif", "nerd_video_sync", "nerd_interpolation", "nerd_probe", "nerd_demux_max_mb",
                "nerd_mpv_config_dir", "nerd_shaders", "nerd_mpv_options", "nerd_adelay_per_channel",
@@ -341,6 +341,11 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     c.row(tr("nerd_timeout"), timeout, tr("nerd_timeout_hint"))
     recon = Stepper(lo=1, hi=60, value=n.num("nerd_reconnect_max", 5) or 5, width=130)
     c.row(tr("nerd_reconnect"), recon, tr("nerd_reconnect_hint"))
+    # The player's and the recorder's certificate check for a server at
+    # home too (core/nerd.py, STRICT_TLS): every internet stream's is
+    # checked already (checks_certificate); off by default - a box's or a
+    # media server's certificate is often its own.
+    tls_strict = c.toggle(tr("nerd_tls_strict"), n.flag("nerd_tls_strict"), tr("nerd_tls_strict_hint"))
     c.note(tr("nerd_applies_conn"))
 
     # -- network: own DNS (ui/net_advanced.py) ----------------------------------------------
@@ -894,6 +899,7 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         put("nerd_ip_family", ip_box.currentData())
         put("nerd_net_timeout", str(timeout.value()))
         put("nerd_reconnect_max", str(recon.value()))
+        put("nerd_tls_strict", "true" if tls_strict.isChecked() else "false")
         put("nerd_vpn_guard", "true" if guard.isChecked() else "false")
         put("nerd_vpn_iface", iface.text().strip())
         put("nerd_vpn_lan", "true" if vpn_lan.isChecked() else "false")
@@ -1003,7 +1009,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         says what the page showed stays unstored (an untouched window
         changes nothing)."""
         for key, value in values().items():
-            if settings.value(key) is None and value == shown[key]:
+            # A key the page did not hold as it was built (the tuner's
+            # mode, once chosen) is written as it now is.
+            if settings.value(key) is None and value == shown.get(key):
                 continue
             put(key, value)
 
@@ -1057,9 +1065,14 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
                       (hs.OPEN_HOME, tr("srv_open_home"))], open_was)
 
     def open_job() -> Any:
-        if open_box.currentData() != hs.OPEN_HOME:
-            return None
-        return lambda: Check(WARN, "srv_open_home_warn")
+        # What the tuner is open to, in plain words - whichever is chosen.
+        mode = str(open_box.currentData() or hs.OPEN_OFF)
+        hosts = hs.parse_open_hosts(open_hosts.text())[0]
+
+        def look() -> Any:
+            key, params = hs.exposure(mode, hosts, hs.home_networks() if mode == hs.OPEN_HOME else ())
+            return Check(OK if mode == hs.OPEN_OFF else WARN, key, params)
+        return look
     open_line = CheckLine(open_job, tr("srv_open"))
     lines.append(open_line)
     c.row(tr("srv_open"), open_box, tr("srv_open_hint"),
@@ -1078,6 +1091,7 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
     hosts_line = CheckLine(hosts_job, tr("srv_open_hosts"))
     lines.append(hosts_line)
     open_hosts.textChanged.connect(hosts_line.changed)
+    open_hosts.textChanged.connect(open_line.changed)
     hosts_row = c.row(tr("srv_open_hosts"), open_hosts, tr("srv_open_hosts_hint"),
                       stretch_control=True, search="address addresses devices Plex token",
                       below=hosts_line)
@@ -1179,6 +1193,9 @@ def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[Ch
         # nothing (the server stores what it found the first time it starts).
         if mode != open_was or settings.value(hs.K_OPEN) is not None:
             out[hs.K_OPEN] = mode
+        if mode == hs.OPEN_HOME and mode != open_was:
+            # Chosen here, its warning in sight: nothing to tell again.
+            out[hs.K_OPEN_TOLD] = "true"
         return out
     values.switch = on  # type: ignore[attr-defined]
     values.port = port.value  # type: ignore[attr-defined]

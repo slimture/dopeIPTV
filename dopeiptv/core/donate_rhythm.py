@@ -15,7 +15,7 @@ in a calendar month while all of this holds:
   the app has no way to know, and does not try).
 
 The window checks the rest: asking is switched on (Settings, General;
-``asking``), there is no supporter key, and nothing would be disturbed - a
+``asking``) and nothing would be disturbed - a
 period begins only when it can be seen, and while it runs the ask is simply
 not drawn in full screen, TV mode or private viewing (its days still count).
 

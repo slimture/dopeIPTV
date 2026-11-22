@@ -19,7 +19,7 @@ import threading
 
 import pytest
 
-from dopeiptv.core.player_exec import FFMPEG_PROTOCOLS
+from dopeiptv.core.player_exec import BRIDGED_PROTOCOLS, FFMPEG_PROTOCOLS
 from dopeiptv.providers import airplay_bridge as ab
 from dopeiptv.providers import cast_bridge as cb
 from dopeiptv.providers import cast_feed
@@ -28,15 +28,26 @@ URL = "http://h.invalid/live/u/p/1.ts"
 FILE = "/films/a film.mkv"
 
 
-def _listed(cmd: list[str], source: str) -> bool:
+def _listed(cmd: list[str], source: str, protocols: str = FFMPEG_PROTOCOLS) -> bool:
     """Whether *cmd* names the list as an input option of *source*."""
     i = len(cmd) - 1 - cmd[::-1].index(source)
     assert cmd[i - 1] == "-i", cmd
     if "-protocol_whitelist" not in cmd:
         return False
     j = cmd.index("-protocol_whitelist")
-    assert j < i and cmd[j + 1] == FFMPEG_PROTOCOLS
+    assert j < i and cmd[j + 1] == protocols
     return True
+
+
+def _aliased(cmd: list[str], real: str) -> str:
+    """The alias *cmd* reads in *real*'s place (core/net_bridge.hand_over):
+    nothing of the address in any argument, the bridge's few protocols."""
+    from urllib.parse import urlsplit
+    read = cmd[cmd.index("-i") + 1]
+    assert ".stream.invalid/" in read and _listed(cmd, read, BRIDGED_PROTOCOLS), cmd
+    host = urlsplit(real).hostname or ""
+    assert not any(real in a or host in a for a in cmd), cmd
+    return read
 
 
 def test_ffprobe_takes_the_address_as_its_input_never_as_an_option():
@@ -54,6 +65,16 @@ def test_a_casts_converter_reads_a_stream_with_a_streams_protocols(monkeypatch):
     assert _listed(cast_feed.reader_args("ffmpeg", URL), URL)
     assert _listed(cast_feed.reader_args("ffmpeg", "http://127.0.0.1:5/t/s/1.ts"),
                    "http://127.0.0.1:5/t/s/1.ts")       # the rewind buffer's own server
+    # What they read in its place: the alias, through the bridge alone.
+    alias = "http://" + "a" * 48 + ".stream.invalid/~/~/~/~.ts"
+    for cmd in (cb.ffmpeg_args("ffmpeg", URL, True, read=alias),
+                cb.hls_args("ffmpeg", URL, True, "/tmp/x", subs=0, read=alias),
+                cb.probe_args("/usr/bin/ffprobe", URL, alias),
+                cast_feed.reader_args("ffmpeg", URL, read=alias)):
+        assert _aliased(cmd, URL) == alias
+    # The options are still chosen by the real address: an archive's own.
+    ts = "http://h.invalid/timeshift/u/p/60/2026-11-15:20-00/1.ts"
+    assert "-reconnect" not in cb.ffmpeg_args("ffmpeg", ts, True, read=alias)
 
 
 def test_airplays_converter_the_same(monkeypatch):
@@ -70,7 +91,9 @@ def test_airplays_converter_the_same(monkeypatch):
 
     monkeypatch.setattr(ab.subprocess, "run", fake_run)
     ab.probe(URL, exe="ffmpeg")
-    assert _listed(seen["cmd"], URL)
+    _aliased(seen["cmd"], URL)
+    alias = "http://" + "a" * 48 + ".stream.invalid/~/~/~/~.ts"
+    _aliased(ab.ffmpeg_args("ffmpeg", ab.Plan(False, URL, live=True), read=alias), URL)
 
 
 def test_server_modes_hls_copy_the_same(monkeypatch):
@@ -90,7 +113,7 @@ def test_server_modes_hls_copy_the_same(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr(subprocess, "Popen", FakeProc)
         restream.ffmpeg_opener("ffmpeg", None)("https://h.invalid/x/index.m3u8")
-    assert _listed(seen["cmd"], "https://h.invalid/x/index.m3u8")
+    _aliased(seen["cmd"], "https://h.invalid/x/index.m3u8")
 
 
 # -- the real ffmpeg ------------------------------------------------------------------
@@ -135,8 +158,9 @@ def served(tmp_path):
         srv.server_close()
 
 
-def _record_command(tmp_path, monkeypatch, url) -> list[str]:
-    """The recorder's own command for *url*, with the real ffmpeg."""
+def _record_command(tmp_path, monkeypatch, url) -> tuple[list[str], dict[str, str]]:
+    """The recorder's own command for *url*, with the real ffmpeg, and what
+    its environment adds (the bridge it reads an alias through)."""
     from PyQt6.QtCore import QSettings
 
     from dopeiptv.core import recording
@@ -146,11 +170,11 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
     s.clear()
     s.setValue("recordings_dir", str(tmp_path / "rec"))
     rm = RecordingManager(s)
-    seen: list[list[str]] = []
+    seen: list[tuple[list[str], dict[str, str]]] = []
 
     class FakeProc:
-        def __init__(self, cmd, **_kw):
-            seen.append(cmd)
+        def __init__(self, cmd, **kw):
+            seen.append((cmd, kw.get("env") or {}))
 
         def poll(self):
             return None
@@ -159,8 +183,13 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
         m.setattr(recording.subprocess, "Popen", FakeProc)
         m.setattr(RecordingManager, "recorder",
                   staticmethod(lambda: ("ffmpeg", shutil.which("ffmpeg"))))
-        rm._spawn({"url": url, "title": "T", "stop": None})
-    return seen[0]
+        # The recorder reading the address itself - an HLS playlist's way,
+        # and the way back for what the app cannot read (Feed.classic) -
+        # through the bridge under an alias; a stream the app reads and pipes
+        # over is tests/test_recording_feed.py's.
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
+    cmd, env = seen[0]
+    return cmd, {k: v for k, v in env.items() if k in ("http_proxy", "no_proxy")}
 
 
 @needs_ffmpeg
@@ -168,10 +197,10 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
 def test_the_real_ffmpeg_still_records_a_stream_and_an_hls_list(what, served, tmp_path,
                                                                monkeypatch):
     base, _root = served
-    cmd = _record_command(tmp_path, monkeypatch, f"{base}/{what}")
-    assert "-protocol_whitelist" in cmd
+    cmd, through = _record_command(tmp_path, monkeypatch, f"{base}/{what}")
+    assert "-protocol_whitelist" in cmd and base not in " ".join(cmd)
     done = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, timeout=120,
-                          env=_clean_env(), check=False)
+                          env={**_clean_env(), **through}, check=False)
     assert done.returncode == 0, done.stderr.decode("utf-8", "replace")[-400:]
     assert os.path.getsize(cmd[-1]) > 10_000
 

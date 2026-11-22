@@ -473,3 +473,76 @@ def test_settings_changed_while_playing_reach_the_player_and_go_back(tmp_path):
     finally:
         nerd.install(None)
         m.terminate()
+
+
+# -- the strict certificate check (Nerd > Network) --------------------------------
+
+def test_strict_tls_is_off_unless_switched_on_and_nerd_on():
+    assert not on().strict_tls()
+    assert not Nerd(S(nerd_tls_strict="true")).strict_tls()          # Nerd off: nothing
+    n = on(nerd_tls_strict="true")
+    assert n.strict_tls()
+    opts = dict(n.core_options())
+    assert opts["tls-verify"] == "yes"
+    ca = nerd.ca_file()
+    assert ca == "" or opts["tls-ca-file"] == ca
+
+
+def test_strict_tls_leaves_the_persons_own_tls_verify():
+    n = on(nerd_tls_strict="true", nerd_mpv_options="tls-verify=no")
+    assert [v for k, v in n.core_options() if k == "tls-verify"] == ["no"]
+    assert n.typed_tls()
+    assert not on(nerd_tls_strict="true").typed_tls()
+
+
+def test_strict_tls_for_the_recorder(monkeypatch):
+    monkeypatch.setattr(nerd, "current", lambda: on(nerd_tls_strict="true"))
+    ff = nerd.strict_tls_recorder("ffmpeg", "https://p.example/live/1.ts")
+    assert ff[:2] == ["-tls_verify", "1"]
+    # an option no protocol reads would stop ffmpeg: only for https
+    assert nerd.strict_tls_recorder("ffmpeg", "http://p.example/live/1.ts") == []
+    assert nerd.strict_tls_recorder("ffmpeg", "rtsp://box/1") == []
+    assert nerd.strict_tls_recorder("mpv", "https://192.168.1.5/1")[0] == "--tls-verify=yes"
+    # Without the strict check: the internet's checked, a server at home's not.
+    monkeypatch.setattr(nerd, "current", lambda: on())
+    assert nerd.strict_tls_recorder("ffmpeg", "https://p.example/1")[:2] == ["-tls_verify", "1"]
+    assert nerd.strict_tls_recorder("ffmpeg", "https://192.168.1.5/1") == []
+    # A source the person let play unchecked: said outright.
+    loose = {nerd.TLS_UNCHECKED: "true"}
+    assert nerd.strict_tls_recorder("ffmpeg", "https://p.example/1", loose) == ["-tls_verify", "0"]
+    assert nerd.strict_tls_recorder("mpv", "https://p.example/1", loose) == ["--tls-verify=no"]
+    assert nerd.strict_tls_recorder("mpv", "http://p.example/1", loose) == []
+
+
+def test_every_internet_streams_certificate_is_checked_nerd_or_not(monkeypatch):
+    """The player checks an https stream from the internet whatever Nerd
+    says; a server at home as its core does; a source the person let play
+    unchecked not; a pinned host is the bridge's - and a tls-verify the
+    person typed is theirs."""
+    class Core(dict):
+        pass
+
+    monkeypatch.setattr(nerd, "current", lambda: Nerd(S(nerd_enabled="false")))
+    core = Core({"tls-verify": False, "tls-ca-file": ""})
+    nerd.apply_stream(core, {}, False, url="https://p.example/live/u/p/1.ts")
+    assert core["tls-verify"] is True
+    assert core["tls-ca-file"] == (nerd.ca_file() or "")
+    nerd.apply_stream(core, {}, False, url="https://192.168.1.5:8920/s/1.ts")
+    assert core["tls-verify"] is False and core["tls-ca-file"] == ""      # the core's own
+    nerd.apply_stream(core, {nerd.TLS_UNCHECKED: "true"}, False, url="https://p.example/1.ts")
+    assert core["tls-verify"] is False
+    nerd.apply_stream(core, {}, False, url="https://p.example/1.ts",
+                      opened="http://127.0.0.1:5000/buffer/x")              # the rewind buffer
+    assert core["tls-verify"] is False
+    newer = Core({"tls-verify": True, "tls-ca-file": ""})                 # a newer mpv
+    nerd.apply_stream(newer, {nerd.TLS_UNCHECKED: "true"}, False, url="https://p.example/1.ts")
+    assert newer["tls-verify"] is False
+    nerd.apply_stream(newer, {}, False, url="https://192.168.1.5/1.ts")
+    assert newer["tls-verify"] is True
+    assert nerd.checks_certificate({}, "https://p.example/1.ts")
+    assert not nerd.checks_certificate({}, "http://p.example/1.ts")
+    assert not nerd.checks_certificate({}, "https://nas.local/1.ts")
+    monkeypatch.setattr(nerd, "current", lambda: on(nerd_mpv_options="tls-verify=no"))
+    typed = Core({"tls-verify": False, "tls-ca-file": ""})
+    nerd.apply_stream(typed, {}, False, url="https://p.example/1.ts")
+    assert typed["tls-verify"] is False                                    # the person's own

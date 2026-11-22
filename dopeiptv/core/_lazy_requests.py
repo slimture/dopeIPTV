@@ -27,6 +27,12 @@ download to disk, a guide read with its own ceiling) is never counted. And
 ``Response.json()`` says a document nested deeper than Python reads is not
 JSON (a ``ValueError``, as for any other), instead of a RecursionError no
 caller expects.
+
+**Where it lands** (core/dest_guard.py): every connection is looked at once
+it is made (``check_peer``), every redirect before it is followed
+(``redirect_refusal``, ``RedirectRefused``), and a request that goes
+through a proxy - whose connection is the proxy's - has its name looked up
+here first (``proxied_refusal``, ``DestinationRefused``: a ConnectionError).
 """
 from __future__ import annotations
 
@@ -58,6 +64,10 @@ def _classes() -> dict[str, Any]:
 
         class RedirectRefused(real.exceptions.RequestException):
             """A redirect core/dest_guard.py does not let on: not followed."""
+
+        class DestinationRefused(real.exceptions.ConnectionError):
+            """A request through a proxy whose name leads where
+            core/dest_guard.py lets no request land: not sent."""
 
         from urllib3.connection import HTTPConnection, HTTPSConnection
         from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
@@ -137,6 +147,16 @@ def _classes() -> dict[str, Any]:
                 self.poolmanager.pool_classes_by_scheme = {"http": _HttpPool, "https": _HttpsPool}
 
             def send(self, request: Any, stream: bool = False, *args: Any, **kwargs: Any) -> Any:
+                # requests' own order: timeout, verify, cert, proxies.
+                proxies = kwargs.get("proxies", args[3] if len(args) > 3 else None)
+                if proxies and real.utils.select_proxy(request.url, proxies):
+                    # Through a proxy the proxy connects (check_peer sees
+                    # only it): the name is looked up here first - best
+                    # effort; the proxy's own lookup is the proxy's.
+                    why = dest_guard.proxied_refusal(request.url)
+                    if why:
+                        raise DestinationRefused(f"its name led to {why} - not sent",
+                                                 request=request)
                 r = super().send(request, stream, *args, **kwargs)
                 if type(r) is real.Response:
                     r.__class__ = Response
@@ -205,7 +225,7 @@ def _classes() -> dict[str, Any]:
         verbs = ("get", "post", "put", "patch", "delete", "head", "options")
         _made.update(Session=Session, session=Session, request=request,
                      CappedAdapter=CappedAdapter, ResponseTooLarge=ResponseTooLarge,
-                     RedirectRefused=RedirectRefused,
+                     RedirectRefused=RedirectRefused, DestinationRefused=DestinationRefused,
                      Response=Response, **{m: _verb(m) for m in verbs})
         # requests' own, as they were when it was imported: one replaced
         # since (a test's stand-in for the network) is the one to call.
@@ -217,7 +237,7 @@ def _classes() -> dict[str, Any]:
 _POSITIONAL = {"get": ("params",), "post": ("data", "json"), "put": ("data",), "patch": ("data",)}
 #: What this stand-in answers itself; every other name is requests' own.
 _OWN = frozenset(("Session", "session", "request", "get", "post", "put", "patch", "delete",
-                  "head", "options", "ResponseTooLarge", "RedirectRefused"))
+                  "head", "options", "ResponseTooLarge", "RedirectRefused", "DestinationRefused"))
 
 
 def capped_adapter() -> Any:

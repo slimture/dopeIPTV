@@ -168,3 +168,175 @@ def test_the_casts_own_redirects_are_judged_hop_by_hop(monkeypatch):
     asked.clear()
     url, served = chromecast._resolve_redirects("http://iptv.example.com/live/1")
     assert url == "http://cdn.example.net/x.ts" and served == "video/mp2t"
+
+
+# -- a public name an internet source named never leads home ---------------------
+
+def test_a_picture_host_of_an_internet_source_never_reaches_the_home_network():
+    """The review's first point: a provider's picture name that its DNS
+    answers with a router's or a NAS's address. Noted as the source's
+    (note_outside), the connection is refused there; anywhere public it
+    goes on, and a name nobody noted is as before."""
+    g.forget_names()
+    try:
+        g.note_outside("https://img.provider.example/logo/1.png")
+        assert g.peer_refusal("img.provider.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("img.provider.example", "10.0.0.2") == g.HOME
+        assert g.peer_refusal("IMG.provider.example.", "fd00::5") == g.HOME
+        assert g.peer_refusal("img.provider.example", "93.184.216.34") == ""
+        assert g.peer_refusal("cdn.elsewhere.example", "192.168.1.1") == ""
+    finally:
+        g.forget_names()
+
+
+def test_the_persons_own_names_and_plex_stay_reachable_at_home():
+    """A server at home by its public name (split DNS), a source's backup
+    address, and Plex's own names answering a home address."""
+    g.forget_names()
+    try:
+        for host in ("media.myhome.example", "1-2-3-4.abc123.plex.direct"):
+            g.note_outside(f"https://{host}:32400/photo/x.jpg")
+        g.note_own("https://media.myhome.example:8920")
+        assert g.peer_refusal("media.myhome.example", "192.168.1.5") == ""
+        assert g.peer_refusal("1-2-3-4.abc123.plex.direct", "192.168.1.5") == ""
+        # Home names and addresses as written are never noted.
+        g.note_outside("http://192.168.1.9/picon.png")
+        g.note_outside("http://vuplus.local/picon.png")
+        assert g.peer_refusal("192.168.1.9", "192.168.1.9") == ""
+        assert g.peer_refusal("vuplus.local", "192.168.1.9") == ""
+    finally:
+        g.forget_names()
+
+
+def test_the_noted_names_are_bounded_and_fail_closed():
+    """A list naming more picture hosts than are kept never pushes an early
+    one out to reach the home network: past the bound every public name is
+    taken for an outsider's, but the person's own and Plex's."""
+    g.forget_names()
+    try:
+        g.note_own("https://my-server.example:8080")
+        for i in range(g.OUTSIDE_MAX + 50):
+            g.note_outside(f"https://h{i}.example/p.png")
+        assert len(g._OUTSIDE) == g.OUTSIDE_MAX
+        assert g.peer_refusal("h0.example", "192.168.1.1") == g.HOME          # never let go
+        assert g.peer_refusal(f"h{g.OUTSIDE_MAX + 49}.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("never-noted.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("my-server.example", "192.168.1.1") == ""
+        assert g.peer_refusal("192-168-1-5.abc.plex.direct", "192.168.1.5") == ""
+        assert g.peer_refusal("nas.local", "192.168.1.9") == ""
+        assert g.peer_refusal("never-noted.example", "93.184.216.34") == ""
+    finally:
+        g.forget_names()
+    assert g.peer_refusal("never-noted.example", "192.168.1.1") == ""     # a new run
+
+
+def test_an_internet_sources_lists_note_their_pictures_and_its_server_is_its_own():
+    """make_client: a source on the internet's rows note their pictures;
+    the source's own server is the person's."""
+    from dopeiptv.providers import client as c
+    g.forget_names()
+    try:
+        rows = [{"stream_icon": "https://img.provider.example/a.png"},
+                {"stream_icon": "https://iptv.provider.example/b.png"}]
+        c._note_own_names({"kind": "xtream", "server": "https://iptv.provider.example"})
+        c._pictures_kept(rows, home=True)
+        assert g.peer_refusal("img.provider.example", "192.168.1.1") == g.HOME
+        assert g.peer_refusal("iptv.provider.example", "192.168.1.1") == ""
+        # A source the person let into the home network (home=False): nothing noted.
+        g.forget_names()
+        c._pictures_kept([{"stream_icon": "https://img2.provider.example/a.png"}], home=False)
+        assert g.peer_refusal("img2.provider.example", "192.168.1.1") == ""
+    finally:
+        g.forget_names()
+
+
+# -- through a proxy: the name looked up here first (best effort) ------------------------
+
+def _answers(monkeypatch, table):
+    looked = []
+    real = socket.getaddrinfo
+
+    def fake(host, port, *a, **kw):
+        if host == "127.0.0.1":
+            return real(host, port, *a, **kw)       # the proxy itself
+        looked.append(host)
+        if host not in table:
+            raise socket.gaierror("no such name here")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port)) for ip in table[host]]
+    monkeypatch.setattr(socket, "getaddrinfo", fake)
+    return looked
+
+
+def test_a_proxied_requests_name_is_judged_by_what_it_resolves_to_here(monkeypatch):
+    g.forget_names()
+    try:
+        looked = _answers(monkeypatch, {
+            "rebind.example.com": ["93.184.216.34", "127.0.0.1"],
+            "meta.example.com": ["169.254.169.254"], "fine.example.com": ["93.184.216.34"],
+            "img.provider.example": ["192.168.1.1"], "my-server.example": ["192.168.1.5"],
+            "nas.local": ["192.168.1.9"]})
+        assert g.proxied_refusal("http://rebind.example.com/x") == g.THIS_COMPUTER
+        assert g.proxied_refusal("https://meta.example.com/latest") == g.LINK_LOCAL
+        assert g.proxied_refusal("https://fine.example.com/a.png") == ""
+        # Home only for a public name a source on the internet named; the
+        # person's own server and a home name stay theirs.
+        g.note_outside("https://img.provider.example/a.png")
+        g.note_own("https://my-server.example")
+        assert g.proxied_refusal("https://img.provider.example/a.png") == g.HOME
+        assert g.proxied_refusal("https://my-server.example/player_api.php") == ""
+        assert g.proxied_refusal("http://nas.local/x") == ""
+        # An address as written is as it is; a name not resolved here is the
+        # proxy's to look up.
+        n = len(looked)
+        assert g.proxied_refusal("http://10.0.0.5/x") == ""
+        assert g.proxied_refusal("http://unknown.example/x") == ""
+        assert len(looked) == n + 1
+        # Kept a moment: thousands of pictures, one lookup.
+        for _ in range(5):
+            g.proxied_refusal("https://fine.example.com/b.png")
+        assert looked.count("fine.example.com") == 1
+    finally:
+        g.forget_names()
+
+
+def test_a_proxied_request_to_this_computer_is_never_sent(monkeypatch, local_server):
+    """Through a proxy - the person's own, or one in the environment - the
+    proxy connects, so check_peer sees only it: the request is refused
+    before anything goes, and one that may go reaches the proxy."""
+    g.forget_names()
+    try:
+        _answers(monkeypatch, {"rebind.example.com": ["127.0.0.1"],
+                               "fine.example.com": ["93.184.216.34"]})
+        for var in ("NO_PROXY", "no_proxy"):
+            monkeypatch.delenv(var, raising=False)
+        proxy = {"http": f"http://127.0.0.1:{local_server}",
+                 "https": f"http://127.0.0.1:{local_server}"}
+        with pytest.raises(requests.DestinationRefused):
+            requests.get("http://rebind.example.com/secret", proxies=proxy, timeout=5)
+        assert issubclass(requests.DestinationRefused, requests.ConnectionError)
+        assert _Seen.hits == [], "nothing reached the proxy"
+        s = requests.Session()
+        with pytest.raises(requests.DestinationRefused):
+            s.get("http://rebind.example.com/secret", proxies=proxy, timeout=5)
+        # One that may go is sent to the proxy, as it always was.
+        assert requests.get("http://fine.example.com/ok", proxies=proxy, timeout=5).text == "ok"
+        assert _Seen.hits == ["http://fine.example.com/ok"]
+    finally:
+        g.forget_names()
+
+
+def test_a_route_s_adapter_checks_a_proxied_request_too(monkeypatch, local_server):
+    from dopeiptv.core import net_adapter, net_route
+    g.forget_names()
+    try:
+        _answers(monkeypatch, {"rebind.example.com": ["127.0.0.1"]})
+        route = net_route.Route(family="ipv4")
+        a = net_adapter.adapter(route)
+        s = requests.Session()
+        s.mount("http://", a)
+        with pytest.raises(requests.DestinationRefused):
+            s.get("http://rebind.example.com/x", timeout=5,
+                  proxies={"http": f"http://127.0.0.1:{local_server}"})
+        assert _Seen.hits == []
+    finally:
+        g.forget_names()

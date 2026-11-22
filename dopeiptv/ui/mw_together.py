@@ -56,9 +56,9 @@ class _TogetherSignals(QObject):
     older = pyqtSignal(int)                 # link id: a member of an older app
 
 
-def _derive(lid: int, code: str) -> tuple[int, str, str, bytes]:
+def _derive(lid: int, code: str) -> tuple[int, str, str, bytes, str]:
     room_id, key = together.derive(code)
-    return lid, code, room_id, key
+    return lid, code, room_id, key, together.auth_of(code)
 
 
 def _locate(lid: int, media: together.Media, client: Any, tmdb_of: Any,
@@ -237,7 +237,7 @@ class _TogetherMixin:
         self.together_leave(quiet=True)
 
     def _together_on_entered(self, got: tuple) -> None:
-        lid, code, room_id, key = got
+        lid, code, room_id, key, auth = got
         room = self._together_room
         if lid != self._together_lid or room is None or room.code != code:
             return
@@ -253,7 +253,7 @@ class _TogetherMixin:
                              on_older=partial(sig.older.emit, lid),
                              relay_for=self._together_relay_for,
                              endpoint=self._together_endpoint,
-                             identity=self._together_identity)
+                             identity=self._together_identity, auth=auth)
         self._together_link = link
         link.start()
         self._together_local = self._together_now_playing()
@@ -329,12 +329,17 @@ class _TogetherMixin:
                 # meanwhile may be too old to be taken - the others'
                 # answers to a hello say what plays now.
                 link.send(self._together_room.hello())
-        if kind == "full":
+        if kind in ("full", "refused"):
+            # Refused: the relay holds the room for another credential -
+            # someone without the code took its id first. A new room is the
+            # way on; nothing here can be done about that one.
+            said = (tr("together_full", most=together.MAX_MEMBERS) if kind == "full"
+                    else tr("together_refused"))
             self.together_leave(quiet=True)
-            self._together_toast(tr("together_full", most=together.MAX_MEMBERS), 6000)
+            self._together_toast(said, 6000)
             dlg = self._together_dialog
             if dlg is not None and not sip.isdeleted(dlg):
-                dlg.show_error(tr("together_full", most=together.MAX_MEMBERS))
+                dlg.show_error(said)
             return
         self._together_refresh()
 
@@ -354,9 +359,11 @@ class _TogetherMixin:
                 self._together_toast(tr("together_joined", name=what.name), 3000)
             elif kind == "left":
                 self._together_toast(tr("together_left", name=what.name), 3000)
-            elif kind == "hello":
+            elif kind in ("hello", "answer"):
+                # Named in the answer: a member since 1.6.11 takes this
+                # computer's messages only from one that names it.
                 room.status = self._together_my_status()
-                link.send(room.hello(answer=True))
+                link.send(room.hello(answer=True, to=what.id if kind == "hello" else what))
             elif kind == "state":
                 self._together_on_state(what[1])
             elif kind == "unsigned":

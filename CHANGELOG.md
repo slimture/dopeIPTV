@@ -7,6 +7,183 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+## [1.6.11]
+
+### Security
+
+- A backup made without a password holds no login any more: playlist
+  passwords, tokens and box MACs, a login in their addresses, Trakt, Simkl,
+  OpenSubtitles, the sync code and the rest stay out, and putting such a
+  backup back keeps the logins already on that computer. With a password
+  the whole backup is encrypted, as before.
+- Every network address but a multicast group's goes to a program the app
+  starts in a private file - not only one the app sees a login in - and a
+  cast's converter and the Apple TV's now get it that way too; the
+  external player's title is in its playlist file, no longer in its
+  command line.
+- Through Nerd's proxy, a name is looked up on this computer before the
+  proxy is asked, so a public name that leads to this computer or the home
+  network is refused there too.
+- Casting an rtsp or udp stream to a Chromecast through the converter
+  works: it was given HTTP options ffmpeg refused before it opened.
+- A picture or guide address an internet source names can no longer reach
+  the home network through a public name that resolves to a home address:
+  the app's own requests to such a name are refused on the socket, after
+  the name is looked up and before a byte is sent. The source's own server
+  names (its server, list, guide, portal and backup addresses) and Plex's
+  `*.plex.direct` are left alone (`core/dest_guard.note_outside`).
+- Every https stream from the internet has its certificate checked, in the
+  player and in recordings, whether Nerd is on or not. One that does not
+  check out - expired, self-signed, made for another name - plays nothing,
+  says why, and the app asks once whether that source may play without the
+  check; the answer is the source's own, taken back on its page (Advanced),
+  and sync never turns it on by itself. A server at home is checked as the
+  player's own default does, unless Nerd > Network, "Check every stream's
+  certificate", asks for it too.
+- A recording over its own connection no longer puts the stream's address
+  - an Xtream login in it - on the recorder's command line, which every
+  account on a Linux computer can read: the app reads the stream itself and
+  hands it to ffmpeg or mpv on their input, and ffmpeg may then open no
+  network protocol at all. An external player gets an http(s) address in a
+  private playlist file, or is not started, and Nerd's bridge key goes to
+  the recorder in its environment.
+- No program the app starts is handed a provider's address any more. A
+  recording of an HLS playlist, a cast's converter and its probe, the
+  pieces of a cast's archive or rewind buffer, AirPlay's converter and
+  server mode's HLS copy read an alias that names nothing of it - not the
+  host, the folders, the login or the query - and works only through the
+  app's bridge, whose key is in their environment alone. An rtsp, srt or
+  rtmp address with a login goes in a private file; a token header stays
+  out of the command line. Without the bridge or the file, nothing starts
+  and the app says why.
+- Every connection the bridge opens is judged before a byte is sent - by
+  its address as written and then on the connected socket, so a name that
+  turns into this computer's address (DNS rebinding) is caught too. The
+  in-app player (and each multiview cell, and a radio station) reads every
+  stream of a source on the internet through it, Nerd on or off, and so do
+  the programs above: an HLS playlist's segments, keys and redirects can no
+  longer reach this computer, a link-local or cloud-metadata host or the
+  home network. The stream's own server stays reachable; a home source is
+  left as it was. Nerd's or the system's http proxy is chained behind it.
+- A stream whose certificate must be checked is not opened when the player
+  cannot check it, and the video says why; it is never handed to another
+  player instead.
+- The list of picture hosts an internet source named no longer forgets the
+  oldest: past 8 192 names every public name is treated as an outsider's
+  (it fails closed).
+- An error report hides a login of one or two characters too, as a word of
+  its own.
+- Turning private viewing on stops a cast's converter writing to the disk
+  at once, not at its next look a second later; a TMDB lookup that waited
+  while its title began to play privately is not sent.
+- The remote API holds back a device that asks too often, and shuts out
+  one that tries ten wrong tokens in a minute for ten minutes; the phone
+  remote and the remote API also have a budget for every device together.
+  The remote API plays no address that leads to this computer or a
+  link-local host.
+- The app's own yt-dlp is hashed against its pinned SHA-256 before every
+  run, and mpv's hook runs it through a wrapper that hashes it first.
+- A login is masked in the log and in reports in its encoded forms too -
+  percent-encoded, JSON-escaped and as HTTP Basic base64.
+- The second-start socket fails closed: a folder that cannot be made this
+  user's alone is never listened in.
+- A computer joining sync is asked before it takes a copy last saved more
+  than 30 days ago. A report sends exactly what its window shows. Updates
+  are offered and installed only when strictly newer.
+- A Kodi's login is never sent over plain http unasked: once per Kodi,
+  "Send anyway" or "Use HTTPS" (tried first), Cancel the default.
+- Server mode's tuner, kept open to every device from before 1.6.9, is
+  said once, with "Close it"; `--server` logs it at every start. A
+  `dopeiptv://channel` link is asked about first.
+- Restoring a backup brings nothing that runs something, lets others in or
+  sends connections elsewhere unless it is ticked.
+- Kids profiles can see "Only what a grown-up allows": only the categories
+  picked per source. Profile PINs can be 4 to 12 digits.
+- Requests through a proxy are checked against this computer, link-local
+  and the home network by name first; udpxy relays are accepted only in
+  their own shape; an address with no host counts as this computer.
+- Watch together: every request to the relay carries the room's
+  credential, of which the relay keeps only a hash - a room's id alone no
+  longer posts, takes a seat or reads; the relay limits messages per
+  member, rooms per address and a room's life. A member since 1.6.11 is
+  taken only from its first message that names this stay's own id, so
+  nothing said before joining is replayed after a restart.
+- A recording stops while a gibibyte is still free where it is written.
+- The subtitle search opened while viewing privately waits for Search
+  before it asks OpenSubtitles anything.
+- The add-a-source form and a source's page say so under the address when
+  an Xtream server or a portal on the internet is on plain http: the login
+  travels unencrypted in every address.
+- An error report hid one of your names - a channel's, a source's, a
+  title - even inside another word, and the placeholder then told what it
+  was: "not st<private>d yet" with a channel called Arte. A name is now
+  hidden only where it stands as a word of its own, and a login wherever it
+  stands with the whole word around it; the log does the same with a login
+  (`report._own_value`, `log.redact`).
+
+### Added
+
+- The cast card says "Preparing for the TV…" while a channel is
+  repackaged or converted on this computer before the TV can show it (an
+  HEVC channel to an Apple TV, the converter for a Chromecast), instead of
+  a silent wait with the last channel's Playing.
+- A decision card's words show whole with a click on them.
+- Settings > Appearance > Show channel numbers. The TV list shows no
+  numbers by default now - calmer, with more room for the names; typing a
+  number still zaps to its channel.
+- Pick the app's icon under Settings > Appearance > App icon: the blue
+  one, a heart, one in your accent colour (it follows the accent),
+  midnight, paper, ocean, forest, sunset, grape, a round one or a retro
+  TV. It shows in the Dock, the taskbar and the app switcher while the
+  app runs; the installed program's own icon stays the blue one.
+
+### Removed
+
+- The supporter key, everywhere: its window, the menu entry, the row in
+  Settings, the line in About, the mark on the logo, the
+  `dopeiptv://supporter` link and the "supporter" word feedback carried.
+  An older app's key and heart-icon switch are removed from the settings
+  file at start. The heart icon is one of the icons to pick.
+
+### Fixed
+
+- A channel in HEVC cast to an Apple TV played its sound over a black
+  picture: the Apple TV was handed the provider's HLS, whose MPEG-TS
+  segments it plays HEVC in only as fMP4. HEVC now goes through the
+  bridge, copied into fMP4 and tagged hvc1 - nothing is converted
+  (`airplay_bridge.plan`). A stream nothing is known of - a zap during
+  the cast, a cast from a list - is looked into before it goes to the TV:
+  a quick look at its program map, a quarter of a megabyte, on a zap once
+  the TV has paused the last channel (from the bridge, once ffmpeg has
+  stopped and the provider had its moment), so a zap stays as quick as it
+  was; what was found is remembered for the session by the address's
+  hash, never while watching privately (`airplay_macos._look_into`,
+  `airplay_bridge.QUICK_PROBE`).
+- The app closed at start when it had been left on Radio: building the
+  window filtered Radio's list before any of its rows was picked.
+- Posters went blank after a while in Movies, Series, Mine, Search, a
+  series' page and TV mode - the top of a long list first - and stayed so
+  until the app was started again. The app keeps the pictures it used most
+  recently in memory and lets the oldest go; a card asked for its picture
+  only once, so one let go was never asked for again. It is now asked for
+  again - from the disk cache, in a few milliseconds - and a picture that
+  failed and rests for a moment is asked for again when the rest is over
+  (`series_cards.ImageSource`, `LogoLoader.cooldown_left`).
+- Updating to 1.6.10 could switch the app to the heart icon by itself; the
+  icon is now the blue one until another is picked. A heart turned on by
+  hand in 1.6.10 stays the heart.
+- The app could crash as Settings opened, before anything had played, on a
+  system whose language writes numbers with a decimal comma (Swedish,
+  German...) and that sets `LC_ALL`: Nerd's check of the mpv options made
+  its mpv core while the numeric locale was the system's, libmpv makes none
+  then, and python-mpv crashed on the nothing it got. Every core is now made
+  after the numeric locale is put back to "C", and the start puts it back
+  as soon as Qt has set it (`players.numeric_c`).
+- On Windows, an update whose installer Windows would not start - Smart
+  App Control, an antivirus or a policy on the computer - was reported as a
+  crash. The update window now says what stopped it, that nothing was
+  changed and how to install it by hand (`winupdate.blocked_by_policy`).
+
 ## [1.6.10]
 
 ### Changed

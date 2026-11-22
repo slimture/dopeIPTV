@@ -14,12 +14,15 @@ control's token (one is made on the computer that turns it on), and caches
 the app fills again by itself. Of the other three files only the person's
 own keys go; the rest of them is cache.
 
-Logins go in as they are in the settings themselves: as plain text, unless
-the person gives the backup a password - the app says so where the file is
-made. With one (lock, for_file) the file is one JSON object of its own: a
+Logins go in only when the person gives the backup a password. Without one
+they are left out (without_logins): the settings that are a login, a
+playlist's password, token and box MAC, a login in its addresses - the file
+says so (NO_LOGINS), and a restore keeps the logins of the computer it is
+put back on (Backup.keep, _logins_from_here). With one (lock, for_file) the
+file is one JSON object of its own: a
 header that says how it is locked (MAGIC "encrypted", v, kdf, cipher,
-rounds, salt, nonce) and *data* - the backup without a password, byte for
-byte, encrypted with ChaCha20-Poly1305 (core/chacha20poly1305.py) under the
+rounds, salt, nonce) and *data* - the whole backup, logins and all,
+encrypted with ChaCha20-Poly1305 (core/chacha20poly1305.py) under the
 key PBKDF2-HMAC-SHA256 makes of the password (NFC, UTF-8) and the salt, the
 header itself as the associated data, so a changed header fails as a
 changed byte does. read_any() checks the header before any work (Locked);
@@ -38,6 +41,12 @@ Putting a backup back over everything replaces the files the backup has,
 and only those: a file it does not have stays exactly as it is here. One
 whose app settings hold neither playlists nor settings is not put back over
 everything at all (replaceable()): it would only empty what is here.
+
+What runs something, lets others in or sends the connections elsewhere
+(risky, risky_sources - one choice each, risky_choices) is brought only when
+the person ticks it, in either way of restoring (without): a setting not
+ticked stays as it is here (Backup.keep, kept with a staged restore), a
+playlist not ticked comes without those options.
 
 That is done as the app starts: stage() now, apply_pending() at the next
 start, before anything reads the settings.
@@ -70,7 +79,7 @@ import re
 import secrets
 import tempfile
 import unicodedata
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -175,7 +184,25 @@ SIGN_INS = ("trakt_access_token", "simkl_access_token")
 #: A playlist's own options that do the same for its connections (its
 #: backup addresses, a certificate trusted for it, its own DNS server).
 RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
-                "backup_servers", "dns_url", "cert_pin")
+                "backup_servers", "dns_url", "cert_pin", "tls_unchecked")
+#: A playlist's options that are one setting with one of RISKY_SOURCE (as
+#: core/sync.py holds them back together): left out with it.
+_SOURCE_WITH = {"cert_pin": ("cert_pin_for",), "catchup_template": ("catchup_mode",),
+                "dns_url": ("dns",)}
+#: What a risky setting brings with it, brought only with it: server mode's
+#: reach with its switch, a sync's own with its code, a watch history's
+#: whole sign-in with its token (a renewal token alone would sign in again;
+#: providers/trakt.SIGN_IN_KEYS, providers/simkl.SIGN_IN_KEYS).
+_WITH = {"nerd_server": (_SERVER_ADULT, "nerd_server_open", "nerd_server_open_hosts"),
+         SYNC_CODE: ("sync_cats", "sync_source_ids"),
+         "trakt_access_token": ("trakt_refresh_token", "trakt_expires_at"),
+         "simkl_access_token": ("simkl_refresh_token", "simkl_token_expires")}
+#: The remote API's and sharing's reach: brought only with one of them.
+_LAN = "nerd_remote_lan"
+#: A choice of risky_choices() that is a playlist's: "source:<its place>".
+SOURCE_CHOICE = "source:"
+#: The most keys a restore keeps as they are here (Backup.keep).
+_KEEP_MAX = 256
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.
@@ -221,21 +248,32 @@ class BackupError(ValueError):
 
 @dataclass
 class Backup:
-    """A backup as read: *kind* "full", or "playlists" for an old export."""
+    """A backup as read: *kind* "full", or "playlists" for an old export.
+    *keep*: the app settings (by their names without a profile's part) a
+    restore over everything leaves as they are here - the risky ones the
+    person did not tick (``without``), the logins a backup without a
+    password left out. *logins_out*: it holds no logins (without_logins)."""
 
     kind: str
     stores: dict[str, dict[str, Any]] = field(default_factory=dict)
     sources: list[dict] = field(default_factory=list)
     app_version: str = ""
     created: str = ""
+    keep: list[str] = field(default_factory=list)
+    logins_out: bool = False
 
     @property
     def full(self) -> bool:
         return self.kind == "full"
 
     def document(self) -> dict[str, Any]:
-        return {MAGIC: FORMAT, "app_version": self.app_version,
-                "created": self.created, "stores": self.stores}
+        doc: dict[str, Any] = {MAGIC: FORMAT, "app_version": self.app_version,
+                               "created": self.created, "stores": self.stores}
+        if self.keep:
+            doc["keep"] = list(self.keep)
+        if self.logins_out:
+            doc[NO_LOGINS] = _LEFT
+        return doc
 
 
 # -- what goes in ----------------------------------------------------------------
@@ -468,9 +506,178 @@ def lock(doc: Mapping[str, Any], password: str, rounds: int = ROUNDS) -> dict[st
 
 
 def for_file(doc: Mapping[str, Any], password: str = "") -> Mapping[str, Any]:
-    """What goes in the file: *doc* itself without a password - the backup
-    exactly as it always was - or, with one, lock()'s."""
-    return lock(doc, password) if password else doc
+    """What goes in the file: with a password, lock()'s - every login in it,
+    encrypted; without one, *doc* without its logins (without_logins), so
+    a file anyone can read holds none."""
+    return lock(doc, password) if password else without_logins(doc)
+
+
+# -- without a password: no logins -------------------------------------------------
+
+#: The app settings that are a login, a token or the sync code: a backup
+#: without a password leaves them out, and a restore of one keeps this
+#: computer's own (Backup.keep).
+LOGIN_SETTINGS = ("trakt_access_token", "trakt_refresh_token", "trakt_client_secret",
+                  "simkl_access_token", "simkl_refresh_token", "simkl_token_expires",
+                  "os_password", "os_api_key", "tmdb_api_key", SYNC_CODE,
+                  "nerd_mqtt_pass", "nerd_hooks_header")
+#: Settings that hold a login only sometimes - a proxy's address with one,
+#: a header that opens something, a Kodi's password: left out then.
+_LOGIN_IN = ("nerd_proxy", "nerd_headers", "kodi_devices")
+#: A playlist's own fields that are a login.
+LOGIN_FIELDS = ("password", "token", "mac")
+#: A playlist's addresses that may carry one (user:password@, a query's
+#: login words), and its options that may.
+_LOGIN_URLS = ("server", "url", "epg_url")
+_LOGIN_URL_OPTIONS = ("proxy", "backup_servers")
+#: The document's own word that its logins were left out.
+NO_LOGINS = "logins"
+_LEFT = "left out"
+
+
+def _no_login_word(piece: str) -> str:
+    from urllib.parse import unquote_plus
+
+    from .player_exec import LOGIN_WORDS
+    key, eq, _value = piece.partition("=")
+    return f"{key}=" if eq and unquote_plus(key).strip().lower() in LOGIN_WORDS else piece
+
+
+def _no_login_url(text: str) -> str:
+    """*text* - an address, or lines of them - without what opens an
+    account in it: a login before its host and the values of a query's
+    login words (player_exec.LOGIN_WORDS). A login in an address's path
+    (an Xtream stream's) cannot be told from a folder: a source's server
+    holds none."""
+    from urllib.parse import urlsplit, urlunsplit
+    out = []
+    for line in str(text or "").split("\n"):
+        if "://" not in line:
+            out.append(line)
+            continue
+        try:
+            parts = urlsplit(line)
+        except ValueError:
+            out.append("")
+            continue
+        query = "&".join(_no_login_word(p) for p in parts.query.split("&")) if parts.query else ""
+        out.append(urlunsplit((parts.scheme, parts.netloc.rpartition("@")[2], parts.path,
+                               query, parts.fragment)))
+    return "\n".join(out)
+
+
+def _no_login_headers(value: Any) -> Any:
+    """Headers (lines of "Name: value", or a mapping) with only those that
+    open nothing (net_bridge.SAFE_HEADERS, and the user agent)."""
+    from .net_bridge import SAFE_HEADERS
+    safe = SAFE_HEADERS | {"user-agent"}
+    if isinstance(value, dict):
+        return {k: v for k, v in value.items() if str(k).strip().lower() in safe}
+    lines = [ln for ln in str(value or "").splitlines()
+             if (m := _HEADER_NAME.match(ln)) and m.group(1).lower() in safe]
+    return "\n".join(lines)
+
+
+def _holds_login(key: str, value: Any) -> bool:
+    """Whether the setting *key* (one of _LOGIN_IN) holds a login now."""
+    if key == "nerd_proxy":
+        return _no_login_url(str(value or "")) != str(value or "")
+    if key == "nerd_headers":
+        return _no_login_headers(value) != (value if isinstance(value, dict) else
+                                            "\n".join(str(value or "").splitlines()))
+    try:
+        devices = json.loads(value) if isinstance(value, str) else value
+    except ValueError:
+        return bool(value)
+    return any(isinstance(d, dict) and d.get("password") for d in devices or [])
+
+
+def _playlists_without_logins(text: str) -> str:
+    try:
+        rows = json.loads(text)
+    except ValueError:
+        return "[]"
+    out = []
+    for p in rows if isinstance(rows, list) else []:
+        if not isinstance(p, dict):
+            continue
+        p = dict(p)
+        for f in LOGIN_FIELDS:
+            if p.get(f):
+                p[f] = ""
+        for f in _LOGIN_URLS:
+            if isinstance(p.get(f), str):
+                p[f] = _no_login_url(p[f])
+        opts = p.get("options")
+        if isinstance(opts, dict):
+            opts = dict(opts)
+            for f in _LOGIN_URL_OPTIONS:
+                if isinstance(opts.get(f), str):
+                    opts[f] = _no_login_url(opts[f])
+            if opts.get("headers"):
+                opts["headers"] = _no_login_headers(opts["headers"])
+            p["options"] = opts
+        out.append(p)
+    return json.dumps(out, ensure_ascii=False)
+
+
+def without_logins(doc: Mapping[str, Any]) -> dict[str, Any]:
+    """collect()'s *doc* with no login in it - for a file without a
+    password, which anyone who gets it can read: the settings that are one
+    (LOGIN_SETTINGS) or hold one now (_LOGIN_IN) left out, a playlist's
+    password, token and box MAC emptied and a login in its addresses taken
+    out (_no_login_url, _no_login_headers). It says so (NO_LOGINS), and the
+    settings left out are kept as they are wherever it is put back (keep);
+    a playlist that is there takes that computer's login (_logins_from_here)."""
+    stores = {name: dict(values) for name, values in dict(doc.get("stores") or {}).items()}
+    main = stores.get("main", {})
+    keep = set(doc.get("keep") or [])
+    for key in list(main):
+        base = _base(key)
+        if base in LOGIN_SETTINGS or (base in _LOGIN_IN and _holds_login(base, main[key])):
+            del main[key]
+            keep.add(base)
+        elif base == "playlists" and isinstance(main[key], str):
+            main[key] = _playlists_without_logins(main[key])
+    out: dict[str, Any] = {k: v for k, v in doc.items() if k not in ("stores", "keep")}
+    out["stores"] = stores
+    out[NO_LOGINS] = _LEFT
+    if keep:
+        out["keep"] = sorted(keep)[:_KEEP_MAX]
+    return out
+
+
+def _logins_from_here(incoming: Any, here: Any) -> Any:
+    """A playlist list from a backup without logins (*incoming*, JSON text)
+    with this computer's logins for the playlists it has too (*here*): the
+    fields emptied filled in again, an address that is this one's but for
+    its login this one's. Anything that does not read as playlists stays as
+    it came."""
+    try:
+        rows, mine = json.loads(incoming), json.loads(here) if here else []
+    except (TypeError, ValueError):
+        return incoming
+    if not isinstance(rows, list) or not isinstance(mine, list):
+        return incoming
+    by_id = {str(h.get("id")): h for h in mine if isinstance(h, dict) and h.get("id")}
+    for p in rows:
+        h = by_id.get(str(p.get("id"))) if isinstance(p, dict) else None
+        if h is None:
+            continue
+        for f in LOGIN_FIELDS:
+            if not p.get(f) and h.get(f):
+                p[f] = h[f]
+        for f in _LOGIN_URLS:
+            if isinstance(h.get(f), str) and p.get(f) == _no_login_url(h[f]):
+                p[f] = h[f]
+        opts, theirs = p.get("options"), h.get("options")
+        if isinstance(opts, dict) and isinstance(theirs, dict):
+            for f in _LOGIN_URL_OPTIONS:
+                if isinstance(theirs.get(f), str) and opts.get(f) == _no_login_url(theirs[f]):
+                    opts[f] = theirs[f]
+            if theirs.get("headers") and opts.get("headers", "") == _no_login_headers(theirs["headers"]):
+                opts["headers"] = theirs["headers"]
+    return json.dumps(rows, ensure_ascii=False)
 
 
 def is_locked(data: Any) -> bool:
@@ -623,8 +830,15 @@ def parse(data: Any) -> Backup:
             if not _good_key(key) or not _plain(value):
                 raise BackupError("invalid", f"{name}/{key}")
         clean[name] = dict(values)
+    # What a restore keeps here (a staged one's: the risky settings not
+    # ticked). From someone else's file it can only keep more of what is
+    # here; anything that is not a short list of keys is passed over.
+    keep = data.get("keep")
+    keep = ([k for k in keep if _good_key(k)][:_KEEP_MAX]
+            if isinstance(keep, list) and all(isinstance(k, str) for k in keep) else [])
     return Backup("full", clean, _sources(clean.get("main", {}).get("playlists")),
-                  app_version, created if isinstance(created, str) else "")
+                  app_version, created if isinstance(created, str) else "", keep,
+                  data.get(NO_LOGINS) == _LEFT)
 
 
 # -- what it holds ---------------------------------------------------------------
@@ -816,19 +1030,81 @@ def risky(b: Backup) -> list[tuple[str, str]]:
     return out
 
 
-def risky_sources(b: Backup) -> list[tuple[str, list[str]]]:
-    """(playlist name, its RISKY_SOURCE options set) of each playlist in *b*
-    that has any."""
+def _risky_keys(options: Any) -> list[str]:
+    """The RISKY_SOURCE options a playlist's *options* set."""
+    if not isinstance(options, dict):
+        return []
+    return [k for k in RISKY_SOURCE if isinstance(options.get(k), str) and options[k].strip()]
+
+
+def _risky_rows(b: Backup) -> list[tuple[int, str, list[str]]]:
+    """(its place in b.sources, its name, its RISKY_SOURCE options) of each
+    playlist in *b* that sets any."""
     out = []
-    for p in b.sources:
-        options = p.get("options")
-        if not isinstance(options, dict):
-            continue
-        keys = [k for k in RISKY_SOURCE if isinstance(options.get(k), str) and options[k].strip()]
+    for i, p in enumerate(b.sources):
+        keys = _risky_keys(p.get("options"))
         if keys:
             name = p.get("name") if isinstance(p.get("name"), str) else ""
             server = p.get("server") if isinstance(p.get("server"), str) else ""
-            out.append((name or server or "?", keys))
+            out.append((i, name or server or "?", keys))
+    return out
+
+
+def risky_sources(b: Backup) -> list[tuple[str, list[str]]]:
+    """(playlist name, its RISKY_SOURCE options set) of each playlist in *b*
+    that has any."""
+    return [(name, keys) for _i, name, keys in _risky_rows(b)]
+
+
+def risky_choices(b: Backup) -> list[str]:
+    """Each risky thing *b* would bring, as one choice the person ticks or
+    not: the keys risky() names, in its order, then SOURCE_CHOICE + the
+    place in b.sources of each playlist risky_sources() names, in its order
+    - one per line the restore shows."""
+    return ([key for key, _shown in risky(b)]
+            + [f"{SOURCE_CHOICE}{i}" for i, _name, _keys in _risky_rows(b)])
+
+
+def without(b: Backup, take: Iterable[str] = ()) -> Backup:
+    """*b* bringing only the risky things in *take* (risky_choices' names)
+    and everything else as it is: a risky setting not ticked - with what is
+    one setting with it (_WITH, the remote's reach _LAN unless the remote
+    or sharing is ticked) - is not taken, and a restore over everything
+    leaves this computer's own as it is (``Backup.keep``); a playlist not
+    ticked comes without its RISKY_SOURCE options (and their companions,
+    _SOURCE_WITH), in either way of restoring. Nothing is ticked by default:
+    ``without(b)`` brings none of them."""
+    take = set(take)
+    main = dict(b.stores.get("main", {}))
+    keep = set(b.keep)
+    choices = risky_choices(b)
+    left = [key for key in choices if key not in take]
+    for key in left:
+        if key.startswith(SOURCE_CHOICE):
+            continue
+        keep.update((key, *_WITH.get(key, ())))
+    if any(key in _LAN_ON for key in left) and not take & set(_LAN_ON):
+        keep.add(_LAN)
+    for k in list(main):
+        if _base(k) in keep:
+            del main[k]
+    gone = {int(key[len(SOURCE_CHOICE):]) for key in left if key.startswith(SOURCE_CHOICE)}
+    sources = []
+    for i, p in enumerate(b.sources):
+        if i in gone:
+            keys = _risky_keys(p.get("options"))
+            drop = set(keys) | {c for k in keys for c in _SOURCE_WITH.get(k, ())}
+            p = dict(p, options={k: v for k, v in p["options"].items() if k not in drop})
+        sources.append(p)
+    stores = dict(b.stores)
+    if "main" in stores:
+        if gone and isinstance(main.get("playlists"), str):
+            main["playlists"] = json.dumps(sources, ensure_ascii=False)
+        stores["main"] = main
+    out = Backup(b.kind, stores, sources, b.app_version, b.created,
+                 sorted(keep)[:_KEEP_MAX] if b.full else [], b.logins_out)
+    if gone or left:
+        log.info("restore: %d risky setting(s) not brought", len(left))
     return out
 
 
@@ -862,6 +1138,19 @@ def restore(b: Backup, stores: Mapping[str, Settings | None],
         incoming = {k: v for k, v in b.stores.get(name, {}).items()
                     if covered(name, k)}
         keep_here: set[str] = set()
+        if name == "main" and b.keep:
+            # The risky settings not ticked (without): this computer's own
+            # stay as they are, whichever profile's they are.
+            kept_names = set(b.keep)
+            incoming = {k: v for k, v in incoming.items() if _base(k) not in kept_names}
+            with _no_fallbacks(s):
+                keep_here |= {k for k in s.allKeys() if _base(k) in kept_names}
+        if name == "main" and b.logins_out:
+            # A backup without logins: a playlist this computer has too
+            # keeps its login here (_logins_from_here).
+            with _no_fallbacks(s):
+                for key in [k for k in incoming if _base(k) == "playlists"]:
+                    incoming[key] = _logins_from_here(incoming[key], s.value(key))
         if name == "main":
             for key, kind in _PATHS.items():
                 if key not in incoming:

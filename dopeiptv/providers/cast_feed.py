@@ -21,8 +21,10 @@ copy drops what comes before one), with SPS/PPS in front of every keyframe
 (dump_extra), and its clock carried on from where the last piece ended
 (-output_ts_offset), so the converter sees one stream. Whatever the piece's
 address is - the provider's, or the rewind buffer's loopback server - only
-ffmpeg here reads it; the TV only ever sees the converter's playlist on the
-LAN.
+ffmpeg here reads it, and only as an alias through the app's bridge
+(core/net_bridge.hand_over): its command line names nothing of the address,
+its login, the buffer's token, a proxy or a header that may hold a token.
+The TV only ever sees the converter's playlist on the LAN.
 """
 from __future__ import annotations
 
@@ -72,23 +74,25 @@ def is_loopback(url: str) -> bool:
 
 
 def reader_args(exe: str, url: str, start: float = 0.0, ts_offset: float = 0.0,
-                net: list[str] | None = None, audio: int = 0) -> list[str]:
+                net: list[str] | None = None, audio: int = 0, read: str = "") -> list[str]:
     """The command that copies one piece to stdout as MPEG-TS, reporting
-    how far it got on stderr (-progress: out_time_us=...).
+    how far it got on stderr (-progress: out_time_us=...). *read*: what it
+    reads in *url*'s place - its alias (core/net_bridge.hand_over).
 
     Only the picture and the one sound track the cast plays (*audio*, what
     -map 0:a:N counts): a second track with no packets in the probe (an
     audio description that is silent for now) has no sample rate, and the
     TS muxer then refuses to write anything at all."""
+    read = read or url
     return [
         exe, "-hide_banner", "-loglevel", "error", "-nostdin", "-nostats",
         "-progress", "pipe:2",
         "-analyzeduration", "8000000", "-probesize", "8000000",
         *(net or []),
         # What the piece's address leads to stays a stream's.
-        *ffmpeg_protocols(url),
+        *ffmpeg_protocols(read, bridged=read != url),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
-        *KEYFRAME_INPUT, "-i", url,
+        *KEYFRAME_INPUT, "-i", read,
         "-map", "0:v:0?", "-map", f"0:a:{max(0, int(audio))}?", "-sn", "-dn",
         "-c", "copy", *KEYFRAME_OUTPUT,
         *(["-output_ts_offset", f"{ts_offset:.3f}"] if ts_offset > 0 else []),
@@ -139,6 +143,9 @@ class Feed:
         self.reached = self.first_wall
         self.pieces = 0
         self.audio = 0
+        #: The source's own headers for the provider's pieces (Nerd's, as
+        #: AirPlay reads them): the bridge adds them (attach).
+        self.headers: dict[str, str] = {}
         self.closed = False
         #: What the pieces come from, for whoever asks again from another
         #: moment (the rewind buffer's session).
@@ -153,12 +160,17 @@ class Feed:
         return self.first[0] if self.first else ""
 
     def attach(self, sink: IO[bytes], exe: str,
-               net_for: NetFor | None = None, audio: int = 0) -> None:
+               net_for: NetFor | None = None, audio: int = 0,
+               headers: dict[str, str] | None = None) -> None:
         """Begin writing the pieces into *sink* (a converter's stdin), on a
         thread of its own; *sink* is closed when they run out. *audio*: the
-        one sound track the pieces carry (the converter reads it as 0:a:0)."""
+        one sound track the pieces carry (the converter reads it as 0:a:0).
+        *headers*: the source's own, for the provider's pieces - added by
+        the app's bridge, never in a reader's arguments but those that open
+        nothing (*net_for*'s)."""
         self.detach()
         self.audio = audio
+        self.headers = dict(headers or {})
         if self.closed:
             raise RuntimeError("the feed was closed")
         stop = threading.Event()
@@ -268,12 +280,26 @@ class Feed:
               ts_offset: float, net: list[str],
               stop: threading.Event) -> float | None:
         """Copy one piece into *sink*: how many seconds it gave, or None
-        when *sink* is gone."""
-        args = reader_args(exe, url, at, ts_offset, net, self.audio)
+        when *sink* is gone - or the piece cannot be handed to a reader
+        privately, which ends the stream (nothing is read otherwise)."""
+        way = _hand_over(url, self.headers)
+        if way is None:
+            log.warning("cast feed: the %s cannot be handed to a reader privately - the "
+                        "stream ends here", self.kind)
+            return None
+        try:
+            return self._copy(sink, exe, url, at, ts_offset, net, stop, way)
+        finally:
+            way.close()
+
+    def _copy(self, sink: IO[bytes], exe: str, url: str, at: float,
+              ts_offset: float, net: list[str], stop: threading.Event,
+              way: Any) -> float | None:
+        args = reader_args(exe, url, at, ts_offset, net, self.audio, read=way.address)
         try:
             proc = subprocess.Popen(args, stdin=subprocess.DEVNULL,
                                     stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, env=way.env,
                                     creationflags=NO_WINDOW)
         except OSError as e:
             log.info("cast feed: the reader did not start (%s)", e)
@@ -313,6 +339,18 @@ class Feed:
                 if self._reader is proc:
                     self._reader = None
         return None if gone else out[0]
+
+
+def _hand_over(url: str, headers: dict[str, str]) -> Any:
+    """How a reader reads the piece at *url* (core/net_bridge.hand_over):
+    the provider's piece as the cast's source's (core/nerd.cast_source), its
+    headers added by the bridge; the rewind buffer's own server on this
+    computer as no source's, its token kept out of the reader's arguments
+    too."""
+    from ..core import net_bridge, nerd
+    if is_loopback(url):
+        return net_bridge.hand_over(None, url)
+    return net_bridge.hand_over(nerd.cast_source(), url, headers)
 
 
 def _progress(proc: subprocess.Popen[bytes], out: list[float]) -> None:

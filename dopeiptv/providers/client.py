@@ -13,7 +13,7 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
-from ..core import m3u_ids, mirrors, stream_address
+from ..core import dest_guard, m3u_ids, mirrors, stream_address
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
@@ -801,8 +801,13 @@ class M3UClient(OfflineClient):
             return True
         if not url.lower().startswith(("http://", "https://")):
             return False
-        return not (stream_address.on_internet(self.server)
-                    and stream_address.host_refusal(url, home=not self.home_ok))
+        if not stream_address.on_internet(self.server):
+            return True
+        if stream_address.host_refusal(url, home=not self.home_ok):
+            return False
+        if not self.home_ok:
+            dest_guard.note_outside(url)
+        return True
 
     def __init__(self, url: str, stable: bool = False, map_path: str = "") -> None:
         super().__init__()
@@ -1167,6 +1172,7 @@ def make_client(playlist: dict):
     route (core/net_route.py: own DNS, IP version, a pinned certificate)
     under it, which its guide download takes too (client.net_route)."""
     client = _make_client(playlist)
+    _note_own_names(playlist or {})
     from ..core import nerd, net_route
     source = dict((playlist or {}).get("options") or {},
                   _kind=(playlist or {}).get("kind") or "xtream",
@@ -1189,6 +1195,24 @@ def make_client(playlist: dict):
     _use_mirrors(client, playlist or {})
     _nerd_lists(client, source, (playlist or {}).get("id"))
     return client
+
+
+def _note_own_names(playlist: dict) -> None:
+    """The names the person gave this source - its own server, its guide's
+    address and its backup addresses - as theirs (dest_guard.note_own): a
+    server at home by its public name stays reachable, its pictures too."""
+    options = playlist.get("options") or {}
+    kind = str(playlist.get("kind") or "xtream")
+    for key in ("server", "url", "epg_url", "portal"):
+        value = playlist.get(key)
+        if isinstance(value, str) and value.strip():
+            dest_guard.note_own(value.strip())
+    if kind in mirrors.KINDS and options.get(mirrors.KEY):
+        try:
+            for address in mirrors.parse(options.get(mirrors.KEY), kind):
+                dest_guard.note_own(address)
+        except Exception:
+            pass
 
 
 def _use_mirrors(client, playlist: dict) -> None:
@@ -1330,12 +1354,22 @@ _PICTURE_DEPTH = 6
 def _picture_kept(value: Any, home: bool = False) -> Any:
     """*value* (an address or a list of them) without what names this
     computer or a link-local host - with *home*, a device at home too
-    (core/stream_address.picture_refusal)."""
+    (core/stream_address.picture_refusal). With *home* each picture kept
+    is noted as an internet source's (dest_guard.note_outside): its public
+    name may not lead to the home network when the app fetches it."""
     if isinstance(value, str):
-        return "" if value and stream_address.picture_refusal(value, home) else value
+        if value and stream_address.picture_refusal(value, home):
+            return ""
+        if home and value:
+            dest_guard.note_outside(value)
+        return value
     if isinstance(value, list):
         kept = [v for v in value if not (isinstance(v, str) and v
                                          and stream_address.picture_refusal(v, home))]
+        if home:
+            for v in kept:
+                if isinstance(v, str) and v:
+                    dest_guard.note_outside(v)
         return kept if len(kept) != len(value) else value
     return value
 

@@ -296,13 +296,12 @@ def test_a_login_outside_an_address_is_masked_too():
                        ("{'refresh_token': 'r3fresh', 'scope': 'public'}", "r3fresh"),
                        ("X-Emby-Token: 0123456789abcdef", "0123456789abcdef"),
                        ("X-Api-Key=k3yk3yk3y", "k3yk3yk3y"),
-                       ("portal box 00:1A:79:AB:CD:EF answered", "00:1A:79:AB:CD:EF"),
-                       ("key DS1-" + "A" * 100 + " pasted", "A" * 30)):
+                       ("portal box 00:1A:79:AB:CD:EF answered", "00:1A:79:AB:CD:EF")):
         out = _filtered("%s", line)
         assert gone not in out, out
     # The server a line is about stays, and so does a line of Python.
     assert _filtered("host: box.example login: joe") == "host: box.example login: joe"
-    code = '    key = str(settings.value("supporter_key", "") or "")'
+    code = '    key = str(settings.value("theme_light", "") or "")'
     assert _filtered("%s", code) == code
 
 
@@ -313,11 +312,10 @@ def test_an_address_s_new_names_lose_their_values():
 
 
 def test_the_log_s_login_patterns_are_the_report_s():
-    """The report and the log mask the same headers, tokens, MACs and
-    supporter keys; the log's names are the report's but the login and
-    the host."""
+    """The report and the log mask the same headers, tokens and MACs; the
+    log's names are the report's but the login and the host."""
     from dopeiptv.core import report
-    for name in ("AUTH_LINE", "BEARER", "MAC", "SUPPORTER"):
+    for name in ("AUTH_LINE", "BEARER", "MAC"):
         assert getattr(logmod, name).pattern == getattr(report, "_" + name).pattern, name
     names = report._KEYVAL.pattern.split("(", 2)[1]
     assert logmod.KEYVAL.pattern.split("(", 2)[1] == names.replace("|login|host", "")
@@ -371,12 +369,11 @@ def test_a_log_file_and_the_crash_file_are_this_user_s_alone(tmp_path, monkeypat
         os.umask(old)
 
 
-def test_sign_ins_codes_and_the_supporter_key_are_registered_where_they_are_read(monkeypatch):
-    """Trakt's and Simkl's tokens, the sync code, a room's code and the
-    supporter key - each masked in every log line from the moment the app
-    reads it."""
+def test_sign_ins_and_codes_are_registered_where_they_are_read(monkeypatch):
+    """Trakt's and Simkl's tokens, the sync code and a room's code - each
+    masked in every log line from the moment the app reads it."""
     import dopeiptv.core.workers as workers
-    from dopeiptv.core import supporter, sync, together
+    from dopeiptv.core import sync, together
     from dopeiptv.core.stores import KeptValues
 
     class S(dict):
@@ -391,9 +388,7 @@ def test_sign_ins_codes_and_the_supporter_key_are_registered_where_they_are_read
     sync.code_of(S(sync_code=sync.format_code(raw)))
     room = together.new_code()
     together.derive(room)
-    key = "DS1-" + "B" * 100
-    supporter.stored(S(supporter_key=key))
-    gone = ("trakt-acc3ss", "simkl-t0ken", sync.format_code(raw), room, room.replace("-", ""), key)
+    gone = ("trakt-acc3ss", "simkl-t0ken", sync.format_code(raw), room, room.replace("-", ""))
     out = redact(" / ".join(gone))
     assert not [g for g in gone if g in out], out
     assert "1700000000" not in logmod._secrets
@@ -431,3 +426,72 @@ def test_a_line_that_could_not_be_masked_is_withheld_not_written_as_it_was(monke
     _RedactFilter().filter(rec)
     assert "hunter2pw" not in rec.getMessage()
     assert rec.getMessage().startswith(logmod.WITHHELD)
+
+
+def test_a_login_inside_a_longer_word_takes_the_word_with_it():
+    """"not st***d yet" told a login of "arte" by where the mask began and
+    ended: the whole word goes, never a part of it."""
+    logmod.register_secrets("arte")
+    out = redact("Video: own thread (not started yet) /live/arte/x/1.ts")
+    assert out == "Video: own thread (not *** yet) /live/***/x/1.ts"
+    assert "st***" not in out and "***d" not in out
+
+
+# -- a login in its encoded forms ----------------------------------------------------
+
+_PW = 'p@ss w/rd"é'
+
+
+def _forms_of(value):
+    import json
+    import re
+    from urllib.parse import quote, quote_plus
+    upper = [quote(value, safe=""), quote(value), quote_plus(value), quote_plus(value, safe="/")]
+    lower = [re.sub(r"%[0-9A-F]{2}", lambda m: m.group(0).lower(), q) for q in upper]
+    escaped = [json.dumps(value)[1:-1], json.dumps(value, ensure_ascii=False)[1:-1],
+               json.dumps(value)[1:-1].replace("/", "\\/"),
+               re.sub(r"\\u([0-9a-f]{4})", lambda m: "\\u" + m.group(1).upper(), json.dumps(value)[1:-1])]
+    return upper + lower + escaped
+
+
+def test_a_login_is_masked_percent_encoded_and_json_escaped_too():
+    """A password with characters an address or JSON writes otherwise
+    (%40, + for a space, \\" and \\u00e9) is masked in those forms as well:
+    quote, quote_plus, either case of hex, JSON with and without \\u."""
+    logmod.register_secrets("anna", _PW)
+    for form in _forms_of(_PW):
+        assert form != _PW
+        line = f"retry with {form} now"
+        for out in (redact(line), logmod.redact_text(line), _filtered("%s", line)):
+            assert form not in out, (form, out)
+            assert out.startswith("retry with ") and out.endswith(" now"), out
+
+
+def test_http_basic_s_base64_of_user_and_password_is_masked_padded_or_not():
+    import base64
+    logmod.register_secrets("anna", "hunter2pw")
+    for raw in (b"anna:hunter2pw", b"anna:hunter2pw!"):
+        for enc in (base64.b64encode, base64.urlsafe_b64encode):
+            b64 = enc(raw).decode()
+            for form in (b64, b64.rstrip("=")):
+                for line in (f"sent {form} to the box", f"headers={{'X-Auth': '{form}'}}",
+                             f"GET /api/{form}/status"):
+                    out = _filtered("%s", line)
+                    assert form.rstrip("=") not in out, (line, out)
+    # Registered together, two short values are masked as Basic too.
+    logmod.register_secrets("tv", "pw")
+    b64 = base64.b64encode(b"tv:pw").decode()
+    assert b64.rstrip("=") not in redact(f"auth {b64} ok") and redact("tv and pw") == "*** and ***"
+
+
+def test_encoded_forms_keep_the_short_rule_and_leave_ordinary_text_alone():
+    """A login of three characters or fewer is masked as a word of its own -
+    its encoded forms too - and ordinary words, numbers and hex stay."""
+    logmod.register_secrets("a@b")
+    assert redact("login a%40b failed, a%40bc and xa%40b stay") == "login *** failed, a%40bc and xa%40b stay"
+    logmod.register_secrets("hunter2pw", "k@lle")
+    for keep in ("21:05:03 INFO play: started stream 1234 (Settings, connection)",
+                 "sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                 "dopeiptv-remote listening on port 3673",
+                 "QWxhZGRpbjpvcGVuIHNlc2FtZQ== is someone else's"):
+        assert _filtered("%s", keep) == keep, keep

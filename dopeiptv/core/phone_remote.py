@@ -45,6 +45,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import re
 import secrets
@@ -81,6 +82,14 @@ QUERY_MAX = 400
 #: scrolled: a bucket of their own, more generous than the rest's.
 PICTURES_RATE = 60.0
 PICTURES_BURST = 300.0
+#: Every address together, beside each one's own bucket: a device that asks
+#: from address after address cannot keep the server - and the window's
+#: thread - busy. Four phones at full tilt; a phone polls about once a
+#: second, Home Assistant every few. This computer is not counted.
+SERVER_RATE = 60.0
+SERVER_BURST = 360.0
+PICTURES_SERVER_RATE = 120.0
+PICTURES_SERVER_BURST = 900.0
 
 #: The touchpad, in CSS pixels and milliseconds: a swipe moves this far at
 #: least (the larger axis gives its direction), a tap no more than
@@ -292,21 +301,46 @@ def cross_site(headers: Any, host: str | None = None) -> bool:
     return bool(origin) and (host is None or origin != "http://" + host.strip().lower())
 
 
+def this_computer(who: str) -> bool:
+    """Whether *who* is this computer (loopback, however it is written)."""
+    try:
+        ip = ipaddress.ip_address(who.split("%", 1)[0])
+    except ValueError:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped.is_loopback
+    return ip.is_loopback
+
+
 class RateLimiter:
     """Per client address: *rate* requests a second with *burst* at once,
     and a lock-out of *lockout* seconds after *fails* wrong tokens within
-    *window* seconds. *clock* is time.monotonic, or a test's."""
+    *window* seconds - never of an address *spare* names (this_computer:
+    loopback, the computer's own scripts). With *total_rate*, every address
+    but those together has a budget too (*total_rate* a second,
+    *total_burst* at once): one device asking from address after address
+    gets a fresh bucket with each, never more than the whole server's.
+    *clock* is time.monotonic, or a test's."""
 
     def __init__(self, rate: float = 15.0, burst: float = 90.0, fails: int = 10,
                  window: float = 60.0, lockout: float = 600.0, clients: int = 1024,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic,
+                 total_rate: float = 0.0, total_burst: float = 0.0,
+                 spare: Callable[[str], bool] | None = None) -> None:
         self.rate, self.burst = rate, burst
         self.fails, self.window, self.lockout = fails, window, lockout
         self.clients, self.clock = clients, clock
+        self.total_rate, self.total_burst = total_rate, max(total_burst, 1.0)
+        self.spare = spare
         self._lock = threading.Lock()
         self._buckets: OrderedDict[str, list[float]] = OrderedDict()
+        self._total = [self.total_burst, clock()]
+        self._said_full = -1e18
         self._failures: dict[str, list[float]] = {}
         self._blocked: dict[str, float] = {}
+
+    def _spared(self, who: str) -> bool:
+        return self.spare is not None and self.spare(who)
 
     def blocked(self, who: str) -> bool:
         with self._lock:
@@ -319,7 +353,8 @@ class RateLimiter:
             return True
 
     def allow(self, who: str) -> bool:
-        """One request from *who*: False when it is asking too often."""
+        """One request from *who*: False when it is asking too often - or,
+        with a whole-server budget, when every address together is."""
         now = self.clock()
         with self._lock:
             b = self._buckets.pop(who, None)
@@ -327,6 +362,17 @@ class RateLimiter:
                 b = [self.burst, now]
             tokens = min(self.burst, b[0] + (now - b[1]) * self.rate)
             ok = tokens >= 1.0
+            whole = self.total_rate > 0 and not self._spared(who)
+            if ok and whole:
+                t = self._total
+                t[0], t[1] = min(self.total_burst, t[0] + (now - t[1]) * self.total_rate), now
+                ok = t[0] >= 1.0
+                if ok:
+                    t[0] -= 1.0
+                elif now - self._said_full >= 60.0:
+                    self._said_full = now
+                    log.warning("a server of the app was asked more often than its whole budget - "
+                                "too many requests, from too many addresses; answered 429")
             b[0], b[1] = (tokens - 1.0 if ok else tokens), now
             self._buckets[who] = b
             while len(self._buckets) > self.clients:
@@ -334,7 +380,10 @@ class RateLimiter:
             return ok
 
     def failed(self, who: str) -> bool:
-        """A wrong token from *who*; True when that shut it out."""
+        """A wrong token from *who*; True when that shut it out. An address
+        *spare* names is never shut out."""
+        if self._spared(who):
+            return False
         now = self.clock()
         with self._lock:
             seen = [t for t in self._failures.get(who, []) if now - t < self.window]
@@ -377,8 +426,14 @@ class PhoneServer:
         self.on_client = on_client
         self._clients: set[str] = set()
         self._clients_lock = threading.Lock()
-        self.limiter = limiter or RateLimiter()
-        self.pictures = pictures or RateLimiter(rate=PICTURES_RATE, burst=PICTURES_BURST)
+        # This computer is never shut out nor counted in the whole server's
+        # budget; every phone is.
+        self.limiter = limiter or RateLimiter(total_rate=SERVER_RATE, total_burst=SERVER_BURST,
+                                              spare=this_computer)
+        self.pictures = pictures or RateLimiter(rate=PICTURES_RATE, burst=PICTURES_BURST,
+                                                total_rate=PICTURES_SERVER_RATE,
+                                                total_burst=PICTURES_SERVER_BURST,
+                                                spare=this_computer)
         self._httpd: _Server | None = None
         self._thread: threading.Thread | None = None
 

@@ -10,7 +10,15 @@ should not go:
   after it connects and before a byte is sent (``peer_refusal``,
   ``check_peer``) - so a name whose DNS answer changes between a check and
   the connection (DNS rebinding) is caught at the connection. Through a
-  proxy the proxy connects; there the name is not checked here.
+  proxy the proxy connects: there the request's name is looked up here
+  first and judged by the same rule (``proxied_refusal``, from
+  core/_lazy_requests.py's adapter) - best effort, since the proxy's own
+  lookup, and where it then connects, are the proxy's. A public
+  name a source on the internet named for the app to fetch itself - a
+  picture of its lists, its playlist's guide (``note_outside``) - never
+  reaches the home network either, unless the person gave that name
+  themselves: a source's own server, its backup addresses (``note_own``),
+  or Plex's own names (``.plex.direct``, a server at home by design).
 * **The redirect.** A redirect goes on only over http(s), never from the
   internet into the home network, and never to this computer or a
   link-local host unless the address it came from was that very kind
@@ -24,8 +32,11 @@ redirects are theirs - docs/SECURITY.md says so.
 """
 from __future__ import annotations
 
+import functools
 import ipaddress
 import socket
+import threading
+import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -41,6 +52,104 @@ _METADATA = frozenset({*stream_address._METADATA_IPS,
                        *map(ipaddress.ip_address, ("169.254.169.254", "169.254.170.2"))})
 #: The most addresses one name's answer is looked through for a redirect.
 _ANSWERS_MAX = 16
+
+#: Public names a source on the internet named for the app to fetch itself
+#: (its lists' pictures, its playlist's guide): such a name never leads to
+#: the home network (``note_outside``). At most this many kept; once a
+#: source has named more, every public name is taken for one of them
+#: (``_FULL``) - a list of thousands of picture hosts could otherwise push
+#: an early name out before it is fetched, and that name would then reach
+#: the home network.
+OUTSIDE_MAX = 8192
+#: Names the person gave themselves - a source's own server and its backup
+#: addresses (``note_own``): theirs to resolve as they like, a server at
+#: home by its public name among them.
+_OUTSIDE: dict[str, None] = {}
+_OWN: set[str] = set()
+#: Set once more than OUTSIDE_MAX names were noted, until the app closes:
+#: from then on no public name but the person's own (``note_own``) and
+#: Plex's leads home - it fails closed rather than forget a name.
+_FULL = [False]
+_NAMES_LOCK = threading.Lock()
+#: Plex's names for a server's own addresses ("192-168-1-5.<id>.plex.direct"
+#: answers 192.168.1.5): a server at home, by design.
+_HOME_BY_DESIGN = (".plex.direct",)
+
+
+def _name_of(address_or_host: str) -> str:
+    """The host of an address (or a bare host), lower case, without its
+    port, its login or a trailing dot; "" when there is none."""
+    text = str(address_or_host or "").strip()
+    if "://" in text:
+        try:
+            return (urlsplit(text).hostname or "").rstrip(".").lower()
+        except ValueError:
+            return ""
+    return text.strip("[]").rstrip(".").lower()
+
+
+@functools.lru_cache(maxsize=4096)
+def _public_name(head: str) -> str:
+    """The public name in an address's head ("https://host:port"), or ""
+    for an address, a home name or none - read once per head."""
+    name = _name_of(head)
+    return name if name and named_kind(name) == "" else ""
+
+
+def note_outside(address: str) -> None:
+    """*address* (or its host) was named by a source on the internet for
+    the app to fetch itself: a public name of it may not lead home. Asked
+    for every picture of a list, so read once per scheme and host part."""
+    text = str(address or "")
+    start = text.find("://")
+    if start >= 0:
+        ends = [i for i in (text.find("/", start + 3), text.find("?", start + 3)) if i >= 0]
+        text = text[:min(ends)] if ends else text
+    name = _public_name(text)
+    if not name:
+        return
+    with _NAMES_LOCK:
+        if name in _OUTSIDE:
+            return
+        if len(_OUTSIDE) >= OUTSIDE_MAX:
+            _FULL[0] = True
+            return
+        _OUTSIDE[name] = None
+
+
+def note_own(address: str) -> None:
+    """*address* (or its host) is one the person gave: a source's own
+    server or backup address. Never refused for leading home - a server at
+    home by its public name (split-horizon DNS) answers there. Whoever runs
+    that name's DNS can point it home too, and the app's requests to it -
+    its lists, and the pictures and guide it names on that name - then
+    reach a device at home: a GET of their choosing, unanswered to them,
+    never this computer or a link-local host (peer_refusal holds those for
+    every name). Not narrowed: told apart from a server that is at home by
+    its public name, it is not - by its port, its paths or when it changes
+    (a laptop coming home flips the answer too, and the rewind buffer's
+    connection is one of these requests). docs/SECURITY.md says so."""
+    name = _name_of(address)
+    if name:
+        with _NAMES_LOCK:
+            _OWN.add(name)
+
+
+def _outside_name(host: str) -> bool:
+    name = _name_of(host)
+    if not name or name.endswith(_HOME_BY_DESIGN):
+        return False
+    with _NAMES_LOCK:
+        return name not in _OWN and (_FULL[0] or name in _OUTSIDE)
+
+
+def forget_names() -> None:
+    """Every name noted (the tests)."""
+    with _NAMES_LOCK:
+        _OUTSIDE.clear()
+        _OWN.clear()
+        _FULL[0] = False
+        _proxied.clear()
 
 
 def ip_kind(address: str) -> str:
@@ -80,8 +189,10 @@ def peer_refusal(host: str, peer: str) -> str:
     """Why a connection to *host* that reached *peer* may not be used: it
     is this computer while the name is not this computer's, or link-local
     while the name is neither link-local nor a home name (a device at home
-    without a router's address answers its .local name from 169.254/16).
-    "" when it may."""
+    without a router's address answers its .local name from 169.254/16),
+    or the home network while the name is a public one a source on the
+    internet named (``note_outside``) and the person did not give
+    (``note_own``). "" when it may."""
     kind = ip_kind(peer)
     said = named_kind(host)
     if kind == THIS_COMPUTER and said != THIS_COMPUTER:
@@ -90,6 +201,8 @@ def peer_refusal(host: str, peer: str) -> str:
         return LINK_LOCAL
     if kind == LINK_LOCAL and stream_address._ip(peer) in _METADATA and said != LINK_LOCAL:
         return LINK_LOCAL           # a cloud's metadata service, never by a home name
+    if kind == HOME and said == "" and _outside_name(host):
+        return HOME
     return ""
 
 
@@ -122,6 +235,46 @@ def _resolved(host: str, port: int) -> list[str]:
     except (OSError, UnicodeError, ValueError):
         return []
     return [str(a[4][0]) for a in answers[:_ANSWERS_MAX]]
+
+
+#: A proxied request's target looked up here (``proxied_refusal``): kept
+#: this long per host and port, at most _PROXIED_MAX - pictures through a
+#: proxy are thousands of requests to a few hosts.
+PROXIED_TTL = 30.0
+_PROXIED_MAX = 1024
+_proxied: dict[tuple[str, int], tuple[float, str]] = {}
+
+
+def proxied_refusal(url: str) -> str:
+    """Why a request for *url* that goes through a proxy may not be sent:
+    its host looked up here first and judged as ``peer_refusal`` judges a
+    connection - this computer for a name that is not this computer's,
+    link-local or a cloud's metadata service, and, for a public name a
+    source on the internet named (``note_outside``), the home network.
+    Any of its answers counts. "" when it may - also when the name does not
+    resolve here: best effort, since the proxy looks the name up itself
+    and connects where its own answer says (that lookup is the proxy's)."""
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").rstrip(".").lower()
+        port = parts.port or (443 if parts.scheme.lower() == "https" else 80)
+    except ValueError:
+        return "an address that cannot be read"
+    if not host:
+        return ""
+    if stream_address._ip(host) is not None:
+        return ""                           # an address as written: as it is
+    now = time.monotonic()
+    with _NAMES_LOCK:
+        hit = _proxied.get((host, port))
+    if hit is not None and now - hit[0] < PROXIED_TTL:
+        return hit[1]
+    why = next((w for w in (peer_refusal(host, a) for a in _resolved(host, port)) if w), "")
+    with _NAMES_LOCK:
+        if len(_proxied) >= _PROXIED_MAX:
+            _proxied.clear()
+        _proxied[(host, port)] = (now, why)
+    return why
 
 
 def redirect_refusal(origin: str, target: str, resolve: bool = True) -> str:

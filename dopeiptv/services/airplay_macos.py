@@ -63,6 +63,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import hashlib
 import importlib.util
 import re
 import sys
@@ -75,7 +76,7 @@ from typing import Any, Callable, cast
 from PyQt6.QtCore import QObject, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-from ..core import nerd
+from ..core import nerd, privacy
 from ..core.log import log, redact, redact_url
 from ..i18n import LocalizedError, tr
 from ..providers import airplay_bridge as ab
@@ -95,6 +96,7 @@ DETECT_SETTLE_S = 3.0   # AVRouteDetector's first answer once it is on
 MENU_HINT_S = 8.0       # Apple's menu closed this long, and still no route
 PANEL_HIDE_S = 4.0      # on the Apple TV this long: the panel steps aside
 ERROR_LOG_MAX = 20      # AVFoundation error-log entries logged per cast
+SEEN_MAX = 256          # streams whose codecs this session remembers
 
 _NEEDS = ("objc", "Foundation", "AppKit", "AVFoundation", "AVKit")
 # AVPlayerItemStatus, AVPlayerTimeControlStatus
@@ -532,6 +534,9 @@ class AirPlayReceiver(QObject):
     """AirPlay as CastHub sees a receiver: one entry, one cast at a time."""
 
     KIND = "airplay"
+    #: True while the bridge readies a stream for the TV (the cast card
+    #: says so): read from the window's thread, set on the worker.
+    preparing = False
     #: CastHub hands this receiver the pieces of an archive or a buffer.
     TAKES_FEED = True
     #: The cast ended by itself; a string key says why (tr), "" for none.
@@ -559,6 +564,10 @@ class AirPlayReceiver(QObject):
         self.duration = 0.0
         self.plan: ab.Plan | None = None
         self._req: dict[str, Any] = {}
+        #: What each stream cast this session was found to hold (its
+        #: address's hash -> codecs), in memory alone and never while
+        #: watching privately: a zap back to it needs no look into it.
+        self._seen: dict[str, list[str]] = {}
         self._offset = 0.0
         self._pos = 0.0
         self._volume, self._muted = 1.0, False
@@ -752,13 +761,21 @@ class AirPlayReceiver(QObject):
     def _network(self, url: str) -> tuple[list[str], bool]:
         """ffmpeg's input options as the source plays (Nerd), and whether
         the source sends anything of its own the Apple TV would not - the
-        source the cast is from (nerd.cast_source)."""
+        source the cast is from (nerd.cast_source). Its proxy and the
+        headers that may hold a token are the app's bridge's to add
+        (_headers, airplay_bridge.hand_over), never ffmpeg's arguments."""
         n, src = nerd.current(), nerd.cast_source()
         ua = n.user_agent(src)
         headers = n.headers(src)
         proxy = n.proxy(src, url)
         own = n.on and (bool(headers) or bool(proxy) or ua != nerd.DEFAULT_UA)
-        return ab.input_options(url, ua, headers, proxy), own
+        return ab.input_options(url, ua, headers), own
+
+    @staticmethod
+    def _headers() -> dict[str, str]:
+        """The headers of the source the cast is from (Nerd's), which the
+        app's bridge adds to what the converter reads."""
+        return nerd.current().headers(nerd.cast_source())
 
     def _prepare(self, req: dict[str, Any], force_bridge: bool = False) -> None:
         with self._lock:
@@ -776,8 +793,20 @@ class AirPlayReceiver(QObject):
             # probed (when nothing is known) is the first piece.
             src = feed.first_url or src
         net, own = self._network(src)
-        p = ab.plan(url, src, req["codecs"], req["live"], req["track"],
+        codecs = list(req["codecs"])
+        p = ab.plan(url, src, codecs, req["live"], req["track"],
                     own or force_bridge or feed is not None)
+        found: dict[str, Any] | None = None
+        if codecs:
+            self._remember(url or src, codecs)
+        elif p.direct:
+            # Nothing known of what is in it (a zap, a cast from a list):
+            # HEVC in a provider's HLS plays on an Apple TV with a black
+            # picture (ab.plan), so it is looked into first.
+            codecs, found = self._look_into(p.url, url or src, net, req)
+            if codecs:
+                p = ab.plan(url, src, codecs, req["live"], req["track"],
+                            own or force_bridge or feed is not None)
         duration = req["duration"]
         if p.direct:
             self.bridge.stop()
@@ -806,18 +835,23 @@ class AirPlayReceiver(QObject):
                 p = replace(p, video=last.video, audio=last.audio, hevc=last.hevc,
                             adts=last.adts)
                 log.info("airplay: a seek in the same channel - its stream as before")
-            elif not req["codecs"] or force_bridge:
-                found = ab.probe(p.url, net, self.bridge.exe)
+            elif not codecs or force_bridge:
+                if found is None:
+                    found = ab.probe(p.url, net, self.bridge.exe, headers=self._headers())
                 p = ab.refine(p, found)
                 if not duration and found["duration"] > 0 \
                         and req["live"] is not True:
                     duration = found["duration"]
             gen = req["generation"]
-            target = self.bridge.start(
-                p, req["start"], net, feed=feed,
-                net_for=lambda u: self._network(u)[0])
-            if not self.bridge.wait_ready(
-                    stopping=lambda: self._generation != gen):
+            self.preparing = True
+            try:
+                target = self.bridge.start(
+                    p, req["start"], net, feed=feed,
+                    net_for=lambda u: self._network(u)[0], headers=self._headers())
+                ready = self.bridge.wait_ready(stopping=lambda: self._generation != gen)
+            finally:
+                self.preparing = False
+            if not ready:
                 why = self.bridge.error
                 self.bridge.stop()
                 if self._generation != gen:
@@ -828,10 +862,50 @@ class AirPlayReceiver(QObject):
         self._open_blocking(target, offset, seek_to)
         # Only once the player has it: until then the strip asks about the
         # stream still playing.
-        self._req = dict(req, codecs=req["codecs"], settle=False)
+        self._req = dict(req, codecs=codecs, settle=False)
         self.plan = p
         self.duration = 0.0 if p.live else duration
         self._gui("row")
+
+    def _remember(self, address: str, codecs: list[str]) -> None:
+        if not address or not codecs or privacy.playing_private():
+            return
+        key = hashlib.sha256(address.encode("utf-8", "replace")).hexdigest()
+        self._seen.pop(key, None)
+        self._seen[key] = list(codecs)
+        while len(self._seen) > SEEN_MAX:
+            self._seen.pop(next(iter(self._seen)))
+
+    def _look_into(self, target: str, address: str, net: list[str],
+                   req: dict[str, Any]) -> tuple[list[str], dict[str, Any] | None]:
+        """What the stream at *target* holds - remembered from this session,
+        else asked of ffmpeg - as codecs ([] when it cannot be told) and
+        ffmpeg's answer (None when remembered). A quick look - the program
+        map, a quarter of a megabyte - so a zap stays as quick as it was. On
+        a zap the stream on the TV lets go first: paused - as quick as the
+        TV's own swap to the next channel - or, through the bridge, ffmpeg
+        stopped and the provider given its moment, as before."""
+        key = hashlib.sha256((address or "").encode("utf-8", "replace")).hexdigest()
+        known = self._seen.get(key)
+        if known:
+            log.info("airplay: the stream is %s, as cast before", ",".join(known))
+            return list(known), None
+        if req.get("settle"):
+            if self.bridge.running():
+                # ffmpeg held the provider's connection: it goes first, and
+                # the provider has its moment, as a zap through the bridge.
+                self.bridge.stop()
+                time.sleep(SETTLE_S)
+                req["settle"] = False       # let go once: not again before the bridge
+            done = threading.Event()
+            self._gui("let_go", done)
+            done.wait(OPEN_WAIT_S)
+        found = ab.probe(target, net, self.bridge.exe, headers=self._headers(),
+                         quick=True)
+        codecs = [c for c in [str(found.get("video") or "")]
+                  + [str(a) for a in found.get("audio") or []] if c]
+        self._remember(address, codecs)
+        return codecs, found
 
     def _open_blocking(self, target: str, offset: float, seek_to: float) -> None:
         box: dict[str, Any] = {}
@@ -870,6 +944,15 @@ class AirPlayReceiver(QObject):
                 return
             if name == "close":
                 self._close()
+                return
+            if name == "let_go":
+                # The stream on the TV stops asking the provider: paused,
+                # the route and the window kept for the next one.
+                try:
+                    if self._player is not None:
+                        self._player.pause()
+                finally:
+                    arg.set()
                 return
             if name == "row":
                 self._show_row()

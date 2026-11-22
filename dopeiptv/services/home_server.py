@@ -16,12 +16,17 @@ without one (``dopeiptv --server``, dopeiptv/headless.py); either way the
 household's sources and settings, never a profile's own. What it serves:
 the sources chosen, and in each the categories chosen - never a hidden,
 locked or adult one, nor a channel hidden by hand. Who: an address on the
-home network only (core/home_net.py). The HDHomeRun endpoints need no token
-(Plex cannot send one), so they and the UDP discovery answer only this
-computer's own networks and, while Nerd is on, the other networks it lists
-(home_net.LocalNetworks) - never every private range. Everything else needs
-the token - the settings page in a browser (``/?token=…``,
-core/server_page.py), the playlist, the guide and the stream addresses
+home network only (core/home_net.py). The HDHomeRun endpoints take the
+token in the tuner's own address (``/t/<token>/``) unless the person lets
+devices in without it (K_OPEN: only those listed, or - what a server set up
+before 1.6.9 keeps - every device of this computer's own networks and, while
+Nerd is on, the other networks it lists: home_net.LocalNetworks, never every
+private range); the UDP discovery answers only those. A server that kept
+the open tuner unasked is said so once (``open_untold``: the window's card,
+whose "Close it" lets in only the devices that used it so, ``closed_mode``;
+the log at every start of ``--server``). Everything else needs the token -
+the settings page in a browser (``/?token=…``, core/server_page.py), the
+playlist, the guide and the stream addresses
 (``/stream/<source id>/<stream id>?token=…``).
 
 The server knows the app only through its *host* (Host below): the window
@@ -86,6 +91,11 @@ K_ADULT = "nerd_server_adult"
 #: take an address with a path (Plex) needs one of the last two.
 K_OPEN = "nerd_server_open"
 K_OPEN_HOSTS = "nerd_server_open_hosts"
+#: The person knows the tuner is open to every device of this computer's
+#: networks and keeps it so: the window's card that says so (``open_told``)
+#: was dismissed, or the mode was picked in Settings. Unset for a server set
+#: up before 1.6.9 that kept it unasked.
+K_OPEN_TOLD = "nerd_server_open_told"
 OPEN_OFF = "off"
 OPEN_DEVICES = "devices"
 OPEN_HOME = "home"
@@ -227,6 +237,55 @@ def open_mode_of(settings: Any, ran_before: bool = False) -> str:
     return OPEN_HOME if was else OPEN_OFF
 
 
+def open_told(settings: Any) -> bool:
+    """Whether the person was told the tuner is open to every device of
+    this computer's networks and keeps it (K_OPEN_TOLD)."""
+    return read_flag(settings.value(K_OPEN_TOLD, False))
+
+
+def open_untold(settings: Any) -> bool:
+    """Whether the tuner is open to every device of this computer's
+    networks without the person having been told - what a server set up
+    before 1.6.9 kept (``open_mode``): the window says so once."""
+    return open_mode_of(settings) == OPEN_HOME and not open_told(settings)
+
+
+def closed_mode(seen: Iterable[str], kept: Any = "") -> tuple[str, str]:
+    """(K_OPEN, K_OPEN_HOSTS) once the open tuner is closed: the devices
+    that used it without the token (*seen*, this run) and those listed
+    before (*kept*, K_OPEN_HOSTS) let in by their address alone
+    (OPEN_DEVICES) - or, when none is known, nobody (OPEN_OFF): a device
+    then takes the tuner's address with its token, or is let in by its
+    address in Settings."""
+    hosts, _bad = parse_open_hosts(" ".join([str(kept or ""), *map(str, seen)]))
+    if not hosts:
+        return OPEN_OFF, str(kept or "")
+    return OPEN_DEVICES, ", ".join(hosts)
+
+
+def exposure(mode: str, hosts: Iterable[str] = (), networks: Iterable[Any] = ()) -> tuple[str, dict]:
+    """What the tuner is open to, in the person's words: (an i18n key, its
+    values) - nobody without the token (*mode* OPEN_OFF), the devices
+    listed (*hosts*), or every device of this computer's networks
+    (*networks*, as they are read now)."""
+    if mode == OPEN_HOME:
+        nets = ", ".join(str(n) for n in networks)
+        return ("srv_open_now_home", {"nets": nets}) if nets else ("srv_open_home_warn", {})
+    if mode == OPEN_DEVICES:
+        shown = ", ".join(hosts)
+        return ("srv_open_now_devices", {"hosts": shown}) if shown else ("srv_open_hosts_none", {})
+    return "srv_open_now_off", {}
+
+
+def home_networks() -> list[Any]:
+    """This computer's own home networks the open tuner answers (as
+    home_net.LocalNetworks reads them), for the words that say so."""
+    try:
+        return [n for n in home_net.own_networks() if home_net.trusted(n)]
+    except Exception:
+        return []
+
+
 def read_config(settings: Any) -> Config:
     """The server's settings; a token and a device id made the first time."""
     token = str(settings.value(K_TOKEN, "") or "").strip()
@@ -361,6 +420,9 @@ class HomeServer:
         self._refused_names: set[str] = set()
         self._refused_addresses: set[str] = set()
         self._refused_lock = threading.Lock()
+        #: The addresses that used the tuner without its token this run
+        #: (``note_open_use``): who "Close it" keeps letting in.
+        self._open_seen: dict[str, None] = {}
         self.restream = Restreamer(host.pool, self.limit, self.total, others=self._others,
                                    app_session=host.app_session, ingest_for=self._ingest_for,
                                    check=self._check)
@@ -699,6 +761,24 @@ class HomeServer:
             return norm in self.config.open_hosts
         return False
 
+    def note_open_use(self, ip: str) -> None:
+        """*ip* used the tuner without its token (it was let in): kept for
+        this run, at most OPEN_HOSTS_MAX, as K_OPEN_HOSTS would hold it."""
+        try:
+            norm = str(ipaddress.ip_address(ip.split("%")[0]))
+        except ValueError:
+            return
+        if norm.startswith("::ffff:"):
+            norm = norm[7:]
+        with self._refused_lock:
+            if norm not in self._open_seen and len(self._open_seen) < OPEN_HOSTS_MAX:
+                self._open_seen[norm] = None
+
+    def open_seen(self) -> list[str]:
+        """The addresses that used the tuner without its token this run."""
+        with self._refused_lock:
+            return list(self._open_seen)
+
     def _may_discover(self, ip: str) -> bool:
         # The UDP search gets the tuner's address without its token: only
         # for a device that may use it so.
@@ -946,6 +1026,7 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                         self._text(429, "asked too often - try again in a moment",
                                    {"Retry-After": "5"})
                         return
+                    server.note_open_use(who)
                     self._hdhomerun(path, method, self._base())
                     return
                 if lim.blocked(who):

@@ -128,12 +128,14 @@ def is_hls(url: str) -> bool:
 
 class _Piped:
     """ffmpeg's standard output as the Ingest reads a provider's answer: the
-    one connection to the provider is ffmpeg's, closed with it."""
+    one connection to the provider is ffmpeg's, closed with it - and with it
+    *done* (the alias it read let go)."""
 
     raw = None
 
-    def __init__(self, proc: Any) -> None:
+    def __init__(self, proc: Any, done: Callable[[], None] | None = None) -> None:
         self.proc = proc
+        self._done = done
 
     def raise_for_status(self) -> None:
         return None
@@ -156,35 +158,52 @@ class _Piped:
                 self.proc.kill()
         if self.proc.stdout is not None:
             self.proc.stdout.close()
+        done, self._done = self._done, None
+        if done is not None:
+            done()
+
+
+#: Why a channel is not copied: its address could not be handed to ffmpeg
+#: other than in its arguments (NotAStream's words - not asked again).
+NO_PRIVATE_WAY = "an address the app could not hand ffmpeg privately"
 
 
 def ffmpeg_opener(ffmpeg: str, src: dict | None) -> Callable[..., Any]:
     """An Ingest opener that has ffmpeg read an HLS channel and copy its
     picture and sound, unchanged, into MPEG-TS - with the source's user
-    agent, headers and proxy as the player has them (Nerd)."""
+    agent, headers and proxy as the player has them (Nerd). ffmpeg reads an
+    alias through the app's bridge (core/net_bridge.hand_over): its command
+    line names nothing of the address, the proxy or a header that may hold
+    a token, and what the list names never lands on this computer or - for
+    a source on the internet - the home network."""
     import subprocess
 
-    from . import nerd
+    from . import nerd, net_bridge
     from .dvr_ingest import USER_AGENT
     from .player_exec import NO_WINDOW, ffmpeg_protocols
 
     def opener(url: str, **_kw: Any) -> _Piped:
         n = nerd.current()
+        headers = n.headers(src) if n.on else {}
+        way = net_bridge.hand_over(src, url, headers, n)
+        if way is None:
+            raise NotAStream(NO_PRIVATE_WAY)
         cmd = [ffmpeg, "-nostdin", "-loglevel", "error",
                "-user_agent", n.user_agent(src) if n.on else USER_AGENT]
-        if n.on:
-            headers = n.headers(src)
-            if headers:
-                cmd += ["-headers", "".join(f"{k}: {v}\r\n" for k, v in headers.items())]
-            px = n.proxy(src, url) if n.flag("nerd_proxy_player", True) else ""
-            if px:
-                cmd += ["-http_proxy", px]
+        safe, _held = net_bridge.split_headers(headers)
+        if safe and "://" in url:
+            cmd += ["-headers", "".join(f"{k}: {v}\r\n" for k, v in safe.items())]
         # ffmpeg_protocols: the list's segments and keys stay a stream's.
-        cmd += [*ffmpeg_protocols(url), "-i", url, "-map", "0:v?", "-map", "0:a?", "-c", "copy",
-                "-f", "mpegts", "pipe:1"]
-        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
-        return _Piped(proc)
+        cmd += [*ffmpeg_protocols(way.address, bridged=way.bridged), "-i", way.address,
+                "-map", "0:v?", "-map", "0:a?", "-c", "copy", "-f", "mpegts", "pipe:1"]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=way.env,
+                                    creationflags=NO_WINDOW)
+        except BaseException:
+            way.close()
+            raise
+        return _Piped(proc, way.close)
     return opener
 
 

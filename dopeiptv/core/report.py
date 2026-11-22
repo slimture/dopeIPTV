@@ -24,7 +24,8 @@ import sys
 from typing import Any, Callable, Iterable
 
 from . import build_check
-from .log import URL_IN_TEXT, log, open_private, private_folder, recent_lines
+from .log import (URL_IN_TEXT, base64_masked, basic_forms, encoded_forms, log, open_private,
+                  private_folder, recent_lines)
 
 ENDPOINT = "https://dopeiptv.org/feedback/report"
 REPLIES = "https://dopeiptv.org/feedback/replies"
@@ -44,8 +45,6 @@ _IPV6 = re.compile(r"(?<![\w:])(?:(?:(?:[0-9A-Fa-f]{1,4}:){5,7}[0-9A-Fa-f]{1,4}"
                    r"|[0-9A-Fa-f:]{0,30}[0-9A-Fa-f]::)(?![\w:])")
 _MAC = re.compile(r"(?<![0-9A-Fa-f])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f])")
 _EMAIL = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+")
-# A supporter key pasted into a report would be the one thing that could tie it to a payment.
-_SUPPORTER = re.compile(r"(?i)\bDS1-[A-Za-z0-9_-]{20,}")
 # A login written name=value or name: value - a quoted name or value too, as
 # JSON and config files write them ("password": "x y"); the quotes stay.
 # (The log's filter masks the same, core/log.py, all but the login and host.)
@@ -64,13 +63,16 @@ _HOST_PATH = re.compile(r"(?<![\w@/.:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\
 
 
 # A login told in words: "my password is hunter2", "lösenord: x",
-# "username kalle" - the word after the name, in the languages most reports
-# come in. ("login" and "pin" are left: "login failed", "the PIN was wrong".)
+# "username kalle" - the word after the name, on the same line, in the
+# languages most reports come in. ("login" and "pin" are left: "login
+# failed", "the PIN was wrong".) Never across a line: "my password" at the
+# end of the person's words took the first word of the report below them.
 _SAID = re.compile(r"(?i)\b(password|passwd|passcode|username|user name|"
                    r"l\u00f6senord|anv\u00e4ndarnamn|passwort|benutzername|kennwort|"
                    r"mot de passe|identifiant|contrase\u00f1a|usuario|senha|usu\u00e1rio|"
                    r"wachtwoord|gebruikersnaam|has\u0142o|parola|salasana|adgangskode|passord)"
-                   r"(\s*[:=]\s*|\s+(?:is now|is|was|\u00e4r|var|ist|est|es|\u00e9)?\s*)"
+                   r"([^\S\r\n]*[:=][^\S\r\n]*|[^\S\r\n]+(?:is now|is|was|\u00e4r|var|ist|est|es|\u00e9)?"
+                   r"[^\S\r\n]*)"
                    r"(?![\"']?<)([^\s,;.!?]{2,128})")
 # A token whatever it is called: a JSON web token, a GitHub or Slack token,
 # and any run of 32 or more letters and digits with both in it (a key, a
@@ -100,14 +102,62 @@ def _not_an_address(text: str) -> bool:
     return text.startswith("127.") or (text == __version__ and text.count(".") == 3)
 
 
+class Secret(str):
+    """A login among the person's values (personal_values): hidden wherever
+    it stands, with the word around it."""
+
+
+#: A login this short is hidden where it stands as a word of its own, as a
+#: name is: inside other words ("a" in every word that has one) it would
+#: blank the whole report out. core/log.py draws the same line (_short).
+SHORT_SECRET = 3
+
+
+def _own_value(value: str, secret: bool) -> str:
+    """The pattern one of the person's values is hidden by. A name - a
+    source's, a channel's, a title, a server - only where it stands as a
+    word of its own: hidden inside another word it told what it was ("not
+    st<private>d yet" with a channel called Arte), and that word was never
+    it. A login wherever it stands, with the whole word around it, so no
+    part of a word is left to tell where it began - one of SHORT_SECRET
+    characters or fewer as a word of its own, however short."""
+    body = re.escape(value)
+    if secret and len(value) > SHORT_SECRET:
+        return rf"\w*{body}\w*"
+    head = r"(?<!\w)" if re.match(r"\w", value) else ""
+    tail = r"(?!\w)" if re.search(r"\w$", value) else ""
+    return head + body + tail
+
+
+def _holds_login(logins: list[str]) -> Callable[[str], bool]:
+    """Whether a text holds one of *logins* - one of SHORT_SECRET characters
+    or fewer as a word of its own - whatever its case."""
+    pats = [re.compile(_own_value(v, True), re.IGNORECASE) for v in logins]
+    return lambda text: any(p.search(text) for p in pats)
+
+
 def scrub(text: str, personal: Iterable[str] = ()) -> str:
     """*text* without anything that identifies a stream or a person."""
     # Whole addresses first (a login or a name inside one goes with it),
     # then the person's own values, longest first (a name inside another).
     out = _URL.sub(lambda m: f"{m.group(1)}://<address>", text or "")
-    for value in sorted({v.strip() for v in personal if v and len(v.strip()) >= 3}, key=len, reverse=True):
-        out = re.sub(re.escape(value), "<private>", out, flags=re.IGNORECASE)
-    out = _SUPPORTER.sub("<supporter key>", out)
+    kinds: dict[str, bool] = {}
+    for v in personal:
+        value = v.strip() if v else ""
+        # A name of one or two characters is a word anyone writes ("TV",
+        # "a"); a login is hidden however short it is.
+        if len(value) >= 3 or (value and isinstance(v, Secret)):
+            kinds[value] = kinds.get(value, False) or isinstance(v, Secret)
+    logins = [value for value, secret in kinds.items() if secret]
+    for value in logins:
+        # A login as an address, a form or JSON writes it too; a short one's
+        # forms hidden as words of their own, as it is.
+        for form in encoded_forms(value):
+            kinds.setdefault(form, len(value) > SHORT_SECRET)
+    for value in sorted(kinds, key=len, reverse=True):
+        out = re.sub(_own_value(value, kinds[value]), "<private>", out, flags=re.IGNORECASE)
+    if logins:
+        out = base64_masked(out, _holds_login(logins), "<private>")
     out = _EMAIL.sub("<email>", out)
     out = _HOST_PATH.sub("<address>", out)
     out = _MAC.sub("<mac>", out)
@@ -143,10 +193,14 @@ def personal_values(playlists: Iterable[dict], channels: Iterable[str] = (),
         for key in ("name", "server", "username", "password", "mac", "epg_url"):
             v = str(p.get(key) or "")
             if v:
-                out.append(v)
+                out.append(Secret(v) if key in ("username", "password", "mac") else v)
                 if key == "server":
                     host = re.sub(r"^[a-z]+://", "", v).split("/")[0].split("@")[-1].split(":")[0]
                     out.append(host)
+        user, password = str(p.get("username") or ""), str(p.get("password") or "")
+        if user and password:
+            # The two as HTTP Basic sends them (a box's, a media server's).
+            out += [Secret(b) for b in sorted(basic_forms(user, password))]
     out += [str(c) for c in channels if c]
     out += [str(t) for t in titles if t]
     return out
@@ -318,10 +372,10 @@ def send_status(kind: str, text: str, *, personal: Iterable[str], timeout: float
               # what is the person's own: the last pass, so no way out
               # skips either.
               "text": scrub(text or "", personal)[:MAX_TEXT]}
-    # What feedback is about (a topic, an area, how often) and "supporter":
-    # "yes" from a supporter (read first): single words from a short list.
+    # What feedback is about (a topic, an area, how often): single words
+    # from a short list.
     fields.update({k: v for k, v in extra.items()
-                   if k in ("topic", "area", "often", "supporter")
+                   if k in ("topic", "area", "often")
                    and isinstance(v, str) and v.isalpha() and len(v) <= 12})
     # The hash of the code this computer keeps to be told the answers - and
     # for a reply to an answer, the same hash as the thread it belongs to.

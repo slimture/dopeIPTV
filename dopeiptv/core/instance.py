@@ -48,7 +48,7 @@ def server_name() -> str:
     socket; the app's runtime folder is the one place two starts share.
     Elsewhere on Linux the user's own runtime folder ($XDG_RUNTIME_DIR,
     which only they can enter) - without one a folder of their own in
-    their cache (0700, ``_make_folder``) - never the /tmp everyone shares,
+    their cache (0700, ``_folder_refusal``) - never the /tmp everyone shares,
     where another account could take the name first and hear this one's
     commands. Elsewhere (macOS, a BSD), or with a cache path too long for
     a socket, a folder of their own in the temporary folder
@@ -83,7 +83,7 @@ def server_name() -> str:
     if uid is None:
         return name
     # Off Linux, or a cache path too long for a socket: a folder of the
-    # user's own in the temporary folder (0700 and theirs, _make_folder) -
+    # user's own in the temporary folder (0700 and theirs, _folder_refusal) -
     # never the temporary folder itself, which may be every account's.
     import tempfile
     return os.path.join(tempfile.gettempdir(), f"dopeiptv-{uid()}", name)
@@ -121,27 +121,31 @@ def _pipe_key() -> str:
     return ""
 
 
-def _make_folder(name: str) -> bool:
-    """The folder a path name lives in, only the user's (0700): made so,
-    narrowed when it is wider; False when another account owns it - the
-    socket is then not made there."""
+def _folder_refusal(name: str) -> str:
+    """Why the folder a path name lives in is not the user's own: "" once it
+    is - made 0700, narrowed when it was wider, and looked at again after.
+    It fails closed: a folder that could not be made, read or narrowed, a
+    link, or one another account owns, is never listened in."""
     folder = os.path.dirname(name)
     if not folder:
-        return True
+        return ""
     try:
         os.makedirs(folder, mode=0o700, exist_ok=True)
-        if os.name == "posix":
-            # lstat: a link another account left in a shared temporary
-            # folder would lead the socket - and the chmod - elsewhere.
+        if os.name != "posix":
+            return ""
+        # lstat: a link another account left in a shared temporary folder
+        # would lead the socket - and the chmod - elsewhere.
+        st = os.lstat(folder)
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+            return f"{folder} is another account's"
+        if stat.S_IMODE(st.st_mode) & 0o077:
+            os.chmod(folder, 0o700)
             st = os.lstat(folder)
-            if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
-                log.warning("commands: %s is another account's - not listening there", folder)
-                return False
-            if stat.S_IMODE(st.st_mode) & 0o077:
-                os.chmod(folder, 0o700)
+            if stat.S_ISLNK(st.st_mode) or stat.S_IMODE(st.st_mode) & 0o077:
+                return f"{folder} could not be made this user's alone"
     except OSError as e:
-        log.info("commands: no folder for the socket (%s)", e)
-    return True
+        return f"no folder of this user's own for it ({e.__class__.__name__}: {e.strerror or e})"
+    return ""
 
 
 def send_to_running(command: dict, timeout_ms: int = 800) -> bool:
@@ -184,7 +188,12 @@ class CommandServer(QObject):
         server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
         server.newConnection.connect(self._accept)
         name = server_name()
-        if not _make_folder(name):
+        why = _folder_refusal(name)
+        if why:
+            # As without Qt's network library: a second start opens a window
+            # of its own rather than hand its command to a socket another
+            # account could reach.
+            log.warning("commands: not listening - %s; a second start opens a window of its own", why)
             return
         if not server.listen(name):
             # A copy that crashed leaves its socket file behind (Unix).

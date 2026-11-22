@@ -309,6 +309,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # The place the app opens on (mw_places): where the person left off,
         # or Mine - its list mode set before the first list is fetched.
         self._init_places()
+        # No category yet: the build's first filter asks it (a start on
+        # Radio asked for its Search row and crashed - 1.6.9's report).
+        self._current_cat = None
         self.all_items: list = []
         # Which Favorites section is showing: "chan", "movie" or
         # "series". Drives the content kind (poster vs live, play as
@@ -1911,6 +1914,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # ordinary preview still reaches mpv untouched.
         self._apply_audio_visuals(url)
         self._arm_loading(it.get("stream_icon"))
+        self.player.refusal = ""
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(wake_reason(title))
@@ -1920,6 +1924,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._stats_begin(self._item_key(it), title, it, "live", False)
             self._discord_started(self._item_key(it), title, it, "live", False)
             self._ms_started(url, self._item_key(it), "live", it)
+        elif getattr(self.player, "refusal", ""):
+            self._show_stream_error(self.player.refusal)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -2657,8 +2663,11 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._arm_loading(icon_url, reconnect)
             # own_buffer False is an address opened by hand (a dopeiptv://
             # link, --play, the remote API, Open address…): the source's
-            # Nerd headers only on the source's own server.
-            outside = not own_buffer and self._from_outside(url)
+            # Nerd headers only on the source's own server. A radio station
+            # is no source's either: none of the source's headers go to it,
+            # and where it is decides its way out (core/net_bridge.py).
+            outside = kind == "radio" or (not own_buffer and self._from_outside(url))
+            self.player.refusal = ""
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,
@@ -2674,6 +2683,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                     self._ms_started(url, key, kind, item, resume_at)
                 # TV mode: the picture fills the screen, whoever asked.
                 self._tv_started(kind)
+            elif getattr(self.player, "refusal", ""):
+                # Not opened on purpose (its certificate cannot be checked
+                # here): said on the video - never another player instead.
+                self._show_stream_error(self.player.refusal)
+                if getattr(self, "_tv_on", False):
+                    self._tv_refused()
             elif getattr(self, "_tv_on", False):
                 # TV mode fills the screen: another window would open
                 # behind it, out of reach of the remote.
@@ -3023,9 +3038,46 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._show_stream_error(reason)
             if reason == tr("diag_not_started"):
                 self._offer_upcoming_actions(it)
+            elif reason == tr("diag_certificate"):
+                self._tls_offer(lp)
 
         run_async(self.pool, lambda: diagnose_stream(url, self.client),
                   show, lambda _e: show(tr("diag_generic")))
+
+    #: What plays from a source - a station, a web page, a file or a
+    #: recording is none's, and has nothing to let play unchecked.
+    _TLS_NO_SOURCE = frozenset({"radio", "web", "local", "recording"})
+
+    def _tls_offer(self, lp: dict | None) -> None:
+        """A stream of the source in use whose certificate did not check out
+        (the player checks every internet stream's: core/nerd.
+        checks_certificate): asked once, on the decision card, whether the
+        source may play without it - stored as the source's own option
+        (nerd.TLS_UNCHECKED, taken back on its page), and the stream tried
+        again. Nothing is played unchecked without that answer."""
+        from ..core import nerd
+        pl = self.playlist_store.active() if self.playlist_store else None
+        if (not pl or not lp or lp.get("kind") in self._TLS_NO_SOURCE
+                or nerd.tls_unchecked(pl.get("options"))):
+            return
+        pid = str(pl.get("id") or "")
+        name = str(pl.get("name") or pl.get("server") or "")
+
+        def go() -> None:
+            now = self.playlist_store.get(pid) if self.playlist_store else None
+            if not now:
+                return
+            options = dict(now.get("options") or {}, **{nerd.TLS_UNCHECKED: "true"})
+            self.playlist_store.update(pid, options=options)
+            nerd.set_source(dict(now, options=options))
+            log.info("tls: the person let a source play without its certificate checked")
+            self._diag_shown = False
+            self._stream_retries = 0
+            self._retry_last_stream()
+
+        self._show_action_toast(tr("tls_offer", name=name), 0, go,
+                                label=tr("tls_offer_go"), decide=True,
+                                key=f"tls-offer-{pid}")
 
     def _style_media_info(self) -> None:
         """The detail panel's info box, in the theme's colours and corners."""

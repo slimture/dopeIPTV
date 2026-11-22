@@ -9,7 +9,7 @@ from PyQt6.QtCore import (
     QEvent, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QIcon, QImage, QImageReader, QLinearGradient, QPainter, QPainterPath,
+    QColor, QFont, QIcon, QImage, QImageReader, QPainter, QPainterPath,
     QPen, QPixmap,
 )
 from PyQt6.QtWidgets import (
@@ -384,30 +384,6 @@ class HeartButton(_ChipPainting, QPushButton):
         if not self.underMouse():
             self._paint(colour)
 
-    def set_supporter(self, on: bool) -> None:
-        """A supporter's heart: always the heart's red, on a soft glow with a
-        ring - a thank-you mark rather than a request."""
-        self._supporter = bool(on)
-        if on:
-            self._rest = HEART
-            self._paint(HEART)
-        self.update()
-
-    def paintEvent(self, event) -> None:
-        if getattr(self, "_supporter", False):
-            p = QPainter(self)
-            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-            d = float(min(self.width(), self.height())) - 3.0
-            circle = QRectF((self.width() - d) / 2, (self.height() - d) / 2, d, d)
-            glow, ring = QColor(HEART), QColor(HEART)
-            glow.setAlphaF(0.16)
-            ring.setAlphaF(0.65)
-            p.setBrush(glow)
-            p.setPen(QPen(ring, 1.5))
-            p.drawEllipse(circle)
-            p.end()
-        super().paintEvent(event)
-
     def enterEvent(self, event) -> None:
         self._paint(HEART)
         super().enterEvent(event)
@@ -512,16 +488,6 @@ class _SidebarLogo(QWidget):
         self._update_color = QColor("#E5484D")
         self._update_follow_accent = False
         self._bounce_dy = 0.0
-        self._supporter = False
-
-    def set_supporter(self, on: bool, tip: str = "") -> None:
-        """A supporter's mark: the pill shades from the accent into the
-        heart's colour and the tall middle bar is a short one crowned with a
-        heart - the same silhouette, nothing that moves."""
-        self._supporter = bool(on)
-        self.setToolTip(tip or APP_NAME)
-        self.setAccessibleName(tip or APP_NAME)
-        self.update()
 
     def set_compact(self, on: bool) -> None:
         """Rail mode: the same mark scaled down to fit the 60 px icon rail
@@ -608,13 +574,7 @@ class _SidebarLogo(QWidget):
         # Rounded pill as the base.
         pill = QPainterPath()
         pill.addRoundedRect(x0, y0, w, h, h * 0.30, h * 0.30)
-        if self._supporter:
-            shade = QLinearGradient(QPointF(x0, y0), QPointF(x0 + w, y0 + h))
-            shade.setColorAt(0.0, accent)
-            shade.setColorAt(1.0, QColor(HEART))
-            painter.fillPath(pill, shade)
-        else:
-            painter.fillPath(pill, accent)
+        painter.fillPath(pill, accent)
 
         # Left half: play triangle. Nudged right by a fraction so its
         # optical centre lines up with its geometric third of the pill.
@@ -649,16 +609,6 @@ class _SidebarLogo(QWidget):
         gap = h * 0.14
         for i, bh in enumerate(heights):
             bx = first_x + i * (bar_w + gap)
-            if self._supporter and i == 1:
-                # A short bar crowned with a heart, reaching where the tall
-                # bar did.
-                stem = h * 0.20
-                painter.drawRoundedRect(QRectF(bx, base_y - stem, bar_w, stem),
-                                        bar_w * 0.4, bar_w * 0.4)
-                painter.fillPath(heart_shape(QRectF(bx + bar_w / 2 - h * 0.17,
-                                                    base_y - bh - h * 0.02,
-                                                    h * 0.34, h * 0.28)), ink)
-                continue
             painter.drawRoundedRect(
                 QRectF(bx, base_y - bh, bar_w, bh),
                 bar_w * 0.4, bar_w * 0.4)

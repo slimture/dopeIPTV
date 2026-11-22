@@ -23,10 +23,15 @@ profile (MAIN_ID, "Me" in their language) - copied, not moved: the old keys
 stay until the next version, so a downgrade still finds them (migrate()).
 
 A profile: a name, a colour from a fixed palette (COLOURS - ui/theme.py's
-ACCENTS) or an emoji for its avatar, an optional PIN of 4 to 8 digits (kept as the
+ACCENTS) or an emoji for its avatar, an optional PIN of 4 to 12 digits
+(PIN_SHORTEST, PIN_LONGEST - six or more are much harder to guess; kept as the
 parental PIN is - core/pins.py: PBKDF2 with a salt of its own, an older
 value written anew on the next right entry), and a parental level: "kids"
-sees only what the parental lock leaves open and never asks for the rest.
+sees only what the parental lock leaves open and never asks for the rest -
+and, with "Only what a grown-up allows" (``only_allowed``, off by default),
+only the categories a grown-up chose per source (``allowed``,
+``allowed_for``): everything else is not for it, as nothing a provider
+leaves unmarked is taken to be for children.
 """
 
 from __future__ import annotations
@@ -358,7 +363,11 @@ def adult_item(item: dict) -> bool:
 # -- a profile -------------------------------------------------------------------
 
 _WORD = re.compile(r"[^\W_]+")
-_PIN = re.compile(r"\d{4,8}")
+#: A profile's PIN: 4 to 12 digits - a remote types digits. Four are 10,000
+#: PINs; six or more are what the app suggests (core/pins.py).
+PIN_SHORTEST = 4
+PIN_LONGEST = 12
+_PIN = re.compile(r"\d{%d,%d}" % (PIN_SHORTEST, PIN_LONGEST))
 
 
 def initials(name: str) -> str:
@@ -382,6 +391,32 @@ def valid_pin(text: str) -> bool:
     return bool(_PIN.fullmatch(str(text or "")))
 
 
+#: What a kids profile's "Only what a grown-up allows" names, per source:
+#: the catalogues a category is one of.
+ALLOW_MODES = ("live", "vod", "series")
+#: The most categories allowed per source and catalogue.
+ALLOW_MAX = 2000
+
+
+def clean_allowed(raw: Any) -> dict[str, dict[str, list[str]]]:
+    """A kids profile's allowed categories as kept: {source id: {"live" |
+    "vod" | "series": [category ids]}} - anything else in *raw* passed
+    over, each list at most ALLOW_MAX, a source with none left out."""
+    out: dict[str, dict[str, list[str]]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for sid, modes in list(raw.items())[:256]:
+        if not isinstance(sid, str) or not sid or not isinstance(modes, dict):
+            continue
+        kept = {m: list(dict.fromkeys(str(c) for c in ids if isinstance(c, (str, int))
+                                      and not isinstance(c, bool)))[:ALLOW_MAX]
+                for m, ids in modes.items() if m in ALLOW_MODES and isinstance(ids, list)}
+        kept = {m: ids for m, ids in kept.items() if ids}
+        if kept:
+            out[sid[:64]] = kept
+    return out
+
+
 @dataclass
 class Profile:
     id: str
@@ -391,10 +426,30 @@ class Profile:
     kids: bool = False
     pin_hash: str = ""
     pin_salt: str = ""
+    #: A kids profile that sees only what a grown-up chose (``allowed``):
+    #: every other category, and the radio, is not for it. Off by default.
+    only_allowed: bool = False
+    #: {source id: {"live" | "vod" | "series": [category ids]}} (clean_allowed).
+    allowed: dict[str, dict[str, list[str]]] = field(default_factory=dict)
 
     @property
     def has_pin(self) -> bool:
         return bool(self.pin_hash)
+
+    @property
+    def allow_only(self) -> bool:
+        """Whether it sees only what a grown-up allows: a kids profile with
+        the mode on."""
+        return self.kids and self.only_allowed
+
+    def allowed_for(self, source_id: str, mode: str) -> frozenset[str] | None:
+        """The categories of *source_id*'s *mode* it may see while
+        ``allow_only`` - none at all for a source or a catalogue a grown-up
+        chose nothing of; None when every category not for adults is
+        (the mode off, or not a kids profile)."""
+        if not self.allow_only:
+            return None
+        return frozenset((self.allowed.get(str(source_id)) or {}).get(mode) or ())
 
     def initials(self) -> str:
         return initials(self.name)
@@ -420,7 +475,9 @@ class Profile:
                    colour=colour if colour in COLOURS else "blue",
                    emoji=str(d.get("emoji") or "")[:8], kids=bool(d.get("kids")),
                    pin_hash=str(d.get("pin_hash") or ""),
-                   pin_salt=str(d.get("pin_salt") or ""))
+                   pin_salt=str(d.get("pin_salt") or ""),
+                   only_allowed=d.get("only_allowed") is True,
+                   allowed=clean_allowed(d.get("allowed")))
 
 
 @dataclass
@@ -522,6 +579,10 @@ class ProfileStore:
             p.emoji = str(fields["emoji"] or "")[:8]
         if "kids" in fields:
             p.kids = bool(fields["kids"])
+        if "only_allowed" in fields:
+            p.only_allowed = bool(fields["only_allowed"])
+        if "allowed" in fields:
+            p.allowed = clean_allowed(fields["allowed"])
         self._save()
 
     def set_pin(self, pid: str, pin: str) -> None:

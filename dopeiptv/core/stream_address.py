@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import functools
 import ipaddress
+import re
 import socket
 import unicodedata
 from typing import Any
@@ -283,13 +284,45 @@ def _hosts(address: str) -> set[str]:
     return {h for h in found | more if h}
 
 
+#: Network schemes whose address with no host means "here": a socket this
+#: computer listens on (``udp://@:1234``, ``srt://:9000?mode=listener``,
+#: ``tcp://:1234?listen``) - a playlist file's or a home source's to name,
+#: this computer from a source on the internet. Any other network address
+#: without a host is no address at all, whoever lists it: FFmpeg opens one
+#: on this computer.
+_LISTEN = frozenset(("udp", "rtp", "srtp", "srt", "rist", "tcp", "tls"))
+
+
+def empty_host(address: str) -> bool:
+    """Whether *address* names no host for one of its readers
+    (_HOST_ENDS, urlsplit's): ``http://:8080/x``, ``http:///x``,
+    ``http://user@:80/``, ``rtsp://[]:554/``, ``udp://@:1234``."""
+    rest = address.partition("://")[2]
+    for ends in _HOST_ENDS:
+        cut = min((i for i in map(rest.find, ends) if i >= 0), default=len(rest))
+        part = rest[:cut].rpartition("@")[2]
+        if part.startswith("["):
+            close = part.find("]")
+            host = part[1:close] if close > 0 else part[1:]
+        else:
+            host = part.partition(":")[0]
+        if not host.strip():
+            return True
+    try:
+        return not (urlsplit(address).hostname or "").strip()
+    except ValueError:
+        return True
+
+
 def host_refusal(address: str, home: bool = False) -> str:
     """Why *address* names a host a source on the internet may not send the
     player to: THIS_COMPUTER (loopback however it is spelt, localhost, this
-    computer's own name, 0.0.0.0) or LINK_LOCAL (169.254/16, fe80::/10, a
-    cloud's metadata service), and with *home* HOME (a device of the home
-    network: _home_kind); "" for any other host. Read as written, never
-    looked up."""
+    computer's own name, 0.0.0.0 - and no host at all, ``empty_host``, which
+    FFmpeg opens here) or LINK_LOCAL (169.254/16, fe80::/10, a cloud's
+    metadata service), and with *home* HOME (a device of the home network:
+    _home_kind); "" for any other host. Read as written, never looked up."""
+    if "://" in address and empty_host(address):
+        return THIS_COMPUTER
     hosts = _hosts(address)
     kinds = {_host_kind(h) for h in hosts}
     for kind in (THIS_COMPUTER, LINK_LOCAL):
@@ -390,6 +423,8 @@ def refusal(address: str, remote: bool = True, internet: bool = False,
         return f"{scheme}://{_device(address)}"
     if remote and scheme not in NETWORK:
         return f"{scheme}://" if scheme else "no network address"
+    if scheme in NETWORK and scheme not in _LISTEN and empty_host(address):
+        return "no host"            # whoever lists it: FFmpeg would open it here
     if not internet:
         return ""
     if scheme not in MEDIA:
@@ -402,25 +437,32 @@ def refusal(address: str, remote: bool = True, internet: bool = False,
     return where + _INTERNET if where else ""
 
 
+#: A relay's address exactly as udpxy (and msd_lite, astra's relay) has it:
+#: http(s), a home address as written, its port, ``/udp/`` or ``/rtp/``, a
+#: multicast group with its port - and nothing else: no login, no other
+#: path, no query, no fragment, no percent-escape, nothing a reader could
+#: take another host or path from.
+_RELAY = re.compile(
+    r"(?i:https?)://(?P<host>[0-9]{1,3}(?:\.[0-9]{1,3}){3}|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?"
+    r"/(?:udp|rtp)/@?(?P<group>[0-9]{1,3}(?:\.[0-9]{1,3}){3}|\[[0-9A-Fa-f:.]+\])"
+    r"(?::[0-9]{1,5})?/?")
+
+
 def udpxy(address: str) -> bool:
     """Whether *address* is a multicast group through a relay on the home
     network (udpxy on the router: http://192.168.1.1:4022/udp/239.0.0.1:1234)
     - what an operator's playlist on the internet names for its own
-    channels. It asks the relay for a group and nothing else."""
-    try:
-        parts = urlsplit(address)
-        host = parts.hostname or ""
-    except ValueError:
+    channels. Only that shape (_RELAY): a private address of the home
+    written as one, and the path a group and its port alone - so it asks
+    the relay for a group and nothing else, never another page of the
+    device that answers there (a router's own pages, ``/udp/x/../..``)."""
+    m = _RELAY.fullmatch(address or "")
+    if m is None:
         return False
-    if parts.scheme not in ("http", "https") or parts.username or parts.password:
+    ip, gip = _ip(m.group("host")), _ip(m.group("group"))
+    if ip is None or gip is None or not gip.is_multicast:
         return False
-    ip = _ip(host)
-    if ip is None or not ip.is_private:
-        return False
-    kind, _sep, group = parts.path.lstrip("/").partition("/")
-    group_host = group.lstrip("@").rsplit(":", 1)[0]
-    gip = _ip(group_host)
-    return kind in ("udp", "rtp") and gip is not None and gip.is_multicast
+    return ip.is_private and not (ip.is_loopback or ip.is_link_local or ip.is_unspecified)
 
 
 #: Each refusal is said once a session: a list asks for its addresses often.

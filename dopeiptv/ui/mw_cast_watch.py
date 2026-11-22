@@ -199,6 +199,13 @@ class _CastWatchMixin:
         return bool(getattr(self, "_cast_zap_busy", False)
                     or getattr(self, "_cast_inflight", 0) > 0)
 
+    def _cast_preparing(self) -> bool:
+        preparing = getattr(getattr(self, "cast", None), "preparing", None)
+        try:
+            return bool(callable(preparing) and preparing())
+        except Exception:
+            return False
+
     def _cast_waiting_route(self) -> bool:
         waiting = getattr(getattr(self, "cast", None), "waiting_for_route", None)
         return bool(self._cast_on_airplay() and callable(waiting) and waiting())
@@ -286,6 +293,10 @@ class _CastWatchMixin:
                            note=tr("cast_note_reconnecting"))
         elif self._cast_waiting_route():
             card.set_state(cast_card.WAITING, note=tr("airplay_pick_window"), action="airplay")
+        elif self._cast_busy() and self._cast_preparing():
+            # Repackaged or converted here first: seconds the TV says
+            # nothing in - it may play the last channel on meanwhile.
+            card.set_state(cast_card.PREPARING, note=tr("cast_note_preparing"))
         elif self._cast_busy() and ph != cast_watch.PLAYING:
             # A send on its way while the TV says it plays (it plays on
             # until the new stream replaces it): the pill is the TV's.

@@ -32,7 +32,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     (["https://h/live.m3u8"], {"play": "https://h/live.m3u8"}),
     (["udp://@239.0.0.1:1234"], {"play": "udp://@239.0.0.1:1234"}),
     (["dopeiptv://open"], {"open": True}),
-    (["--no-x11", "dopeiptv://channel/SVT1%20HD"], {"channel": "SVT1 HD"}),
+    (["--no-x11", "dopeiptv://channel/SVT1%20HD"], {"channel": "SVT1 HD", "link": True}),
     # Nothing to do: the options the app already reads, a bare word, a
     # --play of something that is no address, macOS's -psn_ argument.
     ([], None),
@@ -74,8 +74,8 @@ def test_a_file_address_is_the_path_it_names(url, posix, windows):
 @pytest.mark.parametrize("link, want", [
     # A link's address is marked as one: the window asks before it plays.
     ("dopeiptv://play?url=http%3A%2F%2Fh%2Fx.ts", {"play": "http://h/x.ts", "link": True}),
-    ("dopeiptv://channel?name=TV4%20HD", {"channel": "TV4 HD"}),
-    ("dopeiptv://channel/Kanal%205", {"channel": "Kanal 5"}),
+    ("dopeiptv://channel?name=TV4%20HD", {"channel": "TV4 HD", "link": True}),
+    ("dopeiptv://channel/Kanal%205", {"channel": "Kanal 5", "link": True}),
     ("DOPEIPTV://OPEN", {"open": True}),
     ("dopeiptv://", {"open": True}),
     # Any web page can open a link: it plays a stream, never a file here.
@@ -83,9 +83,8 @@ def test_a_file_address_is_the_path_it_names(url, posix, windows):
     ("dopeiptv://play?url=FILE%3A%2F%2F%2Fhome%2Fu%2Fx.mkv", None),
     ("dopeiptv://play?url=%2Fhome%2Fu%2Ffilm.mkv", None),
     ("dopeiptv://play?url=C%3A%5CUsers%5Cu%5Cx.mkv", None),
-    # The site's thank-you hands a supporter key over; nothing else rides along.
-    ("dopeiptv://supporter?key=DS1-AQALYXcAAAAAAAAACmF8F1Jg", {"supporter": "DS1-AQALYXcAAAAAAAAACmF8F1Jg"}),
-    ("dopeiptv://supporter?key=hello", None),
+    # The supporter key is gone: its old link does nothing.
+    ("dopeiptv://supporter?key=DS1-AQALYXcAAAAAAAAACmF8F1Jg", None),
     ("dopeiptv://supporter", None),
     # A link may not run anything but a stream: no other scheme, no
     # unknown verb, no play without an address.
@@ -283,6 +282,43 @@ def test_a_link_in_place_of_the_socket_folder_is_not_listened_in(app, monkeypatc
     server.close()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="folder modes")
+def test_a_socket_folder_that_cannot_be_made_the_users_own_is_not_listened_in(
+        app, monkeypatch, tmp_path, caplog):
+    """It fails closed: a folder that could not be made, or narrowed to
+    this user alone, is never listened in - the app starts without the
+    second-start handoff, said once, as without Qt's network library."""
+    import logging
+
+    from dopeiptv.core import instance
+    blocker = tmp_path / "a-file"
+    blocker.write_text("")
+    monkeypatch.setenv("DOPEIPTV_INSTANCE_SOCKET", str(blocker / "s"))   # its folder is a file
+    with caplog.at_level(logging.WARNING, logger="dopeiptv"):
+        server = instance.CommandServer(lambda _c: None)
+    assert not server.listening
+    said = [r for r in caplog.records if "not listening" in r.getMessage()]
+    assert len(said) == 1 and "a window of its own" in said[0].getMessage()
+    server.close()
+
+    wide = tmp_path / "wide"
+    wide.mkdir()
+    os.chmod(wide, 0o755)
+    monkeypatch.setenv("DOPEIPTV_INSTANCE_SOCKET", str(wide / "s"))
+
+    def refused(*_a, **_k):
+        raise PermissionError(1, "Operation not permitted")
+    monkeypatch.setattr(instance.os, "chmod", refused)
+    server = instance.CommandServer(lambda _c: None)
+    assert not server.listening and not (wide / "s").exists()
+    server.close()
+    monkeypatch.setattr(instance.os, "chmod", lambda *_a, **_k: None)   # "done", and not so
+    server = instance.CommandServer(lambda _c: None)
+    assert not server.listening and not (wide / "s").exists()
+    assert instance._folder_refusal(str(wide / "s"))
+    server.close()
+
+
 def test_a_windows_pipe_s_name_holds_a_word_only_its_user_can_read(monkeypatch, tmp_path):
     """Named pipes are the whole machine's: another account could make
     dopeiptv-<user> first and hear this one's commands. The name carries a
@@ -412,27 +448,18 @@ def test_the_window_carries_out_each_command():
     assert calls.count(["forward"]) == 6
 
 
-def test_a_supporter_link_opens_the_supporter_window_filled_in():
-    """The key is shown in the supporter window, checked there; the call
-    that asked returns at once (the window opens after)."""
+def test_an_old_supporter_command_is_only_a_come_forward():
+    """The supporter key is gone: a command that still names one opens
+    nothing and takes nothing."""
     pytest.importorskip("PyQt6.QtWidgets")
-    from PyQt6.QtWidgets import QApplication
-
     from dopeiptv.ui.mw_commands import _CommandsMixin
-    app = QApplication.instance() or QApplication([])
 
     class Host(_CommandsMixin):
         def __init__(self):
-            self.opened, self.forward = [], 0
+            self.forward = 0
 
         def _come_forward(self):
             self.forward += 1
-
-        def open_supporter(self, key=""):
-            self.opened.append(key)
     h = Host()
-    assert h.handle_command({"supporter": "DS1-abcdefghijklmnopqrstuv"}) == {"ok": True}
-    assert h.opened == [] and h.forward == 1
-    for _ in range(5):
-        app.processEvents()
-    assert h.opened == ["DS1-abcdefghijklmnopqrstuv"]
+    h.handle_command({"supporter": "DS1-abcdefghijklmnopqrstuv"})
+    assert h.forward == 0 and not hasattr(h, "open_supporter")

@@ -104,6 +104,11 @@ class CastHub:
     def bridged(self) -> bool:
         return self._current.bridged()
 
+    def preparing(self) -> bool:
+        """Whether a stream is being readied on this computer for the TV -
+        repackaged or converted before it can play there."""
+        return bool(getattr(self._current, "preparing", False))
+
     def volume(self) -> tuple[float, bool]:
         return self._current.volume()
 

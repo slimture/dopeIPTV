@@ -45,15 +45,19 @@ STARTING, PLAYING, PAUSED, BUFFERING = "starting", "playing", "paused", "bufferi
 RECONNECTING, WAITING, FAILED, ENDED = "reconnecting", "waiting", "failed", "ended"
 #: A seek on its way to the TV: back in time, or back to live.
 MOVING, TO_LIVE = "moving", "to_live"
+#: The stream readied on this computer for the TV (repackaged or converted).
+PREPARING = "preparing"
 STATES = (STARTING, PLAYING, PAUSED, BUFFERING, RECONNECTING, WAITING, FAILED, ENDED,
-          MOVING, TO_LIVE)
+          MOVING, TO_LIVE, PREPARING)
 #: The states that turn the pill's spinner.
-SPINNING = frozenset({STARTING, BUFFERING, RECONNECTING, WAITING, MOVING, TO_LIVE})
+SPINNING = frozenset({STARTING, BUFFERING, RECONNECTING, WAITING, MOVING, TO_LIVE,
+                      PREPARING})
 _WORDS = {STARTING: "cast_state_starting", PLAYING: "cast_state_playing",
           PAUSED: "cast_state_paused", BUFFERING: "cast_state_buffering",
           RECONNECTING: "cast_state_reconnecting", WAITING: "cast_state_waiting",
           FAILED: "cast_state_failed", ENDED: "cast_state_ended",
-          MOVING: "cast_state_moving", TO_LIVE: "cast_state_to_live"}
+          MOVING: "cast_state_moving", TO_LIVE: "cast_state_to_live",
+          PREPARING: "cast_state_preparing"}
 
 #: The widest the content gets; a wider pane centres it.
 MAX_W = 600

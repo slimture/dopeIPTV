@@ -305,7 +305,8 @@ STILL_FROM_THE_INTERNET = (
     "rtsp://cam.example/1", "rtmp://live.example/app playpath=x live=1", "udp://@239.0.0.1:1234",
     "rtp://@239.1.1.1:5000", "srt://relay.example:9000?streamid=x", "rist://relay.example:1968",
     "mms://radio.example/a", "http://192.168.1.1:4022/udp/239.0.0.1:1234",
-    "http://10.0.0.1:4022/rtp/@232.1.1.1:5000",
+    "http://10.0.0.1:4022/rtp/@232.1.1.1:5000", "HTTP://192.168.1.1:4022/udp/239.0.0.1",
+    "http://192.168.1.1:4022/udp/239.0.0.1:1234/", "http://[fd00::1]:4022/udp/[ff38::1]:1234",
     "http://tv.example/x.ts|Referer=http://127.0.0.1/", "http://127.0.0.1.tv.example/x.ts")
 #: A device of the home network: never from a source on the internet unless
 #: the person let that source in (its option home_addresses).
@@ -313,7 +314,15 @@ HOME_FROM_THE_INTERNET = (
     "http://10.0.0.5:8080/x.ts", "http://[fd00::5]:8096/x", "http://172.16.4.2/x.ts",
     "http://192.168.1.1/", "http://router/admin", "http://nas.local:5000/x.ts",
     "http://kodi.lan:8080/jsonrpc", "http://192.168.1.1:4022/status",
-    "http://192.168.1.1:4022/udp/192.168.1.5:80")
+    "http://192.168.1.1:4022/udp/192.168.1.5:80",
+    # A relay's shape and nothing else: never another page of the device
+    # that answers there.
+    "http://192.168.1.1/udp/239.0.0.1:1234/../../cgi-bin/reboot",
+    "http://192.168.1.1/udp/239.0.0.1:1234/x", "http://192.168.1.1:4022/udp/239.0.0.1:1234?a=1",
+    "http://192.168.1.1:4022/udp/239.0.0.1:1234#x", "http://192.168.1.1:4022/udp/%32%33%39.0.0.1:1",
+    "http://admin:pw@192.168.1.1:4022/udp/239.0.0.1:1234",
+    "http://router.lan:4022/udp/239.0.0.1:1234", "http://192.168.1.1:4022/udp//239.0.0.1:1234",
+    "http://192.168.1.1:4022/UDP/239.0.0.1:1234/")
 
 
 def test_a_source_on_the_internet_hands_out_media_streams_and_never_this_computer():
@@ -354,6 +363,39 @@ def test_an_acestream_list_on_the_internet_plays_through_the_engine_here_and_not
                     "http://169.254.1.1:6878/ace/getstream", "http://0.0.0.0:6878/ace/getstream",
                     "rtmp://127.0.0.1:6878/ace/getstream"):
         assert refusal(address, internet=True), address
+
+
+#: No host for one of the readers: FFmpeg opens such an address on this
+#: computer.
+NO_HOST = ("http://:8080/x", "http:///x", "https://:443/live.m3u8", "http://user@:80/x",
+           "http://u:p@/x", "rtsp://:554/cam", "rtsp://[]:554/s", "rtmp://:1935/app",
+           "mms://:1755/a", "http://\\@tv.example/x", "http://:8080|Referer=x")
+#: No host where it means "listen here": a socket of this computer's.
+LISTEN_HERE = ("udp://@:1234", "rtp://@:5000", "srt://:9000?mode=listener", "tcp://:1234?listen",
+               "rist://@:1968")
+
+
+def test_an_address_with_no_host_is_this_computer():
+    for address in NO_HOST + LISTEN_HERE:
+        assert stream_address.empty_host(address), address
+        assert refusal(address, internet=True), address
+        assert played(address, True, internet=True) == ""
+        assert stream_address.host_refusal(address) == stream_address.THIS_COMPUTER, address
+    # One no source could mean: refused from the home network and a playlist
+    # file too.
+    for address in NO_HOST:
+        assert refusal(address, remote=True) == "no host", address
+        assert refusal(address, remote=False) == "no host", address
+    # Listening here: a home source's or a playlist file's own to name.
+    for address in LISTEN_HERE:
+        assert refusal(address, remote=True) == "", address
+        assert refusal(address, remote=False) == "", address
+    # A host there, as ever.
+    for address in ("http://tv.example:8080/x", "udp://@239.0.0.1:1234", "rtsp://[fd00::5]:554/s",
+                    "http://u:p@tv.example/x", "rtmp://live.example/app playpath=x"):
+        assert not stream_address.empty_host(address), address
+    # A picture with no host, from a source on the internet: not fetched.
+    assert stream_address.picture_refusal("http://:8080/logo.png") == stream_address.THIS_COMPUTER
 
 
 def test_where_a_source_is_read_from_its_own_address_never_looked_up():

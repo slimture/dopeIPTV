@@ -117,6 +117,77 @@ def test_a_client_that_keeps_guessing_is_shut_out_for_a_while():
         assert not lim.failed("10.0.0.7")
 
 
+def test_the_whole_server_has_a_budget_beside_each_address_s():
+    """A device that asks from address after address gets a fresh bucket
+    with each - never more than the whole server's budget, all addresses
+    together. Lock-outs stay per address; this computer is neither shut out
+    nor counted in the whole."""
+    clock = Clock()
+    lim = RateLimiter(rate=2.0, burst=5, total_rate=4.0, total_burst=10, clock=clock,
+                      spare=phone_remote.this_computer)
+    assert sum(lim.allow(f"192.168.7.{i}") for i in range(50)) == 10
+    assert not lim.allow("192.168.7.200"), "a fresh address: the whole is spent"
+    assert all(lim.allow("127.0.0.1") for _ in range(5)), "this computer is not counted"
+    assert not lim.allow("127.0.0.1"), "but has its own bucket"
+    clock.t += 1.0                                        # four more for everyone
+    assert sum(lim.allow(f"10.1.0.{i}") for i in range(20)) == 4
+    # A refusal by the whole does not spend that address's own bucket.
+    clock.t += 100
+    lim2 = RateLimiter(rate=0.001, burst=3, total_rate=0.001, total_burst=1, clock=clock)
+    assert lim2.allow("10.0.0.1") and not lim2.allow("10.0.0.2")
+    assert lim2._buckets["10.0.0.2"][0] >= 3 - 1e-6
+    # Ten wrong tokens shut one address out, never another, never loopback.
+    lim3 = RateLimiter(fails=10, total_rate=60.0, total_burst=360.0, clock=clock,
+                       spare=phone_remote.this_computer)
+    for _ in range(10):
+        lim3.failed("192.168.1.20")
+        assert not lim3.failed("127.0.0.1") and not lim3.failed("::1")
+    assert lim3.blocked("192.168.1.20") and not lim3.blocked("192.168.1.21")
+    assert not lim3.blocked("127.0.0.1") and not lim3.blocked("::1")
+    for me in ("127.0.0.1", "127.0.0.5", "::1", "::ffff:127.0.0.1"):
+        assert phone_remote.this_computer(me), me
+    for other in ("192.168.1.20", "::ffff:192.168.1.20", "fe80::1%eth0", "", "nope"):
+        assert not phone_remote.this_computer(other), other
+
+
+def test_the_whole_budget_never_bothers_real_phones():
+    """Four phones polling twice a second and Home Assistant every second,
+    for a minute: never refused by the default budgets."""
+    from dopeiptv.core import phone_remote as pr
+    clock = Clock()
+    lim = RateLimiter(total_rate=pr.SERVER_RATE, total_burst=pr.SERVER_BURST, clock=clock)
+    pics = RateLimiter(rate=pr.PICTURES_RATE, burst=pr.PICTURES_BURST,
+                       total_rate=pr.PICTURES_SERVER_RATE, total_burst=pr.PICTURES_SERVER_BURST,
+                       clock=clock)
+    for step in range(120):
+        clock.t += 0.5
+        for phone in range(4):
+            assert lim.allow(f"192.168.1.{30 + phone}")
+        if step % 2 == 0:
+            assert lim.allow("192.168.1.10")             # Home Assistant
+    # Each phone scrolling a list at once: its posters.
+    assert all(pics.allow(f"192.168.1.{30 + phone}") for phone in range(4) for _ in range(150))
+
+
+def test_a_server_answers_429_once_its_whole_budget_is_spent(served):
+    srv = served(limiter=RateLimiter(rate=100.0, burst=100.0, total_rate=0.001, total_burst=3))
+    codes = [ask(srv.port, "GET", f"/{TOKEN}/api/state")[0] for _ in range(5)]
+    assert codes[:3] == [200] * 3 and set(codes[3:]) == {429}
+    # This computer, as the server's own limiter spares it: never held by the whole.
+    srv2 = served(limiter=RateLimiter(rate=100.0, burst=100.0, total_rate=0.001, total_burst=1,
+                                      spare=phone_remote.this_computer))
+    assert [ask(srv2.port, "GET", f"/{TOKEN}/api/state")[0] for _ in range(5)] == [200] * 5
+    # The default: a whole-server budget on both buckets, this computer spared.
+    srv3 = served()
+    assert srv3.limiter.total_rate == phone_remote.SERVER_RATE
+    assert srv3.pictures.total_rate == phone_remote.PICTURES_SERVER_RATE
+    for lim in (srv3.limiter, srv3.pictures):
+        assert lim.spare is phone_remote.this_computer
+        for _ in range(12):
+            lim.failed("127.0.0.1")
+        assert not lim.blocked("127.0.0.1")
+
+
 def test_the_limiter_remembers_a_bounded_number_of_clients():
     lim = RateLimiter(clients=8)
     for i in range(50):

@@ -262,9 +262,11 @@ def name_need(names: Iterable[str], marks: bool = True) -> int:
 
 def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, density: str,
                  rtl: bool, hover: bool = False, selected: bool = False,
-                 pictures: Pictures | None = None, name_w: int = 0) -> dict[str, QRect]:
+                 pictures: Pictures | None = None, name_w: int = 0,
+                 numbers: bool = True) -> dict[str, QRect]:
     """*r* painted in *rect* (the list's row *row* of *count*); the parts
-    it went into (for the tests)."""
+    it went into (for the tests). Without *numbers* no number and no room
+    for one (Settings > Appearance, "Show channel numbers")."""
     pictures = pictures if pictures is not None else Pictures()
     begin_paint(p)
     try:
@@ -273,11 +275,11 @@ def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, densi
         if r.heading:
             _paint_heading(p, rect, r.heading, rtl)
             return {"heading": rect}
-        parts = channel_parts(rect, density, rtl, name_w)
+        parts = channel_parts(rect, density, rtl, name_w, numbers=numbers)
         align = _aligned(rtl)
         small = _font(SMALL_PX)
         sfm = QFontMetrics(small)
-        if r.number:
+        if r.number and numbers:
             p.setFont(small)
             p.setPen(colour("muted"))
             num_align = (Qt.AlignmentFlag.AlignLeft if rtl else Qt.AlignmentFlag.AlignRight) \

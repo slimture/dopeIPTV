@@ -1,8 +1,8 @@
-"""The app's own icon: the accent tile with its play triangle - or, for
-anyone who switches it on, the heart icon: the tile shaded from the accent
-into the heart's colour and the triangle crowned with a heart, the same
-mark as a supporter's sidebar logo (widgets._SidebarLogo.set_supporter).
-A supporter key's until November 2026; everyone's since.
+"""The app's own icon: the blue tile with its white play triangle - or
+the one the person picks on Settings > Appearance (`LOOKS`): the heart
+icon (the tile shaded from the blue into the heart's colour and the
+triangle crowned with a heart), the tile in their own accent, darker,
+lighter and brighter tiles, a round one and a retro TV.
 
 Drawn here, at every size a desktop asks for, rather than shipped as a
 file: a frozen build has nothing extra to bundle or to lose. It is the
@@ -19,11 +19,12 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import (
-    QColor, QIcon, QLinearGradient, QPainter, QPainterPath, QPixmap,
+    QColor, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
 )
 
 from ..core.log import log
@@ -51,15 +52,50 @@ ICON_SAFE_INSET = 0.098
 #: user picked - the packaged icons are this blue too.
 ICON_ACCENT = ACCENTS["blue"][1]
 
-#: The Settings switch (Settings > General): off unless switched on - or,
-#: never switched, on for a supporter key from before, as it was for them.
-SETTING = "supporter_icon"
+@dataclass(frozen=True)
+class Look:
+    """One of the icons to pick from: its tile's colour (two for a
+    diagonal shade; "" the person's accent), the play triangle's colour,
+    the tile's shape (a rounded square, a circle, a TV), a heart on the
+    triangle's tip, a hairline round a tile that would vanish into a
+    window of its own colour."""
+    key: str
+    tile: tuple[str, ...]
+    mark: str = "#ffffff"
+    shape: str = "square"
+    heart: bool = False
+    edge: str = ""
+
+
+#: The blue tile and its white triangle: every package's own icon.
+DEFAULT = "classic"
+#: The icons on Settings > Appearance, in their order there. Their names
+#: are `icon_<key>` in i18n.
+LOOKS: dict[str, Look] = {lk.key: lk for lk in (
+    Look("classic", (ICON_ACCENT,)),
+    Look("heart", (ICON_ACCENT, HEART), heart=True),
+    Look("accent", ("",)),
+    Look("midnight", ("#262a35", "#0c0e13"), mark=ICON_ACCENT, edge="#3a4050"),
+    Look("paper", ("#ffffff", "#e6eaf1"), mark=ICON_ACCENT, edge="#cfd5df"),
+    Look("ocean", ("#36c6e8", "#2350d8")),
+    Look("forest", ("#38c98a", "#0f7257")),
+    Look("sunset", ("#ffa23d", "#e5437e")),
+    Look("grape", ("#9b6bff", "#c24bd2")),
+    Look("round", (ICON_ACCENT,), shape="circle"),
+    Look("retro", ("#f6ead2", "#e3cfa8"), mark=ICON_ACCENT, shape="tv"),
+)}
+#: The TV's screen and antennas in "retro".
+_SCREEN = "#1f232b"
+
+#: Settings > Appearance's choice (a key of LOOKS), the household's; never
+#: picked, the blue one.
+SETTING = "app_icon"
 
 _THEME_SIZES = (256, 128, 64, 48, 32)
 
 
 def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32),
-                  supporter: bool = False) -> QIcon:
+                  look: str = "", accent: str = "") -> QIcon:
     """Draw the app icon (rounded accent tile with a play triangle).
 
     *inset* is the fraction of each side left as transparent margin; pass
@@ -70,10 +106,14 @@ def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32),
     for 1024 got a 256 px image, and that is what the retina Dock icon was
     built from.
 
-    *supporter* draws the supporter's icon: the same tile and triangle, the
-    tile shaded diagonally from the accent into the heart's colour and a
-    heart crowning the triangle's tip - a little larger at panel sizes, so
-    it still reads as a heart at 32 px."""
+    *look* is one of LOOKS ("" or one not known: the blue one). The heart
+    icon's heart is a little larger at panel sizes, so it still reads as
+    a heart at 32 px. *accent* is the colour of "accent"'s tile (the
+    theme's accent when not given)."""
+    chosen = LOOKS.get(look) or LOOKS[DEFAULT]
+    if not accent:
+        from . import theme
+        accent = theme.ACCENT
     icon = QIcon()
     for s in sizes:
         pm = QPixmap(s, s)
@@ -81,37 +121,76 @@ def make_app_icon(inset: float = 0.0, sizes=(256, 128, 64, 48, 32),
         p = QPainter(pm)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         off = s * inset
-        side = s - 2 * off
-        tile = QPainterPath()
-        tile.addRoundedRect(off, off, side, side, side * 0.22, side * 0.22)
-        if supporter:
-            shade = QLinearGradient(QPointF(off, off),
-                                    QPointF(off + side, off + side))
-            shade.setColorAt(0.0, QColor(ICON_ACCENT))
-            shade.setColorAt(1.0, QColor(HEART))
-            p.fillPath(tile, shade)
-        else:
-            p.fillPath(tile, QColor(ICON_ACCENT))
-        tri = QPainterPath()
-        # Centred by its weight (centroid at the middle), not by its box:
-        # a play triangle centred by its box looks shifted left.
-        tri.moveTo(off + side * 0.38, off + side * 0.28)
-        tri.lineTo(off + side * 0.38, off + side * 0.72)
-        tri.lineTo(off + side * 0.74, off + side * 0.50)
-        tri.closeSubpath()
-        p.fillPath(tri, QColor("white"))
-        if supporter:
-            w = side * (0.25 if s > 48 else 0.28)
-            h = w * 0.84
-            cx, cy = off + side * 0.74, off + side * 0.28
-            p.fillPath(heart_shape(QRectF(cx - w / 2, cy - h / 2, w, h)),
-                       QColor("white"))
+        draw_look(p, chosen, QRectF(off, off, s - 2 * off, s - 2 * off), s, accent)
         p.end()
         icon.addPixmap(pm)
     return icon
 
 
-def platform_icon(supporter: bool = False) -> QIcon:
+def _triangle(r: QRectF) -> QPainterPath:
+    """The play triangle in *r*, centred by its weight (centroid at the
+    middle), not by its box: one centred by its box looks shifted left."""
+    tri = QPainterPath()
+    tri.moveTo(r.x() + r.width() * 0.38, r.y() + r.height() * 0.28)
+    tri.lineTo(r.x() + r.width() * 0.38, r.y() + r.height() * 0.72)
+    tri.lineTo(r.x() + r.width() * 0.74, r.y() + r.height() * 0.50)
+    tri.closeSubpath()
+    return tri
+
+
+def draw_look(p: QPainter, look: Look, r: QRectF, px: int, accent: str) -> None:
+    """One icon drawn into the square *r* (*px* the size it is drawn for:
+    the heart grows a little at panel sizes)."""
+    side = r.width()
+    tile = QPainterPath()
+    if look.shape == "circle":
+        tile.addEllipse(r)
+    else:
+        tile.addRoundedRect(r, side * 0.22, side * 0.22)
+    colours = [c or accent for c in look.tile]
+    if len(colours) == 1:
+        p.fillPath(tile, QColor(colours[0]))
+    else:
+        shade = QLinearGradient(r.topLeft(), r.bottomRight())
+        shade.setColorAt(0.0, QColor(colours[0]))
+        shade.setColorAt(1.0, QColor(colours[1]))
+        p.fillPath(tile, shade)
+    if look.edge:
+        width = max(1.0, side / 64)
+        pen = QPen(QColor(look.edge))
+        pen.setWidthF(width)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        half = width / 2
+        p.drawRoundedRect(r.adjusted(half, half, -half, -half),
+                          side * 0.22 - half, side * 0.22 - half)
+        p.setPen(Qt.PenStyle.NoPen)
+    if look.shape == "tv":
+        screen = QRectF(r.x() + side * 0.14, r.y() + side * 0.30,
+                        side * 0.72, side * 0.56)
+        box = QPainterPath()
+        box.addRoundedRect(screen, side * 0.10, side * 0.10)
+        p.fillPath(box, QColor(_SCREEN))
+        pen = QPen(QColor(_SCREEN))
+        pen.setWidthF(max(1.2, side * 0.045))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        foot = QPointF(r.x() + side * 0.5, screen.y())
+        p.drawLine(foot, QPointF(r.x() + side * 0.36, r.y() + side * 0.13))
+        p.drawLine(foot, QPointF(r.x() + side * 0.64, r.y() + side * 0.13))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.fillPath(_triangle(screen), QColor(look.mark))
+        return
+    p.fillPath(_triangle(r), QColor(look.mark))
+    if look.heart:
+        w = side * (0.25 if px > 48 else 0.28)
+        h = w * 0.84
+        cx, cy = r.x() + side * 0.74, r.y() + side * 0.28
+        p.fillPath(heart_shape(QRectF(cx - w / 2, cy - h / 2, w, h)),
+                   QColor("white"))
+
+
+def platform_icon(look: str = "", accent: str = "") -> QIcon:
     """The icon as this system wants it: Apple's and GNOME's margin on
     macOS and Linux, full bleed on Windows; big enough for a retina Dock.
 
@@ -131,56 +210,71 @@ def platform_icon(supporter: bool = False) -> QIcon:
         inset=ICON_SAFE_INSET if _padded else 0.0,
         sizes=((512, 256, 128, 64, 48, 32) if _mac
                else (256, 128, 64, 48, 32)),
-        supporter=supporter)
+        look=look, accent=accent)
 
 
-def wanted(settings) -> bool:
-    """Whether the heart icon is the one to show: the switch on - or, never
-    switched, a supporter key that checks out (core/supporter.py), whose
-    icon it was by default until November 2026."""
+#: 1.6.10's switch for the heart icon (Settings > General), read once.
+OLD_SWITCH = "heart_icon"
+
+
+def carry_over(settings) -> None:
+    """1.6.10's heart switch, turned on by hand, becomes the picker's heart
+    - a choice made is kept - and the switch goes. Nothing else from before
+    picks an icon: a supporter key never does."""
     try:
-        chosen = str(settings.value(SETTING, "") or "")
-    except Exception:
-        chosen = ""
-    if chosen in ("true", "false"):
-        return chosen == "true"
+        if (str(settings.value(OLD_SWITCH, "") or "") == "true"
+                and not settings.contains(SETTING)):
+            settings.setValue(SETTING, "heart")
+        if settings.contains(OLD_SWITCH):
+            settings.remove(OLD_SWITCH)
+    except Exception as e:
+        log.warning("app icon: 1.6.10's switch not carried over: %s", e)
+
+
+def chosen(settings) -> str:
+    """The icon to show, a key of LOOKS: the one picked, else - never
+    picked, one not known, anything unreadable - the blue one."""
     try:
-        from ..core import supporter
-        return supporter.is_supporter(settings)
+        picked = str(settings.value(SETTING, "") or "")
     except Exception:
-        return False
+        return DEFAULT
+    return picked if picked in LOOKS else DEFAULT
 
 
-#: Which icon the app shows now (None: none set by this module yet).
-_shown: bool | None = None
+#: Which icon the app shows now - its look and, for "accent", the colour
+#: (None: none set by this module yet).
+_shown: tuple[str, str] | None = None
 #: Whether this run writes the icon into the user's icon theme - only the
 #: real start does (app.main), so a window built anywhere else, a test's
 #: for one, never touches the user's files.
 _theme_icons = False
 
 
-def show(supporter: bool, theme_icons: bool | None = None) -> bool:
-    """Make the supporter's icon - or the plain one - the app's, now: the
-    window icon (Qt passes it on to every open window and, on macOS, to the
-    Dock), and on Linux the icon theme's copy. True when it changed.
+def show(look: str, theme_icons: bool | None = None) -> bool:
+    """Make *look* (a key of LOOKS) the app's icon, now: the window icon
+    (Qt passes it on to every open window and, on macOS, to the Dock), and
+    on Linux the icon theme's copy. True when it changed.
 
     *theme_icons* is given once, by the start: whether this run keeps the
     icon theme's copy in step (Linux only)."""
     global _shown, _theme_icons
     if theme_icons is not None:
         _theme_icons = bool(theme_icons) and sys.platform.startswith("linux")
-    supporter = bool(supporter)
-    if _shown is supporter:
+    if look not in LOOKS:
+        look = DEFAULT
+    from . import theme
+    accent = theme.ACCENT if look == "accent" else ""
+    if _shown == (look, accent):
         return False
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance()
     if not isinstance(app, QApplication):
         return False
-    icon = platform_icon(supporter)
+    icon = platform_icon(look=look, accent=accent)
     app.setWindowIcon(icon)
     if _shown is not None:
-        log.info("app icon: %s", "the supporter's" if supporter else "the plain one")
-    _shown = supporter
+        log.info("app icon: %s", look)
+    _shown = (look, accent)
     if _theme_icons:
         install_icon(icon)
     return True
@@ -202,7 +296,7 @@ def install_icon(icon: QIcon) -> bool:
     rewriting matters.
 
     A changed file is written beside the old one and moved over it, so a
-    shell reading the icon while the supporter's replaces the plain one
+    shell reading the icon while another replaces it
     (or back) never sees half a PNG; and the theme directory is touched,
     which is what tells GTK - and so GNOME's dash - to look again."""
     base = Path(os.environ.get("XDG_DATA_HOME")

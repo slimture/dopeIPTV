@@ -299,21 +299,21 @@ def test_seal_refuses_what_it_cannot_lock():
             backup.seal(PLAIN, **kwargs)
 
 
-# -- without a password: as it always was -------------------------------------------
+# -- without a password: no logins ---------------------------------------------------
 
-def test_no_password_is_todays_file_byte_for_byte(tmp_path):
+def test_no_password_is_the_file_without_its_logins(tmp_path):
+    """A file anyone can read holds no login (backup.without_logins); with
+    a password the plain text inside is the whole backup."""
     doc = _doc()
-    assert backup.for_file(doc, "") is doc
-    plain, today = str(tmp_path / "plain.json"), str(tmp_path / "today.json")
+    plain = str(tmp_path / "plain.json")
     backup.write(plain, backup.for_file(doc))
-    with open(today, "wb") as fh:
-        fh.write(json.dumps(doc, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8"))
-    assert open(plain, "rb").read() == open(today, "rb").read()
+    assert json.loads(open(plain, encoding="utf-8").read()) == backup.without_logins(doc)
     got = backup.read_any(plain)
-    assert isinstance(got, backup.Backup) and got.stores == backup.read(plain).stores
-    # With one, the plain text inside is that same file.
+    assert isinstance(got, backup.Backup) and got.logins_out
+    assert got.stores == backup.read(plain).stores
     locked = backup.for_file(doc, PASSWORD)
     assert backup.is_locked(locked) and not backup.is_locked(doc)
+    assert not backup.parse(doc).logins_out
 
 
 def test_an_old_plain_backup_and_an_old_export_still_read(tmp_path):

@@ -577,13 +577,13 @@ class WelcomeOverlay(QWidget):
         self._b_err.setVisible(True)
         self._fit_card(self._stack.currentIndex())
 
-    def sync_no_sources(self) -> None:
+    def sync_no_sources(self, saved: str = "") -> None:
         """Settings and profiles came, no source: the connect step, with a
-        word on why and what to do."""
+        word on why and what to do - and *saved*, how old the copy was."""
         self._set_busy(False)
         self._b_code.clear()
         self._b_err.setVisible(False)
-        self._c_note.setText(self._no_sources_text())
+        self._c_note.setText(self._no_sources_text() + (f"\n\n{saved}" if saved else ""))
         self._c_note.setVisible(True)
         self._stack.setCurrentIndex(PAGE_CONNECT)
         self._fit_card(PAGE_CONNECT)

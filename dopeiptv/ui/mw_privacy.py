@@ -226,7 +226,7 @@ class _PrivacyMixin:
         if pill is not None:
             pill.setVisible(on)
             self._place_private_pill()
-        if hasattr(self, "_donate_heart_refresh"):   # the supporter's label gives way
+        if hasattr(self, "_donate_heart_refresh"):   # the heart gives way
             self._donate_heart_refresh()
         if was != on:
             self._show_toast(tr("private_on_toast") if on else tr("private_off_toast"), 5000)

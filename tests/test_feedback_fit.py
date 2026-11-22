@@ -123,7 +123,7 @@ def test_feedback_and_a_report_link_to_the_privacy_policy(monkeypatch):
 
 def test_the_windows_say_what_goes_beside_the_text(monkeypatch):
     # An outside review: the window said "exactly what is sent" while the
-    # version, the system, a supporter's mark and the answer code's hash
+    # version, the system and the answer code's hash
     # went beside the text unseen. Each is said now, as send_status writes it.
     app = _qapp()
     import json
@@ -132,16 +132,14 @@ def test_the_windows_say_what_goes_beside_the_text(monkeypatch):
     from dopeiptv import __version__
     from dopeiptv.core import build_check, report
     from dopeiptv.ui import dialogs
-    fb = dialogs.FeedbackDialog(None, lambda opts: "", supporter=True)
+    fb = dialogs.FeedbackDialog(None, lambda opts: "")
     _settle(app)
     line = fb.beside.text()
     assert f"dopeIPTV {__version__}" in line and platform.system() in line
-    for key in ("report_item_picked", "report_item_supporter", "report_item_code"):
+    for key in ("report_item_picked", "report_item_code"):
         assert dialogs.tr(key) in line, key
     fb.answers.setChecked(False)
     assert dialogs.tr("report_item_code") not in fb.beside.text()
-    plain = dialogs.FeedbackDialog(None, lambda opts: "")
-    assert dialogs.tr("report_item_supporter") not in plain.beside.text()
     rd = dialogs.ReportDialog(None, "error", "trace")
     assert rd.beside is not None and f"dopeIPTV {__version__}" in rd.beside.text()
     assert dialogs.ReportDialog(None, "error", "trace", copy_only=True).beside is None
@@ -152,3 +150,65 @@ def test_the_windows_say_what_goes_beside_the_text(monkeypatch):
     report.send_status("error", "x", personal=())
     assert set(sent) == {"kind", "version", "os", "text"}
     assert [f"dopeIPTV {sent['version']}", sent["os"]] == report.sent_beside()
+
+
+def test_what_is_sent_is_exactly_what_the_window_shows(monkeypatch):
+    """The boxes are the person's to edit, and on Send they are scrubbed
+    once more with the person's own values: where that hides more - an
+    e-mail or a password typed into them - the boxes show it, a note says
+    so and nothing goes until Send again; what goes then is exactly what
+    is shown, and the last scrub on the way out changes nothing."""
+    app = _qapp()
+    import json
+
+    from dopeiptv.core import build_check, report
+    from dopeiptv.ui import dialogs
+    personal = report.personal_values([{"name": "Box", "username": "kalle", "password": "hunter2pw"}])
+
+    def scrub(text):
+        return report.scrub(text, personal)
+    sent = {}
+    monkeypatch.setattr(build_check, "allowed", lambda: True)
+    monkeypatch.setattr(report, "_post", lambda url, body, timeout: (sent.update(json.loads(body)), (200, b""))[1])
+
+    rd = dialogs.ReportDialog(None, "feedback", report.build("feedback", personal=personal),
+                              scrub=scrub)
+    assert rd.text.isReadOnly() is False and rd.message is not None and not rd.message.isReadOnly()
+    rd.message.setPlainText("It stopped. Mail me: anna.s@example.se, my password is hunter2pw")
+    rd.include.setChecked(True)
+    rd.show()
+    _settle(app)
+    rd.accept()
+    _settle(app)
+    assert rd.result() == 0 and rd.isVisible(), "not sent: shown first"
+    assert rd.hidden_note.isVisible()
+    shown = rd.message.toPlainText()
+    assert "anna.s@example.se" not in shown and "hunter2pw" not in shown and "<email>" in shown
+    rd.accept()
+    assert rd.result() == 1
+    payload = rd.payload()
+    assert scrub(payload) == payload, "nothing left for the last scrub"
+    report.send_status("feedback", payload, personal=personal)
+    assert sent["text"] == payload, "what goes is what was shown"
+
+    fb = dialogs.FeedbackDialog(None, lambda opts: "dopeIPTV 1.6.10\nSystem: Linux", scrub=scrub)
+    fb.topic_chips["bug"].setChecked(True)
+    fb.message.setPlainText("Box kalle froze")
+    fb.preview.setPlainText("dopeIPTV 1.6.10\nlogin kalle / hunter2pw")
+    assert not fb.preview.isVisible()
+    fb.show()
+    _settle(app)
+    fb.accept()
+    _settle(app)
+    assert fb.result() == 0 and fb.preview.isVisible() and fb.hidden_note.isVisible()
+    for box in (fb.message, fb.preview):
+        assert "kalle" not in box.toPlainText() and "hunter2pw" not in box.toPlainText()
+    assert fb.send_btn.isEnabled()
+    fb.accept()
+    assert fb.result() == 1 and scrub(fb.payload()) == fb.payload()
+    # Nothing to hide: sent at once, as before.
+    plain = dialogs.ReportDialog(None, "error", "Traceback: boom", scrub=scrub)
+    plain.accept()
+    assert plain.result() == 1 and not plain.hidden_note.isVisible()
+    for w in (rd, fb, plain):
+        w.close()

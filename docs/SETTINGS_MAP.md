@@ -123,7 +123,9 @@ or "Shared" and where the shared one lives. Nerd's rows only while it is on.
   `epg_delay_min`), `picons` (Enigma2), `cloud_guide` (HDHomeRun); picons →
   Nerd › Boxes and lists (shared: `nerd_picon_dir`); channel numbers
   (`nerd_chno_<source id>`) → Nerd › Boxes and lists; a channel's guide by hand
-- Advanced: `refresh`; Nerd: `radio`, `recordings` (Enigma2, Tvheadend),
+- Advanced: `refresh`; `tls_unchecked` (its streams play without their
+  certificate checked - the answer when one did not check out, asked once;
+  off); Nerd: `radio`, `recordings` (Enigma2, Tvheadend),
   `show_drm`, `hd_group` (HDHomeRun), `radio`, `recordings` (VDR, NextPVR),
   `favourites`, `recordings` (DVBViewer), `recordings` (MythTV);
   `home_addresses` (a list on the internet may name devices at home; off)
@@ -182,9 +184,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - System: `desktop_entry` (Linux), `mpris` (the system's media controls)
 - TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
   LIRC), the remotes and controllers found
-- Feedback and tips: feedback and its answers, `supporter_key` (its window;
-  a key from before 22 November 2026), `supporter_icon` (the heart icon,
-  everyone's), ask for a tip now and then (`donate_ask`; the
+- Feedback and tips: feedback and its answers, ask for a tip now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About
@@ -193,7 +193,9 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
   `theme_light` (these four this profile's), `corner_style`, `ui_scale`
-- Lists: `view_density`, `sort_order`
+- App icon: `app_icon` (one of `ui/app_icon.LOOKS`; the household's, the
+  blue one when never picked)
+- Lists: `view_density`, `sort_order`, `list_channel_numbers` (Show channel numbers, off by default)
 - What the places show (all of it this profile's; core/places.py,
   ui/mw_place_look.py): `just_the_list` (Just the list: no rows over TV,
   Movies, Series and Local files, compact headers, Movies and Series as
@@ -241,7 +243,9 @@ while Nerd is on, and so are the link rows that lead to them.
 **Network** (`nerd_net`)
 - Who the app says it is: `nerd_user_agent`, `nerd_referer`, `nerd_headers`
 - Proxy: `nerd_proxy`, `nerd_proxy_player`
-- Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`
+- Connection: `nerd_ip_family`, `nerd_net_timeout`, `nerd_reconnect_max`,
+  `nerd_tls_strict` (check a server at home's certificate too - every
+  internet stream's is checked already)
 - Own DNS: `nerd_dns`, `nerd_dns_url`, `nerd_dns_fallback`
 - VPN guard: `nerd_vpn_guard`, `nerd_vpn_iface`, `nerd_vpn_lan`
 - Other networks (VLANs): `nerd_other_networks` (the parts of a split home

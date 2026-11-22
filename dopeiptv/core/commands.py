@@ -6,17 +6,18 @@ dopeiptv:// link, another program (the remote API asks the same way).
     dopeiptv <address>               as --play
     dopeiptv dopeiptv://play?url=<address, url-encoded>   (a stream only,
                                          asked about in the window first)
-    dopeiptv dopeiptv://channel/<name>   (or ?name=<name>)
+    dopeiptv dopeiptv://channel/<name>   (or ?name=<name>; asked about in
+                                         the window first)
     dopeiptv dopeiptv://open             bring the window forward
-    dopeiptv dopeiptv://supporter?key=DS1-...   a supporter key from the
-                                         site's thank-you, shown to be kept
     dopeiptv --tv                    TV mode (with any of the above too)
 
 A command is a small dict - {"play": url}, {"channel": name},
-{"open": True}, {"supporter": key}, {"tv": True} - or None when there
-is nothing to do. A link's play carries {"link": True} beside it: any web
-page can open a link, so the window asks before it plays the address
-(ui/mw_commands.py).
+{"open": True}, {"tv": True} - or None when there
+is nothing to do. A link's play and channel carry {"link": True} beside
+them: any web page can open a link, so the window asks before it plays the
+address or tunes the channel (ui/mw_commands.py). ``--channel`` on the
+person's own command line, the remote API and Home Assistant are no links:
+theirs plays as asked.
 
 A link is all a start by one takes from its command line
 (``own_arguments``): the system puts the link where the menu entry or the
@@ -131,12 +132,9 @@ def parse_link(link: str) -> dict | None:
         return {"play": url, "link": True} if link_address_ok(url) else None
     if what == "channel":
         name = _name(q.get("name") or unquote(rest))
-        return {"channel": name} if name else None
+        return {"channel": name, "link": True} if name else None
     if what in ("open", ""):
         return {"open": True}
-    if what == "supporter":
-        key = _supporter(q.get("key", ""))
-        return {"supporter": key} if key else None
     return None
 
 
@@ -148,13 +146,6 @@ def _name(value: Any) -> str:
     text = " ".join("".join(c for c in value if unicodedata.category(c) != "Cc"
                             or c.isspace()).split())
     return text if len(text) <= MAX_NAME else ""
-
-
-def _supporter(value: Any) -> str:
-    if not isinstance(value, str):
-        return ""
-    key = "".join(value.split())
-    return key if key.upper().startswith("DS1-") and 20 < len(key) < 200 else ""
 
 
 def _ok_url(url: str) -> bool:
@@ -232,16 +223,13 @@ def checked(cmd: Any) -> dict | None:
         if not name:
             return None
         out["channel"] = name
+        if link:
+            out["link"] = True
     if cmd.get("number") is not None:
         number = cmd.get("number")
         if isinstance(number, bool) or not isinstance(number, (int, str)):
             return None
         out["number"] = number
-    if cmd.get("supporter") not in (None, ""):
-        key = _supporter(cmd.get("supporter"))
-        if not key:
-            return None
-        out["supporter"] = key
     for flag in ("open", "tv"):
         if cmd.get(flag) is True:
             out[flag] = True

@@ -245,3 +245,25 @@ def test_what_is_kept_of_the_tv_used_last():
     assert cc.cast_button_text(None) == cc.tr("cast_cast")
     assert "…" in cc.cast_button_text("x" * 60)
     s.clear()
+
+
+def test_cast_button_keeps_its_whole_words():
+    """The button names the device picked ("Cast to AirPlay (Apple TV)"):
+    the window grows to it, never cuts it to its middle. A minimum width
+    of the window's own had kept its layout's out, so the button was
+    squeezed to less than its words."""
+    from PyQt6.QtWidgets import QApplication, QListWidgetItem
+    win, dlg = _dialog(managing=True)
+    dlg.show()
+    item = QListWidgetItem("AirPlay (Apple TV)")
+    dlg.list.addItem(item)
+    dlg.list.setCurrentItem(item)
+    for _ in range(5):
+        QApplication.processEvents()
+    dlg.layout().activate()
+    assert dlg.cast_btn.text().endswith("AirPlay (Apple TV)")
+    assert dlg.minimumSizeHint().width() >= dlg.cast_btn.sizeHint().width()
+    assert dlg.minimumWidth() >= dlg.layout().minimumSize().width()
+    assert dlg.list.minimumWidth() >= 300      # still starts as wide as before
+    dlg.close()
+    win.deleteLater()

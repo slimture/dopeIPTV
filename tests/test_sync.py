@@ -17,23 +17,21 @@ import pytest
 from PyQt6.QtCore import QSettings
 
 from dopeiptv.core import chacha20poly1305 as aead
-from dopeiptv.core import shortcut_keys, supporter, sync
+from dopeiptv.core import shortcut_keys, sync
 from dopeiptv.core.stores import FavoriteStore, HistoryStore, PlaylistStore
 from dopeiptv.i18n import tr
 
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 
-SEED, PUB = supporter.new_seed()
 SUNSCREEN = (b"Ladies and Gentlemen of the class of '99: If I could offer you only one "
              b"tip for the future, sunscreen would be it.")
 ALL = sync.CATEGORIES
 
 
 @pytest.fixture(autouse=True)
-def _no_proxy_and_a_test_key(monkeypatch):
+def _no_proxy(monkeypatch):
     for var in ("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr(supporter, "PUBLIC_KEY_HEX", PUB.hex())
     # Nothing in here may reach the real site.
     monkeypatch.setattr(sync, "ENDPOINT", "http://127.0.0.1:9/never/")
 
@@ -281,7 +279,8 @@ def site():
 
 
 def _key():
-    return supporter.make(SEED)
+    """An older app's supporter key, left in a settings file: never synced."""
+    return "DS1-" + "k" * 100
 
 
 # -- what syncs, what never does --------------------------------------------------------
@@ -667,6 +666,114 @@ def test_an_earlier_copy_handed_back_is_told_and_this_computers_put_back(tmp_pat
     b.state.fresh = b.state.joining = True
     result, _ = b.round(remote, key, now=4000)
     assert not result.older and b.settings.value("theme") == "dracula"
+
+
+DAY = 86400
+NOW = 1_790_000_000                     # a time in 2026, as a computer's clock says
+
+
+def test_a_copy_says_when_it_was_saved_sealed_with_the_rest(tmp_path, site):
+    """Every upload carries when it was put there; an older app's copy, with
+    no such stamp, tells it by its newest entry. Both are sealed: the site
+    can hand back an old copy, never make one look newer."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a = Computer(tmp_path, "a", slot)
+    a.settings.setValue("theme", "nord")
+    a.round(remote, key, now=NOW)
+    doc = _site_doc(site, slot, key)
+    assert sync.saved_at(doc) == NOW and doc["c"]["~"]["s"] == {"t": NOW, "v": NOW}
+    assert sync.age_days(NOW, NOW + 3 * DAY + 5) == 3 and not sync.is_stale(NOW, NOW + 30 * DAY)
+    assert sync.is_stale(NOW, NOW + 31 * DAY) and not sync.is_stale(0, NOW)
+    older_app = {"v": 1, "c": {"settings": {"theme": {"t": NOW - 5 * DAY, "v": "x"},
+                                            "accent": {"t": NOW - 9 * DAY, "v": "y"}},
+                               "~": {"n": {"t": 7, "v": 7}}}}
+    assert sync.saved_at(older_app) == NOW - 5 * DAY, "the newest entry, never the counter"
+    assert sync.saved_at(sync.empty_doc()) == 0
+    assert sync.saved_at({"v": 1, "c": {"settings": {"a": {"t": 0, "v": 1}}}}) == 0
+
+
+def test_an_unchanged_copy_is_put_back_once_a_week(tmp_path, site):
+    """So its time says when a computer last synced, not only last changed:
+    a household that changes nothing for a month is not taken for an old
+    copy by the next computer that joins."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a = Computer(tmp_path, "a", slot)
+    a.settings.setValue("theme", "nord")
+    a.round(remote, key, now=NOW)
+    result, _ = a.round(remote, key, now=NOW + 6 * DAY)
+    assert not result.uploaded
+    result, _ = a.round(remote, key, now=NOW + 8 * DAY)
+    assert result.uploaded and sync.saved_at(_site_doc(site, slot, key)) == NOW + 8 * DAY
+    assert result.saved == NOW, "what the round found there"
+    assert not a.round(remote, key, now=NOW + 9 * DAY)[0].uploaded
+
+
+def _join_round(b, remote, key, now, stale_ok):
+    snap = sync.collect(b.ctx, sync.DEFAULT_CATS)
+    return sync.round_trip(remote, key, b.state.doc, snap, sync.DEFAULT_CATS, now=now,
+                           fresh=b.state.fresh, joining=b.state.joining, seen=b.state.seen,
+                           stale_ok=stale_ok)
+
+
+def test_a_computer_that_joins_is_asked_before_it_takes_a_copy_a_month_old(tmp_path, site):
+    """A computer new to the slot has seen no counter, so it cannot tell an
+    earlier copy the site hands back. One last saved more than a month ago
+    stops the round before anything is merged, put back or applied - the
+    window asks; taken only when the person says so. A newer one joins as
+    ever, and says how old it was."""
+    slot, key = sync.derive(os.urandom(32))
+    remote = sync.Remote(slot, site.url, timeout=5)
+    a = Computer(tmp_path, "a", slot)
+    a.settings.setValue("theme", "nord")
+    a.round(remote, key, sync.DEFAULT_CATS, now=NOW)
+    b = Computer(tmp_path, "b", slot)
+    b.state.fresh = b.state.joining = True
+    puts, blob = site.puts(), site.slots[slot]
+    with pytest.raises(sync.SyncError) as e:
+        _join_round(b, remote, key, NOW + 40 * DAY, stale_ok=False)
+    assert e.value.kind == "stale" and e.value.saved == NOW
+    assert site.puts() == puts and site.slots[slot] == blob, "nothing put back"
+    assert b.settings.value("theme") is None
+    # Asked, and taken.
+    result = _join_round(b, remote, key, NOW + 40 * DAY, stale_ok=True)
+    assert result.saved == NOW and sync.live(result.merged, "settings")["theme"] == "nord"
+    # A copy within the month: no question, its age with the result.
+    c = Computer(tmp_path, "c", slot)
+    c.state.fresh = c.state.joining = True
+    result = _join_round(c, remote, key, NOW + 41 * DAY, stale_ok=False)
+    assert result.saved == NOW + 40 * DAY
+    # A computer that has synced before is never asked: it has its counter.
+    assert not a.round(remote, key, sync.DEFAULT_CATS, now=NOW + 400 * DAY)[0].older
+    # After a restore (fresh, not joining) the same question.
+    d = Computer(tmp_path, "d", slot)
+    d.state.fresh = True
+    with pytest.raises(sync.SyncError) as e:
+        _join_round(d, remote, key, NOW + 800 * DAY, stale_ok=False)
+    assert e.value.kind == "stale"
+
+
+def test_an_old_copy_handed_back_on_a_conflict_is_asked_about_too(tmp_path):
+    """The site could pass the question with a new copy, then hand back an
+    old one as the "newer" copy of a conflict: asked about as the first."""
+    slot, key = sync.derive(os.urandom(32))
+    fresh_doc = sync._counted(sync.empty_doc(), 5, saved=NOW)
+    old_doc = sync._counted(sync.empty_doc(), 2, saved=NOW - 90 * DAY)
+
+    class Sly:
+        def get(self):
+            return 7, sync.seal(key, fresh_doc)
+
+        def put(self, version_seen, blob):
+            return False, (8, sync.seal(key, old_doc))
+
+    b = Computer(tmp_path, "b", slot)
+    b.state.fresh = b.state.joining = True
+    b.settings.setValue("theme", "nord")
+    with pytest.raises(sync.SyncError) as e:
+        _join_round(b, Sly(), key, NOW + DAY, stale_ok=False)
+    assert e.value.kind == "stale" and e.value.saved == NOW - 90 * DAY
 
 
 def test_sync_goes_over_https_only_and_follows_no_redirect(tmp_path, site, monkeypatch):
@@ -1071,7 +1178,8 @@ def _settle(w, secs=10.0):
 
 
 def test_off_nothing_runs_and_anyone_can_start(tmp_path, site, qapp):
-    """Sync is for everyone: no supporter key, and none sent when there is."""
+    """Sync is for everyone, and an older app's key left in the settings
+    file is never sent."""
     w = _window(tmp_path, "w", site)
     assert not w._sync_on() and not w._sync_timer.isActive()
     assert not w.sync_now(manual=True)
@@ -1081,7 +1189,7 @@ def test_off_nothing_runs_and_anyone_can_start(tmp_path, site, qapp):
     code = w._sync_start_here()                                   # no key at all
     assert sync.parse_code(code) and w._sync_on() and _settle(w)
     assert w._sync_status[0] == "ok" and len(site.slots) == 1
-    w.settings.setValue("supporter_key", _key())                  # a supporter's
+    w.settings.setValue("supporter_key", _key())                  # an older app's
     w.settings.setValue("theme", "nord")
     assert w.sync_now(manual=True) and _settle(w) and w._sync_status[0] == "ok"
     for h in site.headers:

@@ -3,7 +3,8 @@ Kodi with its web server's port and login (``_KodiAddDialog``), and "Add
 a device by address…", a Chromecast, a TV or a Kodi the search does not
 reach - another part of a network split in VLANs (``_AddressDialog``).
 Each asks off the window's thread and keeps the device only once it
-answers; ui/mw_cast.py opens them (``add_kodi``, ``add_cast_device``).
+answers; ui/mw_cast.py opens them (``add_kodi``, ``add_cast_device``). A
+Kodi's login over plain http is asked about before it is first sent.
 """
 
 from __future__ import annotations
@@ -21,16 +22,22 @@ from .theme import P
 
 class _KodiAddDialog(QDialog):
     """A Kodi by its address: the web server's port (8080 unless changed in
-    Kodi) and, when it has one, its login. Kept only once Kodi answers."""
+    Kodi) and, when it has one, its login. Kept only once Kodi answers. A
+    login over plain http is asked about before it is first sent (*ask*,
+    the window's ``_kodi_plain_ask`` for the address: "send", "https" or
+    ""); one this Kodi was let send so already, at the same address, is not
+    asked again."""
 
-    def __init__(self, parent, kodi, current: str | None, pool) -> None:
+    def __init__(self, parent, kodi, current: str | None, pool, ask=None) -> None:
         super().__init__(parent)
         self.kodi = kodi
         self.pool = pool
         self.current = current
+        self.ask = ask
         self.result_label: str | None = None
         self._checking = False
         dev = kodi.device(current) if current else None
+        self._was = dev
         self.setWindowTitle(tr("kodi_add_title"))
         self.setMinimumWidth(420)
         lay = QVBoxLayout(self)
@@ -97,11 +104,25 @@ class _KodiAddDialog(QDialog):
             return
         host, port, secure = where
         user, password = self.user.text().strip(), self.password.text()
+        plain_ok = False
+        if (user or password) and not secure:
+            was = self._was
+            if was is not None and was.plain_ok and (was.host.lower(), was.port) == (host.lower(), port):
+                plain_ok = True             # asked for this Kodi already
+            else:
+                shown = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+                answer = self.ask(shown) if callable(self.ask) else ""
+                if answer == "https":
+                    secure = True           # asked over https, its certificate checked
+                elif answer == "send":
+                    plain_ok = True
+                else:
+                    return                  # nothing sent, the dialog as it was
         self._checking = True
         self.ok_btn.setEnabled(False)
         self._say(tr("kodi_checking", address=f"{host}:{port}"))
         run_async(self.pool, self.kodi.add, self._added, self._failed,
-                  host, port, user, password, "", secure)
+                  host, port, user, password, "", secure, plain_ok)
 
     def _alive(self) -> bool:
         return not sip.isdeleted(self) and self.isVisible()

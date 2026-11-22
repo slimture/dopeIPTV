@@ -362,8 +362,8 @@ language are very welcome**; see [`docs/TRANSLATING.md`](docs/TRANSLATING.md)
 
 dopeIPTV is free, with no ads, no tracking and no paid version. If you use
 it and like it, you can say thanks with
-**[a tip](https://dopeiptv.org/support/?ref=github)** - once, any amount you
-choose. It is voluntary and gives nothing in return: the app is the same for
+**[a tip](https://dopeiptv.org/support/?ref=github)** - any amount you
+choose, never a subscription. It is voluntary and gives nothing in return: the app is the same for
 everyone. Reporting bugs and fixing a translation in your language help just
 as much.
 

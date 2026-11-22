@@ -168,6 +168,13 @@ class SourceFields:
         # entry is unaffected. textEdited fires on paste (but not on our own
         # setText), so the credentials fill the moment the link is pasted.
         self.server.textEdited.connect(lambda _t: self._maybe_autodetect_link())
+        # Plain http to a provider on the internet: its login travels in
+        # every address, readable on the way (docs/SECURITY.md, "A provider
+        # on plain http") - said under the address, nothing refused.
+        self.http_note = QLabel(tr("playlist_http_note"))
+        self.http_note.setWordWrap(True)
+        self.http_note.setTextFormat(Qt.TextFormat.PlainText)
+        self.http_note.setStyleSheet(f"color:{P.get('warn', P['muted'])}; font-size:12px;")
         self.user = QLineEdit(playlist.get("username", ""))
         self.pw = QLineEdit(playlist.get("password", ""))
         self.pw.setEchoMode(QLineEdit.EchoMode.Password)
@@ -194,6 +201,22 @@ class SourceFields:
         self._kind_own = KindOwnFields(
             self.kind, {"server": self.server, "user": self.user, "pw": self.pw,
                         "mac": self.mac}, self.signin)
+
+    def plain_http(self) -> bool:
+        """Whether the address typed sends a login over plain http to the
+        internet: an Xtream server or a portal at http:// - or with no
+        scheme, which the Xtream client takes as http - on a host outside
+        the home network."""
+        if self.kind.currentData() not in ("xtream", "stalker"):
+            return False
+        text = self.server.text().strip()
+        low = text.lower()
+        if not text or low.startswith("https://"):
+            return False
+        if "://" in low and not low.startswith("http://"):
+            return False
+        from ..core import stream_address
+        return stream_address.on_internet(text)
 
     def _build_satip(self, options: dict) -> None:
         """A SAT>IP server's fields: its channel lists (M3U, a file or an
@@ -410,6 +433,13 @@ class SourceFields:
         }
         options = (self.nerd_panel.values() if self.nerd_panel is not None
                    else dict(self._options))
+        # A source's page: whether it plays without its certificate checked
+        # (core/nerd.TLS_UNCHECKED) - the quick form has no such switch.
+        tls = getattr(self, "tls_box", None)
+        if tls is not None:
+            options.pop("tls_unchecked", None)
+            if tls.isChecked():
+                options["tls_unchecked"] = "true"
         if out["kind"] == "satip":
             options = self._satip_options(options)
         if out["kind"] in MEDIA_KINDS:
@@ -474,6 +504,8 @@ class PlaylistDialog(SourceFields, QDialog):
             self.presets = PresetButton(self._preset_picked, self)
             form.addRow("", self.presets)
         form.addRow(self._server_lbl, self.server)
+        form.addRow("", self.http_note)
+        self.server.textChanged.connect(lambda _t: self.http_note.setVisible(self.plain_http()))
         form.addRow("", self.finder.row)
         form.addRow(self._user_lbl, self.user)
         form.addRow(self._pw_lbl, self.pw)
@@ -510,6 +542,7 @@ class PlaylistDialog(SourceFields, QDialog):
         self._server_lbl.setText(shown["server_label"])
         for w in (self._server_lbl, self.server):
             w.setVisible(shown["server"])
+        self.http_note.setVisible(shown["server"] and self.plain_http())
         for w in (self._user_lbl, self.user):
             w.setVisible(shown["login"] and shown["user"])
         for w in (self._pw_lbl, self.pw):
@@ -783,126 +816,6 @@ class UpdateDialog(QDialog):
             self.cancelled.emit()
         super().reject()
 
-
-
-class SupporterDialog(QDialog):
-    """The supporter key: paste it (it is checked here, offline), or - for
-    a supporter - the thank-you, with a way to donate again."""
-
-    def __init__(self, parent, settings, donate=None) -> None:
-        super().__init__(parent)
-        from PyQt6.QtWidgets import QLineEdit
-
-        from ..core import supporter
-        from .widgets import HeartButton, _SidebarLogo
-        self._settings = settings
-        self.setWindowTitle(tr("supporter_title"))
-        self.setMinimumWidth(480)
-        col = QVBoxLayout(self)
-        col.setContentsMargins(24, 22, 24, 20)
-        col.setSpacing(10)
-        top = QHBoxLayout()
-        heart = HeartButton(size=22)
-        heart.setFixedSize(46, 46)
-        heart.setFlat(True)
-        self.heart = heart
-        top.addWidget(heart, 0, Qt.AlignmentFlag.AlignTop)
-        # A supporter sees their mark: the logo as the sidebar shows it now.
-        mark = _SidebarLogo()
-        mark.set_supporter(True)
-        mark.setCursor(Qt.CursorShape.ArrowCursor)
-        mark.setFixedWidth(mark.LOGO_W + 8)
-        self.mark = mark
-        top.addWidget(mark, 0, Qt.AlignmentFlag.AlignTop)
-        words = QVBoxLayout()
-        self.head = QLabel()
-        self.head.setStyleSheet(f"font-size:16px; font-weight:700; color:{P['text']};")
-        self.sub = QLabel()
-        self.sub.setWordWrap(True)
-        self.sub.setStyleSheet(f"font-size:13px; color:{P['text2']};")
-        words.addWidget(self.head)
-        words.addWidget(self.sub)
-        top.addLayout(words, 1)
-        col.addLayout(top)
-        self.key = QLineEdit(str(settings.value("supporter_key", "") or ""))
-        self.key.setPlaceholderText(tr("supporter_paste"))
-        self.key.setAccessibleName(tr("supporter_key"))
-        col.addWidget(self.key)
-        self.state = QLabel()
-        self.state.setWordWrap(True)
-        col.addWidget(self.state)
-        where = QLabel(tr("supporter_where"))
-        where.setWordWrap(True)
-        where.setStyleSheet(f"font-size:12px; color:{P['muted']};")
-        self.where = where
-        col.addWidget(where)
-        buttons = QHBoxLayout()
-        self.remove = QPushButton(tr("supporter_remove"))
-        buttons.addWidget(self.remove)
-        buttons.addStretch(1)
-        self.donate_btn = QPushButton(tr("donate_support") + "…")
-        if donate is not None:
-            self.donate_btn.clicked.connect(lambda _c=False: donate())
-        else:
-            self.donate_btn.hide()
-        close = QPushButton(tr("common_close"), objectName="Primary")
-        close.clicked.connect(self.accept)
-        buttons.addWidget(self.donate_btn)
-        buttons.addWidget(close)
-        col.addLayout(buttons)
-        self._supporter = supporter
-        self.key.textChanged.connect(self._check)
-        self.remove.clicked.connect(lambda _c=False: self.key.setText(""))
-        self._check()
-
-    def _check(self, *_a) -> None:
-        text = self.key.text().strip()
-        found = self._supporter.parse(text) if text else None
-        if found is not None:
-            self._settings.setValue("supporter_key", text)
-            from .qt_i18n import format_month
-            date = format_month(found["since"])
-            self.head.setText(tr("supporter_thanks"))
-            self.sub.setText(tr("supporter_since", date=date))
-            self.state.setText("✓ " + tr("supporter_ok", date=date))
-            self.state.setStyleSheet(f"font-size:12px; color:{P.get('ok', P['text2'])};")
-            self.donate_btn.setText(tr("donate_support") + "…")
-        else:
-            if not text:
-                self._settings.remove("supporter_key")
-            self.head.setText(tr("supporter_title"))
-            self.sub.setText(tr("supporter_intro"))
-            self.state.setText(tr("supporter_bad") if text else "")
-            self.state.setStyleSheet(f"font-size:12px; color:{P['error']};")
-            self.donate_btn.setText(tr("donate_support") + "…")
-        self.heart.setVisible(found is None)
-        self.mark.setVisible(found is not None)
-        self.mark.setToolTip(tr("supporter_tip", date=date) if found is not None else "")
-        self.where.setVisible(found is None)
-        self.state.setVisible(bool(text))
-        self.remove.setVisible(bool(text))
-        self.supporter = found
-        if self.isVisible():
-            self._fit()
-
-    def _fit(self) -> None:
-        """As tall as its words at its width: the intro and what the key
-        opens wrap beside the heart, and a plain size hint does not count
-        the wrapping - they ran past the top and bottom of the row."""
-        lay = self.layout()
-        if lay is None:
-            return
-        lay.invalidate()
-        lay.activate()
-        w = max(self.width(), self.minimumWidth())
-        h = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else lay.totalSizeHint().height()
-        h = max(h, lay.totalSizeHint().height())
-        self.setMinimumHeight(h)
-        self.resize(w, h)
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        self._fit()
 
 
 class ProblemDialog(QDialog):

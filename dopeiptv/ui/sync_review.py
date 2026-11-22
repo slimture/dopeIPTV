@@ -29,7 +29,7 @@ from .theme import P
 _LABELS = {"proxy": "nerd_proxy", "headers": "nerd_headers", "rewrite": "nerd_src_rewrite",
            "udpxy": "nerd_card_udpxy", "catchup_template": "nerd_src_catchup",
            "backup_servers": "nerd_src_mirrors", "dns_url": "nerd_card_dns",
-           "cert_pin": "cert_row"}
+           "cert_pin": "cert_row", "tls_unchecked": "src_tls_unchecked"}
 # A place to break after each of these, and inside a long run without one:
 # an address is one word, and would set the window's width.
 _BREAK_AFTER = re.compile(r"([/?&=,;:|])(?=\S)")

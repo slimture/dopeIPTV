@@ -127,10 +127,21 @@ def test_a_kids_profile_sees_nothing_for_adults(tmp_path):
             {"stream_id": 12, "name": "Renamed", "category_id": "ren"},
             {"stream_id": 13, "name": "Flagged", "category_id": "k", "is_adult": 1},
             {"stream_id": 14, "name": "Nowhere"}]
-    assert [r["stream_id"] for r in sa.visible(rows, shown.keep, kids=True, adult=adult)] == [10, 14]
-    # Categories that could not be read: none of the categorised rows.
-    assert [r["stream_id"] for r in sa.visible(rows, None, kids=True, adult=None)] == [14]
+    # As a kids profile's lists have them: a row of no category is none of
+    # its (what a provider leaves unlabelled is not taken to be for children).
+    assert [r["stream_id"] for r in sa.visible(rows, shown.keep, kids=True, adult=adult)] == [10]
+    # Categories that could not be read: none of the rows.
+    assert [r["stream_id"] for r in sa.visible(rows, None, kids=True, adult=None)] == []
     assert len(sa.visible(rows, None, kids=False, adult=None)) == 5
+    # A category the source does not list; only what a grown-up allows.
+    more = rows + [{"stream_id": 15, "name": "Elsewhere", "category_id": "zz"}]
+    known = frozenset(c["category_id"] for c in provider)
+    assert [r["stream_id"] for r in sa.visible(more, None, True, adult, known)] == [10]
+    assert sa.visible(more, None, True, adult, known, allowed=frozenset()) == []
+    assert [r["stream_id"] for r in sa.visible(more, None, True, adult, known,
+                                               allowed=frozenset({"k"}))] == [10]
+    assert [r["stream_id"] for r in sa.visible(more, None, False, adult, known,
+                                               allowed=frozenset())] == [10, 11, 12, 13, 14, 15]
 
 
 class _Client:

@@ -193,11 +193,12 @@ def test_the_real_ffmpeg_goes_through_with_the_key_and_not_without(case):
     env = {"PATH": __import__("os").environ.get("PATH", "")}
 
     def record(proxy: str) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["ffmpeg", "-nostdin", "-loglevel", "error",
-             *net_bridge.recorder_options("ffmpeg", proxy, False),
-             "-i", url, "-c", "copy", "-f", "null", "-"],
-            capture_output=True, timeout=60, env=env, check=False)
+        cmd = ["ffmpeg", "-nostdin", "-loglevel", "error",
+               *net_bridge.recorder_options("ffmpeg", proxy, False),
+               "-i", url, "-c", "copy", "-f", "null", "-"]
+        assert not any(bridge.secret in a for a in cmd)     # the key in the environment alone
+        return subprocess.run(cmd, capture_output=True, timeout=60,
+                              env={**env, **net_bridge.recorder_env(proxy)}, check=False)
 
     bare = record(f"http://{bridge.where}")
     assert bare.returncode != 0 and inside.requests == []

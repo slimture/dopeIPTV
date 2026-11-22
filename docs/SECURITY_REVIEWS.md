@@ -286,3 +286,139 @@ CodeQL on `main`. Checked against the code, what holds:
 | CodeQL | yt-dlp's own copy and wrapper runnable by other users; SHA-1 for ids kept in memory | low | After 1.6.9: this user's alone (0700); SHA-256 |
 | CodeQL | 40 log lines "logging a password", a cache file "storing a secret", SHA-1 for the picture cache's file names, MD5 in NextPVR's login, three sockets on every interface | answered | False positives or by design: the stream address (which holds an Xtream login) taints every row that carries one, while each line logs `url_for_log`, `redact_url`, `address_scheme` or `for_log` of it; the cache's names are no secret; NextPVR's protocol is MD5; the HDHomeRun and mDNS answers and server mode must listen on the network |
 | CodeQL | 25 in the tests (fake servers, test regexes) | answered | The tests' own, not the app's |
+
+## November 2026 - an independent AI review of 1.6.10 (testing at ec467dd)
+
+The maintainer gave the review kit (`tools/review_kit.py`, 19 parts, the
+code at `ec467dd`) to ChatGPT, which read the excerpts and the linked
+files. It scored the whole 6/10 against docs/SECURITY.md, found no
+critical or unauthenticated takeover, and listed 46 weaknesses. Checked
+against the code and the threat model, none is a defect the code did not
+already mean: almost every one is a limit docs/SECURITY.md writes down
+with its reason, and three that it did not say were written down.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Network boundary | A public name that resolves to a home address is not refused for the app's own requests (pictures) nor for the player; "close this first" | medium | Written down: **A list chooses where its pictures come from**, and its reason (a media server's artwork and Plex's `plex.direct` names resolve to home addresses). Put to the maintainer as a choice for a later version: refuse it for an internet source's own requests, the source's own server and Plex's names left out |
+| Logins | Kept in the settings files, not a keyring; http providers send them in the clear; the player does not check certificates on old libraries | high | Written down: **Logins are in the settings files, not a keyring**, **A provider on plain http**, **The player checks certificates only as its libraries do** (the maintainer's decision: playback first) |
+| LAN servers | Plain http: a reader takes the tokens, a changer can change the phone remote's page | high | Written down: **The home network's servers speak plain http**. Added: the remote API's shared playlist redirects to the source's own address, an Xtream login in it, so its token reaches those logins (server mode restreams instead) |
+| Casting | A receiver gets the stream address, a device can take a name, the Apple TV bridge serves the first asker | high/medium | Written down: **A cast hands the TV the stream address**, the device table's "what is left", the bridge's `admits` |
+| Tuner | Endpoints without a token for the devices let in | medium | Written down: **The tuner without its token**; off by default since 1.6.9 |
+| Updates | The site can hold an update back or offer an older signed release still newer than the one running; the release key and the build are trusted | medium/high | Written down: **What dopeiptv.org keeps is its word**, **Builds are not yet reproducible**, **The build key signs in jobs that run other people's code**; the release key signs only after the maintainer approves (`release-signing`) |
+| Updates | The AppImage checked by its path, then moved by its path - a race in a folder another account can write to | medium, conditional | Answered: whoever can write that folder can replace the AppImage itself at any time; nothing new is opened |
+| yt-dlp | The app's copy known by its size and time after install, not hashed before each run | medium, conditional | Answered and written down under **yt-dlp is trusted by its own signature**: the folder is the user's own (0700); whoever can write there can change the app too |
+| Private viewing | Turned on midway: a converter's second, a request already sent; providers and TVs see what they serve | medium | Written down: **Private viewing writes nothing to a disk** (the second each converter is watched in, what it does not reach) |
+| Private viewing | A subtitle search sends the title | low | Written down: the search asks by the words in its box as the person opens it - what is asked right then goes (rule 3) |
+| Reports | Pattern cleaning cannot catch every name; the site sees the address and the time | medium/low | Written down: the report is shown whole before Send, and **What dopeiptv.org keeps is its word** |
+| Sync | The code is the whole key; the server can hold a copy back from a new computer; a slot only an older app wrote is unbound | high/medium | Written down: **The sync code is the whole key**, **The sync server can hold a copy back** (the older slot there too) |
+| Watch together | The relay sees who is in a room and when; a replay across a restart | medium | Written down: **The Watch together relay sees who is in a room**; the restart's limit in the round above |
+| Statistics | Visits kept 14 days could single someone out; swap is warned about, not enforced | medium | Written down on the transparency page (part 10) and in the round above |
+| Backups | An unencrypted export, a weak password, a restore staged decrypted, a restore that turns things on | medium | Written down: **A backup's password is as strong as the password**; the staged file is 0600 beside the settings that then hold the same logins; what a restore turns on is named before it is put back (`backup.RISKY_SOURCE`, `SIGN_INS`) |
+| Profiles | A short PIN offline; kids filtering by the provider's categories | medium | Written down: **A PIN can be short**, **A kids profile holds only with a grown-up's PIN** |
+| Links | A web page can play a named channel | low | Written down: **A link to a channel plays without a question** |
+| Third parties | TMDB sees the titles looked up; the built-in key can be read from the app | medium/low | Written down: **TMDB learns what is looked up**; Provider artwork, TMDB off asks it nothing; the key is public by nature |
+| Media libraries | mpv's and FFmpeg's parsers and their own requests | medium | Written down: **Bugs in the media libraries are theirs**, **The player and the recorder look names up themselves**, **A hostile source can make the app work up to its ceilings** |
+
+## November 2026 - an independent AI review of 1.6.11 (testing at cb79269)
+
+The maintainer gave the review kit (20 parts, the code at `cb79269`, part
+20 the changes since 1.6.10) to ChatGPT. It scored the whole 6/10, found
+no critical weakness and no way past the signed updates, and ranked what
+to close first: logins out of process arguments and receivers' addresses,
+the phone remote's first page and the home network's plain http,
+certificates checked by default, the bounded name registry, backups and
+report cleaning. This round closes in code what can be closed without
+risking playback; what stays is written down with its reason.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | An Xtream address - its login - in the recorder's and an external player's command line, readable by every account on Linux | high | Fixed: a recording over its own connection is read by the app (`dvr_ingest.Ingest`, its route, reconnects and landing check) and handed to ffmpeg/mpv on their input (`recording.Feed`, `piped`; `-protocol_whitelist pipe`); an external player gets an http(s) address in a 0600 playlist file (`players.handoff_file`). What stays - an HLS recording, a cast's converter, server mode's HLS copy - is written down under **Programs started by the app show their arguments** |
+| Logins | Nerd's bridge key in the recorder's arguments | high | Fixed: in its environment only (`net_bridge.recorder_env`) |
+| Certificates | Strict TLS only opt-in; an https stream's certificate unchecked on older libraries | high | Fixed: every internet https stream's certificate checked in the player and the recorder, Nerd or not (`nerd.checks_certificate`, `_apply_tls`); one that does not check out is said (`diag_certificate`) and asked about once per source (`MainWindow._tls_offer`), the answer the source's own `tls_unchecked`, taken back on its page, a risky setting for sync and restore (`backup.RISKY_SOURCE`). Written down: **Every internet stream's certificate is checked** |
+| Network boundary | The 8 192-name registry lets an early name go | medium | Fixed: it fails closed - past the bound every public name counts as an outsider's but the person's own and Plex's (`dest_guard._FULL`) |
+| Network boundary | A proxied connection is the proxy's; mpv and FFmpeg resolve and redirect themselves | medium | Answered, written down: **The player and the recorder look names up themselves**; a recording over its own connection now goes through `dest_guard` (above) |
+| Reports | A login of one or two characters stayed in free text | medium | Fixed: a login however short hidden as a word of its own (`report.SHORT_SECRET`, as `core/log.py` does) |
+| Private viewing | A TMDB lookup queued before its title turned private still went | low | Fixed: asked again on the worker just before the request, nothing kept (`metadata._PRIVATE`) |
+| Private viewing | A cast's converter on the disk stopped only at the next second's look | medium | Fixed: turning private viewing on wakes both bridges' watches at once (`privacy.wait_change`) |
+| LAN servers | The remote API had no per-client budget or lock-out | medium | Fixed: a request budget per address and ten wrong tokens a minute shut it out for ten minutes, never this computer (`RemoteServer.limits`) |
+| LAN servers | Plain http: a reader takes tokens, a changer the phone remote's page; the shared playlist redirects to Xtream addresses | high | Written down: **The home network's servers speak plain http** - a page on the home network cannot be authenticated without a certificate the phone trusts; server mode restreams instead of redirecting |
+| LAN servers | The tuner's token-free endpoints; optional browser headers | medium | Answered: off by default since 1.6.9 (`home_server.OPEN_OFF`), the devices let in named by the person |
+| LAN servers | Any private address counts as home | medium | Answered, written down: **Home means any private address** - the token, the signatures and the Host check are the lock; server mode keeps to this computer's own networks |
+| Casting | A device can take a name; a direct cast hands the receiver the address | high/medium | Answered, written down: **A cast hands the TV the stream address**; a device known by more than its name is not preselected (`ui/cast_dialog._is_stranger`) |
+| Logins | Plain text in the settings files, not a keyring | high | Written down: **Logins are in the settings files, not a keyring** |
+| Backups | An unencrypted export | high | Answered: a backup without a password is made only after a warning whose default is Cancel (`MainWindow._backup_without_password_ok`); written down: **A backup's password is as strong as the password** |
+| Profiles | A four-digit PIN can be guessed offline; kids filtering trusts the provider's categories | medium | Written down: **A PIN can be short**, **A kids profile holds only with a grown-up's PIN** |
+| Updates | An older but newer signed release; a compromised signing key or builder | medium/high | Written down: **What dopeiptv.org keeps is its word**, **Builds are not yet reproducible**, **The build key signs in jobs that run other people's code** |
+| Sync, Watch together | A new computer cannot tell an older copy; the relay sees who is in a room and can hold messages back | medium | Written down: **The sync server can hold a copy back**, **The Watch together relay sees who is in a room** |
+| Statistics | A day's visits linkable; keys in memory | low/medium | Written down on the transparency page (part 10); the server's swap is encrypted and watched (`swap_state`) |
+| Guides | 2 GiB of guide is still work | medium | Written down: **A hostile source can make the app work up to its ceilings** |
+| yt-dlp | Checked by its hash, not at the moment it runs | low | Answered: whoever can change it runs as the person already (outside the model) |
+| Poster cache | A picture let go is asked for again | low | Answered: the same host, the same picture; **Provider artwork, TMDB off** asks TMDB nothing |
+| Third parties, update checks, links | TMDB sees titles; an update check shows the system; a web page can offer a stream | low | Written down: **TMDB learns what is looked up**, what an update check sends, the question before an address from a link (`mw_commands._ask_link_play`) |
+
+## November 2026 - a second independent AI review of 1.6.11 (testing at cb28ead)
+
+The maintainer gave the 21-part kit (the code at `cb28ead`, part 21 the
+fixes after the first review) to ChatGPT. It scored the whole 7/10 (from
+6/10), found no unauthenticated critical weakness, no way past the signed
+updates and no way for the server to read sync, and named what stood
+between 7 and 8: logins in the arguments of the programs the app starts in
+every mode, the media engines' own requests (an HLS playlist's segments,
+keys and redirects) outside the app's destination guard, a certificate
+check that did not fail closed, and Kodi's and the home network's plain
+http. This round answers the whole table, most of it in code; four
+agents and a second pass worked on it, each change with real tests (real
+ffmpeg, real mpv, `/proc/<pid>/cmdline` read while they run).
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | The recorder still got the address for an HLS playlist, the certificate fallback and RTSP; an external player fell back to the address | high | Fixed: no program the app starts is handed a provider's address. The recorder, a cast's converter and probe, the cast's archive and buffer readers, AirPlay's converter and server mode's HLS copy read an alias (`net_bridge.Bridge.alias`: a `.stream.invalid` host under a 192-bit token, the path's shape alone, mapped back segment by segment so relative HLS addresses work) through the bridge, its key in their environment alone (`child_env`); an rtsp/srt/rtmp address with a login goes in a 0600 file (ffmpeg's concat list, mpv's playlist); an external player gets its 0600 playlist or is not started; a token header never in argv (`tests/test_security_rules.py` fails on `-http_proxy` or an unfiltered `-headers` anywhere) |
+| Network boundary | FFmpeg/mpv fetch nested HLS resources, keys and redirects outside the app's guard (SSRF) | medium | Fixed: the bridge judges every connection it opens - by the host as written, then on the connected socket before a byte is sent (DNS rebinding) - by where the stream's source is (`Policy`): a source on the internet's never this computer, link-local, a metadata service or the home network, but the stream's own server, the person's own names and `.plex.direct`. The in-app player (docked, multiview, radio) reads every stream of an internet source through it, Nerd on or off (`nerd.player_proxy`); every program above too. A home source is left as it was (written down) |
+| Certificates | A refused `tls-verify` was logged and playback went on | high (conditional) | Fixed: the stream is not opened and the video says why (`nerd.CertificateUnchecked`); never handed to another player instead. An https alias's certificate is checked by the bridge as the player checks it |
+| Network boundary | A proxied request is the proxy's; the source's own names and udpxy are exceptions | medium | Fixed in part: a request through a proxy has its name looked up here first (`dest_guard.proxied_refusal`); udpxy only in its own shape; an address with no host counts as this computer. Answered: `note_own` stays (a server at home by its public name), its reason in `dest_guard` |
+| LAN servers | The remote API plays any network address for a token holder; a global budget | medium/low | Fixed: no address that leads to this computer or a link-local host (`remote_api.play_refusal`); a budget for every device together beside each address's (`RateLimiter`) |
+| LAN servers | The tuner open to the home network, carried over from before 1.6.9 | medium | Fixed: said once on a card with "Close it" (only the devices that used it), `--server` logs it at every start, Settings says what the tuner is open to |
+| Casting | Kodi's login over plain http | high | Fixed: asked once per Kodi before a login goes over http - "Send anyway", "Use HTTPS" (tried first), Cancel the default (`kodi.KodiPlainLogin`) |
+| Links | A `dopeiptv://` link changes the channel unasked | low | Fixed: asked first, the channel's name in plain text |
+| Backups | Risky settings restored when the restore is approved | medium | Fixed: every risky thing a box of its own, none ticked; what is not ticked stays as it is here |
+| Profiles | Kids filtering trusts the provider's categories; short PINs | medium | Fixed: "Only what a grown-up allows" (per source, off by default); PINs of 4 to 12 digits with a hint |
+| Reports and logs | An encoded login escapes redaction; the outgoing report not editable | medium | Fixed: percent-encoded, JSON-escaped and Basic base64 forms masked; the report sends exactly what its window shows |
+| Sync | A new computer can be handed an older copy | medium | Fixed in part: a copy last saved more than 30 days ago is asked about before a joining computer takes it (`sync.saved_at`, `STALE_DAYS`); a server that withholds stays written down |
+| Watch together | The relay cannot tell members from anyone who knows a room id; replay after a restart | medium | Fixed (app and website): a room credential the relay keeps only a hash of binds the room; limits per member, address and day; a member since 1.6.11 taken only from its first message naming this stay's own id |
+| Updates | Nightly-to-stable at the same three numbers offered automatically | low | Fixed: only for the build the person left Test builds on; else strictly newer |
+| yt-dlp | Checked by size and time between hashes | low | Fixed: hashed before every run; mpv's hook through a wrapper that hashes it first |
+| Instance socket | The folder's error path went on | low | Fixed: fails closed (`instance._folder_refusal`) |
+| Recordings | A stream with no end fills the disk | medium | Fixed: a recording stops while a gibibyte is still free (`recording.DISK_FLOOR`) |
+| Website statistics | Visit-level retention; raw server logs | medium/low | Fixed: single visits 7 days (was 14); the service warns on the admin page while an old log with addresses is on the disk; the servers' configuration is checked by hand (written down) |
+| Release signing | A compromised signing environment | high | Answered: the update key lives only in GitHub environments of its own (`release-signing`: a required reviewer, `main` and `v*` tags only, administrators may not bypass; `nightly-signing`: `testing` only) - nothing else reads it |
+| Logins at rest | The settings file, not a keyring | medium | Answered: a keyring is planned as a round of its own after 1.6.11 (it touches every login); written down |
+| Third parties, metadata | TMDB sees titles; the update check shows the build | low | Answered: Posters & info can turn TMDB off; written down |
+| Crypto | An own ChaCha20-Poly1305 | low (unproven) | Answered: RFC 8439 test vectors in the tests; written down |
+| Casting | A device can claim another's identity | medium | Answered: discovery is unauthenticated by design of those protocols; a device known by more than its name is not preselected |
+
+## November 2026 - a third independent AI review of 1.6.11 (testing at 3886b6f)
+
+The maintainer gave the new 21-part kit (the code at `3886b6f`, part 21
+the fixes after the second review) to ChatGPT. It scored the whole 8/10
+(from 7/10), found no unauthenticated critical weakness, and named what
+was left: arguments that still name something, the person's proxy
+connecting where the bridge cannot see, a backup without a password
+holding every login, and the home network's plain http and wide reach.
+This round closes what can be closed without losing a feature or risking
+playback, and writes down why the rest stays.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | A non-http address goes to a program as an argument unless the app sees a login in it - a token in an rtsp or rtmp path, or under a query word of its own, escapes | medium | Fixed: every network address but a multicast group's goes in a 0600 file (`player_exec.handed_privately`) - the recorder's list, the external player's playlist, and now a cast's converter, ffprobe and the Apple TV's converter too (`player_exec.private_list`, through `net_bridge.hand_over`), which before got an rtsp address with a login as it was. A SAT>IP tuning (the tuning alone), a multicast group, and for the recorder an address an ffmpeg older than 5 would read without its options, stay an argument - written down |
+| Privacy | The external player's title in its arguments | low | Fixed: with a handoff file the title is that file's `#EXTINF` line alone, which mpv and VLC show; a local file keeps its title beside its path, which is there anyway |
+| Network boundary | Through Nerd's proxy the bridge cannot see where the proxy connects | medium | Fixed in part: a name is looked up here before the proxy is asked, and each of its addresses judged as a connection that landed there (`Bridge._proxied`, best effort as `dest_guard.proxied_refusal`); the proxy's own lookup stays the proxy's - written down |
+| Backups | A backup without a password holds every login in plain text | medium | Fixed: without a password the file holds no login (`backup.without_logins`: Trakt, Simkl, OpenSubtitles, a TMDB key of one's own, the sync code, MQTT, the webhooks' header, a proxy or header with a login, a Kodi's password, a playlist's password, token and box MAC, a login in its addresses); a restore keeps the logins of the computer it is put back on (`Backup.keep`, `_logins_from_here`); a login written into an address's path stays - written down |
+| Casting | A direct cast hands the TV the stream's address, an Xtream login in it | medium | Answered: a DLNA TV, a Kodi and an Apple TV are made to fetch a stream themselves; every cast through the computer would keep it awake and in the path and make casting less dependable. To a Chromecast or an Apple TV one cast can go through the app (a quality, track or subtitle chosen). Written down in docs/SECURITY.md |
+| LAN servers | The remote API's token travels over plain http | medium | Answered: a certificate for a home address would be one every client warns about, and Home Assistant's REST calls, VLC and Kodi cannot sign; the token is 192 bits, with a lock-out and New address. Written down |
+| LAN servers | "Home" is every private range | medium | Answered: narrowing the phone remote and the remote API to this computer's own networks would shut out phones and Home Assistant on another part of a network split in VLANs; every request needs the token or the phone's signature, a lock-out holds, server mode's token-free tuner already uses the narrow rule (`home_net.LocalNetworks`). Written down |
+| Casting | Kodi over http allowed after the person says so | low | Answered: the person's choice per Kodi, "Use HTTPS" tried first, Cancel the default |
+| Network boundary | `note_own` lets a source's own name lead home | low | Answered: a server at home under its public name needs it; its reason in `dest_guard` |
+| Sync | A computer new to the slot can be handed an older copy | low | Answered: the 30-day question holds; a server that withholds stays written down |
+| Media engines | FFmpeg and mpv decode outside input in the app's own process | medium | Answered: a sandbox for the decoders is the step towards 9/10, a project of its own after 1.6.11 (the Flatpak runs in Flatpak's sandbox already) |
+| Release signing | The signing infrastructure | medium | Answered: the update key lives only in GitHub environments of its own with a required reviewer, administrators may not bypass; the next kit's part 19 says so |
+| Logins at rest | The settings file, not a keyring | medium | Answered: planned as a round of its own after 1.6.11 |

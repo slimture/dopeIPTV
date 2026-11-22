@@ -409,6 +409,10 @@ def _uuid_of(h: dict):
 
 
 class ChromecastManager:
+    #: True while the converter readies a stream for the TV (the cast card
+    #: says so): read from the window's thread, set on the worker.
+    preparing = False
+
     """Discovers Chromecast devices on the LAN and casts streams."""
 
     def __init__(self) -> None:
@@ -895,23 +899,27 @@ class ChromecastManager:
         if audio is None and subs is None and quality == "original":
             log.info("cast: %s cannot decode %s - converting it here",
                      device_name, " + ".join(bad) or "this stream")
-        bridged = self.bridge.start(
-            url, codecs, receiver=_host_of(self.active) if self.active is not None else "",
-            audio=(audio or {}).get("index", 0),
-            subs=None if subs is None else subs.get("index"),
-            sub_codec=(subs or {}).get("codec", ""), start_at=start,
-            quality=quality, sub_lang=(subs or {}).get("lang", ""),
-            feed=feed)
-        # ffmpeg does the seeking, so the converted stream starts at zero and
-        # the offset is added back when the position is read.
-        self.position_offset = start
-        # A text subtitle travels beside the picture as a WebVTT rendition,
-        # which means the bridge hands over a playlist rather than one long
-        # response - and a receiver told "video/mp4" about a playlist plays
-        # nothing at all.
-        ctype = ("application/x-mpegURL" if self.bridge.hls else "video/mp4")
-        if self._play_and_verify(mc, bridged, ctype, title,
-                                 converted=True) is not False:
+        self.preparing = True
+        try:
+            bridged = self.bridge.start(
+                url, codecs, receiver=_host_of(self.active) if self.active is not None else "",
+                audio=(audio or {}).get("index", 0),
+                subs=None if subs is None else subs.get("index"),
+                sub_codec=(subs or {}).get("codec", ""), start_at=start,
+                quality=quality, sub_lang=(subs or {}).get("lang", ""),
+                feed=feed)
+            # ffmpeg does the seeking, so the converted stream starts at zero
+            # and the offset is added back when the position is read.
+            self.position_offset = start
+            # A text subtitle travels beside the picture as a WebVTT
+            # rendition, which means the bridge hands over a playlist rather
+            # than one long response - and a receiver told "video/mp4" about
+            # a playlist plays nothing at all.
+            ctype = ("application/x-mpegURL" if self.bridge.hls else "video/mp4")
+            played = self._play_and_verify(mc, bridged, ctype, title, converted=True)
+        finally:
+            self.preparing = False
+        if played is not False:
             log.info("cast: %s is playing the converted stream", device_name)
             return True
         self.bridge.stop()

@@ -102,6 +102,55 @@ def test_nothing_in_the_app_reads_a_pickle():
     assert not found, "a pickle reader in the app: " + ", ".join(found)
 
 
+# -- a certificate is checked: never verify=False, the few reads beside a pin --------
+
+#: Where a TLS connection of the app's own checks no certificate chain, each
+#: with its reason (rule 3): the function that does it.
+UNCHECKED_TLS = {
+    # A certificate read to be shown before it is pinned, or compared with
+    # the pin, which is then the trust.
+    ("core/cert_pin.py", "fetch"),
+    # The pinned server of a source: its fingerprint, after the handshake,
+    # is the check (core/net_adapter.py).
+    ("core/net_adapter.py", "connect"),
+    # The bridge: a pin's read, and an alias's server neither the player
+    # nor the recorder would check (a server at home without Nerd's strict
+    # check, a source the person let play unchecked) - exactly the trust
+    # the recorder had reading the address itself (Alias.trust).
+    ("core/net_bridge.py", "_unchecked_context"),
+}
+
+
+def _unchecking(node: ast.AST) -> bool:
+    """verify=False, CERT_NONE, an unverified context or check_hostname off."""
+    if isinstance(node, ast.keyword):
+        return (node.arg == "verify" and isinstance(node.value, ast.Constant)
+                and node.value.value is False)
+    if isinstance(node, ast.Attribute):
+        return node.attr in ("CERT_NONE", "_create_unverified_context")
+    if isinstance(node, ast.Constant):
+        return node.value == "CERT_NONE"
+    if isinstance(node, ast.Assign):
+        return (any(isinstance(t, ast.Attribute) and t.attr == "check_hostname" for t in node.targets)
+                and isinstance(node.value, ast.Constant) and node.value.value is False)
+    return False
+
+
+def _in_functions(tree: ast.AST, fn: str = ""):
+    """Every node of *tree* with the name of the innermost function it is in."""
+    for child in ast.iter_child_nodes(tree):
+        inner = child.name if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) else fn
+        yield child, inner
+        yield from _in_functions(child, inner)
+
+
+def test_no_certificate_check_is_switched_off_but_beside_a_pin():
+    found = {(rel, fn) for rel, tree in _modules() for node, fn in _in_functions(tree)
+             if _unchecking(node)}
+    assert found <= UNCHECKED_TLS, f"a certificate unchecked elsewhere: {sorted(found - UNCHECKED_TLS)}"
+    assert found == UNCHECKED_TLS, f"an exception no longer needed: {sorted(UNCHECKED_TLS - found)}"
+
+
 # -- the browser and the file manager: through core/xdg.py alone ---------------------
 
 def test_links_and_folders_are_opened_through_core_xdg_alone():
@@ -247,6 +296,7 @@ def _plain_words(node: ast.expr) -> bool:
 #: person's: (file, the words as the code writes them) -> why.
 OWN_WORDS = {
     ("media/players.py", "tr('status_player_not_found_msg', name=name)"): "mpv or VLC",
+    ("media/players.py", "tr('status_player_no_handoff', name=name)"): "mpv or VLC",
     ("ui/mw_profiles.py", "tr('pin_wait', n=max(1, math.ceil(wait)))"): "a number",
     ("ui/mw_profiles.py", "text"): "the wrong PIN's words and the wait, a number",
     ("ui/mw_settings.py", "tr('pl_export_failed', error=exc)"): "the file the person picked",
@@ -300,3 +350,30 @@ def test_labels_with_outside_words_are_plain_text():
                  and n.args and ast.unparse(n.args[0]) == "Qt.TextFormat.PlainText"}
         found += [f"{rel}: {name}" for name in sorted(wanted - plain)]
     assert not found, "not PlainText: " + ", ".join(found)
+
+
+# -- rule 8: no address, proxy or token header in a program's arguments --------------
+
+#: Where ffmpeg is handed "-headers": only the headers that open nothing
+#: (core/net_bridge.split_headers) - the rest the bridge adds.
+HEADER_ARGUMENTS = {"providers/airplay_bridge.py", "core/restream.py"}
+
+
+def test_no_program_is_handed_a_proxy_or_a_secret_header_in_its_arguments():
+    """Every account on a Linux computer reads a program's arguments: a
+    proxy (its login with it) goes to the app's bridge, a program is given
+    the bridge in its environment (net_bridge.hand_over, child_env), and
+    "-headers" only where the safe ones are picked out first."""
+    found = []
+    for rel, tree in _modules():
+        words = {n.value for n in ast.walk(tree)
+                 if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+        for word in ("-http_proxy", "--http-proxy", "--http-proxy="):
+            if word in words:
+                found.append(f"{rel}: {word}")
+        if "-headers" in words:
+            calls = {_dotted(c.func).rsplit(".", 1)[-1] for c in ast.walk(tree)
+                     if isinstance(c, ast.Call)}
+            if rel not in HEADER_ARGUMENTS or "split_headers" not in calls:
+                found.append(f"{rel}: -headers")
+    assert not found, "in a program's arguments: " + ", ".join(found)

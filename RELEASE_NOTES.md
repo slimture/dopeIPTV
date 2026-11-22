@@ -1,265 +1,35 @@
-## dopeIPTV 1.6.10
+## dopeIPTV 1.6.11
 
-**A tip is a plain thank-you now - every theme and the heart icon are for everyone - and updates, the log and private viewing are tightened further.**
+**Pick the app's icon and a calmer TV list - and a large round of security work: no stream address or login on another program's command line, every internet stream's certificate checked, and a backup without a password holds no login.**
 
-### Changed
+### Added
 
-- **Leave a tip** takes the place of Support dopeIPTV in the menu, in About and on the heart by the logo. A tip on dopeiptv.org is a voluntary thank-you for the app - once, any amount you choose - and nothing is given for it: the app is the same for everyone.
-- **Aurora and Dawn**, the two themes a supporter key opened, are everyone's now, and so is the **heart icon** for the app: switch it on under Settings → General. A supporter key from before goes on working and keeps its icon.
-
-### Security and privacy
-
-- **Updates:** an update is installed only when its signed file names the very version offered, so nobody can pass off an older release - one with a known fault - as a newer one.
-- **The log:** a line the app cannot mask is left out, never written as it was.
-- **Private viewing:** a channel recorded or cast while you watch privately no longer keeps its rewind buffer on the disk once the recording or cast ends.
-- **Error reports** take out every form of IPv6 address, and the report window says what goes beside your text: the app's version, the system and what you picked.
-- Every secure connection the app makes itself asks for TLS 1.2 at least, and the app's own copy of yt-dlp can be run by your user alone.
-
-## dopeIPTV 1.6.9
-
-**Private viewing keeps nothing on a disk, TMDB can be turned off altogether, and the phone remote, server mode and kids profiles are much harder to get round.**
-
-### Privacy
-
-- **Private viewing writes nothing of what plays to a disk.** A channel's rewind buffer, a cast's converted stream and a subtitle you fetch go only to memory that cannot reach a disk - on Linux, with no swap or encrypted swap - or are not made at all: the channel then plays without the rewind buffer, and a cast that needs converting says why it cannot. Turning private viewing on while something plays opens it again the private way, and a cast is sent again within a second. A recording while you watch privately is asked about first.
-- **TMDB can be turned off altogether:** choose **Provider artwork, TMDB off** under Settings → Posters & info and the app asks it nothing - no titles, no searches. Pictures then come from your provider alone, and Popular right now, cast photos and series backdrops are off.
-- **Kids profiles hold:** a kids profile can only be made once a grown-up's profile has a PIN, cannot play local files, recordings or an address typed in, and cannot reach a locked or adult category through History, Search, the phone or anything else. PINs are kept far harder to guess, and wrong tries slow down.
-- **A backup can get a password**, which encrypts the whole file.
-
-### Security
-
-- **The phone remote's key never crosses the network:** the code you scan carries it where a browser never sends it, and every request from the phone is signed with it.
-- **Server mode:** a new server's tuner needs its token, its page and settings a token of their own, and neither answers a web page or a name that is not your home's.
-- **A cast the app converts is served to the TV it was started for alone**, Chromecast and Apple TV.
-- **A provider can no longer make the app reach this computer or your home network:** the app's own requests never land there, nor follow a redirect inward, and a channel's address cannot name them.
-- **yt-dlp**, for YouTube and the like, is downloaded only as the release the build checked against yt-dlp's own signature.
-- **A release is signed only once the audit of everything it ships has passed.**
-
-### Fixed
-
-- The window could stop for good while pictures loaded (a macOS hang report, and the same on Linux).
-- An episode playing shows its series' poster under the video, and a series shows its poster as soon as it is clicked.
-- Ctrl+C in the terminal the app was started from closes the window as its close button does.
-
-### dopeiptv.org
-
-- **The website's statistics:** a visit is kept 14 days at the most, whatever is set; everything that should be gone is looked for after every run and deleted again; the server's swap is encrypted with a key a restart forgets, and the admin page says so if it is not.
-
-## dopeIPTV 1.6.8
-
-**More private: error reports, private viewing, sync and Watch together tightened, and dopeiptv.org shows the code for each.**
+- **App icon:** pick it under Settings → Appearance → App icon - the blue one, a heart, one in your accent colour (it follows the accent), midnight, paper, ocean, forest, sunset, grape, a round one or a retro TV.
+- **Show channel numbers** under Settings → Appearance. The TV list shows no numbers by default now, with more room for the names; typing a number still zaps to its channel.
+- A notice's words show in full when you click them.
+- **Casting** says *Preparing for the TV…* while a channel is repackaged on your computer before the TV can show it, instead of a silent wait.
 
 ### Security and privacy
 
-- **Error reports** are cleaned once more at the very moment they are sent, whichever way the text came, and the cleaning catches more: logins in quotes or in JSON, login headers and cookies, and server addresses written without `http://`. Reports go only over HTTPS to dopeiptv.org, never on to another address.
-- **Private viewing:** a film or an episode that began in private viewing leaves no resume point and no title in the log, even when you turn private viewing off before it ends - and if its stream reconnects after that, Trakt and Simkl are not told either.
-- **Watch together:** room codes have ten characters instead of eight, and each guess at one takes five times as long - trying every code against one room would take a graphics card centuries. A code from 1.6.7 still joins its room.
-- **Settings sync:** dopeiptv.org could never read or change your synced copy; now it cannot hand back an earlier one unnoticed either. Every copy carries a counter, locked with the rest: a computer that has seen a later copy keeps its own, puts it back and says so.
-- **Sync and Watch together** talk to dopeiptv.org only over HTTPS and never follow a redirect elsewhere.
-- **Updates:** a copy of the app built without dopeIPTV's release key takes no update at all, rather than trust a checksum from the same place as the file.
+- **Nothing on a command line:** a recording, a cast's converter, AirPlay and server mode never hand another program a provider's address, login or token. They read the stream through the app's own bridge, or from a private file only your user can read - another account on the computer sees nothing of it.
+- **The bridge guards every connection** a stream makes - its segments, keys and redirects - so a playlist from the internet cannot reach this computer, the router or a device at home. The in-app player reads every internet stream through it, Nerd on or off; your own proxy goes behind it.
+- **Certificates:** every https stream from the internet has its certificate checked, in the player and in recordings. One that does not check out plays nothing and says why, and the app asks once whether that source may play without the check - an answer you can take back on the source's page.
+- **Backups:** a backup without a password holds no login, and putting it back keeps the logins already on the computer. With a password the whole file is encrypted, as before. A restore brings nothing that runs something, lets others in or sends connections elsewhere unless you tick it.
+- **Kodi:** its login is never sent over plain http without asking - Send anyway, Use HTTPS (tried first) or Cancel.
+- **Kids profiles** can be kept to the categories a grown-up picks, and PINs can be 4 to 12 digits.
+- **Watch together:** every request to the relay carries the room's credential, and nothing said before you joined is played back after a restart.
+- **Sync:** a computer joining is asked before it takes a copy saved more than 30 days ago.
+- The remote API and the phone remote hold back a device that asks too often or guesses tokens; the app's own yt-dlp is checked before every run; a login is masked in the log in its encoded forms too; the subtitle search waits for Search while you watch privately; and adding an Xtream server or portal on plain http says the login travels unencrypted.
 
-### dopeiptv.org
+### Removed
 
-- **The website's statistics** keep much less. A visitor's ID is made with a key that changes every month and is deleted once the month after has ended - from then on nobody can tie it to an address, us included. A visit is kept in detail for 30 days instead of 400, then only as anonymous figures. The logs that hold addresses are kept two days instead of a week, and the front server keeps no log of requests at all. A tip is never noted on a visit, only in the day's total, and the service forgets an address within minutes once its request limit no longer needs it.
-- **Privacy, behind the scenes** shows the new code - the sync counter, the room code, the reports' last cleaning, the statistics' monthly key - and says more plainly where each protection stops, including that the list of where the app connects is what its own code names, not a guarantee that nothing else does.
-
-## dopeIPTV 1.6.7
-
-**Safer on a shared computer and on the home network, and Reset all now removes everything.**
+- **The supporter key**, everywhere. The heart icon is one of the icons to pick.
 
 ### Fixed
 
-- **Reset all settings** removes everything: the followed series and a backup waiting to be restored too, and the app's saved pictures, downloaded guides, the local library's index, its log files and its own copy of yt-dlp - when the app closes, and once more at the next start. Your recordings stay where they are. The question before it says so.
-- **Posters** no longer blink when a better picture arrives: a card keeps the one it shows until the new one is ready.
-- **Settings:** after a profile was removed, the next page could fail to open.
-- **macOS:** a Mac too old for the app no longer opens it only to have it fail - each download names the oldest macOS it runs on (15 for Apple Silicon, 14 for Intel).
-
-### Security
-
-- **Your settings files are yours alone** on Linux and macOS: they hold every login and token, and another account on the computer could read them.
-- **A second start** hands its command to the copy running over a channel no other account on the computer can take over.
-- **Server mode's tuner** answers only your home's own networks - a VPN's tunnel, a public network or a provider's shared address range no longer count - and a web page in your browser can neither drive it nor shut anyone out; the same for the phone remote. **If Plex or Jellyfin reaches the tuner through a VPN or Tailscale,** add its address under Nerd > Network > Other networks; the log names every address it refuses. The tuner also answers under a Fritz!Box name (`.fritz.box`) or a Tailscale name (`.ts.net`), and the log says why a name is refused.
-- **Sharing over the remote API** leaves out hidden and locked channels, as server mode always did.
-- **An address from outside** - a `dopeiptv://` link, `--play`, Open address…, the remote API - is never played or cast with your source's own headers, user agent, proxy or route, unless it is on that source's server.
-- **Programme guides:** a guide built to swell in memory is refused wherever it hides it, and a download or its unpacking stops at 2 GB.
-- **Updates on the Releases channel** never install a test build.
-- **Names from a provider, guide, box or server** are shown as plain words, never as formatting or pictures.
-- **AirPlay (macOS):** starting a cast in one copy of the app no longer ends a cast in another.
-
-### New
-
-- **Channels for adults in server mode** (Settings > Nerd > Remote and automation, and the server's page): off, as before, they stay out of the lineup and the shared playlist; on, they go out too. Hidden and locked categories never do.
-- **Send feedback and error reports** link to the privacy policy, and dopeiptv.org has a new page, **Privacy, behind the scenes**: each privacy promise with the code that keeps it, an example made by that code, and a way to ask any AI to check it.
-
-### Changed
-
-- **Under the hood:** the largest files - the main window, the player and Settings - are split into smaller parts. Nothing you see changes.
-
-## dopeIPTV 1.6.6
-
-**The Flatpak starts again.**
-
-### Fixed
-
-- **Flatpak (Linux):** the app crashed as it started, from 1.5.0 on - Qt's network part needs the Kerberos library (`libgssapi_krb5`), which the Flatpak runtime does not have. The Flatpak now carries it (#36). Before a release goes out, its Flatpak is now installed and started in the same runtime you get, as the other packages already were - every Qt part the app uses must load, and the app must keep running.
-- **If that library is ever missing,** the app still starts: a second start then opens a window of its own instead of handing its command to the one running.
-- **First start without a source:** the app no longer tries to load a programme guide from nowhere (it could say the guide failed to load).
-
-## dopeIPTV 1.6.5
-
-**A crash and two mix-ups fixed, safer settings sync, and supporting dopeIPTV is now a tip.**
-
-### Fixed
-
-- **A provider that refuses the login** no longer crashes the app as it opens. The lists from before stay; without them it says the user name or password is wrong.
-- **A source's type:** changing it in Settings no longer takes another type's address and login along (an Xtream login turned up under Jellyfin or Tvheadend). Each type keeps its own, a source is stored as the new type only once its own fields are filled in, and only looking through the types changes nothing and asks nothing.
-- **M3U channels keep who they are** when the provider adds, removes or reorders channels: favourites, hidden and renamed channels, your own numbers and reminders no longer move to the channel next door. The first start after the update reads the list as before; the start after that moves what is kept, in every profile.
-- **Settings sync:** restoring an older backup no longer takes anything from your other computers; the same playlist added on two computers is one; two computers that each had their first provider from before playlists - a different one on each - now keep both, each with its own favourites, instead of one taking the other's place; a full history list no longer removes titles on the others; and what a round brought in is kept even when the window closes right after.
-- **Server mode:** the tuner can no longer be reached from a web page (DNS rebinding). Plex, Jellyfin and Channels are not affected.
-- **Casting:** going back in a channel says so on the card - "Going back…", "Back to live…" - until the TV plays it.
-- **AirPlay (macOS):** a stream the Apple TV is still loading is no longer started over after ten seconds.
-- **TV:** a channel's name is no longer cut short on a scaled Windows screen, and the name column is as wide as the longest names need (#35).
-- **Mac:** the app's text is in the system's own font, and the app starts a little faster.
-- **Send feedback** fits the screen, scrolls and opens wholly on it - on a Mac it opened half under the Dock; **messages** take a new theme's colours.
-
-### New
-
-- **Subtitles on live TV** (Settings > Picture and sound): turn it off to have subtitles on films and series but not on live channels, whose DVB subtitles otherwise come on by themselves in your language.
-
-### Changed
-
-- **Supporting dopeIPTV is a tip or monthly support**, in all 27 languages, and the heart opens the new support page on dopeiptv.org.
-- **AirPlay (macOS):** an Apple TV plays channels live - going back in a channel is no longer offered there, as it was slow and the sound came out of step. Pause, films and episodes work as before, and a Chromecast goes back as before.
-
-## dopeIPTV 1.6.4
-
-**Casting with a card of its own that gets a stuck TV going again, and a round of fixes.**
-
-### New and better
-
-- **Casting has a new look.** While something plays on a TV, a card stands where the video was: the channel's logo or the film's poster, what is on, the TV it plays on and how it goes there - Playing, Paused, Buffering…, Reconnecting… - with big buttons for play and pause, 30 seconds back and forward, and Stop.
-- **A stuck cast gets going by itself.** A TV that buffers for ten seconds without anyone pausing is sent the stream again from where it was - twice at most, and never with a second connection to your provider. If that does not help, the card says so with **Try again**.
-- **On TV**: what plays on the TV is marked in every list and place, and the Now playing button goes to it.
-- **A cast button** in the player, and the cast window has the TV you used last on top, ready - Enter casts.
-- **AirPlay (macOS):** the AirPlay window opens by the card and stays with the app instead of over other programs; going back in a channel starts much sooner.
-- **The phone remote and the media keys** show and drive what plays on the TV - play and pause, stop, seek, channel up and down, the TV's volume.
-
-### Fixed
-
-- **Search:** a right-click on a result opened no menu and sent an error report instead.
-- **macOS:** the pointer hides again over the video, in the window and in full screen.
-- **Now playing** goes exactly to what plays - a recording or a local file too.
-- **Recently watched, Continue** and the other rows over the lists no longer start playing on a single click unless autoplay is on.
-- **Messages** at the foot of the sidebar: a long one is no longer cut off, and two no longer end up on top of each other.
-- **AirPlay** no longer says the Apple TV has not reached the Mac after every seek, and the card says Playing as soon as the TV does.
-
-## dopeIPTV 1.6.3
-
-**Room for the list, a guide that follows the category, and every place in the same new look - with the picture on its own thread on a Mac too.**
-
-### New and better
-
-- **Movies**: a click shows the film in the right-hand column - with **Continue** for one you have started - and a double click plays it. No more page of its own in the middle saying the same thing again.
-- **Room for your categories.** The places at the top of the sidebar fold into a row of icons with the little arrow under them, so the categories get the whole height. Places you never use - Guide, Search, Local files, Radio, Recordings - can be taken out of the sidebar.
-- **Just the list.** One switch in **Settings → Appearance → What the places show**: no rows over the lists, a lower header, Movies and Series as rows. Rows you do not want - Recently watched, Continue, Popular right now - can also be hidden one by one: right-click their heading.
-- **The guide follows the category.** With the guide open, pick Movies, News or Sport in the sidebar and the guide shows that category. A double click on a category opens its guide, and a double click again goes back to the channels; **Show in the guide** is in the category's menu too.
-- **Local files, Recordings and Radio in the new look.** Local files shows a renamed, added or removed file by itself, without Rescan. Recordings shows what records now and next at the top, a picture from each recording and what you have watched. Radio has My stations on top and every station with its logo.
-- **The picture on its own thread on a Mac** as on Linux and Windows: the window stays smooth while video plays, the controls come up when you move the mouse over the picture, and a right-click never leaves it black.
-- **Closing multiview**, the window you were listening to goes on in the main window - a film where it was.
-- **Answers to your feedback** show within minutes, and when you come back to the app, with a message that stays until you read it - after a restart too. When an answer asks for more, you can reply right under it - still no account, no e-mail.
-- **Phone remote:** the window with the code closes by itself once your phone has connected, and a note says so.
-- **Record in TV mode.** Press **Options**, then **Record**: what you are watching is recorded, without a second connection to your provider. While it records, a small **REC** sits in the corner of the picture and the tile says **Stop recording · 12 min** - it asks before it stops. Any question the app has is shown big on the TV and answered with your remote. On the phone remote's TV mode remote, **Record** is under **More**.
-- **Rewind live TV from your phone.** While a live channel plays, Now playing on the phone remote shows how far back the rewind buffer reaches: drag the bar to go back (it shows how far behind live you will be), skip back or forward, and tap **Live** to catch up - it lights up when you are watching live and otherwise shows how far behind you are.
-- **A recording stays in sight** at the foot of the sidebar for as long as it runs. Click it to stop - the app asks first, and what has been recorded so far is kept. With two at once you pick which one.
-- **A calmer header** in every place: the category's name small at the left, then the filter, the sort and Grid / List on the same line - no big title, nothing on top of anything. The count is in the status line.
-- **One way to your sources**: the source picker over the categories is gone - the button at the foot of the sidebar opens the same menu.
-- **Recordings in order**: grouped by day - Today, Yesterday, Earlier this week, Last week, then by month - and the sort button puts them oldest first, by name, by channel, longest or largest first. **Unwatched only** hides what you have seen.
-- **Local files can be sorted**: by name A–Z or Z–A, last changed, oldest, largest or type - folders always first, and the choice holds for every folder.
-- **Phone remote:** More opens on three even tiles - Subtitles and sound, Sleep timer, Record. Record turns red with the time while it records, in TV mode's remote too.
-
-### Fixed
-
-- The **preferred subtitle language** shows by itself again - for every language, also when a stream writes it "sv" or "en-GB" instead of "swe" or "eng". The preferred audio language too.
-- **macOS**: no crash any more when a sound device comes or goes - an AirPlay speaker nearby, headphones.
-- **Local files** with no folder yet offers **Add folder** again, and no stray "1" in its header.
-- The phone remote's **Radio** shows the most voted stations, under your own - it was empty when you had kept none.
-- **macOS**: the app no longer hangs for good going into or out of TV mode - or full screen - while something plays.
-- Muted, the player no longer makes another program's sound (Spotify) crackle at every channel change.
-- Enter plays the row picked in TV, Movies and Series.
-- Movies' and Series' cards show a favourite's star and Watch later's clock.
-- **Mine → History**: pick several rows with Ctrl or Shift and take them out at once with `Delete`.
-- **Mine** follows the autoplay setting: with it off, one click picks and a double click plays, as in every other list.
-- A series' page no longer says the first episode is up next while the second one plays.
-- Jumping to what plays finds a radio station too, in the list or country you played it from.
-- The **Next episode** card can come 10, 20, 30 or 45 seconds before the end, not only whole minutes (**Settings → Playback**).
-
-On the AppImage from 1.2.15 or later, or the Windows or Mac app from 1.4.5? Click **Update now** in the banner - or download 1.6.3 from [dopeiptv.org](https://dopeiptv.org).
-
-## dopeIPTV 1.6.2
-
-**A new look that hangs together: the sidebar is the app - Mine, TV, Movies and Series are places of their own with the same calm header - and dopeIPTV opens where you left off.**
-
-### New and better
-
-- **The sidebar is the app.** Mine, TV, Movies, Series, Guide and Search, then Local files, Radio and Recordings. Home is gone: what it held now lives where you would look for it, and Back, `Esc` or the mouse's back button take you to the place you came from, exactly as you left it.
-- **Opens where you left off** - each profile its own place - or always on Mine: **Settings → General → Start**.
-- **Mine - everything that is yours on one page.** What you were watching, your favourite channels live now in the order you usually watch at this hour ("Usually watched now"), your favourite films and series, Watch later as a queue you put in order yourself, new episodes of the series you follow, and History as a timeline by day with Play, Continue or Play again. One search and a row of chips filter all of it; your favourite folders are a tab of their own, dragged into order.
-- **TV in the new look.** The category's name, how many channels and in which order, Recently watched as small cards, and the channels as rows with what is on, how far it has got and what comes next - **Compact** or **Airy**. Zapping, numbers, favourites, stream health and everything else works as before.
-- **Movies and Series as posters or a list**, with **Popular right now** - this week's chart from TMDB, matched to what your own source has - and **Continue**, which for a series is the next episode ("S2 E5 · 18 min left"). A big category opens at once.
-- **Every film has its own page**, like a series: the backdrop, the plot, the cast, and one button - Play, or Continue from where you stopped. Opening it never starts anything.
-- **Popular right now** can be switched off for Movies or Series in **Settings → Posters & info**.
-- **The phone remote's TV mode remote fits your phone**: the d-pad fills the room below Now playing, nothing scrolls, and every key is big enough for a thumb. Subtitles and sound, the sleep timer and recording fold away behind **More**, and the phone remembers how you left it.
-
-### Fixed
-
-- Switching from Grid back to the list left an empty strip to the left of the channels until the app was restarted.
-- The header over Movies and Series: the filter, the sort and Grid / List stand in one line at one height (on a Mac the filter sat higher), a long category name ends with "…", and on a narrow window the posters no longer run past the edge.
-
-On the AppImage from 1.2.15 or later, or the Windows or Mac app from 1.4.5? Click **Update now** in the banner - or download 1.6.2 from [dopeiptv.org](https://dopeiptv.org).
-
-## dopeIPTV 1.6.1
-
-**Smooth scrolling while video plays, a calmer guide, a night mode that tames loud adverts and bangs, the visualizer for music channels, and your settings on a new computer in one step.**
-
-### New and better
-
-- **Smooth while something plays.** The picture is now drawn on its own, apart from the rest of the window: scrolling a list, the guide or a series' page stays smooth while a channel, a film or the visualizer plays, and nothing in the window can make the video stutter. If a computer cannot draw it that way, dopeIPTV uses the old way by itself - **Settings → Nerd → Diagnostics** says which.
-- **A calmer, denser guide.** Lower rows, so more channels fit; a narrower channel column that shows only the logos when the guide is narrow (drag its edge to set the width); flat cards with a thin progress bar on what is on now; separators like "-= Sweden =-" as headings; and rows without guide data left empty instead of repeating the same sentence. Want a line at the time now? **Settings → Guide** turns it on.
-- **Night mode that works.** Loud adverts, explosions and bangs come down while ordinary speech stays exactly as it is - it never makes anything louder - press `N`. It says so however you switch it, and tells you when it could not be turned on for a stream.
-- **The visualizer for music and radio channels.** A channel in your playlist with sound but no picture now shows the visualizer instead of a black screen. Two new styles, Vectorscope and Frequencies, make five - in the player's options menu.
-- **New computer? Bring your settings from the welcome.** Type the sync code from your other computer, or restore a backup: your profiles and settings come over, and your sources too when the other computer syncs them. Encrypted on your computer before it is sent - dopeiptv.org keeps only bytes it cannot read.
-- **The same menu bar everywhere.** File, View, History and Help on Windows, Linux and macOS - About is under Help (on a Mac in the dopeIPTV menu, as before). **Settings → General** now ends with About and the version too.
-- **Server mode tells you who has its port** - dopeIPTV's own server started earlier, or another program - and offers the next free one with one click.
-- **Local files never freeze the window.** Searching, switching to folders and opening a big folder on a network drive read the disk in the background - the window stays free and the rows fill in as they come. **Rescan** (the button beside the view switch, or `F5`) reads a folder again.
-- **One quiet place for what the app is doing.** Loading the guide, scanning a folder, syncing, checking for updates: a short line at the foot of the sidebar says it, with a count when more runs at once - click it for the details and Cancel. Messages only add a small badge; nothing pops up over your lists, and a small card comes up only when something needs your decision. The "Loading programme guide" bar that could stay stuck at the top is gone.
-- **Settings open at once** - about four times faster, and on GNOME without the spinning pointer that hung around for half a minute.
-- **Pictures load without slowing anything down.** Posters, logos and episode pictures are decoded once, away from the window, so lists, Home and above all a series' page scroll smoothly while they load.
-- **The phone remote plays everything the app plays.** Movies and series by category, Continue watching and History, Local files with their search, radio and recordings - and while an episode plays, its season's episodes with the one playing marked, previous and next episode on the buttons. Seek in a film or an episode, pick subtitles and sound, set the sleep timer, and record what plays or the next programme - it asks first, and any question the app would ask comes to the phone. Searching opens the phone's own keyboard, in TV mode too.
-- **The phone remote fits small phones** - down to the smallest iPhone SE, upright or on its side - and **follows what plays**: change channel anywhere and the page marks it and scrolls to it.
-- **The middle of the window follows what plays.** Start a channel from the phone or the media keys while a series' page shows, and the channel list comes up with it marked - the same for a film, an episode, a file, a station or a recording. Not while you type, in a dialog or in TV mode.
-
-### Fixed
-
-- Keyboard shortcuts sync between your computers again - between computers of the same system, since `⌘` is not `Ctrl`.
-- A series' page played an episode on one click. Now one click picks it and a double click or `Enter` plays it, as in the lists - unless **Auto-play preview on selection** is on.
-- Connections to your account are counted right: a cast on the source it comes from, a stream the player gave up on no longer, a rewind buffer kept by a recording or a cast only on its own source, and YouTube, Twitch and radio not at all. A cast or a recording after you switched source no longer picks the new source's channel with the same number.
-- Searching in a Local files folder finds files in its subfolders too.
-- The search boxes say what they search: the list, the categories, or everything.
-- TV mode: Back on its Home, twice, leaves it; leaving full screen any way really leaves TV mode, so the next channel no longer brings it back; it opens complete instead of folding in; View > TV mode is checked while it is on; and the window and the docked player come back exactly as they were.
-- Leaving full screen put the window back a little lower and smaller each time on Linux.
-- A choice in the player's or the guide's right-click menu no longer opens the menu of the row under it.
-- A click on the picture shows the controls instead of pausing; the pause button and `Space` pause.
-- On a series' page the "Playing" label had its text touching its edges.
-- The round pause button over the picture had a square box around it, and the rewind bar came up squeezed for a moment before its normal size.
-- On a series' page, the poster's play and pause button under the video now controls the episode that plays.
-- Home's back button stays at the top while the page scrolls.
-- TV mode: Stop while a dropped channel waited to reconnect now stops it.
-- A scheduled recording that comes due while you watch no longer opens a second connection by itself: it records from what plays when it is the same channel, and otherwise waits for a free connection or your OK.
-- The same provider account added twice is counted as one account.
-- A cast checks the trusted certificate of the source the stream comes from.
-- With the phone remote on, a single request could freeze the window for seconds while the guide loaded; it no longer does.
-- Smaller things: night mode's notice fits a narrow player, the command palette names the macOS menus right, `N` and `T` get their keys back, and the loading indicator no longer says "Buffering" too early for a playlist address.
-- Trakt and Simkl: switching profile quickly while a sign-in was renewed could sign you out.
-- The welcome on small screens: the text was cut off and the card ran past the window; the Xtream form also showed fields that belong to other kinds.
-
-On the AppImage from 1.2.15 or later, or the Windows or Mac app from 1.4.5? Click **Update now** in the banner - or download 1.6.1 from [dopeiptv.org](https://dopeiptv.org).
+- A channel in HEVC cast to an Apple TV played sound over a black picture; it now plays, also when you change channel during the cast, nothing converted - the computer repackages it as the Apple TV wants it.
+- The app closed at start when it had been left on Radio.
+- Posters went blank after a while in long lists, and stayed so until the app started again.
+- The app could crash as Settings opened on a system that writes numbers with a decimal comma (Swedish, German...).
+- On Windows, an update installer that Windows would not start - Smart App Control, an antivirus or a policy - was reported as a crash; the update window now says what stopped it and how to install by hand.
+- Updating to 1.6.10 could switch the app to the heart icon by itself.

@@ -143,8 +143,6 @@ dopeiptv/
     update_keys.py     The public half of dopeIPTV's release signing key
     build_check.py     Official, modified or from source: the signed build
                        manifest checked once at start; X-dopeIPTV-Build
-    supporter.py       The supporter key: signed by dopeiptv.org, checked
-                       offline
     donate_rhythm.py   When the app asks for a tip (the sidebar's heart one
                        week a month), pure logic
     report.py          Error reports and feedback: scrubbed, shown in full,
@@ -208,8 +206,11 @@ dopeiptv/
                        and pinned certificate
     net_adapter.py     The app's own requests on a source's route (a requests
                        adapter)
-    net_bridge.py      The player's and recorder's way onto a route: a loopback
-                       proxy
+    net_bridge.py      The one way out for the programs the app starts on a
+                       stream, and the player's for every internet source's
+                       stream: a loopback proxy that judges where each
+                       connection lands and hands out aliases that name
+                       nothing of an address
     cert_pin.py        Trusting one certificate for one source: read,
                        fingerprinted, pinned, a change noted
     http_login.py      A login in a stream's address answered as the server

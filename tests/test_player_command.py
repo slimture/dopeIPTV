@@ -51,7 +51,100 @@ def test_launch_player_starts_that_command(monkeypatch):
                 "ytdl://https://www.youtube.com/watch?v=x"):
         seen.clear()
         players.launch_player("mpv", url, "T")
-        assert seen == [players.player_command("mpv", "/usr/bin/mpv", url, "T")], url
+        if url.startswith(("http", "rtsp")):
+            # An http(s) address, and every other network address but a
+            # multicast group's, in a playlist file of the user's own, never
+            # in the command line others can read - the title neither.
+            assert len(seen) == 1 and url not in seen[0]
+            assert not any("T" == a or a.endswith("=T") for a in seen[0])
+            handoff = seen[0][-1].split("=", 1)[1]
+            assert seen[0][-1] == "--playlist=" + handoff
+            with open(handoff, encoding="utf-8") as fh:
+                assert url in fh.read().splitlines()
+            import os
+            import stat
+            assert stat.S_IMODE(os.stat(handoff).st_mode) == 0o600
+            os.remove(handoff)
+        else:
+            assert seen == [players.player_command("mpv", "/usr/bin/mpv", url, "T")], url
+
+
+@pytest.mark.parametrize("player", ["mpv", "vlc"])
+def test_no_handoff_file_no_player_never_the_address_instead(player, monkeypatch):
+    """The handoff file could not be made (no runtime folder, a full disk):
+    the player is not started and the person is told - the address never
+    goes in its command line instead."""
+    started, told = [], []
+    monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/" + player)
+    monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: started.append(cmd))
+    monkeypatch.setattr(players, "private_file", lambda *_a, **_k: "")
+    monkeypatch.setattr(players.QMessageBox, "warning",
+                        staticmethod(lambda *a, **_k: told.append(a[-1])))
+    for url in ("http://h.invalid/live/u/p/1.ts", "rtsp://cam:pw@cam.invalid/live"):
+        players.launch_player(player, url, "T")
+    assert started == [] and len(told) == 2
+    name = "mpv" if player == "mpv" else "VLC"
+    assert told[0] == players.tr("status_player_no_handoff", name=name)
+    # What holds no login is handed over as it always was.
+    players.launch_player(player, "udp://@239.0.0.1:1234", "T")
+    assert len(started) == 1 and started[0][-1] == "udp://@239.0.0.1:1234"
+
+
+def test_a_network_address_with_a_login_goes_in_a_handoff_file(monkeypatch):
+    seen = []
+    monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/mpv")
+    monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: seen.append(cmd))
+    # A login no random file name can hold by chance ("pw" once failed a
+    # run: the handoff file's own random name had those two letters).
+    for url in ("rtsp://cam:s3cr3tword@cam.invalid/live",
+                "srt://h.invalid:9000?passphrase=s3cr3tword",
+                "rtmp://h.invalid/app/x?token=s3cr3tword"):
+        seen.clear()
+        players.launch_player("mpv", url, "T")
+        assert not any("s3cr3tword" in a for a in seen[0])
+        assert seen[0][-1].startswith("--playlist=")
+        import os
+        os.remove(seen[0][-1].split("=", 1)[1])
+    assert players.handed_over("https://h/x") and players.handed_over("rtsp://192.168.1.5/?src=1")
+    assert not players.handed_over("/films/a.mkv") and not players.handed_over("udp://@239.0.0.1:1")
+    # A token where carries_login cannot see it: in the path, under a word
+    # of its own - handed over all the same.
+    for url in ("rtmp://h.invalid/live/9f86d081884c7d659a2feaa0c55ad015", "srt://h.invalid:9?streamid=x",
+                "rtsp://h.invalid/stream?x-opaque=y"):
+        assert players.handed_over(url), url
+    assert players.handed_over("udp://@239.0.0.1:1?pass=pw")
+
+
+@pytest.mark.parametrize("player", ["mpv", "vlc"])
+def test_with_a_handoff_the_title_is_the_playlists_own(player, tmp_path):
+    """A title watched privately is nobody else's to read: with a handoff
+    file it is the playlist's #EXTINF line, which mpv and VLC both show,
+    and stands nowhere in the command line."""
+    path = players.handoff_file("http://h.invalid/1.ts", "Secret title", str(tmp_path))
+    cmd = players.player_command(player, "/usr/bin/" + player, "http://h.invalid/1.ts",
+                                 "Secret title", path)
+    assert not any("Secret title" in a for a in cmd)
+    assert "--force-media-title" not in " ".join(cmd) and "--meta-title" not in cmd
+    with open(path, encoding="utf-8") as fh:
+        assert "#EXTINF:-1,Secret title" in fh.read().splitlines()
+
+
+def test_a_handoff_file_holds_one_line_and_goes(tmp_path, monkeypatch):
+    """No line break in an address or a title reaches the playlist file as
+    a second entry, and the file is deleted once its player had time."""
+    monkeypatch.setattr(players, "HANDOFF_S", 0.05)
+    assert players.handoff_file("http://h.invalid/1.ts\nfile:///etc/passwd", "T",
+                                str(tmp_path)) == ""
+    path = players.handoff_file("http://h.invalid/1.ts", "A\nfile:///etc/passwd",
+                                str(tmp_path))
+    with open(path, encoding="utf-8") as fh:
+        lines = fh.read().splitlines()
+    assert lines == ["#EXTM3U", "#EXTINF:-1,Afile:///etc/passwd", "http://h.invalid/1.ts"]
+    import time
+    time.sleep(0.3)
+    assert not (tmp_path / path.rsplit("/", 1)[-1]).exists()
+    vlc = players.player_command("vlc", "/usr/bin/vlc", "http://h.invalid/1.ts", "T", path)
+    assert vlc[-2:] == ["--", path] and "http://h.invalid/1.ts" not in vlc
 
 
 NOT_STREAMS = (*EVIL, "concat:/etc/passwd|/etc/hosts", "subfile,,start,0,end,9,,:/etc/passwd",
@@ -119,7 +212,15 @@ def _recorder(tmp_path, monkeypatch, kind, name):
         def poll(self):
             return None
 
+    class FakeFeed:                 # the app's own reading of the stream: none here
+        def __init__(self, *_a, **_k):
+            pass
+
+        def start(self):
+            pass
+
     monkeypatch.setattr(recording.subprocess, "Popen", FakeProc)
+    monkeypatch.setattr(recording, "Feed", FakeFeed)
     monkeypatch.setattr(RecordingManager, "recorder",
                         staticmethod(lambda: (kind, "/usr/bin/" + kind)))
     return rm, seen
@@ -129,11 +230,17 @@ def test_the_mpv_recorder_takes_the_address_after_its_options(tmp_path, monkeypa
     """The recorder without ffmpeg is mpv: the address last, after "--"."""
     rm, seen = _recorder(tmp_path, monkeypatch, "mpv", "recdash")
     url = "http://h.invalid/live/u/p/1.ts"
-    rm._spawn({"url": url, "title": "T", "stop": 9e12})
-    cmd = seen[0]
-    assert cmd[-2:] == ["--", url] and url not in cmd[:-2]
-    assert any(a.startswith("--stream-record=") for a in cmd[:-2])
-    assert any(a.startswith("--length=") for a in cmd[:-2])
+    for job in ({}, {"_classic": True}):
+        seen.clear()
+        rm._spawn({"url": url, "title": "T", "stop": 9e12, **job})
+        cmd = seen[0]
+        # Its input, or the bridge's alias for the address - never the address.
+        last = "-" if not job else cmd[-1]
+        assert cmd[-2:] == ["--", last] and url not in cmd
+        assert last == "-" or ".stream.invalid/" in last
+        assert any(a.startswith("--stream-record=") for a in cmd[:-2])
+        assert any(a.startswith("--length=") for a in cmd[:-2])
+        assert "--ytdl=no" in cmd                   # no yt-dlp run on it either
 
 
 @pytest.mark.parametrize("kind", ["ffmpeg", "mpv"])
@@ -152,15 +259,35 @@ def test_ffmpeg_records_a_stream_with_a_streams_protocols_only(tmp_path, monkeyp
     from dopeiptv.core.player_exec import FFMPEG_PROTOCOLS
 
     rm, seen = _recorder(tmp_path, monkeypatch, "ffmpeg", "recproto")
-    for url in ("http://h.invalid/live/u/p/1.ts", "https://h.invalid/x.m3u8",
-                "rtsp://box.invalid/?src=1", "udp://@239.0.0.1:1234"):
+    seen.clear()
+    rm._spawn({"url": "http://h.invalid/live/u/p/1.ts", "title": "T", "stop": None})
+    cmd = seen[0]                   # read by the app: its input, and nothing else
+    assert cmd[cmd.index("-i") + 1] == "pipe:0"
+    assert cmd[cmd.index("-protocol_whitelist") + 1] == "pipe"
+    from dopeiptv.core.player_exec import BRIDGED_PROTOCOLS
+    from dopeiptv.core import recording
+    monkeypatch.setattr(recording, "ffmpeg_major", lambda _exe: 6)
+    for url, kind in (("http://h.invalid/live/u/p/1.ts", None), ("https://h.invalid/x.m3u8", None),
+                      ("rtsp://box.invalid/?src=1", "satip"), ("udp://@239.0.0.1:1234", None),
+                      ("rtsp://cam.invalid/live", None)):
         seen.clear()
-        rm._spawn({"url": url, "title": "T", "stop": None})
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True, "source_kind": kind})
         cmd = seen[0]
         i = cmd.index("-i")
-        assert cmd[i + 1] == url
+        web = url.startswith("http")
+        listed = url == "rtsp://cam.invalid/live"
+        # An http(s) address through the bridge under an alias, what that
+        # needs alone; another network address in a private list; a SAT>IP
+        # tuning and a multicast group as they are, a stream's protocols.
+        if web:
+            assert cmd[i + 1] != url and ".stream.invalid/" in cmd[i + 1]
+        elif listed:
+            assert url not in cmd and cmd[i + 1].endswith(".ffconcat")
+        else:
+            assert cmd[i + 1] == url
+        assert cmd[cmd.index("-protocol_whitelist") + 1] == (
+            BRIDGED_PROTOCOLS if web else "file," + FFMPEG_PROTOCOLS if listed else FFMPEG_PROTOCOLS)
         # An input option of that address, before its -i.
-        assert cmd[cmd.index("-protocol_whitelist") + 1] == FFMPEG_PROTOCOLS
         assert cmd.index("-protocol_whitelist") < i
     # A file's own path: ffmpeg's own rule for files, nothing added.
     seen.clear()

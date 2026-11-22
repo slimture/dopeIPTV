@@ -93,7 +93,8 @@ def test_link_events_are_watched_on_macos_only(monkeypatch):
         f = w._link_filter
         assert f.eventFilter(w, _NoType(QEvent.Type.User)) is False
         assert f.eventFilter(w, FileOpen("dopeiptv://channel?name=SVT1")) is True
-        assert w.commands == [{"channel": "SVT1"}]
+        # A link: asked about before it tunes (core/commands, "link").
+        assert w.commands == [{"channel": "SVT1", "link": True}]
         assert f.eventFilter(w, FileOpen("file:///tmp/x.m3u")) is False
     finally:
         app.removeEventFilter(w._link_filter)

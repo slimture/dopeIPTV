@@ -89,6 +89,14 @@ def _kids(window) -> bool:
     return bool(getattr(window, "_profile_kids", lambda: False)())
 
 
+def _cat_ok(window, mode: str, cid, name: str, own) -> bool:
+    """For a kids profile: whether a category may be listed - none named
+    for adults, and with "Only what a grown-up allows" only what one chose
+    (mw_profiles._kids_cat_ok, the window's own rule)."""
+    ok = getattr(window, "_kids_cat_ok", None)
+    return bool(ok(mode, cid, name, own)) if callable(ok) else not adult_category(name, own)
+
+
 def _set_image(tile: TvTile, url, loader) -> None:
     """*tile*'s picture from *loader*, now or when it comes."""
     if not url or loader is None:
@@ -439,7 +447,7 @@ class ChannelsScreen(TvScreen):
             if w.overrides.is_locked("live", cid) and not unlocked:
                 continue
             name = w.overrides.display_name("live", cid, c.get("category_name", "?"))
-            if kids and adult_category(name, c.get("category_name")):
+            if kids and not _cat_ok(w, "live", cid, name, c.get("category_name")):
                 continue
             rows.append({"name": name, "_cat": cid})
         # Favorites first when there are some, else the first real category

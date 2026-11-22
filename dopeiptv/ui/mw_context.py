@@ -869,12 +869,15 @@ class _ContextMenuMixin:
         if kids is None or not kids():
             return cats
         from ..core.profiles import adult_category
+        cat_ok = getattr(self, "_kids_cat_ok", None)     # with what a grown-up allows
         out = []
         for c in cats:
             cid = c.get("category_id")
             own = c.get("category_name")
             name = self.overrides.display_name(self.mode, cid, str(own or ""))
             if adult_category(name, own) or self.overrides.is_locked(self.mode, cid):
+                continue
+            if callable(cat_ok) and not cat_ok(self.mode, cid, name, own):
                 continue
             out.append(c)
         return out

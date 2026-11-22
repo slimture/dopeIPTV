@@ -480,6 +480,38 @@ def test_the_decision_card_one_action_two_lines_the_rest_counted(app):
     host.close()
 
 
+def test_a_click_on_the_decision_cards_words_shows_them_whole(app):
+    host = _host(app)
+    lay = QVBoxLayout(host)
+    lay.addStretch(1)
+    hub = _hub()
+    card = DecisionCard(hub, host)
+    card.setFixedWidth(230)
+    lay.addWidget(card)
+    hub.changed.connect(card.refresh)
+    body = ("Server mode lets every device on this computer's networks use the tuner "
+            "and watch without its token - what it did before 1.6.9.")
+    hub.post(body, title="The tuner is open to every device", action=lambda: None,
+             action_label="Close it", decide=True)
+    _spin(app, secs=0.05)
+    assert card.text() == "The tuner is open to every device - " + body
+    folded = card.label.height()
+    assert card.cut() and card.label.text().count("\n") == 1
+    QTest.mouseClick(card.label, Qt.MouseButton.LeftButton)
+    _spin(app, secs=0.05)
+    assert card.label.text() == card.text() and card.label.wordWrap()
+    assert card.label.height() > folded
+    QTest.mouseClick(card.label, Qt.MouseButton.LeftButton)
+    _spin(app, secs=0.05)
+    assert card.label.text().endswith("…") and card.label.height() == folded
+    hub.post("Short", action=lambda: None, decide=True, key="short")
+    hub.dismiss(hub.decisions()[0].id)
+    _spin(app, secs=0.05)
+    QTest.mouseClick(card.label, Qt.MouseButton.LeftButton)     # nothing to show more of
+    assert card.label.text() == "Short" and not card.label.wordWrap()
+    host.close()
+
+
 def test_every_theme_reads(app):
     try:
         for key in theme.THEMES:

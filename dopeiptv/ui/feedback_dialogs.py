@@ -440,19 +440,65 @@ class AnswersDialog(QDialog):
 PRIVACY_URL = "https://dopeiptv.org/privacy/?ref=app-feedback#app"
 
 
-def sent_with_text(picked: bool = False, supporter: bool = False, code: bool = False) -> str:
+def sent_with_text(picked: bool = False, code: bool = False) -> str:
     """The line under a report that says what goes with its text: the
     version and the system as they are sent, what was picked in the
-    window, a supporter's mark and an answer code's hash when they go."""
+    window and an answer code's hash when it goes."""
     from ..core import report
     items = report.sent_beside()
     if picked:
         items.append(tr("report_item_picked"))
-    if supporter:
-        items.append(tr("report_item_supporter"))
     if code:
         items.append(tr("report_item_code"))
     return tr("report_sent_with", items=" · ".join(items))
+
+
+class _ShownIsSent:
+    """What a report window sends is what it shows. On Send its boxes are
+    scrubbed with the person's own values (*scrub*: core/report.scrub's);
+    where that hides anything more, the boxes show it, a note says so and
+    the window stays open for another look - Send again sends exactly that.
+    The last scrub on the way out (report.send_status) then finds nothing
+    left to change."""
+
+    _scrub = None
+    hidden_note: QLabel | None = None
+
+    def _hidden_note(self) -> QLabel:
+        note = QLabel(tr("report_hidden_more"))
+        note.setTextFormat(Qt.TextFormat.PlainText)
+        note.setWordWrap(True)
+        note.setStyleSheet(f"font-size:12px; color:{P['warn']};")
+        note.hide()
+        self.hidden_note = note
+        return note
+
+    def _outgoing(self) -> list:
+        """The boxes whose words are sent."""
+        return []
+
+    def shown_is_sent(self) -> bool:
+        """True when every box is as it will be sent; else the boxes now
+        show what will be, said under them, and False."""
+        if self._scrub is None:
+            return True
+        changed = []
+        for box in self._outgoing():
+            text = box.toPlainText()
+            clean = self._scrub(text)
+            if clean != text:
+                box.setPlainText(clean)
+                changed.append(box)
+        if not changed:
+            return True
+        for box in changed:
+            self._show_box(box)
+        if self.hidden_note is not None:
+            self.hidden_note.setVisible(True)
+        return False
+
+    def _show_box(self, box) -> None:
+        box.setVisible(True)
 
 
 def privacy_link() -> QPushButton:
@@ -470,11 +516,12 @@ def privacy_link() -> QPushButton:
     return btn
 
 
-class FeedbackDialog(QDialog):
+class FeedbackDialog(_ShownIsSent, QDialog):
     """Feedback, asked the way the answers are useful: what it is about,
     for something that does not work where and how often, the person's
     words, and what to attach - each on its own, versions only by default.
-    What is sent can be shown in full and changed before Send."""
+    What is sent can be shown in full and changed before Send, and is
+    exactly what is sent (_ShownIsSent, with *scrub*)."""
 
     TOPICS = (("bug", "fb_t_bug"), ("idea", "fb_t_idea"), ("like", "fb_t_like"), ("question", "fb_t_question"))
     AREAS = (("playback", "fb_a_play"), ("guide", "fb_a_guide"), ("recording", "fb_a_rec"),
@@ -483,11 +530,11 @@ class FeedbackDialog(QDialog):
     OFTEN = (("always", "fb_o_always"), ("sometimes", "fb_o_sometimes"), ("once", "fb_o_once"))
 
     def __init__(self, parent, details, has_log_file: bool = False, answers: list | None = None,
-                 all_answers=None, copy_only: bool = False, supporter: bool = False) -> None:
+                 all_answers=None, copy_only: bool = False, scrub=None) -> None:
         super().__init__(parent)
+        self._scrub = scrub
         self._all_answers = all_answers
         self.copy_only = copy_only
-        self._supporter = supporter
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QButtonGroup, QCheckBox, QComboBox, QGridLayout, QPlainTextEdit, QScrollArea
 
@@ -641,6 +688,9 @@ class FeedbackDialog(QDialog):
         self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer.addWidget(self._scroll, 1)
+        note = self._hidden_note()
+        note.setContentsMargins(24, 8, 24, 0)
+        outer.addWidget(note)
         self._button_bar = QWidget()
         buttons = QHBoxLayout(self._button_bar)
         buttons.setContentsMargins(24, 10, 24, 18)
@@ -668,9 +718,21 @@ class FeedbackDialog(QDialog):
     def topic(self) -> str:
         return next((k for k, chip in self.topic_chips.items() if chip.isChecked()), "")
 
+    def _outgoing(self) -> list:
+        return [self.message, self.preview]
+
+    def _show_box(self, box) -> None:
+        if box is self.preview and not self.preview.isVisible():
+            self._toggle_preview()
+
+    def accept(self) -> None:
+        if self.shown_is_sent():
+            super().accept()
+        else:
+            self._ready()
+
     def _say_beside(self) -> None:
-        self.beside.setText(sent_with_text(picked=True, supporter=self._supporter,
-                                           code=self.answers.isChecked()))
+        self.beside.setText(sent_with_text(picked=True, code=self.answers.isChecked()))
 
     def _open_all_answers(self, *_a) -> None:
         if self._all_answers is not None:
@@ -812,13 +874,16 @@ class FeedbackDialog(QDialog):
         return "\n\n".join(p for p in parts if p)
 
 
-class ReportDialog(QDialog):
+class ReportDialog(_ShownIsSent, QDialog):
     """An error report or feedback, shown in full before anything is sent:
     what it holds, that nothing in it identifies a stream or a person, and
-    a box where any of it can be changed or deleted. Sent only on Send."""
+    a box where any of it can be changed or deleted - exactly what is sent
+    (_ShownIsSent, with *scrub*). Sent only on Send."""
 
-    def __init__(self, parent, kind: str, text: str, intro: str = "", copy_only: bool = False) -> None:
+    def __init__(self, parent, kind: str, text: str, intro: str = "", copy_only: bool = False,
+                 scrub=None) -> None:
         super().__init__(parent)
+        self._scrub = scrub
         from PyQt6.QtGui import QFont
         from PyQt6.QtWidgets import QCheckBox, QPlainTextEdit
         self.kind = kind
@@ -884,6 +949,7 @@ class ReportDialog(QDialog):
             self.beside.setStyleSheet(f"font-size:12px; color:{P['muted']};")
             col.addWidget(self.beside)
         col.addWidget(privacy_link(), 0, Qt.AlignmentFlag.AlignLeft)
+        col.addWidget(self._hidden_note())
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         cancel = QPushButton(tr("common_cancel"))
@@ -896,6 +962,14 @@ class ReportDialog(QDialog):
         col.addLayout(buttons)
         if self.message is not None:
             self.message.setFocus()
+
+    def _outgoing(self) -> list:
+        boxes = [self.message] if self.message is not None else []
+        return boxes + ([self.text] if self.include.isChecked() else [])
+
+    def accept(self) -> None:
+        if self.shown_is_sent():
+            super().accept()
 
     def payload(self) -> str:
         """What is sent: the person's words, then the report as they left it."""

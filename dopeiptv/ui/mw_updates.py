@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QThread, QTimer
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QPushButton,
 )
@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from .. import VERSION
 from ..core import build_check, macupdate, selfupdate, winupdate
 from ..core.log import log
-from ..core.updates import GITHUB_REPO, fetch_update, offered
+from ..core.updates import GITHUB_REPO, fetch_update, is_nightly, leave_nightly, offered
 from ..core.xdg import link_ok, open_url
 from ..core.workers import run_async
 from ..i18n import tr
@@ -74,6 +74,18 @@ def _own_file(rel: dict) -> str:
     return str(a.get("url") or "") if a else ""
 
 
+def start_refused(e: OSError) -> str:
+    """The update window's words when the downloaded installer would not
+    start: Windows refusing it (winupdate.blocked_by_policy) said plainly,
+    anything else as it is - and that nothing changed."""
+    if winupdate.blocked_by_policy(e):
+        return tr("update_blocked_windows")
+    why = str(e).strip()
+    if why and why[-1].isalnum():
+        why += "."
+    return f"{why} {tr('update_nothing_changed')}".strip()
+
+
 def _updater():
     """What can update this copy in place: an AppImage in a writable folder
     (selfupdate), a copy the Windows installer put there (winupdate), our
@@ -85,12 +97,46 @@ def _updater():
     return None
 
 
+#: The update channel as the window last saw it, and the test build that
+#: ran when the person left Test builds for Releases (core/updates.
+#: leave_nightly) - this computer's.
+K_CHANNEL_SEEN = "update_channel_seen"
+K_LEFT_NIGHTLY = "update_left_nightly"
+
+
+def channel_seen(settings, channel: str, version: str = VERSION) -> None:
+    """The channel *channel* noted: a switch from Test builds to Releases
+    while *version*, a test build, runs is kept as that build's - the one
+    time the release it carries the number of is offered over it
+    (updates.offered) - and told to core/updates; anything else forgets it.
+    Nothing noted yet is Releases, the default: a computer that never left
+    it writes nothing."""
+    seen = str(settings.value(K_CHANNEL_SEEN, "") or "") or "stable"
+    if seen != channel:
+        if seen == "nightly" and channel == "stable" and is_nightly(version):
+            settings.setValue(K_LEFT_NIGHTLY, version)
+        elif channel == "nightly":
+            settings.remove(K_LEFT_NIGHTLY)
+        settings.setValue(K_CHANNEL_SEEN, channel)
+    left = str(settings.value(K_LEFT_NIGHTLY, "") or "")
+    leave_nightly(left if channel == "stable" and left == version else "")
+
+
 class _UpdatesMixin:
     """MainWindow mixin: the startup update check and its status-row link."""
     def _update_channel(self) -> str:
-        """Settings -> General: "stable", or "nightly" for the test builds."""
+        """Settings -> General: "stable", or "nightly" for the test builds -
+        and a switch from one to the other noted (channel_seen)."""
         ch = self.settings.value("update_channel", "stable")
-        return "nightly" if ch == "nightly" else "stable"
+        channel = "nightly" if ch == "nightly" else "stable"
+        app = QApplication.instance()
+        if app is None or QThread.currentThread() is app.thread():
+            # Noted on the window's thread only (the update's worker asks too).
+            try:
+                channel_seen(self.settings, channel)
+            except Exception:
+                log.debug("update: the channel's switch not noted", exc_info=True)
+        return channel
 
     def _maybe_check_updates(self) -> None:
         """Once-a-day background check for a newer release; on a hit, light the
@@ -378,7 +424,18 @@ class _UpdatesMixin:
 
             def chosen(code: int) -> None:
                 if code == UpdateDialog.DialogCode.Accepted:
-                    updater.restart_into(new)
+                    try:
+                        updater.restart_into(new)
+                    except OSError as e:
+                        # Smart App Control, an antivirus or a policy can
+                        # refuse to start the installer (WinError 4551): said
+                        # in the same window, the app left as it was - an
+                        # error report called it a crash.
+                        log.warning("update: the installer did not start: %s", e)
+                        dlg.finished.disconnect(chosen)
+                        dlg.failed(start_refused(e))
+                        dlg.show()
+                        return
                     self.close()
                 elif hasattr(updater, "on_exit"):
                     # "Is installed" holds anyway: the Mac's new app goes in

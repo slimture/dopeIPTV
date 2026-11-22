@@ -247,7 +247,7 @@ class _PaletteMixin:
         for _group, where, names in MENU_GROUPS:
             menu = tr(_MENU_KIND[where]) if where in _MENU_KIND else APP_NAME
             for name in names:
-                # About, Settings, Quit and the supporter's entries are in
+                # About, Settings, Quit and Leave a tip are in
                 # the application menu on macOS: named by it there.
                 kind = APP_NAME if in_app_menu(name) else menu
                 act = acts.get(name)

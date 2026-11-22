@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 from ..core import tv_nav
 from ..i18n import tr
 from .channel_list import ChannelListModel
+from .series_cards import ImageSource
 from .theme import ACCENTS, P
 
 _unit = [1.0]
@@ -405,27 +406,16 @@ class ColourLegend(QWidget):
 
 # -- lists ----------------------------------------------------------------------------
 
-class _ImageSource:
-    """Pictures for a delegate: from the loader's memory when there,
-    else asked for, the view repainted when they come."""
+class _ImageSource(ImageSource):
+    """Pictures for a delegate: from the loader's memory when there, else
+    asked for - again once the loader's memory let one go - the view
+    repainted when they come (series_cards.ImageSource)."""
 
     def __init__(self, view: QAbstractItemView, loader) -> None:
         self._view = view
-        self._loader = loader
-        self._asked: set[str] = set()
+        super().__init__(loader, self._update_view)
 
-    def get(self, url) -> QPixmap | None:
-        if not url or self._loader is None:
-            return None
-        pm = self._loader.cache.get(url)
-        if pm is not None:
-            return pm
-        if url not in self._asked and not self._loader.is_dead(url):
-            self._asked.add(url)
-            self._loader.get(url, self._arrived)
-        return None
-
-    def _arrived(self, _pm) -> None:
+    def _update_view(self) -> None:
         view = self._view
         if not sip.isdeleted(view):
             view.viewport().update()

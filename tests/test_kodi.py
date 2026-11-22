@@ -33,6 +33,8 @@ class FakeKodi:
 
     def __init__(self, login=None, old_seek=False):
         self.calls = []
+        #: Every request that reached it, answered or refused.
+        self.hits = 0
         self.login = login
         self.old_seek = old_seek
         self.playing = None          # the file being played
@@ -48,6 +50,7 @@ class FakeKodi:
                 pass
 
             def do_POST(self):
+                fake.hits += 1
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
                 if fake.login is not None:
@@ -223,8 +226,14 @@ def test_a_kodi_added_by_hand_is_checked_and_remembered(fast, monkeypatch):
         with pytest.raises(LocalizedError) as e:
             m.add("127.0.0.1", k.port)
         assert e.value.key == "kodi_needs_login"
+        # Its login over plain http, the person not asked: nothing sent.
+        hits = k.hits
+        with pytest.raises(LocalizedError) as e:
+            m.add("127.0.0.1", k.port, "kodi", "s3cret")
+        assert e.value.key == "cast_err_kodi_plain" and k.hits == hits
+        assert kodi.load_devices(s) == []
         with Grab() as grab:
-            label = m.add("127.0.0.1", k.port, "kodi", "s3cret")
+            label = m.add("127.0.0.1", k.port, "kodi", "s3cret", plain_ok=True)
             assert label == "Living room (Kodi)"
             other = kodi.KodiManager(s)
             other.cast(label, "http://p.example/1.ts", "x")
@@ -468,3 +477,68 @@ def test_a_kodi_typed_as_https_is_asked_over_https_never_http():
     back = kodi.load_devices(s)
     assert [d.secure for d in back] == [True, False]
     assert back[0].endpoint.startswith("https://")
+
+
+# -- a login over plain http: asked once per Kodi -------------------------------------
+
+def test_a_login_over_plain_http_is_sent_only_once_the_person_said_so(fast):
+    """A Kodi's login over http is the password in the clear: nothing goes to
+    it - not the cast, not a poll - until Send anyway, kept with that Kodi
+    (never asked again, here or in another run). A Kodi without a login, or
+    one asked over https, is never asked."""
+    k = FakeKodi(login=("kodi", "s3cret"))
+    try:
+        s = FakeSettings()
+        kodi.save_devices(s, [kodi.KodiDevice("Den", "127.0.0.1", k.port, "kodi", "s3cret",
+                                              manual=True)])
+        m = kodi.KodiManager(s)
+        assert m.asks_first("Den (Kodi)")
+        with pytest.raises(LocalizedError) as e:
+            m.cast("Den (Kodi)", "http://p.example/1.ts", "x")
+        assert e.value.key == "cast_err_kodi_plain" and k.hits == 0
+        with pytest.raises(kodi.KodiPlainLogin):
+            kodi.KodiRpc(m.device("Den (Kodi)")).call("JSONRPC.Ping")
+        assert k.hits == 0
+        with Grab() as grab:
+            m.allow_plain("Den (Kodi)")
+        assert "s3cret" not in grab.text
+        assert not m.asks_first("Den (Kodi)")
+        assert [d.plain_ok for d in kodi.load_devices(s)] == [True]
+        assert '"plain_login": true' in s.value(kodi.SETTINGS_KEY)
+        # Another run reads it back: not asked again.
+        again = kodi.KodiManager(s)
+        assert not again.asks_first("Den (Kodi)")
+        again.cast("Den (Kodi)", "http://p.example/1.ts", "x")
+        assert k.playing.startswith("http://p.example/1.ts") and k.hits > 0
+        again.stop()
+    finally:
+        k.close()
+    # No login, or https: nothing to ask.
+    assert not kodi.KodiDevice("A", "h").asks_first
+    assert not kodi.KodiDevice("A", "h", user="kodi", password="pw", secure=True).asks_first
+    assert kodi.KodiDevice("A", "h", password="pw").asks_first
+
+
+def test_use_https_tries_it_first_and_keeps_it_only_once_it_answers(fast, monkeypatch):
+    s = FakeSettings()
+    kodi.save_devices(s, [kodi.KodiDevice("Den", "10.0.0.5", 8080, "kodi", "pw", manual=True)])
+    m = kodi.KodiManager(s)
+    tried = []
+
+    def describe(dev, session=None):
+        tried.append(dev.endpoint)
+        if fail:
+            raise kodi.requests.ConnectionError("no https here")
+        return "Den"
+    monkeypatch.setattr(kodi, "describe", describe)
+    fail = True
+    with pytest.raises(LocalizedError) as e:
+        m.use_https("Den (Kodi)")
+    assert e.value.key == "kodi_https_failed"
+    assert tried == ["https://10.0.0.5:8080/jsonrpc"]
+    assert [d.secure for d in kodi.load_devices(s)] == [False] and m.asks_first("Den (Kodi)")
+    fail = False
+    assert m.use_https("Den (Kodi)") == "Den (Kodi)"
+    assert [d.secure for d in kodi.load_devices(s)] == [True]
+    assert m.device("Den (Kodi)").endpoint.startswith("https://")
+    assert not m.asks_first("Den (Kodi)")

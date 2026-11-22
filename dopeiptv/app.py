@@ -102,7 +102,7 @@ from .core.stores import PlaylistStore
 from .ui.theme import apply_theme, build_style
 
 
-# The icon is drawn in ui/app_icon.py (the plain one and the supporter's);
+# The icon is drawn in ui/app_icon.py (the blue one and the others to pick);
 # the names stay importable from here for packaging/gen_icon*.py.
 from .ui.app_icon import (  # noqa: F401
     ICON_SAFE_INSET, install_icon, make_app_icon,
@@ -533,6 +533,13 @@ def main() -> int:
     # is never Qt's to act on. The person's own command line is as before.
     linked = any(is_link(a) for a in sys.argv[1:])
     app = QApplication(sys.argv[:1] if linked else sys.argv)
+    # QApplication has just set every locale category from the environment
+    # (a LC_ALL there wins over the LC_NUMERIC above): put the one libmpv
+    # needs back now, on this thread, before any worker makes a core
+    # (media/players.numeric_c; every core is made after it again).
+    if _libmpv is not None:
+        from .media.players import numeric_c
+        numeric_c()
     # A command (--play, --channel, a dopeiptv:// link) goes to the copy
     # already running, if there is one; this start then ends here.
     if command is not None:
@@ -586,23 +593,33 @@ def main() -> int:
     # 64 MB keeps a large visible working set scaled exactly once.
     from PyQt6.QtGui import QPixmapCache
     QPixmapCache.setCacheLimit(64 * 1024)   # KB
-    # The app's icon - the supporter's for a supporter who keeps it on -
-    # drawn as this system wants it (ui/app_icon.platform_icon: Apple's and
-    # GNOME's margin, a retina Dock's size) and set for every window; on
-    # Linux also written into the XDG icon theme, where Wayland takes it
-    # from. The window keeps it in step with the key and the switch.
+    # The app's icon - the one picked on Settings > Appearance - drawn as
+    # this system wants it (ui/app_icon.platform_icon: Apple's and GNOME's
+    # margin, a retina Dock's size) and set for every window; on Linux also
+    # written into the XDG icon theme, where Wayland takes it from.
     # The settings as the profile in use sees them (core/profiles.py): its
     # own favorites, history, look... under its name, the household's as
     # they are.
     from .core import profiles
     settings = profiles.ProfileSettings(ORG, ORG)
+    # The supporter key and its icon switch are gone (1.6.11): what an older
+    # app kept of them is removed from the settings file; 1.6.10's heart
+    # switch, turned on by hand, is the picker's heart (app_icon.carry_over).
+    from .ui import app_icon as _icon
+    _icon.carry_over(settings)
+    for gone in ("supporter_key", "supporter_icon"):
+        try:
+            if settings.contains(gone):
+                settings.remove(gone)
+        except Exception as e:
+            log.warning("settings: %s not removed: %s", gone, e)
     from .ui import app_icon
     try:
-        supporter_icon = app_icon.wanted(settings)
-    except Exception as e:          # a thank-you is never worth a failed start
-        log.warning("supporter icon: %s", e)
-        supporter_icon = False
-    app_icon.show(supporter_icon, theme_icons=sys.platform.startswith("linux"))
+        look = app_icon.chosen(settings)
+    except Exception as e:          # an icon is never worth a failed start
+        log.warning("app icon: %s", e)
+        look = app_icon.DEFAULT
+    app_icon.show(look, theme_icons=sys.platform.startswith("linux"))
     from .i18n import is_rtl, set_language, tr as _tr
     set_language(settings.value("language", "en"))
     # The first start with profiles makes everything so far the first

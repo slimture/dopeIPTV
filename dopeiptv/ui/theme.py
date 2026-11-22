@@ -321,10 +321,9 @@ THEMES = {
         "muted4": "#627D98", "ok": "#1E7F3C", "warn": "#9A6200", "nerd": "#6D28D9", "error": "#C62828", "rec": "#D32F2F",
         "accent": ("#1E6FD9", "#3A85E3"), "light": True,
     },
-    # The supporter mark's shading, from the accent into the heart's colour,
+    # The heart icon's shading, from the accent into the heart's colour,
     # as a whole window - a night sky of indigo and violet with a rose
-    # accent, and a rose morning. A supporter key's until November 2026;
-    # everyone's since.
+    # accent, and a rose morning.
     "aurora": {
         "name": "Aurora",
         "bg": "#15122E", "side": "#100D25", "pane": "#1A1636",

@@ -170,11 +170,17 @@ def test_the_apps_copy_first_while_it_is_on_else_the_systems(tmp_path):
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)  # not runnable
     own.chmod(0o755)
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)  # not the app's own
-    ytdlp._mark(tmp_path, "2099.01.02", "0" * 64)
+    import hashlib
+    good_sum = hashlib.sha256(GOOD).hexdigest()
+    ytdlp._mark(tmp_path, "2099.01.02", good_sum)
     assert ytdlp.find(True, tmp_path, which) == Found(str(own), True)
     own.write_bytes(GOOD + b"# changed since\n")
     assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
-    ytdlp._mark(tmp_path, "2099.01.02", "0" * 64)
+    # Marked anew but not the pinned bytes: hashed, and not run.
+    ytdlp._mark(tmp_path, "2099.01.02", good_sum)
+    assert ytdlp.find(True, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
+    own.write_bytes(GOOD)
+    ytdlp._mark(tmp_path, "2099.01.02", good_sum)
     # Off: the system's only, the app's copy is not used.
     assert ytdlp.find(False, tmp_path, which) == Found("/usr/bin/yt-dlp", False)
     assert ytdlp.find(False, tmp_path, none) is None
@@ -283,6 +289,87 @@ def test_a_copy_the_app_did_not_put_there_is_not_run(tmp_path):
     assert not ytdlp.own_copy(tmp_path)
     assert ytdlp.find(True, tmp_path, which=lambda _n: "/usr/bin/yt-dlp") == Found("/usr/bin/yt-dlp", False)
     assert ytdlp.find(True, tmp_path, which=lambda _n: None) is None
+
+
+def _swap_keeping_size_and_time(path, body: bytes) -> None:
+    """*path*'s bytes replaced by *body* (as long), its time put back."""
+    st = os.stat(path)
+    assert len(body) == st.st_size
+    with open(path, "r+b") as fh:
+        fh.write(body)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
+    assert ytdlp._mark_of(ytdlp.managed_path(os.path.dirname(path))) == f"{st.st_size} {st.st_mtime_ns}"
+
+
+def _evil_like(good: bytes) -> bytes:
+    """A script as long as *good* that leaves "<itself>.ran" when it runs."""
+    body = _script('echo pwned > "$0.ran"; exit 0')
+    assert len(body) <= len(good)
+    return body[:-1] + b"#" * (len(good) - len(body)) + b"\n"
+
+
+@posix
+def test_a_copy_swapped_under_the_same_size_and_time_is_never_run(tmp_path, releases):
+    """The copy is hashed against its mark right before every run - not once
+    a run, nor only after its size or time moved: a file swapped under the
+    same size and time is refused by find(), resolve() and version_of()."""
+    ytdlp.install(tmp_path, releases=releases.url, asset=ASSET)
+    own = ytdlp.managed_path(tmp_path)
+    assert ytdlp.own_copy(tmp_path) and ytdlp.version_of(str(own)) == "2099.01.02"
+    assert ytdlp.find(True, tmp_path, which=lambda _n: None) == Found(str(own), True)
+    marker = tmp_path / "yt-dlp.ran"
+    _swap_keeping_size_and_time(own, _evil_like(GOOD))
+    assert not ytdlp.own_copy(tmp_path)
+    assert ytdlp.find(True, tmp_path, which=lambda _n: "/usr/bin/yt-dlp") == Found("/usr/bin/yt-dlp", False)
+    assert ytdlp.version_of(str(own)) == ""
+    with pytest.raises(YtdlpError) as e:
+        ytdlp.resolve(str(own), "https://www.twitch.tv/somechannel")
+    assert e.value.reason == "checksum"
+    assert not marker.exists(), "never run"
+    # The same bytes back: the app's own again.
+    _swap_keeping_size_and_time(own, GOOD)
+    assert ytdlp.own_copy(tmp_path) and ytdlp.version_of(str(own)) == "2099.01.02"
+
+
+@posix
+def test_mpv_runs_the_apps_copy_only_through_a_wrapper_that_hashes_it_first(tmp_path, releases):
+    """mpv's ytdl hook runs yt-dlp whenever it likes (a page, a stream that
+    failed): handed the app's copy, it gets a wrapper that hashes it before
+    each run, in a frozen build and from a checkout alike."""
+    import subprocess
+    ytdlp._HASHER.clear()
+    ytdlp.install(tmp_path, releases=releases.url, asset=ASSET)
+    found = ytdlp.find(True, tmp_path, which=lambda _n: None)
+    assert found is not None and found.managed
+    if ytdlp._hasher(ytdlp.system_env()) is None:
+        pytest.skip("no sha256sum, shasum or openssl here")
+    for frozen in (False, True):
+        path = ytdlp.hook_path(found, tmp_path, frozen=frozen)
+        assert path == str(tmp_path / "yt-dlp-run")
+        text = open(path).read()
+        assert hashlib.sha256(GOOD).hexdigest() in text
+        assert ("unset PYTHONHOME" in text) == frozen
+        done = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=30)
+        assert done.returncode == 0 and done.stdout.strip() == "2099.01.02"
+    marker = tmp_path / "yt-dlp.ran"
+    _swap_keeping_size_and_time(ytdlp.managed_path(tmp_path), _evil_like(GOOD))
+    done = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 1 and "no longer matches its checksum" in done.stderr
+    assert not marker.exists(), "the wrapper never ran it"
+    # The system's yt-dlp from a checkout: mpv is handed it as it is.
+    assert ytdlp.hook_path(Found("/usr/bin/yt-dlp", False), tmp_path, frozen=False) == "/usr/bin/yt-dlp"
+
+
+def test_no_program_to_hash_with_leaves_the_hook_as_it_was(tmp_path, monkeypatch):
+    """Where the system has nothing to hash with, a checkout hands mpv the
+    copy itself (hashed before each page the app opens), as before."""
+    ytdlp._HASHER.clear()
+    monkeypatch.setattr(ytdlp.shutil, "which", lambda *_a, **_k: None)
+    own = ytdlp.managed_path(tmp_path)
+    own.write_bytes(GOOD)
+    ytdlp._mark(tmp_path, "2099.01.02", hashlib.sha256(GOOD).hexdigest())
+    assert ytdlp.hook_path(Found(str(own), True), tmp_path, frozen=False) == str(own)
+    ytdlp._HASHER.clear()
 
 
 @posix

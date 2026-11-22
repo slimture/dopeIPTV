@@ -119,3 +119,16 @@ def test_release_notes_are_written_one_line_a_paragraph():
     # RELEASE_NOTES.md becomes the release's text as it is.
     notes = (Path(__file__).resolve().parent.parent / "RELEASE_NOTES.md").read_text(encoding="utf-8")
     assert tidy_mod.unwrap(notes.strip()) == notes.strip()
+
+
+def test_release_notes_hold_the_newest_version_alone():
+    """RELEASE_NOTES.md is the release's body from the moment the release
+    is made, while its packages are still building: with every version in
+    it, the releases page showed them all until the last job tidied it.
+    Every version before is in CHANGELOG.md and on its own release page."""
+    import re
+
+    import dopeiptv
+    notes = (Path(__file__).resolve().parent.parent / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+    heads = re.findall(r"^## dopeIPTV (\S+)", notes, re.M)
+    assert heads == [dopeiptv.__version__], heads

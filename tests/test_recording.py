@@ -130,11 +130,16 @@ def test_ffmpeg_records_with_the_players_user_agent(tmp_path, monkeypatch):
                         staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
     live = "http://h.tv:8080/live/u/p/1.ts"
     arch = "http://h.tv:8080/timeshift/u/p/60/2026-09-27:20-00/1.ts"
+    # The way the recorder reads an address itself: an HLS playlist, or an
+    # address the app could not read (core/recording.Feed's classic).
     for url in (live, arch):
-        rm._spawn({"url": url, "title": "T", "stop": None})
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
     cmd_live, cmd_arch = seen
     i = cmd_live.index("-i")
-    assert cmd_live[i + 1] == live
+    # Read through the app's bridge under an alias (core/net_bridge.py); the
+    # options are still the address's own.
+    assert cmd_live[i + 1].endswith("/~/~/~/~.ts") and ".stream.invalid/" in cmd_live[i + 1]
+    assert live not in cmd_live
     before = cmd_live[:i]
     assert before[before.index("-user_agent") + 1] == RECORD_UA
     assert "-reconnect_streamed" in before
@@ -146,8 +151,75 @@ def test_ffmpeg_records_with_the_players_user_agent(tmp_path, monkeypatch):
     seen.clear()
     monkeypatch.setattr(RecordingManager, "recorder",
                         staticmethod(lambda: ("mpv", "/usr/bin/mpv")))
-    rm._spawn({"url": live, "title": "T", "stop": None})
+    rm._spawn({"url": live, "title": "T", "stop": None, "_classic": True})
     assert f"--user-agent={RECORD_UA}" in seen[0]
+
+
+def test_a_recordings_address_is_never_in_its_command_line(tmp_path, monkeypatch):
+    """Every account on a Linux computer can read a process's command line
+    (/proc/<pid>/cmdline): an Xtream address there was its login. The app
+    reads the stream and hands it over on the recorder's input; ffmpeg then
+    may open no network protocol at all."""
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core import recording
+    from dopeiptv.core.recording import RecordingManager
+
+    s = QSettings("dopeIPTV-test", "recpipe")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    rm = RecordingManager(s)
+    seen, fed = [], []
+
+    class FakeProc:
+        stdin = None
+
+        def __init__(self, cmd, **kw):
+            seen.append((cmd, kw))
+
+        def poll(self):
+            return None
+
+    class FakeFeed:
+        def __init__(self, proc, url, src, live=True, strict=False, **_kw):
+            fed.append((url, live))
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(recording.subprocess, "Popen", FakeProc)
+    monkeypatch.setattr(recording, "Feed", FakeFeed)
+    live = "http://h.tv:8080/live/user/secretpass/1.ts"
+    arch = "https://h.tv/timeshift/user/secretpass/60/2026-09-27:20-00/1.ts"
+    for kind, exe in (("ffmpeg", "/usr/bin/ffmpeg"), ("mpv", "/usr/bin/mpv")):
+        monkeypatch.setattr(RecordingManager, "recorder",
+                            staticmethod(lambda k=kind, e=exe: (k, e)))
+        for url in (live, arch):
+            seen.clear()
+            rm._spawn({"url": url, "title": "T", "stop": None})
+            cmd, kw = seen[0]
+            assert not any("secretpass" in a for a in cmd), cmd
+            assert kw["stdin"] == recording.subprocess.PIPE
+            if kind == "ffmpeg":
+                assert cmd[cmd.index("-i") + 1] == "pipe:0"
+                assert cmd[cmd.index("-protocol_whitelist") + 1] == "pipe"
+            else:
+                assert cmd[-2:] == ["--", "-"]
+    assert fed == [(live, True), (arch, False)] * 2      # an archive's stretch: one connection
+    # What the recorder must fetch itself: an HLS playlist through the
+    # bridge under an alias, the rest as it is (none holds a login).
+    for url in ("http://h.tv/live/u/p/1.m3u8", "rtsp://192.168.1.5/?src=1", "/tmp/x.ts"):
+        assert not recording.piped(url)
+    assert recording.piped(live) and recording.piped(arch)
+    monkeypatch.setattr(RecordingManager, "recorder",
+                        staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
+    seen.clear()
+    rm._spawn({"url": "https://h.tv/live/user/secretpass/1.m3u8?token=t0ken", "title": "T",
+               "stop": None})
+    cmd, kw = seen[0]
+    assert not any("secretpass" in a or "t0ken" in a or "h.tv" in a for a in cmd), cmd
+    assert kw["stdin"] == recording.subprocess.DEVNULL
+    assert kw["env"]["http_proxy"].startswith("http://dopeiptv:")
+    assert not any(kw["env"]["http_proxy"] in a for a in cmd)         # the key: its environment alone
 
 
 def test_a_rename_or_move_never_replaces_another_recording(tmp_path):
@@ -205,3 +277,45 @@ def test_damaged_scheduled_jobs_are_skipped_not_crashed_on(tmp_path):
     assert [j["url"] for j in rm.jobs] == ["http://ok"]
     assert rm.jobs[0]["id"] and rm.jobs[0]["title"] == ""
     rm.tick()                       # and the scheduler runs over it
+
+
+def test_a_recording_stops_while_a_gibibyte_is_still_free(tmp_path, monkeypatch):
+    """A stream with no end and no size cap never fills the disk: below
+    DISK_FLOOR free where it is written, it stops and says why."""
+    import shutil as _shutil
+    from collections import namedtuple
+
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.core import recording
+    s = QSettings("dopeIPTV-test", "recdiskfloor")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    rm = recording.RecordingManager(s)
+    path = tmp_path / "r.ts"
+    path.write_bytes(b"x" * 1000)
+
+    class Proc:
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, *_a):
+            return 0
+
+    j = {"id": "d", "title": "T", "status": "recording", "path": str(path),
+         "proc": Proc(), "stop": None, "start": 0}
+    rm.jobs = [j]
+    said = []
+    rm.recording_stopped.connect(lambda title, why: said.append(why))
+    usage = namedtuple("usage", "total used free")
+    monkeypatch.setattr(_shutil, "disk_usage",
+                        lambda _p: usage(10**12, 10**12, recording.DISK_FLOOR * 2))
+    rm.tick()
+    assert j["status"] == "recording" and said == []
+    monkeypatch.setattr(_shutil, "disk_usage",
+                        lambda _p: usage(10**12, 10**12, recording.DISK_FLOOR - 1))
+    rm.tick()
+    assert j["status"] == "done" and said == [recording.DISK_FULL]

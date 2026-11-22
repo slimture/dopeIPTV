@@ -7,7 +7,9 @@ Whoever hands a command over, it is checked first (commands.checked): an
 address is a stream's or a file's own path, nothing else. A link's address
 - any web page can open a link - is asked about in the window before it
 plays, with the address in plain sight (``_ask_link_play``); only one the
-person saved among the favourites plays at once (``_link_known``)."""
+person saved among the favourites plays at once (``_link_known``). A link's
+channel is asked about the same way once it is found, its name in plain
+text (``_ask_link_channel``)."""
 
 from __future__ import annotations
 
@@ -64,7 +66,7 @@ class _CommandsMixin:
             log.info("command: not one the app takes - left")
             return {"ok": False}
         log.info("command: %s", ", ".join(sorted(cmd)))
-        if (cmd.get("open") or cmd.get("play") or cmd.get("channel") or cmd.get("supporter")
+        if (cmd.get("open") or cmd.get("play") or cmd.get("channel")
                 or cmd.get("number") or cmd.get("tv")):
             self._come_forward()
         if cmd.get("tv") is True and hasattr(self, "enter_tv_mode"):
@@ -75,13 +77,6 @@ class _CommandsMixin:
             # now): nothing is played for the profile before it is given.
             log.info("command: nothing played - who is watching is not chosen yet")
             return {"ok": False, "locked": True}
-        key = str(cmd.get("supporter") or "").strip()
-        if key and hasattr(self, "open_supporter"):
-            # Shown in the supporter window (checked there, offline), never
-            # taken silently; after this call returns - the asker is waiting.
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(0, lambda: self.open_supporter(key))
-            return {"ok": True}
         url = str(cmd.get("play") or "").strip()
         if url:
             if cmd.get("link") and not self._link_known(url):
@@ -94,8 +89,11 @@ class _CommandsMixin:
             return {"ok": True}
         name = str(cmd.get("channel") or "").strip()
         if name:
-            self._play_channel_named(name)
-            return {"ok": True}
+            # A link's channel is asked about too, once it is found; the
+            # person's own --channel, the remote API's and Home Assistant's
+            # play as asked.
+            self._play_channel_named(name, ask=bool(cmd.get("link")))
+            return {"ok": True, "asked": True} if cmd.get("link") else {"ok": True}
         from ..core.channel_numbers import valid
         number = valid(cmd.get("number"))
         if number is not None:
@@ -175,7 +173,9 @@ class _CommandsMixin:
         pl = active() if callable(active) else None
         return not nerd.same_server(url, str((pl or {}).get("server") or ""))
 
-    def _play_channel_named(self, name: str) -> None:
+    def _play_channel_named(self, name: str, ask: bool = False) -> None:
+        """The channel *name* means, played - *ask*: a link's, asked about
+        first (``_ask_link_channel``)."""
         client = self.client
 
         def done(rows: Any) -> None:
@@ -186,9 +186,46 @@ class _CommandsMixin:
                 from ..i18n import tr
                 self._show_toast(tr("cmd_no_channel", name=name), 5000)
                 return
+            if ask:
+                # Asked after this answer is handed on, as a link's address
+                # is (no dialog inside an event's delivery).
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, lambda: self._ask_link_channel(it, client))
+                return
             self.play_live_channel(it)
         run_async(self.pool, _rows_job(self, client), done,
                   lambda _e=None: done([]))
+
+    def _ask_link_channel(self, it: dict, client: Any = None) -> None:
+        """A link asks to tune the channel *it*: asked first, its name in
+        plain text, Cancel the default - any web page can open a link, and
+        a channel changed is what plays here. As ``_ask_link_play``: the
+        window's question (TV mode's own while it is on), never the
+        phone's, one at a time. Not played when the source changed while it
+        was asked."""
+        from ..i18n import tr
+        if getattr(self, "_link_asking", False):
+            log.info("command: a link's channel left - another link is being asked about")
+            return
+        if getattr(self, "_profile_locked", lambda: False)():
+            return
+        self._link_asking = True
+        phone = self.__dict__.pop("_phone_ask_hook", None)
+        try:
+            idx = self._choice_dialog(
+                tr("link_channel_title"),
+                tr("link_channel_body", name=str(it.get("name") or "?")),
+                [(tr("btn_play"), "normal"), (tr("common_cancel"), "primary")])
+        finally:
+            if phone is not None:
+                self._phone_ask_hook = phone
+            self._link_asking = False
+        if idx == 0 and client is not None and client is not getattr(self, "client", None):
+            log.info("command: a link's channel not played - the source changed meanwhile")
+            return
+        log.info("command: a link's channel %s", "played" if idx == 0 else "not played")
+        if idx == 0:
+            self.play_live_channel(it)
 
     def _play_channel_step(self, direction: int) -> bool:
         """The next (1) or previous (-1) channel from the one playing, as

@@ -597,15 +597,23 @@ def test_a_release_that_is_not_newer_is_never_installed(env, version):
 
 
 def test_back_on_releases_a_test_build_takes_the_release_it_carries_the_number_of(env, monkeypatch):
-    # The one step "down" there is today (updates.offered): 1.2.15 over the
-    # test build 1.2.15.40, and any later release - never an earlier one.
+    # The one step "down" there is (updates.offered): 1.2.15 over the test
+    # build 1.2.15.40 - only once the person left Test builds on this build -
+    # and any later release; never an earlier one.
+    from dopeiptv.core import updates
     monkeypatch.setattr(selfupdate, "VERSION", "1.2.15.40")
-    selfupdate.refuse_older("v1.2.15")
-    selfupdate.refuse_older("v1.2.16")
-    selfupdate.refuse_older("v1.2.15.41")
-    for old in ("v1.2.14", "v1.2.15.39", "v1.2.15.40", "", "v"):
+    try:
         with pytest.raises(UpdateError):
-            selfupdate.refuse_older(old)
+            selfupdate.refuse_older("v1.2.15")                 # not switched: newer only
+        updates.leave_nightly("1.2.15.40")
+        selfupdate.refuse_older("v1.2.15")
+        selfupdate.refuse_older("v1.2.16")
+        selfupdate.refuse_older("v1.2.15.41")
+        for old in ("v1.2.14", "v1.2.15.39", "v1.2.15.40", "", "v"):
+            with pytest.raises(UpdateError):
+                selfupdate.refuse_older(old)
+    finally:
+        updates.leave_nightly("")
 
 
 def test_the_check_is_against_the_version_running_not_the_one_passed_in(env, monkeypatch):

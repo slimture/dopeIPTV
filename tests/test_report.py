@@ -426,15 +426,8 @@ def test_only_the_short_answers_go_with_feedback():
     finally:
         report._post = real
     assert got["topic"] == "bug" and got["area"] == "guide" and got["often"] == "once"
-    assert not {"name", "topicx", "area2", "often_", "key"} & set(got)
-    assert got["supporter"] == "yes"            # a word, never the key itself
-
-
-def test_a_supporter_key_never_goes_in_a_report():
-    from dopeiptv.core import supporter
-    key = supporter.make(bytes(32))
-    out = report.scrub(f"my key is {key} - does it work?")
-    assert key not in out and "<supporter key>" in out
+    # The supporter mark is gone with the key: not sent either.
+    assert not {"name", "topicx", "area2", "often_", "key", "supporter"} & set(got)
 
 
 def test_only_the_part_of_the_log_that_matters_goes_with_feedback():
@@ -628,3 +621,73 @@ def test_a_report_loses_logins_told_in_words_tokens_home_folders_and_phone_numbe
     for text in ("Login failed: 401", "the PIN was wrong", "dopeIPTV 1.6.9 (Linux; x86_64)",
                  "at 21:05:03 on 2026-11-20", 'File "/usr/lib/python3.11/x.py", line 12'):
         assert report.scrub(text) == text, text
+
+
+def test_a_name_is_hidden_as_a_word_and_a_login_with_the_word_around_it():
+    """Crash report a8f41ba99eed said "Video: own thread (not st<private>d
+    yet)": a channel called Arte hidden inside "started" told what it was,
+    and "started" was never it."""
+    personal = report.personal_values(
+        [{"name": "Arte", "username": "kalle", "password": "Sommar24", "server": "http://tv.example:8080"}],
+        channels=["Arte HD", "One"], titles=["Dune"])
+    out = report.scrub("Video: own thread (not started yet); Arte HD froze; done; "
+                       "Dune: Part Two; Arte; none", personal)
+    assert out == ("Video: own thread (not started yet); <private> froze; done; "
+                   "<private>: Part Two; <private>; none")
+    # A login, wherever it stands: with the whole word around it.
+    out = report.scrub("user kalle77x, retry %3DSommar24%26 ok; kalle", personal)
+    assert "kalle" not in out and "Sommar24" not in out and "77x" not in out
+    assert out == "user <private>, retry %<private>%26 ok; <private>"
+    # A name that begins or ends with something else than a letter.
+    assert report.scrub("[SE] Kanal 5 froze", ["[SE] Kanal 5"]) == "<private> froze"
+    assert report.scrub("x[SE] Kanal 5y", ["[SE] Kanal 5"]) == "x[SE] Kanal 5y"
+
+
+def test_a_short_login_is_hidden_as_a_word_of_its_own():
+    """A password of one or two characters is still a login: hidden where it
+    stands as a word, never blanking the words that merely hold it."""
+    from dopeiptv.core.report import Secret, scrub
+    out = scrub("login failed for x, password ab - a cab and abc stay",
+                [Secret("ab"), Secret("x"), "TV"])
+    assert "password <private>" in out and "for <private>," in out
+    assert "a cab and abc stay" in out
+    assert scrub("TV channel", ["TV"]) == "TV channel"      # a short name is no login
+
+
+def test_a_login_is_hidden_percent_encoded_json_escaped_and_as_http_basic():
+    """The person's logins are hidden as written and as an address, a form,
+    JSON and HTTP Basic write them: quote, quote_plus, either case of hex,
+    JSON-escaped, and base64 of user:password padded or not."""
+    import base64
+    import re
+    from urllib.parse import quote, quote_plus
+    pw = 'p@ss w/rd"é'
+    personal = report.personal_values([{"name": "Box", "username": "anna", "password": pw}])
+    forms = [quote(pw, safe=""), quote(pw), quote_plus(pw), quote_plus(pw, safe="/"),
+             json.dumps(pw)[1:-1], json.dumps(pw, ensure_ascii=False)[1:-1],
+             json.dumps(pw)[1:-1].replace("/", "\\/")]
+    forms += [re.sub(r"%[0-9A-F]{2}", lambda m: m.group(0).lower(), f) for f in forms[:4]]
+    for raw in ("anna:" + pw).encode(), ("anna:" + pw).encode("latin-1"):
+        for enc in (base64.b64encode, base64.urlsafe_b64encode):
+            b64 = enc(raw).decode()
+            forms += [b64, b64.rstrip("=")]
+    for form in forms:
+        out = report.scrub(f"retry with {form} now", personal)
+        assert form.rstrip("=") not in out, (form, out)
+        assert out.startswith("retry with ") and out.endswith(" now"), out
+    # Base64 of text that holds a login, wherever it stands.
+    hidden = base64.b64encode(b"user=anna;pass=" + pw.encode()).decode().rstrip("=")
+    assert hidden not in report.scrub(f"GET /api/{hidden}/x", personal)
+    # The short rule holds for their forms; ordinary text stays.
+    short = report.scrub("login a%40b failed; a%40bc stays", [report.Secret("a@b")])
+    assert short == "login <private> failed; a%40bc stays"
+    keep = "QWxhZGRpbjpvcGVuIHNlc2FtZQ== is someone else's; sha 0f1e2d3c"
+    assert report.scrub(keep, personal) == keep
+
+
+def test_a_login_told_in_words_stays_on_its_line():
+    """"my password" at the end of the person's words took the first word of
+    the report below them: hidden on its own line only."""
+    out = report.scrub("I forgot my password\n\ndopeIPTV 1.6.10\nusername: kalle77")
+    assert "dopeIPTV 1.6.10" in out and "kalle77" not in out
+    assert report.scrub("password\nnext") == "password\nnext"

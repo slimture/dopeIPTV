@@ -56,6 +56,13 @@ def test_what_the_apple_tv_refuses_is_converted_and_only_that():
     assert (p.video, p.audio) == ("h264", "copy") and p.costs_cpu
     p = ab.plan("", "http://p/1.ts", ["hevc", "eac3"])
     assert p.hevc and p.video == "copy"
+    # HEVC in a provider's HLS is MPEG-TS, which an Apple TV plays with a
+    # black picture: copied into fMP4 tagged hvc1 instead, nothing converted.
+    for url in ("http://p/live/u/pw/1.m3u8", "http://p/movie/u/pw/7.mp4"):
+        p = ab.plan(url, url, ["hevc", "aac"], live=True)
+        assert not p.direct and p.hevc and (p.video, p.audio) == ("copy", "copy")
+        assert not p.costs_cpu and "fMP4" in p.why
+        assert ab.ffmpeg_args("ffmpeg", p, read=url).count("hvc1") == 1
     # mpv's names and aliases; a name that is neither is assumed fine.
     assert ab.split_codecs(["H264", "ac-3", "e-ac-3", "something"]) == (
         ["h264"], ["ac3", "eac3"])
@@ -151,12 +158,16 @@ def test_a_converted_picture_is_deinterlaced_with_a_keyframe_per_segment(
 
 
 def test_ffmpeg_reads_the_provider_as_the_source_plays():
+    """The user agent and the headers that open nothing in its arguments;
+    a token's header and Nerd's proxy are the app's bridge's to add - never
+    an argument (core/net_bridge.hand_over)."""
     opts = ab.input_options("http://p/live/1.ts", "TiviMate/5",
-                            {"Referer": "http://p/", "X-Bad": "a\r\nb"},
-                            "http://proxy:3128")
+                            {"Referer": "http://p/", "X-Bad": "a\r\nb",
+                             "Authorization": "Bearer s3cret", "X-Token": "t0k"})
     assert opts[opts.index("-user_agent") + 1] == "TiviMate/5"
     assert opts[opts.index("-headers") + 1] == "Referer: http://p/\r\n"
-    assert opts[opts.index("-http_proxy") + 1] == "http://proxy:3128"
+    assert "-http_proxy" not in opts
+    assert not any("s3cret" in a or "t0k" in a for a in opts)
     assert "-reconnect" in opts
     # No reconnect for an archive window; nothing at all for a file or UDP.
     assert "-reconnect" not in ab.input_options(
@@ -217,8 +228,8 @@ def fake_ffmpeg(monkeypatch):
     seen = {}
 
     def use(segments=4, how="live"):
-        def args(exe, p, start=0.0, net=None, feed=False):
-            seen.update(plan=p, start=start, net=net, feed=feed)
+        def args(exe, p, start=0.0, net=None, feed=False, read=""):
+            seen.update(plan=p, start=start, net=net, feed=feed, read=read)
             return [sys.executable, "-c", _FAKE, str(segments), how]
         monkeypatch.setattr(ab, "ffmpeg_args", args)
         return seen
@@ -986,6 +997,88 @@ def test_the_airplay_window_floats_over_the_app_only_while_it_is_in_front(qapp, 
     rx.stop()
 
 
+def test_a_zap_to_an_unknown_stream_looks_into_it_once_the_tv_let_go(
+        qapp, macos, fake_ffmpeg, monkeypatch):
+    """A zap knows nothing of the next channel. HEVC in a provider's HLS
+    plays on an Apple TV with a black picture, so the stream is looked
+    into first - after the TV has paused the last one and the provider had
+    its moment, so the account sees one connection at a time - and HEVC
+    goes through the bridge. A channel cast before is not looked into
+    again; one watched privately is not remembered."""
+    from dopeiptv.core import privacy
+    am, _ = macos
+    seen = fake_ffmpeg(4, "live")
+    monkeypatch.setattr(am, "SETTLE_S", 0.001)
+    order, probed = [], []
+    real_sleep = time.sleep
+
+    def sleep(s):
+        if s == am.SETTLE_S:
+            order.append(("wait",))
+        real_sleep(s)
+
+    monkeypatch.setattr(am, "time", types.SimpleNamespace(
+        monotonic=time.monotonic, time=time.time, sleep=sleep))
+    what = {"http://p/live/u/pw/1.m3u8": "h264", "http://p/live/u/pw/2.m3u8": "hevc",
+            "http://p/live/u/pw/3.m3u8": "h264"}
+
+    def probe(url, *a, **k):
+        assert k.get("quick") is True                    # the program map, no more
+        probed.append(url)
+        order.append(("probe", _plays(_Player.made[-1])[-1:] if _Player.made else []))
+        return {"video": what[url], "audio": ["aac"], "duration": 0.0}
+
+    monkeypatch.setattr(am.ab, "probe", probe)
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    out = {}
+
+    def cast(url, settle=False):
+        def run():
+            try:
+                out["name"] = rx.cast(am.NAME, url, "TV", settle=settle)
+            except Exception as e:                 # pragma: no cover
+                out["error"] = e
+        out.clear()
+        t = threading.Thread(target=run)
+        t.start()
+        while t.is_alive():
+            _pump(qapp, 0.02)
+        assert out.get("name") == am.NAME, out
+
+    cast("http://p/live/u/pw/1.m3u8")
+    p = _Player.made[-1]
+    assert probed == ["http://p/live/u/pw/1.m3u8"] and not rx.bridged()
+    assert p.item.url == "http://p/live/u/pw/1.m3u8"     # H.264: the TV fetches it
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert _plays(p)[-1] == "play"
+    order.clear()
+    cast("http://p/live/u/pw/2.m3u8", settle=True)       # a zap to HEVC
+    # The TV let go first - paused, no wait: as quick as its own swap.
+    assert order[0] == ("probe", ["pause"]), order
+    assert rx.bridged() and rx.plan.hevc and rx.plan.video == "copy"
+    assert seen["plan"].hevc and p.item.url == rx.bridge.url
+    assert len(_Player.made) == 1 and len(_NSPanel.made) == 1
+    cast("http://p/live/u/pw/1.m3u8", settle=True)       # back: known, not looked into
+    assert probed == ["http://p/live/u/pw/1.m3u8", "http://p/live/u/pw/2.m3u8"]
+    assert not rx.bridged() and p.item.url == "http://p/live/u/pw/1.m3u8"
+    cast("http://p/live/u/pw/2.m3u8", settle=True)       # HEVC known: the bridge
+    assert len(probed) == 2 and rx.bridged() and rx.plan.hevc
+    # Watched privately: looked into, never remembered. From the bridge,
+    # ffmpeg goes first and the provider has its moment before the look.
+    monkeypatch.setattr(privacy, "playing_private", lambda: True)
+    order.clear()
+    cast("http://p/live/u/pw/3.m3u8", settle=True)
+    assert order[0] == ("wait",) and order[1][0] == "probe", order
+    cast("http://p/live/u/pw/3.m3u8", settle=True)
+    assert probed[2:] == ["http://p/live/u/pw/3.m3u8"] * 2
+    assert all(len(k) == 64 and "u/pw" not in k for k in rx._seen)
+    rx.stop()
+
+
 def test_a_zap_through_the_bridge_stops_the_old_ffmpeg_first(
         qapp, macos, fake_ffmpeg, monkeypatch):
     am, _ = macos
@@ -1460,8 +1553,8 @@ def test_a_cast_from_the_rewind_buffer_gives_the_apple_tv_the_bridge(
     seen = fake_ffmpeg(4, "live")
     attached = []
     monkeypatch.setattr(cast_feed.Feed, "attach",
-                        lambda self, sink, exe, net_for=None, audio=0: attached.append(
-                            (self, net_for)))
+                        lambda self, sink, exe, net_for=None, audio=0, headers=None:
+                        attached.append((self, net_for)))
     loop = "http://127.0.0.1:4321/tok/s/7.ts"
     feed = cast_feed.Feed(lambda m: (loop, 0.0, m - 2.0), 1000.0,
                           kind="rewind buffer")

@@ -921,9 +921,10 @@ class _PhoneMixin(_PhoneBrowseMixin, _PhoneRecMixin):
         avail = getattr(self, "_mode_avail", None) or {}
         # A kids profile: never files on this computer or the recordings
         # (mw_profiles.KIDS_NEVER) - not listed, and not played.
-        kids = bool(getattr(self, "_profile_kids", lambda: False)())
+        never = getattr(self, "_kids_never_places", None)
+        gone = never() if callable(never) else set()
         return [s for s in ("all", "fav", "vod", "series", "recent", "local", "radio", "rec")
-                if avail.get(s) is not False and not (kids and s in ("local", "rec"))]
+                if avail.get(s) is not False and s not in gone]
 
     def _phone_episode(self, last: dict) -> dict[str, Any]:
         """The playing episode as Now playing shows it - its series, "S2 E5

@@ -2,8 +2,9 @@
 picked and read (``pick_backup``) - one with a password opened with it
 first (``UnlockBackupDialog``) -, what it holds and how to take it - over
 everything here, or its playlists beside the ones here, with what runs
-something, lets others in or sends the connections elsewhere shown first
-(``RestoreBackupDialog``) - and one left to be put back at the next start
+something, lets others in or sends the connections elsewhere shown first,
+each brought only when its box is ticked (``RestoreBackupDialog``,
+core/backup.without) - and one left to be put back at the next start
 (``stage_backup``). Settings' restore and the welcome's Bring step both
 go through here. A backup made with a password is encrypted off the
 window's thread (``run_working``).
@@ -23,7 +24,7 @@ from typing import Any, TypeVar
 
 from PyQt6.QtCore import QEventLoop, Qt, QTimer
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QScrollArea,
+    QCheckBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
@@ -234,15 +235,32 @@ class UnlockBackupDialog(QDialog):
         super().done(r)
 
 
+class _Words(QLabel):
+    """A risky line's words, in plain text: a click on them ticks its box."""
+
+    def __init__(self, text: str, box: QCheckBox) -> None:
+        super().__init__(text)
+        self._box = box
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setStyleSheet(f"font-size:12px; color:{P['text']};")
+
+    def mousePressEvent(self, e) -> None:  # noqa: N802 - Qt's name
+        self._box.toggle()
+        e.accept()
+
+
 class RestoreBackupDialog(QDialog):
     """What a backup holds, and how to take it: over everything here, or its
     playlists beside the ones here. *counts*: backup.summary(); *missing*:
     how many folder settings name folders this computer does not have;
     *risky*: backup.risky() - with backup.risky_sources(), what runs
-    something, lets others in or sends the connections elsewhere, shown
-    before anything is taken. Replacing everything is offered only for a
-    backup that is backup.replaceable(); the files it does not have are
-    named as kept."""
+    something, lets others in or sends the connections elsewhere: each a box
+    of its own, none ticked, and only what is ticked comes, either way
+    (backup.without - *backup*, the one given, is kept to what is ticked as
+    the boxes change: from the start, none of them). Replacing everything is
+    offered only for a backup that is backup.replaceable(); the files it
+    does not have are named as kept."""
 
     WIDTH = 560
 
@@ -356,12 +374,10 @@ class RestoreBackupDialog(QDialog):
                 tr(f"backup_kind_{kind}") for kind in bk.kept(backup))))
         if backup.full and missing:
             notes.append(tr("restore_missing_paths", n=missing))
-        shown = self.risky_lines(risky, bk.risky_sources(backup))
-        if shown:
-            notes.append(tr("restore_risky") + "\n" + "\n".join(
-                "  •  " + line for line in shown))
         if backup.full and bk.new_token_here(backup):
             notes.append(tr("restore_token_note"))
+        if backup.logins_out:
+            notes.append(tr("restore_no_logins"))
         if replaceable and syncing:
             notes.append(tr("restore_sync_note"))
         self.notes = QLabel("\n\n".join(notes))
@@ -370,15 +386,42 @@ class RestoreBackupDialog(QDialog):
         self.notes.setStyleSheet(
             f"font-size:12px; color:{P.get('warn', P['muted'])};")
         self.notes.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.notes.setVisible(bool(notes))
+        # What runs something, lets others in or sends the connections
+        # elsewhere: one box each, none ticked - only what is ticked comes.
+        self.backup = backup
+        self._original = bk.Backup(backup.kind, dict(backup.stores), list(backup.sources),
+                                   backup.app_version, backup.created, list(backup.keep))
+        self.picks: list[tuple[str, QCheckBox, QLabel]] = []
+        shown = self.risky_lines(risky, bk.risky_sources(backup))
+        choices = bk.risky_choices(backup)
+        self._picks_box = QWidget()
+        rows = QVBoxLayout(self._picks_box)
+        rows.setContentsMargins(0, 0, 0, 0)
+        rows.setSpacing(6)
+        rows.addWidget(self.notes)
+        self.risky_head: QLabel | None = None
+        if shown and len(shown) == len(choices):
+            self.risky_head = QLabel(tr("restore_risky") + "\n" + tr("restore_risky_ticks"))
+            self.risky_head.setWordWrap(True)
+            self.risky_head.setTextFormat(Qt.TextFormat.PlainText)
+            self.risky_head.setStyleSheet(
+                f"font-size:12px; color:{P.get('warn', P['muted'])};")
+            rows.addWidget(self.risky_head)
+            for key, line in zip(choices, shown, strict=True):
+                rows.addWidget(self._pick_row(key, line))
+        rows.addStretch(1)
+        # Nothing ticked: the backup given brings none of them from here on.
+        self._take()
         # A backup with many playlists of their own proxy can name dozens:
         # they scroll, the choice below stays on the screen.
         notes_box = QScrollArea()
-        notes_box.setWidget(self.notes)
+        notes_box.setWidget(self._picks_box)
         notes_box.setWidgetResizable(True)
         notes_box.setFrameShape(QScrollArea.Shape.NoFrame)
         notes_box.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget"
                                 " { background:transparent; }")
-        notes_box.setVisible(bool(notes))
+        notes_box.setVisible(bool(notes) or bool(self.picks))
         col.addWidget(notes_box)
         col.addSpacing(4)
         self.replace = QRadioButton(tr("restore_replace"))
@@ -413,9 +456,50 @@ class RestoreBackupDialog(QDialog):
         # width: told here, or they were cut.
         inner = self.WIDTH - 48
         for label in self.findChildren(QLabel):
-            if label.wordWrap() and label is not self.notes:
+            if label.wordWrap() and not self._picks_box.isAncestorOf(label):
                 label.setMinimumHeight(label.heightForWidth(inner - label.contentsMargins().left()))
-        notes_box.setFixedHeight(min(260, self.notes.heightForWidth(inner - 16) + 4))
+        need = rows.totalHeightForWidth(inner - 16)
+        if need <= 0:
+            need = self._picks_box.sizeHint().height()
+        notes_box.setFixedHeight(min(300, need + 4))
+
+    def _pick_row(self, key: str, line: str) -> QWidget:
+        """One risky thing the backup would bring: a box, not ticked, and
+        its line beside it in plain text (a click on the words ticks it)."""
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(8)
+        box = QCheckBox()
+        box.setChecked(False)
+        box.setAccessibleName(line[:300])
+        text = _Words(line, box)
+        h.addWidget(box, 0, Qt.AlignmentFlag.AlignTop)
+        h.addWidget(text, 1)
+        box.toggled.connect(lambda _on: self._take())
+        self.picks.append((key, box, text))
+        return row
+
+    def chosen(self) -> list[str]:
+        """The risky things ticked (backup.risky_choices' names)."""
+        return [key for key, box, _text in self.picks if box.isChecked()]
+
+    def _take(self) -> None:
+        """The backup given kept to what is ticked (backup.without): the
+        window that opened this restores what it handed in, whichever way."""
+        from ..core import backup as bk
+        took = bk.without(self._original, self.chosen())
+        self.backup.stores, self.backup.sources = took.stores, took.sources
+        self.backup.keep = took.keep
+
+    def shown_text(self) -> str:
+        """Every word the window shows of what the backup holds beside its
+        counts: the notes, and each risky line."""
+        parts = [self.notes.text()]
+        if self.risky_head is not None:
+            parts.append(self.risky_head.text())
+        parts += [text.text() for _key, _box, text in self.picks]
+        return "\n".join(p for p in parts if p)
 
     @staticmethod
     def _when(created: str) -> str:

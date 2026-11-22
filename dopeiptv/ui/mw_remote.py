@@ -15,7 +15,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from ..core import nerd, privacy
 from ..core.commands import stream_url_ok
 from ..core.log import log
-from ..core.remote_api import DEFAULT_PORT, RemoteServer, new_token
+from ..core.remote_api import DEFAULT_PORT, RemoteServer, new_token, play_refusal
 from ..i18n import tr
 
 _WAIT_S = 5.0
@@ -158,6 +158,18 @@ class _RemoteMixin:
             return {"channels": [{"id": r.get("stream_id"), "name": r.get("name"),
                                   "number": r.get("num"), "guide_id": r.get("epg_channel_id") or None}
                                  for r in rows]}
+        if action == "play":
+            url = str(params.get("url") or "").strip()
+            # A device at home never sends the player to this computer or a
+            # link-local host; a script on this computer reaches them itself.
+            # Here, on the server's thread: the name is looked up.
+            from ..core import remote_api
+            from ..core.phone_remote import this_computer
+            why = play_refusal(url) if url and stream_url_ok(url) \
+                and not this_computer(remote_api.asker()) else ""
+            if why:
+                log.info("remote: an address of %s was not played", why)
+                raise ValueError(f'"url" leads to {why} - not played from the remote API')
         return bridge.call(action, params)
 
     # -- the work (the window's thread) ---------------------------------------------

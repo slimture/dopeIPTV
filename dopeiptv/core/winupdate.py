@@ -147,6 +147,21 @@ def restart_into(setup: Path, pid: int | None = None) -> None:
     log.info("update: %s started; it installs once this instance (%s) has exited", setup.name, pid)
 
 
+#: What Windows answers when it will not start a program: its Code Integrity
+#: and Smart App Control (4550-4599: 4551 "An Application Control policy has
+#: blocked this file", 4556-4559 Smart App Control's reputation), a group
+#: policy (1260) and an antivirus (225, 226).
+_REFUSALS = frozenset(range(4550, 4600)) | {1260, 225, 226}
+
+
+def blocked_by_policy(e: BaseException) -> bool:
+    """Whether Windows itself refused to start the installer - Smart App
+    Control, an antivirus or a policy on the computer - rather than the
+    file being missing or broken. The installer is not Authenticode-signed,
+    and Smart App Control stops what it cannot vouch for."""
+    return getattr(e, "winerror", None) in _REFUSALS
+
+
 def _hand_over_the_front(proc: subprocess.Popen) -> None:
     """While this window is still in front: let the installer take the
     front, and wait - five seconds at most - until its window is up. A

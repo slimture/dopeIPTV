@@ -115,6 +115,24 @@ class KidsFilter:
         self.client = getattr(window, "client", None)
         self.overrides = getattr(window, "overrides", None)
         self.known: dict = window._kids_known()
+        # "Only what a grown-up allows": per catalogue the categories of the
+        # source in use it may see - read here, on the window's thread, with
+        # the client they are of (None: every one not for adults).
+        allowed = getattr(window, "_kids_allowed", None)
+        self.allowed: dict[str, frozenset[str] | None] = {
+            m: (allowed(m) if callable(allowed) else None) for m in _CATS}
+        self.only = any(v is not None for v in self.allowed.values())
+
+    def category_ok(self, mode: str, cid: Any, name: Any, own: Any = "") -> bool:
+        """Whether a category of the source in use (of *mode*, *name* the
+        one shown, *own* the provider's) may be listed for a kids profile:
+        none named for adults - and, with "Only what a grown-up allows",
+        only one a grown-up chose. The lists' one rule for categories, as
+        __call__ is for rows."""
+        if adult_category(name, own):
+            return False
+        allow = self.allowed.get(_KIDS_KIND.get(mode, mode))
+        return allow is None or str(cid) in allow
 
     def _ids(self, mode: str) -> frozenset[str] | None:
         hit = self.known.get(mode)
@@ -151,10 +169,11 @@ class KidsFilter:
         if kind in KIDS_NEVER:
             return False
         if kind == "radio":
-            return not adult_station(it)
+            # No category a grown-up could choose: not with only theirs.
+            return not self.only and not adult_station(it)
         mode = _KIDS_KIND.get(kind)
         if mode is None:
-            return True
+            return not self.only
         cid = it.get("category_id")
         if cid in (None, ""):
             cid = ctx.get("category_id")
@@ -162,6 +181,9 @@ class KidsFilter:
             # Of no category the app knows: not for a kids profile - what a
             # provider leaves unlabelled is not taken to be for children.
             return False
+        allow = self.allowed.get(mode)
+        if allow is not None and str(cid) not in allow:
+            return False            # not one a grown-up chose
         ids = self._ids(mode)
         if ids is None:
             self.window._kids_held = True
@@ -237,6 +259,39 @@ class _ProfilesMixin:
     def _kids_allows(self, it: Any, mode: str = "live") -> bool:
         keep = self._kids_keep(mode)
         return keep is None or keep(it)
+
+    def _kids_allowed(self, mode: str, source_id: str | None = None) -> frozenset[str] | None:
+        """With "Only what a grown-up allows" (core/profiles.py
+        ``allowed_for``): the categories of *mode* of *source_id* - the
+        source in use when None - the kids profile may see; None for any
+        other profile, or with the mode off."""
+        p = self._profile()
+        if p is None or not p.allow_only:
+            return None
+        if source_id is None:
+            store = getattr(self, "playlist_store", None)
+            source_id = str(getattr(store, "active_id", "") or "")
+        return p.allowed_for(source_id, mode)
+
+    def _kids_only_allowed(self) -> bool:
+        """Whether the profile in use sees only what a grown-up allows."""
+        p = self._profile()
+        return bool(p is not None and p.allow_only)
+
+    def _kids_cat_ok(self, mode: str, cid: Any, name: Any, own: Any = "") -> bool:
+        """Whether a category of the source in use may be listed for the
+        profile in use (KidsFilter.category_ok): every one for anyone but a
+        kids profile."""
+        keep = self._kids_keep(mode)
+        return keep is None or keep.category_ok(mode, cid, name, own)
+
+    def _kids_never_places(self) -> set[str]:
+        """The places a kids profile never has: Local files and Recordings
+        (KIDS_NEVER) - and Radio while it sees only what a grown-up
+        allows (a station is of no category one could choose)."""
+        if not self._profile_kids():
+            return set()
+        return {"local", "rec", "radio"} if self._kids_only_allowed() else {"local", "rec"}
 
     def _live_rows_job(self, client: Any):
         """For a worker: *client*'s channels - and a kids profile's
@@ -482,10 +537,22 @@ class _ProfilesMixin:
         return p.name if p is not None else ""
 
     def _profiles_changed(self) -> None:
-        """A profile was added or edited (Settings > Profiles)."""
+        """A profile was added or edited (Settings > Profiles). The kids
+        profile in use edited - what a grown-up allows it, say -: what it
+        may see is shown again at once."""
         self.profiles.reload()
         self._update_playlist_btn()
         self._events_profile()
+        if self._profile_kids():
+            self._kids_ver = int(self.__dict__.get("_kids_ver", 0)) + 1
+            for again in ("_apply_nav_visibility", "_load_categories"):
+                fn = getattr(self, again, None)
+                if callable(fn):
+                    try:
+                        fn()
+                    except Exception:
+                        log.debug("profiles: %s after an edit", again, exc_info=True)
+            self._held_rows_in("kids")
 
     def _profile_remove(self, pid: str) -> bool:
         files = [self.settings, getattr(self, "_resume_settings", None),

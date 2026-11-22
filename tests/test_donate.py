@@ -17,7 +17,7 @@ from PyQt6.QtCore import QObject, QSettings  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QWidget  # noqa: E402
 
 from dopeiptv.core import donate_rhythm as rhythm  # noqa: E402
-from dopeiptv.core import privacy, profiles, supporter, viewing_stats  # noqa: E402
+from dopeiptv.core import privacy, profiles, viewing_stats  # noqa: E402
 from dopeiptv.core.donate_rhythm import BRIGHT, DAY, MUTED, OFF  # noqa: E402
 from dopeiptv.ui import mw_donate, theme  # noqa: E402
 from dopeiptv.ui.mw_donate import _DonateMixin  # noqa: E402
@@ -278,19 +278,13 @@ def test_donate_opens_the_site_and_ends_the_week(tmp_path, monkeypatch):
     assert opened == ["https://dopeiptv.org/support/?ref=app-home"]
 
 
-def test_a_supporter_is_never_asked(tmp_path, monkeypatch):
-    seed, pub = supporter.new_seed()
-    monkeypatch.setattr(supporter, "PUBLIC_KEY_HEX", pub.hex())
-    monkeypatch.setattr(supporter, "_seen", supporter.OrderedDict())
-    w = _Win(tmp_path)
-    w.settings.setValue("supporter_key", supporter.make(seed))
-    for _ in range(4):
-        w.watch(6)
-        w.later(20 * DAY)
-        assert not w.heart()
-    assert w.settings.value(rhythm.K_PERIOD) is None
-    w.settings.remove("supporter_key")
-    w._donate_minute()                          # the plain icon again
+def test_an_old_supporter_key_changes_nothing(tmp_path):
+    """The supporter key is gone (1.6.11): one an older app kept is not
+    read - the heart asks in its rhythm like for anyone."""
+    w = _asking(tmp_path)
+    w.settings.setValue("supporter_key", "DS1-" + "a" * 100)
+    w._donate_minute()
+    assert w.heart()
 
 
 def test_switched_off_it_never_asks(tmp_path):

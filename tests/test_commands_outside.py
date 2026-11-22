@@ -48,8 +48,9 @@ def test_a_start_by_a_link_reads_nothing_after_the_link(argv, want):
 
 
 def test_what_follows_a_link_is_no_command():
-    assert parse_command(["dopeiptv://channel/SVT1", "--tv"]) == {"channel": "SVT1"}
-    assert parse_command(["--tv", "dopeiptv://channel/SVT1"]) == {"channel": "SVT1", "tv": True}
+    assert parse_command(["dopeiptv://channel/SVT1", "--tv"]) == {"channel": "SVT1", "link": True}
+    assert parse_command(["--tv", "dopeiptv://channel/SVT1"]) == {"channel": "SVT1", "link": True,
+                                                                   "tv": True}
     assert parse_command(["dopeiptv://open", "--play", "/etc/passwd"]) == {"open": True}
     assert parse_command(["dopeiptv://nothing", "http://evil.example/x.ts"]) is None
 
@@ -101,8 +102,8 @@ def test_a_link_that_is_refused(link):
 
 
 def test_a_link_s_words_are_one_plain_line():
-    assert parse_link("dopeiptv://channel/SVT1%0A%00HD") == {"channel": "SVT1 HD"}
-    assert parse_link("dopeiptv:channel/TV4") == {"channel": "TV4"}
+    assert parse_link("dopeiptv://channel/SVT1%0A%00HD") == {"channel": "SVT1 HD", "link": True}
+    assert parse_link("dopeiptv:channel/TV4") == {"channel": "TV4", "link": True}
     got = parse_link("dopeiptv://play?url=udp%3A%2F%2F%40239.0.0.1%3A1234")
     assert got == {"play": "udp://@239.0.0.1:1234", "link": True}
 
@@ -132,10 +133,11 @@ def test_the_question_shows_the_server_and_the_whole_address():
     ({"play": "file:///home/u/film.mkv"}, {"play": "file:///home/u/film.mkv"}),
     ({"play": "http://h/x.ts", "link": True}, {"play": "http://h/x.ts", "link": True}),
     ({"channel": " SVT1\tHD "}, {"channel": "SVT1 HD"}),
+    ({"channel": "SVT1", "link": True}, {"channel": "SVT1", "link": True}),
     ({"number": 7}, {"number": 7}),
     ({"number": "7"}, {"number": "7"}),
     ({"open": True, "tv": True}, {"open": True, "tv": True}),
-    ({"supporter": "DS1-abcdefghijklmnopqrstuv"}, {"supporter": "DS1-abcdefghijklmnopqrstuv"}),
+    ({"supporter": "DS1-abcdefghijklmnopqrstuv"}, {}),
     ({"open": True, "anything": {"else": 1}}, {"open": True}),
     ({}, {}),
     # A file never from a link; no relative path, no scheme of mpv's own.
@@ -153,7 +155,6 @@ def test_the_question_shows_the_server_and_the_whole_address():
     ({"channel": {"name": "SVT1"}}, None),
     ({"number": True}, None),
     ({"number": [1]}, None),
-    ({"supporter": "hello"}, None),
     ("play", None),
     ([{"play": "http://h/x.ts"}], None),
     (None, None),
@@ -243,13 +244,90 @@ def test_the_person_s_own_address_plays_without_a_question(app):
     h.handle_command({"play": url, "link": True})
     _spin(app)
     assert h.played == [url] and h.asked == []
-    # A channel by its name, the window forward: as before.
+    # A channel by its name from the command line, the remote API or Home
+    # Assistant: as before, no question.
     h = _host(1)
     named = []
-    h._play_channel_named = named.append
-    assert h.handle_command(parse_link("dopeiptv://channel/SVT1%20HD")) == {"ok": True}
-    assert named == ["SVT1 HD"] and h.asked == []
+    h._play_channel_named = lambda name, ask=False: named.append((name, ask))
+    assert h.handle_command({"channel": "SVT1 HD"}) == {"ok": True}
+    assert named == [("SVT1 HD", False)] and h.asked == []
+    # A link's channel: asked about once it is found.
+    assert h.handle_command(parse_link("dopeiptv://channel/SVT1%20HD")) == {"ok": True, "asked": True}
+    assert named[-1] == ("SVT1 HD", True)
     assert h.handle_command(parse_link("dopeiptv://open")) == {"ok": True}
+
+
+class _Pool:
+    def start(self, runnable):
+        runnable.run()
+
+
+def _channel_host(answer):
+    """A window whose source has two channels, its pool running at once."""
+    h = _host(answer)
+    h.played_channels = []
+    h.client = object()
+    h.pool = _Pool()
+    h.toasts = []
+    rows = [{"stream_id": 1, "name": "SVT1 HD"}, {"stream_id": 2, "name": "News\nLate"}]
+    h._live_rows_job = lambda client: (lambda: [dict(r) for r in rows])
+    h._chno_rows = lambda got: got
+    h.play_live_channel = lambda it: h.played_channels.append(it["stream_id"])
+    h._show_toast = lambda text, ms=0: h.toasts.append(text)
+    return h
+
+
+def test_a_link_s_channel_plays_only_after_yes_its_name_in_plain_sight(app, monkeypatch):
+    from dopeiptv.i18n import tr
+
+    def now(pool, fn, done, failed, *args):
+        try:
+            got = fn(*args)
+        except Exception as e:      # as run_async hands on a failure
+            failed(str(e))
+            return
+        done(got)
+    monkeypatch.setattr("dopeiptv.ui.mw_commands.run_async", now)
+    # Cancel - the default - and a window closed without an answer.
+    for answer in (1, None):
+        h = _channel_host(answer)
+        assert h.handle_command(parse_link("dopeiptv://channel/svt1hd"))["asked"] is True
+        assert h.played_channels == [] and h.asked == []    # asked after the call returns
+        _spin(app)
+        assert h.played_channels == [] and len(h.asked) == 1
+        title, message, labels, _hook = h.asked[0]
+        assert title == tr("link_channel_title") and "SVT1 HD" in message
+        assert labels == [tr("btn_play"), tr("common_cancel")]
+    # Play.
+    h = _channel_host(0)
+    h.handle_command(parse_link("dopeiptv://channel/SVT1%20HD"))
+    _spin(app)
+    assert h.played_channels == [1] and len(h.asked) == 1
+    # The source changed while it was asked: not played on the new one.
+    h = _channel_host(lambda host: setattr(host, "client", object()) or 0)
+    h.handle_command(parse_link("dopeiptv://channel/SVT1%20HD"))
+    _spin(app)
+    assert h.played_channels == [] and len(h.asked) == 1
+    # A name the source has not: said, nothing asked.
+    h = _channel_host(0)
+    h.handle_command(parse_link("dopeiptv://channel/Nothing%20Here"))
+    _spin(app)
+    assert h.asked == [] and h.played_channels == [] and h.toasts
+    # The command line's --channel and the remote API's: played, no question.
+    h = _channel_host(1)
+    h.handle_command({"channel": "SVT1 HD"})
+    _spin(app)
+    assert h.played_channels == [1] and h.asked == []
+
+
+def test_a_channel_s_name_in_the_question_is_plain_text():
+    """_choice_dialog shows its words as plain text: a provider's channel
+    name with markup in it is shown as written."""
+    import inspect
+
+    from dopeiptv.ui import mw_commands, mw_recording
+    assert "Qt.TextFormat.PlainText" in inspect.getsource(mw_recording._RecordingMixin._choice_dialog)
+    assert "_choice_dialog" in inspect.getsource(mw_commands._CommandsMixin._ask_link_channel)
 
 
 def test_the_question_is_the_computer_s_and_one_at_a_time(app):
@@ -365,7 +443,7 @@ def _start(argv, env):
 
 @pytest.mark.parametrize("argv, want", [
     # A link with more after it (a quote in it, on Windows): the link alone.
-    (["dopeiptv://channel/SVT1", "--self-check"], {"channel": "SVT1"}),
+    (["dopeiptv://channel/SVT1", "--self-check"], {"channel": "SVT1", "link": True}),
     # A link that asks nothing known: the window forward, no second copy.
     (["dopeiptv://rm?path=/"], {"open": True}),
     (["dopeiptv://play?url=file%3A%2F%2F%2Fetc%2Fpasswd"], {"open": True}),
