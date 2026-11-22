@@ -395,3 +395,30 @@ ffmpeg, real mpv, `/proc/<pid>/cmdline` read while they run).
 | Third parties, metadata | TMDB sees titles; the update check shows the build | low | Answered: Posters & info can turn TMDB off; written down |
 | Crypto | An own ChaCha20-Poly1305 | low (unproven) | Answered: RFC 8439 test vectors in the tests; written down |
 | Casting | A device can claim another's identity | medium | Answered: discovery is unauthenticated by design of those protocols; a device known by more than its name is not preselected |
+
+## November 2026 - a third independent AI review of 1.6.11 (testing at 3886b6f)
+
+The maintainer gave the new 21-part kit (the code at `3886b6f`, part 21
+the fixes after the second review) to ChatGPT. It scored the whole 8/10
+(from 7/10), found no unauthenticated critical weakness, and named what
+was left: arguments that still name something, the person's proxy
+connecting where the bridge cannot see, a backup without a password
+holding every login, and the home network's plain http and wide reach.
+This round closes what can be closed without losing a feature or risking
+playback, and writes down why the rest stays.
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | A non-http address goes to a program as an argument unless the app sees a login in it - a token in an rtsp or rtmp path, or under a query word of its own, escapes | medium | Fixed: every network address but a multicast group's goes in a 0600 file (`player_exec.handed_privately`) - the recorder's list, the external player's playlist, and now a cast's converter, ffprobe and the Apple TV's converter too (`player_exec.private_list`, through `net_bridge.hand_over`), which before got an rtsp address with a login as it was. A SAT>IP tuning (the tuning alone), a multicast group, and for the recorder an address an ffmpeg older than 5 would read without its options, stay an argument - written down |
+| Privacy | The external player's title in its arguments | low | Fixed: with a handoff file the title is that file's `#EXTINF` line alone, which mpv and VLC show; a local file keeps its title beside its path, which is there anyway |
+| Network boundary | Through Nerd's proxy the bridge cannot see where the proxy connects | medium | Fixed in part: a name is looked up here before the proxy is asked, and each of its addresses judged as a connection that landed there (`Bridge._proxied`, best effort as `dest_guard.proxied_refusal`); the proxy's own lookup stays the proxy's - written down |
+| Backups | A backup without a password holds every login in plain text | medium | Fixed: without a password the file holds no login (`backup.without_logins`: Trakt, Simkl, OpenSubtitles, a TMDB key of one's own, the sync code, MQTT, the webhooks' header, a proxy or header with a login, a Kodi's password, a playlist's password, token and box MAC, a login in its addresses); a restore keeps the logins of the computer it is put back on (`Backup.keep`, `_logins_from_here`); a login written into an address's path stays - written down |
+| Casting | A direct cast hands the TV the stream's address, an Xtream login in it | medium | Answered: a DLNA TV, a Kodi and an Apple TV are made to fetch a stream themselves; every cast through the computer would keep it awake and in the path and make casting less dependable. To a Chromecast or an Apple TV one cast can go through the app (a quality, track or subtitle chosen). Written down in docs/SECURITY.md |
+| LAN servers | The remote API's token travels over plain http | medium | Answered: a certificate for a home address would be one every client warns about, and Home Assistant's REST calls, VLC and Kodi cannot sign; the token is 192 bits, with a lock-out and New address. Written down |
+| LAN servers | "Home" is every private range | medium | Answered: narrowing the phone remote and the remote API to this computer's own networks would shut out phones and Home Assistant on another part of a network split in VLANs; every request needs the token or the phone's signature, a lock-out holds, server mode's token-free tuner already uses the narrow rule (`home_net.LocalNetworks`). Written down |
+| Casting | Kodi over http allowed after the person says so | low | Answered: the person's choice per Kodi, "Use HTTPS" tried first, Cancel the default |
+| Network boundary | `note_own` lets a source's own name lead home | low | Answered: a server at home under its public name needs it; its reason in `dest_guard` |
+| Sync | A computer new to the slot can be handed an older copy | low | Answered: the 30-day question holds; a server that withholds stays written down |
+| Media engines | FFmpeg and mpv decode outside input in the app's own process | medium | Answered: a sandbox for the decoders is the step towards 9/10, a project of its own after 1.6.11 (the Flatpak runs in Flatpak's sandbox already) |
+| Release signing | The signing infrastructure | medium | Answered: the update key lives only in GitHub environments of its own with a required reviewer, administrators may not bypass; the next kit's part 19 says so |
+| Logins at rest | The settings file, not a keyring | medium | Answered: planned as a round of its own after 1.6.11 |

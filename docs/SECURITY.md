@@ -508,7 +508,8 @@ accept - and a changed page would come with a warning just as the real one
 does, so it would protect nothing; a trusted one needs a public name per
 computer and a service handing out certificates (Plex runs one), which puts
 every computer in the public certificate logs. A TV, Kodi or VLC given a
-playlist cannot sign. What holds them is
+playlist cannot sign, and neither can Home Assistant's plain REST calls,
+which is what the remote API is for. What holds them is
 the home network, a 192-bit token, the lock-out and New address.
 
 ### Server mode's playlist token lets a device watch all it serves
@@ -569,8 +570,14 @@ is the TV's. A Chromecast is Google's device running Google's receiver.
 
 *Why:* a DLNA TV, a Kodi and an Apple TV are made to fetch a stream
 themselves, and a cast through the converter costs the computer's
-processor and starts later. The TV is one the person chose to cast to;
-the app says which device a name stands for (`casting.where`).
+processor and starts later. Sending every cast through the computer
+instead would keep the computer awake and in the path for the whole cast,
+which makes a cast less dependable than the TV fetching the stream itself.
+To a Chromecast or an Apple TV the person can have one cast go through
+the app: choosing a quality, a sound track or a subtitle in the cast window
+converts it. The TV is one
+the person chose to cast to; the app says which device a name stands for
+(`casting.where`).
 
 ### Every internet stream's certificate is checked (since 1.6.11)
 
@@ -836,17 +843,27 @@ proxy or a header that may hold a token as an argument:
   Origin, Accept... - a value with a login in it never) are ffmpeg's
   `-headers` (`split_headers`). `tests/test_security_rules.py` fails on a
   `-http_proxy` or an unsplit `-headers` anywhere in the app.
-* **Another address with a login** - `rtsp://user:pw@`, srt's passphrase,
-  a token in the query (`player_exec.carries_login`) - is put in a 0600
-  file the recorder reads: ffmpeg's concat list (its input's options in it
-  from ffmpeg 5; an older one reads it with its own defaults), mpv's
-  playlist (`recording.concat_list`, `player_exec.private_file`). With
-  none to be made there is no recording (`NO_PRIVATE_FILE`).
-* **An external player** gets an http(s) address, and another with a login,
-  in a one-entry playlist file of the user's own (0600, a name nobody can
-  guess, in `$XDG_RUNTIME_DIR` on Linux, deleted a minute later:
-  `players.handoff_file`); with none to be made it is not started, and the
-  person is told (`status_player_no_handoff`).
+* **Every other network address but a multicast group's** - rtsp, rtmp,
+  srt and the rest, with a login the app sees (`player_exec.carries_login`)
+  or not, since a token may stand in an address's path or under a query
+  word of its own (`player_exec.handed_privately`) - is put in a 0600 file:
+  the recorder's concat list (its input's options in it from ffmpeg 5) or
+  mpv playlist (`recording.concat_list`, `player_exec.private_file`), and a
+  cast's converter's, ffprobe's and the Apple TV's converter's concat list
+  (`player_exec.private_list`, read as `ffmpeg_protocols` says, gone with
+  the run, `net_bridge.Handoff.listed`). With none to be made nothing is
+  started (`NO_PRIVATE_FILE`, `cast_err_no_bridge`). A multicast group
+  (udp, rtp: an address and a port) with no login stays an argument, and so
+  do two more: a SAT>IP tuning, which holds the tuning and nothing else,
+  and, for the recorder, an address an ffmpeg older than 5 would read
+  without its options.
+* **An external player** gets an http(s) address, and every other network
+  address but a multicast group's, in a one-entry playlist file of the
+  user's own (0600, a name nobody can guess, in `$XDG_RUNTIME_DIR` on
+  Linux, deleted a minute later: `players.handoff_file`) - the title too,
+  as that file's own line, never `--force-media-title` or `--meta-title`;
+  with none to be made it is not started, and the person is told
+  (`status_player_no_handoff`).
 
 *What stays:* a header that may hold a token does not reach an https host
 other than the stream's own server - a segment on a CDN of its own, which
@@ -855,9 +872,10 @@ be an argument (FFmpeg's `-/opt <file>` reads only its own options' values
 from a file, not an input's, so there is no private way to hand it over);
 the log says once which headers were left out of such hops, by name. The
 in-app player, which takes no arguments, still sends them everywhere it
-did. yt-dlp is given the page it opens. An address that is not http(s) and
-holds a login the app does not see as one (a stream key in an rtmp path)
-goes as an argument, to the recorder and a cast's converter alike. An alias's token is in the program's arguments: it is
+did. yt-dlp is given the page it opens. A SAT>IP tuning, a multicast
+group, and for the recorder an address an ffmpeg older than 5 would read
+without its options, go as an argument (above). A local file's title stands
+beside its path, which is there anyway. An alias's token is in the program's arguments: it is
 of no use without the bridge's key. A playlist that names an absolute path
 whose folder is itself "~" is read under the real folder at that place
 (`real_target`'s one difference from the real address). The docked player and multiview are
@@ -1049,7 +1067,14 @@ office, a hotel, a guest Wi-Fi - that is everyone on it. The token still
 holds.
 
 *Why:* a home split in VLANs has its phones on another part than its
-computer, and an address cannot tell a home from an office.
+computer, and an address cannot tell a home from an office. Narrowing the
+phone remote and the remote API to this computer's own networks (as server
+mode's tuner is: `home_net.LocalNetworks`, the one place that takes no
+token) would shut out every phone and Home Assistant on another part of the
+network until the person listed it under Nerd, a feature the remote is not.
+Every request still needs the token or the phone's signature, a few wrong
+tries lock the address out, and a request from a public address is refused
+before anything is read.
 
 ### The Watch together relay sees who is in a room
 
