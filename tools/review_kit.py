@@ -29,7 +29,34 @@ import transparency  # noqa: E402
 #: (a block taken by its lines gets them in its first named companion).
 #: At the release they move into transparency.CODE, and its tests into
 #: transparency.TESTS - 1.6.11's did.
-NEXT: dict[tuple[str, str], list[str]] = {}
+NEXT: dict[tuple[str, str], list[str]] = {
+    # 1.6.12: every settings file asked about, each one's owner checked.
+    ("logins", "notprivate"): ["accepted_marks", "with_accepted", "waiting", "_theirs"],
+    # 1.6.12: the file checked again right before it runs or is put in
+    # place, and no AppImage update in a folder another account may change.
+    ("updates", "signed"): ["_VERIFIED", "verify_again", "shared_folder"],
+    # 1.6.12: a buffer a recording or a cast keeps on the disk asked about.
+    ("private", "buffer"): ["DvrPool.kept_on_disk_private"],
+    ("private", "reopen"): ["_PrivacyMixin._private_ask_kept"],
+}
+
+#: Blocks the next release adds to a part, shown when the app has every file
+#: they name - after the part's own blocks, with no marker on the page yet.
+#: At the release each moves into transparency.CODE, with its
+#: <!--tp:code PART ID--> on the page.
+NEW: list[tuple[str, dict]] = [
+    # 1.6.12: nothing that goes to dopeiptv.org carries a login of yours -
+    # asked in the one adapter every request of the app goes through.
+    ("logins", {"id": "guard", "repo": "app", "path": "dopeiptv/core/site_out.py",
+                "names": ["SERVICE_HOST", "HOSTS", "LONG", "ADDRESS_LEAST", "OWN_HEADERS",
+                          "SEALED_FOR_S", "SEALED_MAX", "_FIELDS", "_ADDRESSES", "_ADDRESS_OPTIONS",
+                          "LoginRefused", "_address_logins", "_header_logins", "logins_of", "_rebuild",
+                          "learn", "never", "account_logins", "_fresh", "sealed", "_without_sealed",
+                          "_json_values", "_service", "refusal", "check"],
+                "with": [{"repo": "app", "path": "dopeiptv/core/_lazy_requests.py",
+                          "from": r"^            def send\(self, request",
+                          "to": r"^                    raise LoginHeld\("}]}),
+]
 
 #: Names the next release takes out of a part's code, left out when the app
 #: no longer has them.
@@ -200,6 +227,13 @@ def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
                     w.pop("from", None)
                     w.pop("to", None)
                     w["names"] = list(names)
+    added: set[tuple[str, str]] = set()
+    for part, blk in NEW:
+        files = [b["path"] for b in [blk] + blk.get("with", []) if b["repo"] == "app"]
+        have = {b["id"] for b in transparency.CODE.get(part, [])}
+        if blk["id"] not in have and all(os.path.exists(os.path.join(app, f)) for f in files):
+            transparency.CODE.setdefault(part, []).append(blk)
+            added.add((part, blk["id"]))
     code = transparency.code_of(app, ref, site, site_ref)
     with open(os.path.join(site, "site", "transparency", lang + ".html"), encoding="utf-8") as fh:
         page = fh.read()
@@ -215,9 +249,8 @@ def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
             f"it is about. Explain in plain English what the code does, then review it as an attacker "
             f"would: does the code do what the page says, and where does it fall short?")
         chunks = [ask]
-        for p, bid in _CODE.findall(page):
-            if p != part:
-                continue
+        marked = [(p, bid) for p, bid in _CODE.findall(page) if p == part]
+        for p, bid in marked + sorted(k for k in added if k[0] == part):
             for blk in code.get(part, []):
                 if blk["id"] != bid:
                     continue

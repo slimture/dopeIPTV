@@ -185,7 +185,12 @@ CODE: dict[str, list[dict]] = {
     ],
     "website": [
         {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest", "swap_state"]},
+         "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest", "swap_state"],
+         # Nothing counted while swap keeps what it is given: the stop, and
+         # where a run makes it before any key or line is touched.
+         "with": [{"repo": "site", "path": "donate/stats_collect.py", "names": ["SWAP_HELD", "_swap_holds"]},
+                  {"repo": "site", "path": "donate/stats_collect.py",
+                   "from": r"^def collect\(", "to": r'^    SWAP_HELD\["said"\] = False'}]},
         {"id": "sketch", "repo": "site", "path": "donate/sketch.py",
          "names": ["BITS", "spots", "add", "has", "count"]},
         {"id": "kept", "repo": "site", "path": "donate/stats_collect.py",
