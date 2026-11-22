@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} si è bloccato caricando {title} e non si è ripreso.",
   "cast_state_moving": "Torno indietro…",
   "cast_state_to_live": "Torno alla diretta…",
+  "cast_state_preparing": "Preparazione per la TV…",
+  "cast_note_preparing": "Questo canale viene reimpacchettato su questo computer perché la TV possa mostrarlo: qualche secondo.",
   "cast_note_moving": "Alle {time} · preso dall'archivio, ci vuole qualche secondo.",
   "cast_note_to_live": "La diretta sta arrivando alla TV.",
   "setting_sub_live": "Sottotitoli nella TV in diretta",

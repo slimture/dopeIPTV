@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} bị kẹt khi tải {title} và không phục hồi.",
   "cast_state_moving": "Đang tua lại…",
   "cast_state_to_live": "Đang quay về trực tiếp…",
+  "cast_state_preparing": "Đang chuẩn bị cho TV…",
+  "cast_note_preparing": "Kênh này đang được đóng gói lại trên máy tính này để TV hiển thị được - vài giây.",
   "cast_note_moving": "Đến {time} · đang lấy từ kho lưu trữ - mất vài giây.",
   "cast_note_to_live": "Chương trình trực tiếp đang được gửi tới TV.",
   "setting_sub_live": "Phụ đề trên TV trực tiếp",

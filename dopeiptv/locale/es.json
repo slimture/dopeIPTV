@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} se quedó atascado cargando {title} y no se recuperó.",
   "cast_state_moving": "Retrocediendo…",
   "cast_state_to_live": "Volviendo al directo…",
+  "cast_state_preparing": "Preparando para la tele…",
+  "cast_note_preparing": "Este canal se reempaqueta en este ordenador para que la tele pueda mostrarlo: unos segundos.",
   "cast_note_moving": "A las {time} · se trae del archivo; tarda unos segundos.",
   "cast_note_to_live": "La emisión en directo va de camino a la tele.",
   "setting_sub_live": "Subtítulos en TV en directo",

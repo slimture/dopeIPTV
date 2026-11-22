@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name}で{title}の読み込みが止まり、回復しませんでした。",
   "cast_state_moving": "巻き戻し中…",
   "cast_state_to_live": "ライブに戻っています…",
+  "cast_state_preparing": "テレビ用に準備しています…",
+  "cast_note_preparing": "テレビで表示できるよう、このチャンネルをこのコンピュータで詰め直しています。数秒かかります。",
   "cast_note_moving": "{time} へ · アーカイブから取得中です。数秒かかります。",
   "cast_note_to_live": "ライブ放送をテレビに送っています。",
   "setting_sub_live": "ライブTVの字幕",

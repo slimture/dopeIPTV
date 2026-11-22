@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} ilikwama ikipakia {title} na haikurudi.",
   "cast_state_moving": "Inarudi nyuma…",
   "cast_state_to_live": "Inarudi mubashara…",
+  "cast_state_preparing": "Inaandaa kwa ajili ya TV…",
+  "cast_note_preparing": "Chaneli hii inafungwa upya kwenye kompyuta hii ili TV iweze kuionyesha - sekunde chache.",
   "cast_note_moving": "Hadi {time} · inaletwa kutoka kwenye hifadhi - itachukua sekunde chache.",
   "cast_note_to_live": "Matangazo ya mubashara yanakuja kwenye TV.",
   "setting_sub_live": "Manukuu kwenye TV mubashara",

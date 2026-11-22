@@ -123,6 +123,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
+- The cast card says "Preparing for the TV…" while a channel is
+  repackaged or converted on this computer before the TV can show it (an
+  HEVC channel to an Apple TV, the converter for a Chromecast), instead of
+  a silent wait with the last channel's Playing.
 - A decision card's words show whole with a click on them.
 - Settings > Appearance > Show channel numbers. The TV list shows no
   numbers by default now - calmer, with more room for the names; typing a

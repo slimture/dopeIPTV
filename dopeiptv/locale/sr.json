@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} se zaglavio pri učitavanju {title} i nije se oporavio.",
   "cast_state_moving": "Vraćanje unazad…",
   "cast_state_to_live": "Povratak na uživo…",
+  "cast_state_preparing": "Priprema za televizor…",
+  "cast_note_preparing": "Kanal se ponovo pakuje na ovom računaru kako bi ga televizor mogao prikazati - nekoliko sekundi.",
   "cast_note_moving": "Na {time} · preuzima se iz arhive - potrajaće nekoliko sekundi.",
   "cast_note_to_live": "Prenos uživo stiže na televizor.",
   "setting_sub_live": "Titlovi na TV uživo",

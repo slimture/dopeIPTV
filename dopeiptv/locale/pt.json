@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} ficou preso a carregar {title} e não recuperou.",
   "cast_state_moving": "Voltando…",
   "cast_state_to_live": "Voltando ao vivo…",
+  "cast_state_preparing": "Preparando para a TV…",
+  "cast_note_preparing": "Este canal está sendo reempacotado neste computador para que a TV possa exibi-lo - alguns segundos.",
   "cast_note_moving": "Para {time} · buscando no arquivo - leva alguns segundos.",
   "cast_note_to_live": "A transmissão ao vivo está a caminho da TV.",
   "setting_sub_live": "Legendas na TV ao vivo",

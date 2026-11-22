@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} נתקע בטעינת {title} ולא התאושש.",
   "cast_state_moving": "חוזר אחורה…",
   "cast_state_to_live": "חזרה לשידור החי…",
+  "cast_state_preparing": "מכין לטלוויזיה…",
+  "cast_note_preparing": "הערוץ נארז מחדש במחשב הזה כדי שהטלוויזיה תוכל להציג אותו - כמה שניות.",
   "cast_note_moving": "אל {time} · נטען מהארכיון - זה לוקח כמה שניות.",
   "cast_note_to_live": "השידור החי בדרך לטלוויזיה.",
   "setting_sub_live": "כתוביות בשידור חי",

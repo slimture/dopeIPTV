@@ -534,6 +534,9 @@ class AirPlayReceiver(QObject):
     """AirPlay as CastHub sees a receiver: one entry, one cast at a time."""
 
     KIND = "airplay"
+    #: True while the bridge readies a stream for the TV (the cast card
+    #: says so): read from the window's thread, set on the worker.
+    preparing = False
     #: CastHub hands this receiver the pieces of an archive or a buffer.
     TAKES_FEED = True
     #: The cast ended by itself; a string key says why (tr), "" for none.
@@ -840,11 +843,15 @@ class AirPlayReceiver(QObject):
                         and req["live"] is not True:
                     duration = found["duration"]
             gen = req["generation"]
-            target = self.bridge.start(
-                p, req["start"], net, feed=feed,
-                net_for=lambda u: self._network(u)[0], headers=self._headers())
-            if not self.bridge.wait_ready(
-                    stopping=lambda: self._generation != gen):
+            self.preparing = True
+            try:
+                target = self.bridge.start(
+                    p, req["start"], net, feed=feed,
+                    net_for=lambda u: self._network(u)[0], headers=self._headers())
+                ready = self.bridge.wait_ready(stopping=lambda: self._generation != gen)
+            finally:
+                self.preparing = False
+            if not ready:
                 why = self.bridge.error
                 self.bridge.stop()
                 if self._generation != gen:

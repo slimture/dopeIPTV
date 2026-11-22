@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} bleef hangen bij het laden van {title} en herstelde niet.",
   "cast_state_moving": "Terugspoelen…",
   "cast_state_to_live": "Terug naar live…",
+  "cast_state_preparing": "Voorbereiden voor de tv…",
+  "cast_note_preparing": "Dit kanaal wordt op deze computer opnieuw verpakt zodat de tv het kan tonen - een paar seconden.",
   "cast_note_moving": "Naar {time} · wordt uit het archief gehaald - dat duurt een paar seconden.",
   "cast_note_to_live": "De live-uitzending is onderweg naar de tv.",
   "setting_sub_live": "Ondertitels bij live-tv",

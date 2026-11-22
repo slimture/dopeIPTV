@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} fastnade när den laddade {title} och kom inte igång igen.",
   "cast_state_moving": "Spolar tillbaka…",
   "cast_state_to_live": "Tillbaka till live…",
+  "cast_state_preparing": "Förbereder för tv:n…",
+  "cast_note_preparing": "Kanalen packas om på den här datorn så att tv:n kan visa den - några sekunder.",
   "cast_note_moving": "Till {time} · hämtas ur arkivet - det tar några sekunder.",
   "cast_note_to_live": "Livesändningen är på väg till tv:n.",
   "setting_sub_live": "Undertexter på live-tv",

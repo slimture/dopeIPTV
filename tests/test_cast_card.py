@@ -334,6 +334,30 @@ def test_a_send_on_its_way_beside_a_tv_that_plays_says_playing(sync_runs, clock)
     assert w.cast_bar.pill.state == cc.STARTING
 
 
+def test_a_stream_readied_here_for_the_tv_is_said_on_the_card(sync_runs, clock):
+    """Repackaged or converted on this computer first (an HEVC channel to
+    an Apple TV, a converter for a Chromecast): the card says so while it
+    is readied - not the old channel's Playing, not a silent wait."""
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui import cast_card as cc
+    w = _window("live")
+    ready = [True]
+    w.cast.preparing = lambda: ready[0]
+    w._cast_inflight = 1                                   # a zap on its way
+    _tick(w, clock, 1, "PLAYING/None")                     # the old channel still plays
+    assert w.cast_bar.pill.state == cc.PREPARING
+    assert w.cast_bar.pill.text == tr("cast_state_preparing")
+    assert w.cast_bar.note.text() == tr("cast_note_preparing")
+    assert cc.PREPARING in cc.SPINNING
+    ready[0] = False                                       # readied, being handed over
+    _tick(w, clock, 1, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.PLAYING
+    w._cast_inflight = 0
+    ready[0] = True                                        # nothing on its way: not said
+    _tick(w, clock, 1, "PLAYING/None")
+    assert w.cast_bar.pill.state == cc.PLAYING
+
+
 def test_a_seek_is_said_on_the_card_until_the_tv_plays_it(sync_runs, clock):
     """Going back (or to live) while casting: the card says where to and
     that it takes a moment - not Playing for the old stream, not an error -

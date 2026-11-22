@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name} 加载 {title} 时卡住了，未能恢复。",
   "cast_state_moving": "正在回退…",
   "cast_state_to_live": "正在回到直播…",
+  "cast_state_preparing": "正在为电视准备…",
+  "cast_note_preparing": "正在这台电脑上重新封装该频道，以便电视能显示它，需要几秒钟。",
   "cast_note_moving": "跳到 {time} · 正从回看中获取，需要几秒钟。",
   "cast_note_to_live": "直播正在发送到电视。",
   "setting_sub_live": "直播电视字幕",

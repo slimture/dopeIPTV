@@ -1145,6 +1145,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cast_state_ended": {"en": "Ended"},
     "cast_state_moving": {"en": "Going back…"},
     "cast_state_to_live": {"en": "Back to live…"},
+    "cast_state_preparing": {"en": "Preparing for the TV…"},
+    "cast_note_preparing": {"en": "This channel is repackaged on this computer so the TV can show it - a few seconds."},
     "cast_note_moving": {"en": "To {time} · fetched from the archive - it takes a few seconds."},
     "cast_note_to_live": {"en": "The live broadcast is on its way to the TV."},
     "cast_try_again": {"en": "Try again"},

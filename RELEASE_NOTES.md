@@ -7,6 +7,7 @@
 - **App icon:** pick it under Settings → Appearance → App icon - the blue one, a heart, one in your accent colour (it follows the accent), midnight, paper, ocean, forest, sunset, grape, a round one or a retro TV.
 - **Show channel numbers** under Settings → Appearance. The TV list shows no numbers by default now, with more room for the names; typing a number still zaps to its channel.
 - A notice's words show in full when you click them.
+- **Casting** says *Preparing for the TV…* while a channel is repackaged on your computer before the TV can show it, instead of a silent wait.
 
 ### Security and privacy
 

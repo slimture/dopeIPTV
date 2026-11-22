@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name}에서 {title} 로딩이 멈춘 뒤 복구되지 않았습니다.",
   "cast_state_moving": "되감는 중…",
   "cast_state_to_live": "실시간으로 돌아가는 중…",
+  "cast_state_preparing": "TV용으로 준비하는 중…",
+  "cast_note_preparing": "TV에서 보여 줄 수 있도록 이 컴퓨터에서 채널을 다시 포장하고 있습니다. 몇 초 걸립니다.",
   "cast_note_moving": "{time}(으)로 · 보관 영상에서 가져오는 중이며 몇 초 걸립니다.",
   "cast_note_to_live": "실시간 방송을 TV로 보내는 중입니다.",
   "setting_sub_live": "실시간 TV 자막",

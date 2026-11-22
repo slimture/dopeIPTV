@@ -3127,6 +3127,8 @@
   "cast_stuck_notice": "{name}, {title} yüklenirken takıldı ve toparlanamadı.",
   "cast_state_moving": "Geri sarılıyor…",
   "cast_state_to_live": "Canlı yayına dönülüyor…",
+  "cast_state_preparing": "TV için hazırlanıyor…",
+  "cast_note_preparing": "Bu kanal, TV'nin gösterebilmesi için bu bilgisayarda yeniden paketleniyor - birkaç saniye.",
   "cast_note_moving": "{time} · arşivden alınıyor - birkaç saniye sürer.",
   "cast_note_to_live": "Canlı yayın televizyona geliyor.",
   "setting_sub_live": "Canlı TV'de altyazılar",
