@@ -39,7 +39,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # monthly support, no other way to give (November 2026).
 | (($ARGS.named.tips // "") == "on") as $TIPS_ON
 | ($ARGS.named.tip_url // "") as $TIP_URL
-| (($ARGS.named.tip_hint // "") | if . == "" then "50 kr" else . end) as $TIP_HINT
+| (($ARGS.named.tip_hint // "") | if . == "" then "100 kr" else . end) as $TIP_HINT
 # The tip is invited to - the header's link and heart, the front page's
 # band, the footer's link - only once it is set up: until then the support
 # page is there (its terms, "coming soon"), but nothing on the site asks for
