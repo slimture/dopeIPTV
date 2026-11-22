@@ -9,6 +9,21 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Security
 
+- A backup made without a password holds no login any more: playlist
+  passwords, tokens and box MACs, a login in their addresses, Trakt, Simkl,
+  OpenSubtitles, the sync code and the rest stay out, and putting such a
+  backup back keeps the logins already on that computer. With a password
+  the whole backup is encrypted, as before.
+- Every network address but a multicast group's goes to a program the app
+  starts in a private file - not only one the app sees a login in - and a
+  cast's converter and the Apple TV's now get it that way too; the
+  external player's title is in its playlist file, no longer in its
+  command line.
+- Through Nerd's proxy, a name is looked up on this computer before the
+  proxy is asked, so a public name that leads to this computer or the home
+  network is refused there too.
+- Casting an rtsp or udp stream to a Chromecast through the converter
+  works: it was given HTTP options ffmpeg refused before it opened.
 - A picture or guide address an internet source names can no longer reach
   the home network through a public name that resolves to a home address:
   the app's own requests to such a name are refused on the socket, after
