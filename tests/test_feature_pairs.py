@@ -1012,9 +1012,15 @@ def test_a_multiview_cell_plays_with_the_sources_nerd_options_as_the_player_does
     cell.title, cell._ts_capable, cell._muted = "SVT1", False, True
     cell._want_aid = cell._want_sid = None
     cell._nerd_applied = False
-    # Nerd off: nothing of it is set, as before.
+    # Nerd off: nothing of it is set, as before - but a stream on the
+    # internet goes through the app's guard (core/net_bridge.player_proxy),
+    # as the docked player's does; a stream at home does not.
+    from urllib.parse import urlsplit
     assert cell._mpv_play("http://provider.example/live/1.ts")
-    assert "user-agent" not in m and "http-proxy" not in m
+    assert "user-agent" not in m
+    guard = urlsplit(str(m["http-proxy"]))
+    assert guard.hostname == "127.0.0.1" and guard.username == "dopeiptv"
+    assert cell._mpv_play("http://192.168.1.5:8001/1:0:1") and m["http-proxy"] == ""
     nerd.install(_S(nerd_enabled="true", nerd_dns="cloudflare"))
     nerd.set_source({"kind": "xtream", "options": {"user_agent": "Kodi/21"}})
     try:
@@ -1023,7 +1029,6 @@ def test_a_multiview_cell_plays_with_the_sources_nerd_options_as_the_player_does
         assert m["user-agent"] == "Kodi/21"
         # Own DNS (or a trusted certificate): through the route's bridge,
         # on this computer and with the bridge's own key (core/net_bridge.py).
-        from urllib.parse import urlsplit
         px = urlsplit(str(m["http-proxy"]))
         assert px.scheme == "http" and px.hostname == "127.0.0.1" and px.port
         assert px.username == "dopeiptv" and len(px.password or "") >= 22

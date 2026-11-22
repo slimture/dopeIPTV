@@ -44,6 +44,7 @@ import time
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from ..core import net_bridge
 from ..core.log import log
 from ..core.player_exec import NO_WINDOW, ffmpeg_protocols
 from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
@@ -321,16 +322,41 @@ def lan_address() -> str:
 BITMAP_SUBS = {"dvb_subtitle", "dvd_subtitle", "hdmv_pgs_subtitle", "xsub"}
 
 
-def probe_args(exe: str, source: str) -> list[str]:
+def probe_args(exe: str, source: str, read: str = "") -> list[str]:
     """ffprobe's command for *source*. The address is -i's value - a
     playlist's line that starts with a dash is never an option of
     ffprobe's - and what it leads to stays a stream's
-    (player_exec.ffmpeg_protocols)."""
+    (player_exec.ffmpeg_protocols). *read*: what ffprobe reads in its
+    place - the alias of an http(s) one (core/net_bridge.hand_over), so its
+    arguments name nothing of the address."""
+    read = read or source
     return [exe, "-v", "error",
             *(["-user_agent", _UA] if "://" in source else []),
-            *ffmpeg_protocols(source),
+            *ffmpeg_protocols(read, bridged=read != source),
             "-print_format", "json", "-show_streams", "-show_format",
-            "-i", source]
+            "-i", read]
+
+
+def _whose(url: str) -> dict | None:
+    """The source a cast's stream at *url* is from, as the bridge judges
+    where its connections may land: the cast's (core/nerd.cast_source) - or
+    none for the app's own server on this computer (the rewind buffer's)."""
+    if cast_feed.is_loopback(url):
+        return None
+    from ..core import nerd
+    return nerd.cast_source()
+
+
+def hand_over(url: str, headers: dict | None = None) -> "net_bridge.Handoff | None":
+    """What a converter (ffmpeg, ffprobe) reads a cast's stream at *url* by
+    (core/net_bridge.hand_over): an alias for an http(s) address, the
+    bridge in its environment alone; the address itself for a file. None
+    when an http(s) one cannot be handed over so - nothing is started."""
+    way = net_bridge.hand_over(_whose(url), url, headers)
+    if way is None:
+        log.warning("cast bridge: the converter cannot be handed this stream privately - "
+                    "not started")
+    return way
 
 
 def probe_tracks(source: str, exe: str | None = None) -> dict:
@@ -349,10 +375,13 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
                  "height": 0, "fps": 0.0}
     if not exe:
         return out
+    way = hand_over(source)
+    if way is None:
+        return out
     try:
-        raw = subprocess.run(probe_args(exe, source),
+        raw = subprocess.run(probe_args(exe, source, way.address),
                              capture_output=True, timeout=25,
-                             stdin=subprocess.DEVNULL,
+                             stdin=subprocess.DEVNULL, env=way.env,
                              creationflags=NO_WINDOW).stdout
         probed = json.loads(raw or b"{}")
         streams = probed.get("streams", [])
@@ -367,6 +396,8 @@ def probe_tracks(source: str, exe: str | None = None) -> dict:
     except Exception as e:
         log.info("cast bridge: could not list the tracks (%s)", e)
         return out
+    finally:
+        way.close()
     for s in streams:
         kind = s.get("codec_type")
         if kind == "video" and not out["height"]:
@@ -477,8 +508,10 @@ def _timeshift(source: str) -> bool:
 def ffmpeg_args(exe: str, source: str, copy_video: bool,
                 audio: int = 0, subs: int | None = None,
                 sub_codec: str = "", start: float = 0.0,
-                quality: str = "original") -> list[str]:
+                quality: str = "original", read: str = "") -> list[str]:
     """The command line, kept separate so it can be read and tested.
+    *read*: what ffmpeg reads in *source*'s place (its alias, hand_over) -
+    the options are still chosen by *source* (live or archive, a file).
 
     Fragmented MP4 down a single HTTP response: the receiver is a Chrome
     engine and plays it as it arrives, and unlike HLS there are no segment
@@ -531,12 +564,12 @@ def ffmpeg_args(exe: str, source: str, copy_video: bool,
         *_input_options(source),
         # What the address leads to stays a stream's (a redirect, a
         # playlist's segments): never this computer's own files.
-        *ffmpeg_protocols(source),
+        *ffmpeg_protocols(read or source, bridged=bool(read) and read != source),
         # Seeking before -i is the cheap kind: ffmpeg jumps in the container
         # instead of decoding its way there, which is what makes resuming an
         # hour into a film instant rather than a minute of waiting.
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
-        "-fflags", "+genpts", "-i", source,
+        "-fflags", "+genpts", "-i", read or source,
         *burn, "-map", f"0:a:{audio}",
         *(["-r", str(fps)] if fps else []),
         "-c:v", "copy" if copy_video else video_encoder(),
@@ -556,8 +589,10 @@ HLS_SEGMENT = 4          # seconds per segment
 
 def hls_args(exe: str, source: str, copy_video: bool, folder: str,
              audio: int = 0, subs: int | None = None, start: float = 0.0,
-             quality: str = "original", live: bool = False) -> list[str]:
-    """The command for a cast that carries a text subtitle.
+             quality: str = "original", live: bool = False,
+             read: str = "") -> list[str]:
+    """The command for a cast that carries a text subtitle (*read* as
+    ffmpeg_args's).
 
     Not burned into the picture: handed over beside it, as a WebVTT
     rendition in an HLS playlist, which is how everything that streams does
@@ -591,9 +626,9 @@ def hls_args(exe: str, source: str, copy_video: bool, folder: str,
         exe, "-hide_banner", "-loglevel", "error",
         *_probe_limits(source),
         *_input_options(source),
-        *ffmpeg_protocols(source),
+        *ffmpeg_protocols(read or source, bridged=bool(read) and read != source),
         *(["-ss", f"{start:.3f}"] if start > 0 else []),
-        "-fflags", "+genpts", "-i", source,
+        "-fflags", "+genpts", "-i", read or source,
         "-map", "0:v:0", "-map", f"0:a:{audio}", "-map", f"0:s:{subs}",
         *(["-vf", ",".join(chain)] if chain else []),
         *(["-r", str(fps)] if fps else []),
@@ -1221,6 +1256,9 @@ class CastBridge:
         self._current: tuple[subprocess.Popen, "_Spool", int] | None = None
         self._readers: dict[subprocess.Popen, int] = {}
         self._tmp: str | None = None
+        #: How ffmpeg reads an http(s) source: its alias through the app's
+        #: bridge (hand_over), for the run.
+        self._way: net_bridge.Handoff | None = None
         #: What it converts is private (core/privacy): its work only in
         #: memory out of a disk's reach (private_cast_dir), never on one.
         self.private = False
@@ -1363,6 +1401,15 @@ class CastBridge:
         self.fatal = ""          # a new run gets to fail on its own terms
         self.generation += 1
         source = self._safe_source(source)
+        if feed is None and "://" in source:
+            # Its address never in ffmpeg's arguments - an alias through the
+            # app's bridge, which also keeps what a playlist names off this
+            # computer and the home network (core/net_bridge.py).
+            way = hand_over(source)
+            if way is None:
+                from ..i18n import LocalizedError
+                raise LocalizedError("cast_err_no_bridge")
+            self._way = way
         codecs = [c.lower() for c in (codecs or [])]
         # Copy the video unless it is something the receiver cannot decode.
         # Unknown codecs are assumed fine: re-encoding 1080p live on a laptop
@@ -1738,6 +1785,10 @@ class CastBridge:
         if self.fatal:
             log.info("cast bridge: not trying again - %s", self.fatal)
             return None
+        way = self._way
+        if "://" in self.source and self.feed is None and way is None:
+            return None                 # never the address itself
+        read = way.address if way is not None else ""
         if self.feed is not None:
             args = feed_args(exe, self.copy_video, self.hls_dir or "",
                              self.audio, self.quality)
@@ -1745,11 +1796,11 @@ class CastBridge:
             args = hls_args(exe, self.source, self.copy_video,
                             self.hls_dir or "", self.audio, self.subs,
                             self.start_at, self.quality,
-                            live=_endless(self.source))
+                            live=_endless(self.source), read=read)
         else:
             args = ffmpeg_args(exe, self.source, self.copy_video,
                                self.audio, self.subs, self.sub_codec,
-                               self.start_at, self.quality)
+                               self.start_at, self.quality, read=read)
         # Let the provider notice the last one has gone. Changing subtitle
         # three times in a row does three of these in a few seconds, and
         # the third found the panel still counting the second:
@@ -1767,6 +1818,7 @@ class CastBridge:
             proc = subprocess.Popen(
                 args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE if feed is not None else None,
+                env=way.env if way is not None else None,
                 creationflags=NO_WINDOW)
         except Exception as e:
             log.info("cast bridge: could not start ffmpeg (%s)", e)
@@ -1872,11 +1924,14 @@ class CastBridge:
         with self._lock:
             procs, self._procs = list(self._procs), []
             feed, self.feed = self.feed, None
+            way, self._way = self._way, None
         if feed is not None:
             # Done with, unless it is the one being started again.
             feed.detach() if feed is keep else feed.close()
         for p in procs:
             self.kill(p)
+        if way is not None:
+            way.close()
         ran = self._server is not None
         if self._server is not None:
             try:

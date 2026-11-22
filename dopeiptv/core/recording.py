@@ -1138,7 +1138,9 @@ class RecordingManager(QObject):
         as the player and a recording's own connection take it (while
         "streams through the proxy too" is on). The bridge goes through an
         http proxy only: through another (socks) it connects itself, as the
-        recorder always did."""
+        recorder always did. With none of Nerd's, the environment's
+        http_proxy, which the recorder once read itself (net_bridge
+        .system_proxy) - its http_proxy is the bridge now."""
         from . import nerd, net_bridge
         n = nerd.current()
         proxy = n.proxy(src, url) if n.on and n.flag("nerd_proxy_player", True) else ""
@@ -1147,7 +1149,7 @@ class RecordingManager(QObject):
         except ValueError:
             log.info("record: Nerd's proxy is no http proxy - the recorder's bridge connects itself")
             return ""
-        return proxy
+        return proxy or net_bridge.system_proxy(url)
 
     @staticmethod
     def _not_started(j: dict, why: str) -> None:

@@ -526,23 +526,34 @@ class Nerd:
         return [os.path.join(d, n) for n in names if n.endswith((".lua", ".js"))]
 
     def stream_options(self, source: dict | None = None, url: str = "",
-                       opened: str = "") -> dict[str, Any]:
+                       opened: str = "", route: tuple[str, bool] | None = None,
+                       guard: bool = True) -> dict[str, Any]:
         """Set before each stream opens: who the player says it is, extra
         headers, the proxy. With Nerd off: the app's own defaults, so a
         stream after turning it off is as before. *opened*: the address mpv
-        opens when it is not *url* (the rewind buffer's, on this computer)."""
+        opens when it is not *url* (the rewind buffer's, on this computer).
+        *route*: player_route's answer, when it is known already; *guard*
+        as player_route's."""
         hdrs = self.headers(source)
         ref = hdrs.pop("Referer", "")
-        px, _pinned = self.player_route(source, url, opened)
+        px, _pinned = route if route is not None else self.player_route(source, url, opened,
+                                                                         guard)
         return {"user-agent": self.user_agent(source),
                 "http-header-fields": [f"{k}: {v}" for k, v in hdrs.items()],
                 "referrer": ref,
                 "http-proxy": px}
 
     def player_route(self, source: dict | None = None, url: str = "",
-                     opened: str = "") -> tuple[str, bool]:
+                     opened: str = "", guard: bool = True) -> tuple[str, bool]:
         """(the proxy the player takes a stream through, whether that is the
-        bridge checking a certificate the source pins for it)."""
+        bridge checking a certificate the source pins for it). An http(s)
+        stream of a source on the internet goes through the app's bridge
+        (core/net_bridge.player_proxy), Nerd on or off, so that what mpv
+        fetches itself - an HLS playlist's segments, its keys, a redirect -
+        never lands on this computer, a link-local host or the home network;
+        not with *guard* False (a web page through yt-dlp, the person's own:
+        mpv hands its proxy on to yt-dlp's arguments)."""
+        from . import net_bridge
         target = opened or url
         # Never the proxy for the rewind buffer's own server on this
         # computer (its ingest takes the provider through it): mpv sent the
@@ -550,14 +561,16 @@ class Nerd:
         # reach it.
         px = (self.proxy(source, url)
               if self.flag("nerd_proxy_player", True) and not _is_loopback(target) else "")
-        if px or not self.on:
+        if not px and self.on:
+            # The source's own DNS, IP version or pinned certificate: the
+            # player through the route's bridge - never where a proxy takes
+            # the stream, whose DNS that is. It guards as player_proxy's.
+            routed = net_bridge.address_for(source, target, self)
+            if routed:
+                return routed, net_bridge.checks_pin(source, target, self)
+        if not guard:
             return px, False
-        # The source's own DNS, IP version or pinned certificate: the
-        # player through the bridge (core/net_bridge.py) - never where a
-        # proxy takes the stream, whose DNS that is.
-        from .net_bridge import address_for, checks_pin
-        px = address_for(source, target, self)
-        return px, bool(px) and checks_pin(source, target, self)
+        return net_bridge.player_proxy(source, target, px, self), False
 
     # -- the VPN guard --------------------------------------------------------
 
@@ -585,7 +598,11 @@ _ip_original: Any = None
 
 
 def _options_of(playlist: dict | None) -> dict | None:
-    return (dict(playlist.get("options") or {}, _kind=playlist.get("kind") or "xtream")
+    """A source as the player and the network take it: its own options, its
+    kind and (``_server``) where its server is - which says whether its
+    streams are the internet's (core/net_bridge.policy_for)."""
+    return (dict(playlist.get("options") or {}, _kind=playlist.get("kind") or "xtream",
+                 _server=str(playlist.get("server") or ""))
             if playlist else None)
 
 
@@ -773,23 +790,63 @@ def reapply_core(mpv: Any, picker: bool = True) -> dict[str, list[str]]:
 
 
 def apply_stream(mpv: Any, source: dict | None, was_applied: bool, url: str = "",
-                 opened: str = "") -> bool:
+                 opened: str = "", guard: bool = True) -> bool:
     """Before a stream opens: user agent, headers and proxy for its source.
-    Nothing at all while Nerd is off and never was this session; once it
-    was, the defaults go back. Returns whether Nerd is in force. *opened*:
-    the address mpv opens, when not *url* (the rewind buffer's)."""
+    Nothing of Nerd's while it is off and never was this session; once it
+    was, the defaults go back. For everyone: the app's bridge for an http(s)
+    stream of a source on the internet (player_route; not with *guard*
+    False - the person's own web page through yt-dlp), put back to none for
+    the next stream that needs none, and the certificate's check, which
+    raises CertificateUnchecked rather than let the stream play unchecked.
+    Returns whether Nerd is in force. *opened*: the address mpv opens, when
+    not *url* (the rewind buffer's)."""
     n = current()
-    pinned = False
+    px, pinned = n.player_route(source, url, opened, guard)
     if n.on or was_applied:
-        for key, value in n.stream_options(source, url, opened).items():
+        for key, value in n.stream_options(source, url, opened, route=(px, pinned)).items():
+            if key == "http-proxy":
+                continue
             try:
                 mpv[key] = value
             except Exception as e:
                 log.debug("nerd: %s not set: %s", key, e)
-        pinned = n.player_route(source, url, opened)[1]
+    _apply_proxy(mpv, px, n.on or was_applied)
     # The certificate, for everyone, whether Nerd is on or not.
     _apply_tls(mpv, source, opened or url, pinned, n)
     return n.on
+
+
+#: The cores whose http-proxy the app set to a proxy or a bridge: the next
+#: stream that needs none gets none again (_apply_proxy).
+_proxied: set[int] = set()
+
+
+def _apply_proxy(mpv: Any, px: str, nerd_way: bool) -> None:
+    """http-proxy for the stream *mpv* opens next: *px*, or none - set while
+    Nerd is (or was) in force as it always was; otherwise only on a core the
+    app gave a bridge before, so a core that never needed one is untouched."""
+    key = id(mpv)
+    if not px and not nerd_way and key not in _proxied:
+        return
+    try:
+        mpv["http-proxy"] = px
+    except Exception as e:
+        log.debug("nerd: http-proxy not set: %s", e)
+        return
+    if not px:
+        _proxied.discard(key)
+    elif key not in _proxied:
+        _proxied.add(key)
+        try:
+            weakref.finalize(mpv, _proxied.discard, key)
+        except TypeError:
+            pass
+
+
+class CertificateUnchecked(RuntimeError):
+    """A stream whose certificate the player must check (checks_certificate)
+    on a core that will not check it - tls-verify or tls-ca-file refused, or
+    not taken. The stream is not opened: never played unchecked."""
 
 
 #: Nerd: check every https stream's certificate in the player and the
@@ -888,16 +945,27 @@ def _apply_tls(mpv: Any, source: dict | None, address: str, pinned: bool, n: "Ne
     server's certificate signed by no authority mpv knows - and for a
     source the person let play unchecked; else the core's own setting
     (0.37 checks nothing by default, a newer mpv everything). A tls-verify
-    typed in Nerd's mpv options is the person's and left alone."""
+    typed in Nerd's mpv options is the person's and left alone.
+
+    Where the certificate is to be checked, a core that does not take the
+    check - tls-verify or tls-ca-file refused, or tls-verify not on after -
+    raises CertificateUnchecked: the stream is not opened, never played
+    unchecked (the player says so on the video)."""
     if n.typed_tls():
         return
     key = id(mpv)
+    https = str(address).lower().startswith("https://")
+    loose = pinned or (https and tls_unchecked(source))
+    need = not loose and checks_certificate(source, address, n)
     if key not in _tls_own:
         try:
             _tls_own[key] = (mpv["tls-verify"], mpv["tls-ca-file"])
         except Exception as e:
-            log.debug("nerd: tls-verify not read: %s", e)
-            return
+            if not need:
+                log.debug("nerd: tls-verify not read: %s", e)
+                return
+            # Read or not, the check is asked for: set below, or refused.
+            _tls_own[key] = (False, "")
         if key not in _tls_watched:
             try:
                 weakref.finalize(mpv, _forget_tls, key)
@@ -905,10 +973,9 @@ def _apply_tls(mpv: Any, source: dict | None, address: str, pinned: bool, n: "Ne
             except TypeError:
                 pass
     own_verify, own_ca = _tls_own[key]
-    https = str(address).lower().startswith("https://")
-    if pinned or (https and tls_unchecked(source)):
+    if loose:
         verify, ca = False, own_ca
-    elif checks_certificate(source, address, n):
+    elif need:
         verify, ca = True, (ca_file() or own_ca)
     else:
         verify, ca = own_verify, own_ca
@@ -916,4 +983,13 @@ def _apply_tls(mpv: Any, source: dict | None, address: str, pinned: bool, n: "Ne
         try:
             mpv[prop] = value
         except Exception as e:
+            if need:
+                raise CertificateUnchecked(f"{prop} not taken ({e})") from e
             log.debug("nerd: %s not set: %s", prop, e)
+    if need:
+        try:
+            took = mpv["tls-verify"]
+        except Exception:
+            return                  # set without a word: taken
+        if str(took).strip().lower() not in ("true", "yes", "1"):
+            raise CertificateUnchecked("tls-verify is not on after it was set")

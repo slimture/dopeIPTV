@@ -151,12 +151,16 @@ def test_a_converted_picture_is_deinterlaced_with_a_keyframe_per_segment(
 
 
 def test_ffmpeg_reads_the_provider_as_the_source_plays():
+    """The user agent and the headers that open nothing in its arguments;
+    a token's header and Nerd's proxy are the app's bridge's to add - never
+    an argument (core/net_bridge.hand_over)."""
     opts = ab.input_options("http://p/live/1.ts", "TiviMate/5",
-                            {"Referer": "http://p/", "X-Bad": "a\r\nb"},
-                            "http://proxy:3128")
+                            {"Referer": "http://p/", "X-Bad": "a\r\nb",
+                             "Authorization": "Bearer s3cret", "X-Token": "t0k"})
     assert opts[opts.index("-user_agent") + 1] == "TiviMate/5"
     assert opts[opts.index("-headers") + 1] == "Referer: http://p/\r\n"
-    assert opts[opts.index("-http_proxy") + 1] == "http://proxy:3128"
+    assert "-http_proxy" not in opts
+    assert not any("s3cret" in a or "t0k" in a for a in opts)
     assert "-reconnect" in opts
     # No reconnect for an archive window; nothing at all for a file or UDP.
     assert "-reconnect" not in ab.input_options(
@@ -217,8 +221,8 @@ def fake_ffmpeg(monkeypatch):
     seen = {}
 
     def use(segments=4, how="live"):
-        def args(exe, p, start=0.0, net=None, feed=False):
-            seen.update(plan=p, start=start, net=net, feed=feed)
+        def args(exe, p, start=0.0, net=None, feed=False, read=""):
+            seen.update(plan=p, start=start, net=net, feed=feed, read=read)
             return [sys.executable, "-c", _FAKE, str(segments), how]
         monkeypatch.setattr(ab, "ffmpeg_args", args)
         return seen
@@ -1460,8 +1464,8 @@ def test_a_cast_from_the_rewind_buffer_gives_the_apple_tv_the_bridge(
     seen = fake_ffmpeg(4, "live")
     attached = []
     monkeypatch.setattr(cast_feed.Feed, "attach",
-                        lambda self, sink, exe, net_for=None, audio=0: attached.append(
-                            (self, net_for)))
+                        lambda self, sink, exe, net_for=None, audio=0, headers=None:
+                        attached.append((self, net_for)))
     loop = "http://127.0.0.1:4321/tok/s/7.ts"
     feed = cast_feed.Feed(lambda m: (loop, 0.0, m - 2.0), 1000.0,
                           kind="rewind buffer")

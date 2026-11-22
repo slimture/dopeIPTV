@@ -14,7 +14,8 @@ from ..core import connections
 from ..core.connections import Use
 from ..core.log import log
 from ..core.privacy import for_log
-from ..core.recording import SCRAMBLED, RecordingManager, format_size, free_path, safe_filename
+from ..core.recording import (NO_BRIDGE, NO_PRIVATE_FILE, NOT_A_STREAM, SCRAMBLED,
+                              RecordingManager, format_size, free_path, safe_filename)
 from .notices import hub_of
 from .theme import P
 from .widgets import confirm, plain_text
@@ -48,6 +49,9 @@ _REC_REASONS = {
     RecordingManager.NO_ADDRESS: "rec_reason_no_address",
     RecordingManager.NO_ROOM: "rec_reason_no_room",
     SCRAMBLED: "rec_reason_scrambled",
+    NOT_A_STREAM: "rec_reason_not_a_stream",
+    NO_BRIDGE: "rec_reason_no_bridge",
+    NO_PRIVATE_FILE: "rec_reason_no_private_file",
 }
 
 

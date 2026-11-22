@@ -482,10 +482,24 @@ class _MultiviewCell(QWidget):
             m["start"] = str(float(start)) if start and start > 1 else "none"
             # Nerd: the source's user agent, headers, proxy and route (own
             # DNS, IP version, a trusted certificate), as the docked player
-            # takes them - nothing while Nerd is off and never was.
+            # takes them - nothing while Nerd is off and never was. For
+            # everyone: an internet source's stream through the app's bridge
+            # and its certificate checked, or the cell plays nothing.
             try:
                 self._nerd_applied = nerd.apply_stream(
                     m, nerd.source(), self._nerd_applied, url=url)
+            except nerd.CertificateUnchecked as e:
+                log.warning("multiview: a stream whose certificate cannot be checked here is "
+                            "not opened (%s)", e)
+                try:
+                    m.command("stop")
+                except Exception:
+                    pass
+                self._loading_end()
+                self._title.setText(tr("player_tls_unverifiable"))
+                self._title.setVisible(True)
+                self._title.adjustSize()
+                return False
             except Exception as e:
                 log.debug("multiview: Nerd's stream options not set: %s", e)
             # A SAT>IP source's RTSP transport, for this stream alone.

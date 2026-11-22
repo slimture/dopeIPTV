@@ -590,19 +590,41 @@ def _is_the_bridge(px: str) -> bool:
             and u.username == net_bridge.USER and len(u.password or "") >= 24)
 
 
+def _bridge_at(px: str) -> net_bridge.Bridge:
+    found = [b for b in net_bridge._bridges.values() if b.address == px]
+    assert len(found) == 1, px
+    return found[0]
+
+
 def test_the_player_is_pointed_at_the_bridge_only_where_the_route_changes_something():
+    """The route's bridge where the route changes something; for any other
+    stream of a source on the internet the guard's bridge (no route of its
+    own), Nerd or not - through Nerd's proxy where it takes the stream; for
+    this computer's servers, a source at home and what is no http none."""
     n = on(nerd_dns="cloudflare")
     nerd.install(n.s)
     px = n.stream_options({}, "http://provider.example/live/1.ts")["http-proxy"]
-    assert _is_the_bridge(px)
+    assert _is_the_bridge(px) and _bridge_at(px).route.servers
     assert n.stream_options({}, "http://127.0.0.1:5000/dvr/abc")["http-proxy"] == ""
     assert n.stream_options({}, "http://provider.example/1.ts", opened="http://127.0.0.1:9/x")["http-proxy"] == ""
     assert n.stream_options({}, "http://192.168.1.20:8001/1:0:1")["http-proxy"] == ""
-    assert n.stream_options({"dns": "off"}, "http://provider.example/1.ts")["http-proxy"] == ""
+    guard = n.stream_options({"dns": "off"}, "http://provider.example/1.ts")["http-proxy"]
+    assert _is_the_bridge(guard) and not _bridge_at(guard).route.active
+    assert _bridge_at(guard).policy.internet
     assert n.stream_options({}, "rtmp://provider.example/live")["http-proxy"] == ""
     proxied = on(nerd_dns="cloudflare", nerd_proxy="http://10.0.0.1:3128")
-    assert proxied.stream_options({}, "http://provider.example/1.ts")["http-proxy"] == "http://10.0.0.1:3128"
-    assert nerd.Nerd(S(nerd_dns="cloudflare")).stream_options({}, "http://provider.example/1.ts")["http-proxy"] == ""
+    chained = proxied.stream_options({}, "http://provider.example/1.ts")["http-proxy"]
+    assert _is_the_bridge(chained)
+    assert _bridge_at(chained)._up == net_bridge.Upstream("10.0.0.1", 3128, None)
+    # A source at home goes to Nerd's proxy as it always did.
+    home = {"_kind": "m3u", "_server": "http://192.168.1.20/list.m3u"}
+    assert proxied.stream_options(home, "http://192.168.1.20/1.ts")["http-proxy"] == (
+        "http://10.0.0.1:3128")
+    off = nerd.Nerd(S(nerd_dns="cloudflare")).stream_options({}, "http://provider.example/1.ts")
+    assert _is_the_bridge(off["http-proxy"]) and not _bridge_at(off["http-proxy"]).route.active
+    # A web page through yt-dlp: never the bridge (mpv hands it to yt-dlp).
+    web = nerd.Nerd(S()).stream_options({}, "https://www.example/watch", guard=False)
+    assert web["http-proxy"] == ""
 
 
 def test_the_rewind_buffer_on_this_computer_is_never_asked_through_the_proxy():
@@ -616,9 +638,10 @@ def test_the_rewind_buffer_on_this_computer_is_never_asked_through_the_proxy():
     opts = proxied.stream_options({}, "http://provider.example/live/1.ts",
                                   opened="http://127.0.0.1:41234/tok/live.ts")
     assert opts["http-proxy"] == ""
-    # The provider's own address still goes through it.
-    assert proxied.stream_options({}, "http://provider.example/live/1.ts")["http-proxy"] \
-        == "http://10.0.0.1:3128"
+    # The provider's own address still goes through it - by the guard's
+    # bridge, which goes on through the proxy.
+    px = proxied.stream_options({}, "http://provider.example/live/1.ts")["http-proxy"]
+    assert _bridge_at(px)._up == net_bridge.Upstream("10.0.0.1", 3128, None)
 
 
 def _bridge_case(servers, tmp_path, pin_right=True):
@@ -811,7 +834,12 @@ def test_real_mpv_plays_through_the_bridge(servers, tmp_path, at_home):
         nerd.apply_stream(m, source, True, url=url)
         nerd.install(S(nerd_enabled="false"))
         nerd.apply_stream(m, source, True, url=url)
-        assert m["tls-verify"] is True and m["http-proxy"] == ""
+        # Nerd off: no route and no pin, but a stream on the internet goes
+        # through the guard's bridge all the same.
+        assert m["tls-verify"] is True and _is_the_bridge(m["http-proxy"])
+        assert not _bridge_at(m["http-proxy"]).route.active
+        nerd.apply_stream(m, source, False, url="https://192.168.1.5/live/4.ts")
+        assert m["http-proxy"] == ""                    # a home stream: none again
     finally:
         m.terminate()
         for b in list(net_bridge._bridges.values()):

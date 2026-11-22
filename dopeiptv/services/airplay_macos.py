@@ -752,13 +752,21 @@ class AirPlayReceiver(QObject):
     def _network(self, url: str) -> tuple[list[str], bool]:
         """ffmpeg's input options as the source plays (Nerd), and whether
         the source sends anything of its own the Apple TV would not - the
-        source the cast is from (nerd.cast_source)."""
+        source the cast is from (nerd.cast_source). Its proxy and the
+        headers that may hold a token are the app's bridge's to add
+        (_headers, airplay_bridge.hand_over), never ffmpeg's arguments."""
         n, src = nerd.current(), nerd.cast_source()
         ua = n.user_agent(src)
         headers = n.headers(src)
         proxy = n.proxy(src, url)
         own = n.on and (bool(headers) or bool(proxy) or ua != nerd.DEFAULT_UA)
-        return ab.input_options(url, ua, headers, proxy), own
+        return ab.input_options(url, ua, headers), own
+
+    @staticmethod
+    def _headers() -> dict[str, str]:
+        """The headers of the source the cast is from (Nerd's), which the
+        app's bridge adds to what the converter reads."""
+        return nerd.current().headers(nerd.cast_source())
 
     def _prepare(self, req: dict[str, Any], force_bridge: bool = False) -> None:
         with self._lock:
@@ -807,7 +815,7 @@ class AirPlayReceiver(QObject):
                             adts=last.adts)
                 log.info("airplay: a seek in the same channel - its stream as before")
             elif not req["codecs"] or force_bridge:
-                found = ab.probe(p.url, net, self.bridge.exe)
+                found = ab.probe(p.url, net, self.bridge.exe, headers=self._headers())
                 p = ab.refine(p, found)
                 if not duration and found["duration"] > 0 \
                         and req["live"] is not True:
@@ -815,7 +823,7 @@ class AirPlayReceiver(QObject):
             gen = req["generation"]
             target = self.bridge.start(
                 p, req["start"], net, feed=feed,
-                net_for=lambda u: self._network(u)[0])
+                net_for=lambda u: self._network(u)[0], headers=self._headers())
             if not self.bridge.wait_ready(
                     stopping=lambda: self._generation != gen):
                 why = self.bridge.error

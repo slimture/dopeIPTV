@@ -1,7 +1,9 @@
 """The one way out for the programs the app starts on a provider's stream:
 a small HTTP proxy on this computer that ffmpeg and mpv are pointed at - a
-recorder in its environment (``child_env``: http_proxy, which only this user
-can read), the in-app player in its http-proxy option. Three things it does.
+recorder, a cast's converter, server mode's HLS copy in their environment
+(``child_env``: http_proxy, which only this user can read; ``hand_over``),
+the in-app player in its http-proxy option (``player_proxy``: every http(s)
+stream of a source on the internet, Nerd or not). Three things it does.
 
 **Where a connection may land** (``Policy``). FFmpeg and mpv fetch an HLS
 playlist's segments, its keys and the redirects they meet themselves, so a
@@ -72,7 +74,17 @@ goes through it - a tunnel (CONNECT) for https and for what the client
 tunnels, the absolute address for plain http, the proxy's login sent with
 each - and there the proxy connects: what is judged is the address as
 written (dest_guard's rule for a proxied connection too). An http proxy
-only; another (socks) is none the bridge can take.
+only; another (socks) is none the bridge can take - nor FFmpeg, which
+connects itself past one (``effective_proxy``). With none of Nerd's, the
+environment's http_proxy, as FFmpeg itself takes it (``system_proxy``).
+
+**A source's own headers** (Nerd's, ``headers``): the bridge adds them to
+every request it can read - one to an alias, which it makes itself, and a
+plain http one - in place of the client's of the same name. An https hop to
+another host is a tunnel the bridge cannot look into: there only the headers
+that open nothing (``SAFE_HEADERS``) go, in the program's own arguments
+(``split_headers``); the rest are left out of such a hop, said once in the
+log. No header that may hold a token stands in a program's arguments.
 
 A pinned certificate cannot be read inside the tunnel (TLS 1.3 sends it
 encrypted). Before a tunnel to a pinned host opens, the bridge makes a TLS
@@ -111,6 +123,7 @@ from __future__ import annotations
 
 import base64
 import hmac
+import os
 import secrets
 import selectors
 import socket
@@ -119,6 +132,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import quote, unquote, urlsplit
 
 from . import cert_pin, dest_guard, doh, net_route, stream_address
@@ -161,6 +175,19 @@ _PLACES = ("~", "%7E", "%7e")
 #: Each refusal of where a connection would land is said once per host and
 #: reason; at most this many kept.
 _SAID_MAX = 256
+#: Headers that open nothing - a program may be handed them in its arguments
+#: (split_headers). Any other (Authorization, Cookie, a token of the
+#: provider's own name) only ever goes through the bridge.
+SAFE_HEADERS = frozenset((
+    "referer", "origin", "accept", "accept-language", "accept-encoding", "cache-control",
+    "pragma", "dnt", "x-requested-with", "icy-metadata", "upgrade-insecure-requests",
+    "sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site", "sec-ch-ua", "sec-ch-ua-mobile",
+    "sec-ch-ua-platform"))
+#: What a header of the source's own may never replace: the request's own
+#: framing and the proxy's.
+_NOT_ADDED = frozenset((b"host", b"connection", b"keep-alive", b"content-length",
+                        b"transfer-encoding", b"te", b"trailer", b"upgrade",
+                        b"proxy-connection", b"proxy-authorization"))
 
 
 class Refused(Exception):
@@ -427,17 +454,65 @@ def _basic(user: str, password: str) -> bytes:
     return b"Basic " + base64.b64encode(raw)
 
 
+Headers = tuple[tuple[str, str], ...]
+
+
+def header_lines(headers: dict[str, str] | Headers | None) -> Headers:
+    """*headers* as a bridge adds them: names and values on one line each,
+    none of the request's own framing (_NOT_ADDED), none with a line break."""
+    items = headers.items() if isinstance(headers, dict) else (headers or ())
+    out: list[tuple[str, str]] = []
+    for name, value in items:
+        k, v = str(name or "").strip(), str(value or "").strip()
+        if (not k or not v or any(c in k + v for c in "\r\n\x00") or ":" in k
+                or k.lower().encode("latin-1", "replace") in _NOT_ADDED):
+            continue
+        try:
+            (k + v).encode("latin-1")
+        except UnicodeEncodeError:
+            continue
+        out.append((k, v))
+    return tuple(out)
+
+
+def with_headers(fields: bytes, headers: Headers) -> bytes:
+    """A request's header *fields* with *headers* in place of the client's
+    of the same names."""
+    if not headers:
+        return fields
+    names = {k.lower().encode("latin-1") for k, _v in headers}
+    kept = [raw for raw in fields.split(b"\r\n")
+            if raw and raw.split(b":", 1)[0].strip().lower() not in names]
+    kept += [f"{k}: {v}".encode("latin-1") for k, v in headers]
+    return b"\r\n".join(kept)
+
+
+def split_headers(headers: dict[str, str] | None) -> tuple[dict[str, str], list[str]]:
+    """(the headers a program may be handed in its arguments, the names of
+    the rest): only SAFE_HEADERS, and only with a value that holds no login
+    (a Referer with a token in its query is not one)."""
+    from .player_exec import carries_login
+    safe: dict[str, str] = {}
+    held: list[str] = []
+    for k, v in (headers or {}).items():
+        if k.strip().lower() in SAFE_HEADERS and not carries_login(v):
+            safe[k] = v
+        else:
+            held.append(k)
+    return safe, held
+
+
 def alias_head(method: str, target: str, version: str, fields: bytes, alias: Alias,
-               authorization: bytes | None = None) -> bytes:
+               authorization: bytes | None = None, headers: Headers = ()) -> bytes:
     """The request to the real server for a client's request to *alias*:
     *target* on its first line, the proxy's own headers and the Host left
-    out, the real Host, the source's login (*authorization*, else basic
-    from the address), Connection: close."""
+    out, the real Host, the source's own *headers* (with_headers), its login
+    (*authorization*, else basic from the address), Connection: close."""
     out = [f"{method} {target} {version}".encode("latin-1")]
     login = authorization
     if login is None and alias.user is not None:
         login = _basic(alias.user, alias.password)
-    for raw in fields.split(b"\r\n"):
+    for raw in with_headers(fields, headers).split(b"\r\n"):
         name = raw.split(b":", 1)[0].strip().lower()
         if (not raw or name in _HOP or name == b"host"
                 or (login is not None and name == b"authorization")):
@@ -532,17 +607,19 @@ def split_target(target: str, default_port: int) -> tuple[str, int]:
     return (u.hostname or "").lower(), u.port or default_port
 
 
-def origin_head(method: str, target: str, version: str, fields: bytes) -> tuple[str, int, bytes]:
+def origin_head(method: str, target: str, version: str, fields: bytes,
+                headers: Headers = ()) -> tuple[str, int, bytes]:
     """(host, port, the request as the server takes it) of a proxy's GET
     http://host/path: the path alone on the first line, the proxy's own
-    headers left out, Connection: close."""
+    headers left out, the source's own *headers* in (with_headers),
+    Connection: close."""
     u = urlsplit(target)
     if (u.scheme or "").lower() != "http" or not u.hostname:
         raise Refused("only http:// addresses and CONNECT")
     path = (u.path or "/") + (f"?{u.query}" if u.query else "")
     out = [f"{method} {path} {version}".encode("latin-1")]
     have_host = False
-    for raw in fields.split(b"\r\n"):
+    for raw in with_headers(fields, headers).split(b"\r\n"):
         name = raw.split(b":", 1)[0].strip().lower()
         if not raw or name in _HOP:
             continue
@@ -564,9 +641,12 @@ def _drained(sock: socket.socket) -> bytes:
 
 
 def pipe(a: socket.socket, b: socket.socket) -> None:
-    """Bytes both ways until both have ended (one side ending its sending
-    is passed on to the other, as TCP does - but not to a TLS connection,
-    whose shutdown would end its reading too)."""
+    """Bytes both ways between the client *a* and the server *b*. The
+    client gone is the end of both: the server's connection - one of the
+    account's - goes at once, not when a stalled server next sends. The
+    server ending its sending is passed on to the client, as TCP does (but
+    not to a TLS connection, whose shutdown would end its reading too), and
+    the client reads on until it closes."""
     sel = selectors.DefaultSelector()
     sel.register(a, selectors.EVENT_READ, b)
     sel.register(b, selectors.EVENT_READ, a)
@@ -586,6 +666,8 @@ def pipe(a: socket.socket, b: socket.socket) -> None:
                     except OSError:
                         return
                     continue
+                if src is a:
+                    return
                 sel.unregister(src)
                 open_ -= 1
                 if isinstance(dst, ssl.SSLSocket):
@@ -657,14 +739,21 @@ class Bridge:
     certifi's. *policy*: where its connections may land (HOME_POLICY - the
     least any bridge checks - when none is given). *upstream*: the person's
     http proxy every connection goes through (the module's docstring), ""
-    for none; ValueError for one it cannot go through."""
+    for none; ValueError for one it cannot go through. *headers*: the
+    source's own, added to every request the bridge reads (header_lines)."""
 
     def __init__(self, route: Route, cafile: str | None = None,
-                 policy: Policy | None = None, upstream: str = "") -> None:
+                 policy: Policy | None = None, upstream: str = "",
+                 headers: Headers = ()) -> None:
         self.route = route
         self.cafile = cafile
         self.policy = policy if policy is not None else HOME_POLICY
         self._up = upstream_of(upstream)
+        self.headers = header_lines(headers)
+        #: Connections being served now, and when one last began or ended:
+        #: a bridge a stream reads is not the one let go (bridge_for).
+        self.busy = 0
+        self.active_at = time.monotonic()
         self._trust_ctx: ssl.SSLContext | None = None
         self._checked_ctx: ssl.SSLContext | None = None
         self._trust_ok: dict[tuple[str, int], float] = {}
@@ -781,9 +870,15 @@ class Bridge:
                              daemon=True).start()
 
     def _serve_slot(self, client: socket.socket) -> None:
+        with self._lock:
+            self.busy += 1
+            self.active_at = time.monotonic()
         try:
             self._serve(client)
         finally:
+            with self._lock:
+                self.busy -= 1
+                self.active_at = time.monotonic()
             self._slots.release()
 
     def _failed(self, what: str) -> None:
@@ -953,7 +1048,7 @@ class Bridge:
 
     def _alias_request(self, alias: Alias, proxied: bool, method: str, real: str,
                        version: str, fields: bytes, login: bytes | None = None) -> bytes:
-        head = alias_head(method, real, version, fields, alias, login)
+        head = alias_head(method, real, version, fields, alias, login, self.headers)
         if not proxied:
             return head
         return _via(head, f"http://{alias.netloc}{real}", self._up.login if self._up else None)
@@ -1045,7 +1140,8 @@ class Bridge:
                     if up is None:
                         return
                 else:
-                    host, port, request = origin_head(method, target, version, fields)
+                    host, port, request = origin_head(method, target, version, fields,
+                                                      self.headers)
                     where = f"{_shown(host)}:{port}"
                     up, proxied = self._open_plain(host, port)
                     if proxied:
@@ -1087,30 +1183,54 @@ class Bridge:
                         pass
 
 
-_bridges: dict[tuple[Route, Policy, str], Bridge] = OrderedDict()
+_bridges: dict[tuple[Route, Policy, str, Headers], Bridge] = OrderedDict()
 _lock = threading.Lock()
-#: Bridges kept at once: one per route and policy - a source's stream host
-#: in it - in use this session. Past them the one used longest ago that
-#: holds no alias stops taking connections (those under way go on).
+#: Bridges kept at once: one per route, policy - a source's stream host in
+#: it -, proxy and headers in use this session. Past them one is let go -
+#: it stops taking connections, those under way go on: one that holds no
+#: alias and has served nothing for IDLE_S, else one serving nothing now;
+#: while every one is a stream's, up to HARD_MAX of them before the one
+#: used longest ago goes.
 MAX_BRIDGES = 32
+HARD_MAX = 4 * MAX_BRIDGES
+IDLE_S = 120.0
 
 
-def bridge_for(route: Route, policy: Policy | None = None, upstream: str = "") -> Bridge:
-    """The bridge for *route*, *policy* (HOME_POLICY when none) and the
-    person's *upstream* proxy ("" none), made when there is none yet;
-    ValueError for a proxy a bridge cannot go through."""
-    key = (route, policy if policy is not None else HOME_POLICY, upstream)
+def _let_go(now: float) -> tuple[Route, Policy, str, Headers] | None:
+    """The bridge bridge_for lets go of to make room (the note above)."""
+    free = [(k, v) for k, v in _bridges.items() if not v.aliases and not v.busy]
+    for k, v in free:
+        if now - v.active_at >= IDLE_S:
+            return k
+    if free:
+        return free[0][0]
+    if len(_bridges) < HARD_MAX:
+        return None
+    return next(iter(_bridges))
+
+
+def bridge_for(route: Route, policy: Policy | None = None, upstream: str = "",
+               headers: Headers = ()) -> Bridge:
+    """The bridge for *route*, *policy* (HOME_POLICY when none), the
+    person's *upstream* proxy ("" none) and the source's own *headers*
+    (header_lines), made when there is none yet; ValueError for a proxy a
+    bridge cannot go through."""
+    lines = header_lines(headers)
+    key = (route, policy if policy is not None else HOME_POLICY, upstream, lines)
     with _lock:
         b = _bridges.pop(key, None)
         if b is not None and not b.closed:
             _bridges[key] = b           # the one used last at the end
             return b
         while len(_bridges) >= MAX_BRIDGES:
-            idle = next((k for k, v in _bridges.items() if not v.aliases), None)
-            _bridges.pop(idle if idle is not None else next(iter(_bridges))).close()
-        b = _bridges[key] = Bridge(route, policy=key[1], upstream=upstream)
-        log.info("net bridge on %s (%s; %s%s)", b.where, describe(route), key[1].describe(),
-                 "; through a proxy" if upstream else "")
+            gone = _let_go(time.monotonic())
+            if gone is None:
+                break
+            _bridges.pop(gone).close()
+        b = _bridges[key] = Bridge(route, policy=key[1], upstream=upstream, headers=lines)
+        log.info("net bridge on %s (%s; %s%s%s)", b.where, describe(route), key[1].describe(),
+                 "; through a proxy" if upstream else "",
+                 f"; {len(lines)} header(s) of the source's" if lines else "")
         return b
 
 
@@ -1165,22 +1285,25 @@ def child_env(bridge: Bridge | None) -> dict[str, str]:
 
 
 def guard_for(source: dict | None, url: str, n: object = None,
-              proxy: str = "") -> Bridge | None:
+              proxy: str = "", route: Route | None = None,
+              headers: dict[str, str] | Headers | None = None) -> Bridge | None:
     """The bridge for a stream of *source* (its options and kind as
     core/nerd.set_source keeps them - with ``_server``, make_client's form,
-    where its server is) at *url*: its route (Nerd's, else none) and the
-    policy of where the source is, the stream's own host and port let in;
-    *proxy*: the person's http proxy it goes through (what the caller would
-    have handed the program as -http_proxy, nerd.proxy's), "" for none.
-    None when *url* is no http(s) address, *proxy* no http proxy, or the
-    bridge cannot start: a program the app starts must then not be given
-    the address (a recording fails, say why); the in-app player, which takes
-    no arguments, may play it as before."""
+    where its server is) at *url*: its route (Nerd's, else none; *route*
+    in its place when given) and the policy of where the source is, the
+    stream's own host and port let in; *proxy*: the person's http proxy it
+    goes through (what the caller would have handed the program as
+    -http_proxy: stream_proxy), "" for none; *headers*: the source's own,
+    which the bridge adds (Bridge). None when *url* is no http(s) address,
+    *proxy* no http proxy, or the bridge cannot start: a program the app
+    starts must then not be given the address (a recording fails, say why);
+    the in-app player, which takes no arguments, may play it as before."""
     if net_route.url_host(url) is None:
         return None
-    route = net_route.route_for(source, n)
+    if route is None:
+        route = net_route.route_for(source, n)
     try:
-        return bridge_for(route, policy_for(source, url), proxy)
+        return bridge_for(route, policy_for(source, url), proxy, header_lines(headers))
     except ValueError as e:
         log.warning("net bridge: not through that proxy (%s)", e)
         return None
@@ -1198,6 +1321,153 @@ def proxy_for(source: dict | None, url: str, n: object = None) -> str:
     for want of a bridge)."""
     bridge = guard_for(source, url, n)
     return bridge.address if bridge is not None else ""
+
+
+# -- the proxy a stream goes out through ------------------------------------------
+
+def _no_proxy_names(text: str, host: str) -> bool:
+    """Whether the environment's *text* (no_proxy) names *host*, as
+    libavformat reads it (ff_http_match_no_proxy): words parted by commas
+    or spaces, "*" for every host, a leading "*" or "." for a domain, each
+    the host itself or a domain it is in."""
+    name = _name(host)
+    if not name:
+        return False
+    for word in text.replace(",", " ").split():
+        if word == "*":
+            return True
+        word = _name(word.lstrip("*").lstrip("."))
+        if word and (name == word or name.endswith("." + word)):
+            return True
+    return False
+
+
+def system_proxy(url: str) -> str:
+    """The proxy FFmpeg itself takes a stream at *url* through when it is
+    handed none: the environment's http_proxy - an http:// one only - unless
+    no_proxy names the host, and never for this computer's own servers,
+    which a proxy elsewhere cannot reach. "" for none. A program the app
+    starts on a stream reads the bridge from http_proxy instead, so the
+    bridge goes on through this one (stream_proxy) - the way out stays the
+    system's."""
+    proxy = os.environ.get("http_proxy") or ""
+    where = net_route.url_host(url)
+    if not proxy.startswith("http://") or where is None or _loopback(url):
+        return ""
+    return "" if _no_proxy_names(os.environ.get("no_proxy") or "", where[1]) else proxy
+
+
+def effective_proxy(given: str, url: str) -> str:
+    """The proxy FFmpeg goes through for *url* when handed *given* (its
+    http_proxy option, "" for none): an http:// one; another - a socks or an
+    https one - none, FFmpeg connects itself past it; with none handed, the
+    environment's (system_proxy)."""
+    if given:
+        return given if given.startswith("http://") else ""
+    return system_proxy(url)
+
+
+def stream_proxy(source: dict | None, url: str, n: object = None) -> str:
+    """The proxy a stream of *source* at *url* goes out through, as the
+    player takes it: Nerd's while "Streams through the proxy too" is on
+    (core/nerd.Nerd.proxy), else the environment's - each as FFmpeg would
+    take it (effective_proxy). What a bridge for a program the app starts
+    goes on through, in place of the -http_proxy it was once handed."""
+    from . import nerd
+    m: Any = nerd.current() if n is None else n
+    px = m.proxy(source, url) if m.on and m.flag("nerd_proxy_player", True) else ""
+    return effective_proxy(px, url)
+
+
+def _loopback(url: str) -> bool:
+    host = (net_route.url_host(url) or ("", "", 0))[1].strip("[]")
+    return host == "localhost" or host == "::1" or host.startswith("127.")
+
+
+#: Said once each: the player played without the guard for want of a bridge.
+_player_said: set[str] = set()
+
+
+def player_proxy(source: dict | None, url: str, proxy: str = "", n: object = None) -> str:
+    """The in-app player's http-proxy for a stream of *source* at *url* that
+    is not on a Nerd route (address_for): for an http(s) stream of a source
+    on the internet - Nerd or not - guard_for's bridge, through *proxy* (the
+    person's, as stream_options would hand it) or else the environment's, as
+    FFmpeg itself would have gone (effective_proxy); with no route of its
+    own (the bridge only guards). Anything else - this computer's own
+    servers (the rewind buffer's, AceStream's engine), a file, a source of
+    the home network - *proxy* as it is. Set in the app's own process, an
+    option of the mpv core and no program's argument. When the bridge cannot
+    start, *proxy* as before and one line in the log: never no playback."""
+    if net_route.url_host(url) is None or _loopback(url):
+        return proxy
+    if not policy_for(source, url).internet:
+        return proxy
+    bridge = guard_for(source, url, n, proxy=effective_proxy(proxy, url), route=net_route.INACTIVE)
+    if bridge is not None:
+        return bridge.address
+    if "player" not in _player_said:
+        _player_said.add("player")
+        log.warning("net bridge: the player connects itself, unguarded, until a bridge starts")
+    return proxy
+
+
+# -- what a program the app starts is handed --------------------------------------
+
+@dataclass
+class Handoff:
+    """How a program the app starts (ffmpeg, ffprobe) reads a stream
+    (``hand_over``): *address* in place of the real one - an alias through
+    *bridge*, or the address itself where it is no http(s) one - and *env*,
+    its whole environment then (None: the app's own). ``close`` once the
+    program is done: the alias answers no more."""
+
+    address: str = field(repr=False)
+    env: dict[str, str] | None = field(default=None, repr=False)
+    bridge: Bridge | None = None
+
+    @property
+    def bridged(self) -> bool:
+        return self.bridge is not None
+
+    def close(self) -> None:
+        if self.bridge is not None:
+            self.bridge.forget(self.address)
+
+
+_held_said: set[tuple[str, ...]] = set()
+
+
+def hand_over(source: dict | None, url: str, headers: dict[str, str] | None = None,
+              n: object = None, proxy: str | None = None) -> Handoff | None:
+    """What a program the app starts is handed for the stream of *source*
+    at *url*: an http(s) address as an alias of guard_for's bridge - which
+    goes out through *proxy* (stream_proxy's when None) and adds the
+    source's own *headers* to what it reads - the bridge in the program's
+    environment alone; anything else as it is (the caller's own rules for a
+    file or a tuner's address). The program's arguments name nothing of the
+    address, its login, the proxy or a header that may hold a token: the
+    caller hands it only split_headers's safe ones. None when an http(s)
+    address cannot be handed over that way - the program is then not
+    started, and the feature says why."""
+    if net_route.url_host(url) is None:
+        return Handoff(url)
+    px = stream_proxy(source, url, n) if proxy is None else proxy
+    bridge = guard_for(source, url, n, proxy=px, headers=headers)
+    if bridge is None:
+        return None
+    try:
+        alias = bridge.alias(url, source)
+    except ValueError:
+        return None
+    _safe, held = split_headers(headers)
+    said = tuple(sorted(h.lower() for h in held))
+    if said and said not in _held_said and len(_held_said) < _SAID_MAX:
+        _held_said.add(said)
+        log.info("net bridge: %s go to the stream's own server and plain http only - not into "
+                 "a tunnel to another https host, where a program's arguments would show them",
+                 ", ".join(held))
+    return Handoff(alias, {**os.environ, **child_env(bridge)}, bridge)
 
 
 def address_for(source: dict | None, url: str, n: object = None) -> str:

@@ -1920,6 +1920,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._stats_begin(self._item_key(it), title, it, "live", False)
             self._discord_started(self._item_key(it), title, it, "live", False)
             self._ms_started(url, self._item_key(it), "live", it)
+        elif getattr(self.player, "refusal", ""):
+            self._show_stream_error(self.player.refusal)
         self._apply_seek_mode(it, "live")
         # Refresh the poster overlay glyph (play -> pause for a timeshift
         # channel, -> stop for plain live). Unlike _start_playback, the preview
@@ -2657,8 +2659,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._arm_loading(icon_url, reconnect)
             # own_buffer False is an address opened by hand (a dopeiptv://
             # link, --play, the remote API, Open address…): the source's
-            # Nerd headers only on the source's own server.
-            outside = not own_buffer and self._from_outside(url)
+            # Nerd headers only on the source's own server. A radio station
+            # is no source's either: none of the source's headers go to it,
+            # and where it is decides its way out (core/net_bridge.py).
+            outside = kind == "radio" or (not own_buffer and self._from_outside(url))
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,
@@ -2674,6 +2678,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                     self._ms_started(url, key, kind, item, resume_at)
                 # TV mode: the picture fills the screen, whoever asked.
                 self._tv_started(kind)
+            elif getattr(self.player, "refusal", ""):
+                # Not opened on purpose (its certificate cannot be checked
+                # here): said on the video - never another player instead.
+                self._show_stream_error(self.player.refusal)
+                if getattr(self, "_tv_on", False):
+                    self._tv_refused()
             elif getattr(self, "_tv_on", False):
                 # TV mode fills the screen: another window would open
                 # behind it, out of reach of the remote.

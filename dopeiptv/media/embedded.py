@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 
 from ..core import channel_prefs, night_mode, stream_address
 from ..core.log import log
+from ..core.nerd import CertificateUnchecked
 from ..core.privacy import for_log, url_for_log
 from ..core.local_buffer import rewind_bytes
 from ..i18n import tr
@@ -355,6 +356,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
     # The stream play() opened is playing, once per play(): how many seconds
     # it had already played when the poll saw it (stream health, Nerd).
     first_frame = pyqtSignal(float)
+    #: Why the last play() left its stream unopened on purpose, in the
+    #: person's words ("" for none): its certificate cannot be checked.
+    refusal = ""
     # The stream stats (I) came up or went: what the window polls for them
     # (a box's signal) runs only while they show.
     stats_shown = pyqtSignal(bool)
@@ -1560,6 +1564,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # or an edit list in the address itself (core/stream_address.py) -
         # is never handed to mpv. A source's addresses are looked at where
         # they are handed out; this is the last look.
+        # Why the last play() did not open its stream on purpose, in the
+        # person's words: the window says it on the video, and never hands
+        # such a stream to another player (main_window._start_playback).
+        self.refusal = ""
         why = stream_address.refusal(url, remote=False)
         if why:
             log.warning("play: an address that is no stream (%s) is not opened", why)
@@ -1696,14 +1704,18 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             self._sync_night()
             # Nerd: user agent, headers and proxy for this source (nothing
             # while Nerd is off and never was; the defaults back once it was).
+            # For everyone: an internet source's stream through the app's
+            # bridge, and its certificate checked - or not opened at all
+            # (CertificateUnchecked, below).
             try:
                 from ..core import live_latency, nerd
                 # A web page is no source's: not its proxy or headers; nor
-                # an address from outside its lists.
+                # an address from outside its lists. Nor the bridge: mpv
+                # hands its proxy on to yt-dlp's arguments.
                 self._nerd_applied = nerd.apply_stream(
                     m, None if web or outside else nerd.source(),
                     getattr(self, "_nerd_applied", False),
-                    url=url, opened=source or url)
+                    url=url, opened=source or url, guard=not web)
                 # Nerd: low latency for a live channel the player takes
                 # from the provider - not from the rewind buffer; anything
                 # else gets back what the last one changed.
@@ -1732,6 +1744,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                 elif self._delay_set:
                     m["audio-delay"] = 0.0
                     self._delay_set = False
+            except CertificateUnchecked:
+                raise
             except Exception as e:
                 log.debug("nerd stream options: %s", e)
             # Remembered per-title track choices (resume): set before load,
@@ -1847,6 +1861,24 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             for delay in (500, 1500):
                 QTimer.singleShot(delay, self._ensure_audio_selected)
             return True
+        except CertificateUnchecked as e:
+            # The stream's certificate is to be checked and this core will
+            # not: not opened, and the stream before it ends too - never a
+            # stream played unchecked in its place.
+            log.warning("play: %s - its certificate cannot be checked here, not opened (%s)",
+                        url_for_log(url), e)
+            self.refusal = tr("player_tls_unverifiable")
+            try:
+                if self.video.mpv is not None:
+                    self.video.mpv.command("stop")
+            except Exception as stop_err:
+                log.debug("play: the stream before not stopped: %s", stop_err)
+            self.current_url = None
+            self._reset_stream_info()
+            self._ao_reset()
+            self._ld_clear()
+            self._end_dvr()
+            return False
         except Exception as e:
             log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
             self.current_url = None
