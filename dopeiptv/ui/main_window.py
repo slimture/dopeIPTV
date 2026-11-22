@@ -1911,6 +1911,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # ordinary preview still reaches mpv untouched.
         self._apply_audio_visuals(url)
         self._arm_loading(it.get("stream_icon"))
+        self.player.refusal = ""
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(wake_reason(title))
@@ -2663,6 +2664,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             # is no source's either: none of the source's headers go to it,
             # and where it is decides its way out (core/net_bridge.py).
             outside = kind == "radio" or (not own_buffer and self._from_outside(url))
+            self.player.refusal = ""
             if self.player.play(url, title, start=resume_at,
                                 local_buffer=kind == "live" and not catchup,
                                 buffer_key=f"{kind}:{key}" if key else None,

@@ -1564,14 +1564,15 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # or an edit list in the address itself (core/stream_address.py) -
         # is never handed to mpv. A source's addresses are looked at where
         # they are handed out; this is the last look.
-        # Why the last play() did not open its stream on purpose, in the
-        # person's words: the window says it on the video, and never hands
-        # such a stream to another player (main_window._start_playback).
-        self.refusal = ""
         why = stream_address.refusal(url, remote=False)
         if why:
             log.warning("play: an address that is no stream (%s) is not opened", why)
             return False
+        # Why this play() did not open its stream on purpose, in the
+        # person's words: the window says it on the video, and never hands
+        # such a stream to another player (main_window._start_playback,
+        # which empties it before each play()).
+        self.refusal = ""
         # What a fallback of the video surface plays again (_video_fallback).
         self._play_args = (url, title, start, {"local_buffer": local_buffer,
                                                "buffer_key": buffer_key, "web": web,

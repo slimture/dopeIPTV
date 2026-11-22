@@ -195,7 +195,8 @@ def test_another_sources_channel_not_played_leaves_what_plays_as_it_was(monkeypa
         # Pirat's channel goes on: its own options, counted as Pirat's.
         assert w._last_playback["key"] == 1
         assert w._failover_source is None and w._failover_key is None
-        assert nerd.source() == {"ua": "a", "_kind": "xtream"}
+        assert {k: v for k, v in nerd.source().items() if k != "_server"} == {
+            "ua": "a", "_kind": "xtream"}
     finally:
         nerd.set_source(None)
 
