@@ -123,6 +123,9 @@
 <!--tp:code logins log-->
 <p>If the file cannot be made yours alone – a drive that keeps no permissions, for example – the app asks in a window before it goes on, with <em>Close dopeIPTV</em> the default; only when you choose <em>Go on with it</em>, for that very file, does it go on. From version 1.6.12 it asks about every such file, one after the other, and also when a file or its folder belongs to another account, or is a link to a file that is not there:</p>
 <!--tp:code logins notprivate-->
+<p>And from version 1.6.12, the check every request takes before it goes – a request for dopeiptv.org that holds one of your logins is not sent – with where the one way out of the app asks it, and the tests that try it:</p>
+<!--tp:code logins guard-->
+<!--tp:tests logins-->
 <h3>Check it yourself</h3>
 <p>On Linux, look at the settings file: <code>ls -l ~/.config/dopeIPTV/</code> shows it is yours alone. Then turn on <em>Save a log file</em> (Nerd), play a channel, and search the log for your password – <code>grep -c 'your password' ~/.local/state/dopeiptv/logs/dopeiptv.log</code> on Linux: it is not there.</p>
 <blockquote class="tp-ask" data-for="logins"><p>Below is code from dopeIPTV, an open-source TV player – where it keeps the login to a person's TV provider (user name, password and server) and how its log masks them. Explain in plain English, step by step, what it does. Then review it critically: could the login be read by another user of the computer, end up in a log file, an error report or anything the app sends, or reach the developer's server? Point out weaknesses and what the code does not protect against. Do not guess: say so if something depends on code that is not included here.</p></blockquote>

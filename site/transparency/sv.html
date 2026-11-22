@@ -123,6 +123,9 @@
 <!--tp:code logins log-->
 <p>Om filen inte kan göras till bara din – en disk som inte sparar rättigheter, till exempel – frågar appen i ett fönster innan den fortsätter, med <em>Stäng dopeIPTV</em> förvalt; först när du väljer <em>Fortsätt ändå</em>, för just den filen, fortsätter den. Från version 1.6.12 frågar den om varje sådan fil, en i taget, och också när en fil eller dess mapp tillhör ett annat konto, eller är en länk till en fil som inte finns:</p>
 <!--tp:code logins notprivate-->
+<p>Och från version 1.6.12 kontrollen varje anrop passerar innan det går – ett anrop till dopeiptv.org som innehåller någon av dina inloggningar skickas inte – med stället där appens enda väg ut frågar den, och testerna som provar det:</p>
+<!--tp:code logins guard-->
+<!--tp:tests logins-->
 <h3>Kontrollera det själv</h3>
 <p>På Linux, titta på inställningsfilen: <code>ls -l ~/.config/dopeIPTV/</code> visar att den bara är din. Slå sedan på <em>Spara logg till fil</em> (Nerd), spela en kanal och sök efter ditt lösenord i loggen – <code>grep -c 'ditt lösenord' ~/.local/state/dopeiptv/logs/dopeiptv.log</code> på Linux: det finns inte där.</p>
 <blockquote class="tp-ask" data-for="logins"><p>Här nedan finns kod från dopeIPTV, en tv-spelare med öppen källkod – var den sparar inloggningen till en persons tv-leverantör (användarnamn, lösenord och server) och hur dess logg maskerar den. Förklara på enkel svenska, steg för steg, vad den gör. Granska den sedan kritiskt: skulle inloggningen kunna läsas av en annan användare av datorn, hamna i en loggfil, en felrapport eller något som appen skickar, eller nå utvecklarens server? Peka ut svagheter och vad koden inte skyddar mot. Gissa inte: säg till om något beror på kod som inte finns med här.</p></blockquote>

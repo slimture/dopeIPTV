@@ -28,35 +28,14 @@ import transparency  # noqa: E402
 #: Names the next release adds to a part's code, shown when the app has them
 #: (a block taken by its lines gets them in its first named companion).
 #: At the release they move into transparency.CODE, and its tests into
-#: transparency.TESTS - 1.6.11's did.
-NEXT: dict[tuple[str, str], list[str]] = {
-    # 1.6.12: every settings file asked about, each one's owner checked.
-    ("logins", "notprivate"): ["accepted_marks", "with_accepted", "waiting", "_theirs"],
-    # 1.6.12: the file checked again right before it runs or is put in
-    # place, and no AppImage update in a folder another account may change.
-    ("updates", "signed"): ["_VERIFIED", "verify_again", "shared_folder"],
-    # 1.6.12: a buffer a recording or a cast keeps on the disk asked about.
-    ("private", "buffer"): ["DvrPool.kept_on_disk_private"],
-    ("private", "reopen"): ["_PrivacyMixin._private_ask_kept"],
-}
+#: transparency.TESTS - 1.6.12's did.
+NEXT: dict[tuple[str, str], list[str]] = {}
 
 #: Blocks the next release adds to a part, shown when the app has every file
 #: they name - after the part's own blocks, with no marker on the page yet.
 #: At the release each moves into transparency.CODE, with its
-#: <!--tp:code PART ID--> on the page.
-NEW: list[tuple[str, dict]] = [
-    # 1.6.12: nothing that goes to dopeiptv.org carries a login of yours -
-    # asked in the one adapter every request of the app goes through.
-    ("logins", {"id": "guard", "repo": "app", "path": "dopeiptv/core/site_out.py",
-                "names": ["SERVICE_HOST", "HOSTS", "LONG", "ADDRESS_LEAST", "OWN_HEADERS",
-                          "SEALED_FOR_S", "SEALED_MAX", "_FIELDS", "_ADDRESSES", "_ADDRESS_OPTIONS",
-                          "LoginRefused", "_address_logins", "_header_logins", "logins_of", "_rebuild",
-                          "learn", "never", "account_logins", "_fresh", "sealed", "_without_sealed",
-                          "_json_values", "_service", "refusal", "check"],
-                "with": [{"repo": "app", "path": "dopeiptv/core/_lazy_requests.py",
-                          "from": r"^            def send\(self, request",
-                          "to": r"^                    raise LoginHeld\("}]}),
-]
+#: <!--tp:code PART ID--> on the page - 1.6.12's did.
+NEW: list[tuple[str, dict]] = []
 
 #: Names the next release takes out of a part's code, left out when the app
 #: no longer has them.

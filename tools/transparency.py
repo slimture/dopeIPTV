@@ -57,10 +57,22 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "app", "path": "dopeiptv/core/log.py",
                    "names": ["register_secrets", "redact", "redact_text", "_RedactFilter"]}]},
         {"id": "notprivate", "repo": "app", "path": "dopeiptv/core/settings_files.py",
-         "names": ["ACCEPTED_KEY", "accepted_mark", "not_private"],
+         "names": ["ACCEPTED_KEY", "accepted_mark", "not_private", "accepted_marks", "with_accepted",
+                   "waiting", "_theirs"],
          "with": [{"repo": "app", "path": "dopeiptv/ui/mw_settings.py",
                    "names": ["_SettingsMixin._tell_settings_not_private",
                              "_SettingsMixin._ask_settings_open"]}]},
+        # Nothing that goes to dopeiptv.org carries a login of yours: the
+        # check, and where the one adapter every request takes asks it.
+        {"id": "guard", "repo": "app", "path": "dopeiptv/core/site_out.py",
+         "names": ["SERVICE_HOST", "HOSTS", "LONG", "ADDRESS_LEAST", "OWN_HEADERS",
+                   "SEALED_FOR_S", "SEALED_MAX", "_FIELDS", "_ADDRESSES", "_ADDRESS_OPTIONS",
+                   "LoginRefused", "_address_logins", "_header_logins", "logins_of", "_rebuild",
+                   "learn", "never", "account_logins", "_fresh", "sealed", "_without_sealed",
+                   "_json_values", "_service", "refusal", "check"],
+         "with": [{"repo": "app", "path": "dopeiptv/core/_lazy_requests.py",
+                   "from": r"^            def send\(self, request",
+                   "to": r"^                    raise LoginHeld\("}]},
     ],
     "watching": [
         {"id": "tmdb", "repo": "app", "path": "dopeiptv/providers/metadata.py",
@@ -152,9 +164,9 @@ CODE: dict[str, list[dict]] = {
         {"id": "memory", "repo": "app", "path": "dopeiptv/core/memory_safe.py",
          "names": ["in_memory", "encrypted_block", "swap_safe", "stays_in_memory", "private_folder"]},
         {"id": "buffer", "repo": "app", "path": "dopeiptv/core/dvr_pool.py",
-         "names": ["NoPrivateBuffer", "DvrPool.open"]},
+         "names": ["NoPrivateBuffer", "DvrPool.open", "DvrPool.kept_on_disk_private"]},
         {"id": "reopen", "repo": "app", "path": "dopeiptv/ui/mw_privacy.py",
-         "names": ["_PrivacyMixin.set_private_viewing"],
+         "names": ["_PrivacyMixin.set_private_viewing", "_PrivacyMixin._private_ask_kept"],
          "with": [{"repo": "app", "path": "dopeiptv/media/dvr_player.py",
                    "names": ["DvrPlayerMixin.private_reopen_needed"]},
                   {"repo": "app", "path": "dopeiptv/core/dvr_pool.py",
@@ -169,7 +181,7 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "app", "path": "dopeiptv/core/build_check.py", "names": ["HEADER", "OFFICIAL", "headers"]}]},
         {"id": "signed", "repo": "app", "path": "dopeiptv/core/selfupdate.py",
          "names": ["signed_asset", "_expected_sha256", "download", "_HOPS", "DOWNLOAD_MAX",
-                   "_get_https"]},
+                   "_get_https", "_VERIFIED", "verify_again", "shared_folder"]},
     ],
     "hosts": [
         {"id": "route", "repo": "app", "path": "dopeiptv/providers/cast_bridge.py", "names": ["lan_address"]},
@@ -205,6 +217,14 @@ CODE: dict[str, list[dict]] = {
 
 # The app's tests the page names as proof, by function.
 TESTS: dict[str, list[tuple[str, str]]] = {
+    # Nothing that goes to dopeiptv.org carries a login of yours.
+    "logins": [("tests/test_site_out.py", n) for n in (
+        "test_a_login_readable_to_the_site_is_refused",
+        "test_a_short_login_standing_alone_is_refused",
+        "test_the_adapter_sends_nothing_that_holds_a_login",
+        "test_a_report_with_a_login_the_scrub_missed_is_not_sent",
+        "test_the_adapter_asks_before_every_request",
+        "test_only_the_sealing_modules_mark_anything_sealed")],
     "reports": [("tests/test_report.py", n) for n in (
         "test_nothing_that_identifies_a_stream_or_a_person_is_left",
         "test_the_window_offers_scrubs_and_sends_only_on_send",
