@@ -18,7 +18,7 @@ from ..i18n import english, tr
 
 from ..core.player_exec import HANDOFF_S as _HANDOFF_S
 from ..core.player_exec import (address_scheme, carries_login, fetchable,
-                                find_player_executable, private_file)
+                                find_player_executable, handed_privately, private_file)
 
 _libmpv_error: str | None = None
 
@@ -313,12 +313,20 @@ def player_command(player: str, exe: str, url: str, title: str,
     "--log-file=~/.bashrc" overwrote that file with mpv's log - the title,
     also the playlist's, written into it - and "--include=http://..." took
     mpv's whole configuration from a stranger's server. After "--" such a
-    line is a file that does not open, and nothing else."""
+    line is a file that does not open, and nothing else.
+
+    With a handoff the title is the playlist's own line (#EXTINF), which
+    both players show, and stands nowhere in the command line: every
+    account on a Linux computer reads that, and a title watched privately
+    is not theirs to read. A file's path is there anyway, so a file keeps
+    its title beside it."""
     if player == "mpv":
-        head = [exe, "--force-media-title=" + title, "--user-agent=dopeIPTV/1.0"]
-        return [*head, "--playlist=" + handoff] if handoff else [*head, "--", url]
-    return [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0",
-            "--", handoff or url]
+        if handoff:
+            return [exe, "--user-agent=dopeIPTV/1.0", "--playlist=" + handoff]
+        return [exe, "--force-media-title=" + title, "--user-agent=dopeIPTV/1.0", "--", url]
+    if handoff:
+        return [exe, "--http-user-agent=dopeIPTV/1.0", "--", handoff]
+    return [exe, "--meta-title", title, "--http-user-agent=dopeIPTV/1.0", "--", url]
 
 
 #: How long a handoff file waits for its player before it is deleted: the
@@ -344,10 +352,11 @@ def handoff_file(url: str, title: str, folder: str | None = None) -> str:
 
 def handed_over(url: str) -> bool:
     """Whether *url* goes to an external player in a handoff file: an
-    http(s) address, or another network address with a login in it
-    (player_exec.carries_login)."""
+    http(s) address, any other network address but a multicast group's,
+    and a group's with a login in it (player_exec.handed_privately)."""
     scheme = address_scheme(url)
-    return scheme in ("http", "https") or (scheme not in ("", "file") and carries_login(url))
+    return scheme in ("http", "https") or handed_privately(url) or (
+        scheme not in ("", "file") and carries_login(url))
 
 
 def allowed_page(player: str, url: str) -> bool:

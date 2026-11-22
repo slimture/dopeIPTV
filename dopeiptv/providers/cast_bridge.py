@@ -331,7 +331,7 @@ def probe_args(exe: str, source: str, read: str = "") -> list[str]:
     arguments name nothing of the address."""
     read = read or source
     return [exe, "-v", "error",
-            *(["-user_agent", _UA] if "://" in source else []),
+            *(["-user_agent", _UA] if source.lower().startswith(("http://", "https://")) else []),
             *ffmpeg_protocols(read, bridged=read != source),
             "-print_format", "json", "-show_streams", "-show_format",
             "-i", read]
@@ -444,7 +444,10 @@ def _input_options(source: str) -> list[str]:
     started, over and over, which is worse than stopping: at least stopping
     says something is wrong.
     """
-    if "://" not in source:
+    if not source.lower().startswith(("http://", "https://")):
+        # ffmpeg's HTTP reader's alone: an rtsp, rtmp or udp stream (read
+        # from a private list or as it is) takes none, or ffmpeg refuses it
+        # before it opens anything ("Option reconnect not found").
         return []
     if _timeshift(source):
         # No reconnects for an archive window. The panel closes the stream

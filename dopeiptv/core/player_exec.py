@@ -89,11 +89,57 @@ def ffmpeg_protocols(address: str, bridged: bool = False) -> list[str]:
     *address* to a stream's protocols (FFMPEG_PROTOCOLS) - the address
     itself, a redirect's, and whatever a playlist behind it names; with
     *bridged* (an alias read through core/net_bridge.py) to what the bridge
-    needs, BRIDGED_PROTOCOLS. None for a file's own path: ffmpeg's own rule
-    for a file stands (the file and what lies beside it)."""
+    needs, BRIDGED_PROTOCOLS. A private list (private_list): read as the
+    concat list it is, the file and a stream's protocols. None for a file's
+    own path: ffmpeg's own rule for a file stands (the file and what lies
+    beside it)."""
+    if is_private_list(address):
+        return ["-f", "concat", "-safe", "0", "-protocol_whitelist", "file," + FFMPEG_PROTOCOLS]
     if is_local_file(address):
         return []
     return ["-protocol_whitelist", BRIDGED_PROTOCOLS if bridged else FFMPEG_PROTOCOLS]
+
+
+def _concat_word(text: str) -> str:
+    """*text* as one word of ffmpeg's concat list: in single quotes, a quote
+    in it closed, escaped and opened again."""
+    return "'" + text.replace("'", "'\\''") + "'"
+
+
+def concat_list(url: str, options: list[str] | tuple[str, ...] = ()) -> str:
+    """ffmpeg's concat list (ffconcat) that reads *url* - the one way to hand
+    ffmpeg an address that is not its argument - with *options* (["-key",
+    "value", ...], the input's own) as its ``option`` lines (which an
+    ffmpeg older than 5 does not know: its caller gives none then)."""
+    lines = ["ffconcat version 1.0", f"file {_concat_word(url)}"]
+    for key, value in zip(options[0::2], options[1::2], strict=False):
+        lines.append(f"option {key.lstrip('-')} {_concat_word(value)}")
+    return "\n".join(lines) + "\n"
+
+
+#: A private concat list a converter reads a stream from (private_list).
+LIST_PREFIX = "dopeiptv-read-"
+LIST_SUFFIX = ".ffconcat"
+#: How long one may stay while its program may start again - a cast's
+#: converter on a receiver's new request: its feature drops it first.
+LIST_KEEP_S = 12 * 3600.0
+
+
+def private_list(url: str) -> str:
+    """A private concat list (private_file) that hands a converter *url*
+    - an address handed_privately says is not to be an argument -, kept
+    until its feature drops it (drop_file) or LIST_KEEP_S; "" when none can
+    be made, or for an address that would be two lines."""
+    if any(c in url for c in "\r\n"):
+        return ""
+    return private_file(concat_list(url), LIST_PREFIX, LIST_SUFFIX, keep=LIST_KEEP_S)
+
+
+def is_private_list(address: str) -> bool:
+    """Whether *address* is a private list private_list made."""
+    text = str(address or "")
+    return (is_local_file(text) and text.endswith(LIST_SUFFIX)
+            and os.path.basename(text).startswith(LIST_PREFIX))
 
 
 def carries_login(address: str) -> bool:
@@ -111,6 +157,25 @@ def carries_login(address: str) -> bool:
         return True
     words = {k.strip().lower() for k, _v in parse_qsl(parts.query, keep_blank_values=True)}
     return bool(words & LOGIN_WORDS)
+
+
+#: A multicast group's schemes: an address and a port, nothing that opens
+#: an account - the one kind of network address still handed to a program
+#: as an argument (handed_privately), unless a login stands in it.
+GROUP_SCHEMES = frozenset(("udp", "udplite", "rtp"))
+
+
+def handed_privately(address: str) -> bool:
+    """Whether a program the app starts gets *address* in a private file
+    (private_file) rather than as an argument: every network address of a
+    stream (STREAM_SCHEMES) but a multicast group's - a token may stand in
+    an rtsp or rtmp address's path, or under a query word carries_login
+    does not know - and a group's with a login in it. A file's path and
+    anything else as before. http(s) the bridge's or a handoff's anyway."""
+    scheme = address_scheme(address)
+    if scheme not in STREAM_SCHEMES:
+        return False
+    return scheme not in GROUP_SCHEMES or carries_login(address)
 
 
 #: How long a private file that hands a program its address waits before it

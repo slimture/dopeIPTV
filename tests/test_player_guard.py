@@ -28,6 +28,7 @@ import logging
 import os
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -189,6 +190,38 @@ def test_a_program_goes_out_the_way_it_went_before(_clean, monkeypatch):
     assert RecordingManager._proxy_for(INTERNET_SRC, url) == "http://10.0.0.1:3128"
     way = net_bridge.hand_over(INTERNET_SRC, url)
     assert way is not None and way.bridge._up.host == "10.0.0.1"
+
+
+def test_another_network_address_goes_to_a_converter_in_a_private_list(tmp_path, monkeypatch):
+    """An rtsp, rtmp or srt address may hold a token where carries_login
+    cannot see it - in its path, under a word of its own: a cast's
+    converter and ffprobe get a private list that names it (read as the
+    concat list it is), never the address; a multicast group and a file as
+    before; the list gone with the run."""
+    from dopeiptv.core import player_exec
+    from dopeiptv.providers import cast_bridge
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    os.chmod(tmp_path, 0o700)
+    for url in ("rtsp://cam.example/live?x-opaque=s3cret",
+                "rtmp://h.example/live/9f86d081884c7d659a2feaa0c55ad015",
+                "srt://h.example:9000?passphrase=s3cret", "udp://@239.0.0.1:1234?pass=s3cret"):
+        way = net_bridge.hand_over(INTERNET_SRC, url)
+        assert way is not None and way.listed and not way.bridged and way.env is None, url
+        assert url in Path(way.address).read_text(encoding="utf-8")
+        assert stat.S_IMODE(os.stat(way.address).st_mode) == 0o600
+        args = cast_bridge.ffmpeg_args("ffmpeg", url, True, read=way.address)
+        assert not any(url in a or "s3cret" in a for a in args), args
+        assert args[args.index("-f") + 1] == "concat" and args[args.index("-i") + 1] == way.address
+        assert "-user_agent" not in args and "-reconnect" not in args
+        probe = cast_bridge.probe_args("ffprobe", url, way.address)
+        assert not any("s3cret" in a for a in probe) and "-user_agent" not in probe
+        way.close()
+        assert not os.path.exists(way.address)
+    for url in ("udp://@239.0.0.1:1234", "/films/a.mkv"):
+        way = net_bridge.hand_over(INTERNET_SRC, url)
+        assert way is not None and way.address == url and not way.listed
+    monkeypatch.setattr(player_exec, "private_file", lambda *_a, **_k: "")
+    assert net_bridge.hand_over(INTERNET_SRC, "rtsp://cam.example/live") is None
 
 
 def test_no_bridge_no_program(monkeypatch):

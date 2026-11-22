@@ -19,8 +19,8 @@ from PyQt6.QtCore import QObject, QSettings, Qt, QTimer, pyqtSignal
 from . import rec_mp4
 from .log import log
 from .player_exec import (FFMPEG_PROTOCOLS, NO_WINDOW, address_scheme, carries_login,
-                          drop_file, fetchable, ffmpeg_protocols, find_player_executable,
-                          find_program, private_file)
+                          concat_list, drop_file, fetchable, ffmpeg_protocols,
+                          find_player_executable, find_program, handed_privately, private_file)
 from .privacy import for_log
 from .rec_extras import not_a_device
 
@@ -153,29 +153,12 @@ NOT_A_STREAM = "its address is not a stream's"
 NO_BRIDGE = "the app could not hand the recorder its address privately"
 #: Why one was not started whose address (not http) holds a login and no
 #: private file to hand it over in could be made.
-NO_PRIVATE_FILE = "its address holds a login and no private file for it could be made"
+NO_PRIVATE_FILE = "its address may hold a login and no private file for it could be made"
 #: Why one stopped while less than DISK_FLOOR was left where it is written:
 #: a stream with no end and no size cap never fills the disk.
 DISK_FULL = "the disk the recordings are saved on is nearly full"
 DISK_FLOOR = 1024 ** 3
 _LIST_PREFIX = "dopeiptv-rec-"
-
-
-def _concat_word(text: str) -> str:
-    """*text* as one word of ffmpeg's concat list: in single quotes, a quote
-    in it closed, escaped and opened again."""
-    return "'" + text.replace("'", "'\\''") + "'"
-
-
-def concat_list(url: str, options: list[str]) -> str:
-    """ffmpeg's concat list (ffconcat) that reads *url* - the one way to hand
-    ffmpeg an address that is not its argument - with *options* (["-key",
-    "value", ...], the input's own) as its ``option`` lines (which an
-    ffmpeg older than 5 does not know: its caller gives none then)."""
-    lines = ["ffconcat version 1.0", f"file {_concat_word(url)}"]
-    for key, value in zip(options[0::2], options[1::2], strict=False):
-        lines.append(f"option {key.lstrip('-')} {_concat_word(value)}")
-    return "\n".join(lines) + "\n"
 
 
 _ffmpeg_majors: dict[str, int | None] = {}
@@ -1035,9 +1018,11 @@ class RecordingManager(QObject):
         #   of it (core/net_bridge.py), the bridge in its environment - the
         #   bridge also keeps its segments, keys and redirects off this
         #   computer and the home network for a source on the internet;
-        # - another address with a login in it (rtsp://user:pw@...) in a
-        #   private file: ffmpeg's concat list, mpv's playlist;
-        # - anything else (a tuner's rtsp address, udp, a file) as before.
+        # - every other network address but a multicast group's, and one
+        #   with a login in it (rtsp://user:pw@...), in a private file:
+        #   ffmpeg's concat list, mpv's playlist (_goes_privately);
+        # - a SAT>IP tuning, udp, a file - and an address an ffmpeg older
+        #   than 5 would lose its options for - as before.
         feed = piped(url) and not j.get("_classic")
         web = address_scheme(url) in ("http", "https")
         read, listed = url, ""
@@ -1054,7 +1039,7 @@ class RecordingManager(QObject):
                 return
             j["_alias"] = (bridge, read)
             env = {**os.environ, **net_bridge.child_env(bridge)}
-        elif not web and carries_login(url):
+        elif not web and self._goes_privately(kind, exe, url, j):
             listed = self._private_list(kind, exe, url, j)
             if not listed:
                 self._not_started(j, NO_PRIVATE_FILE)
@@ -1171,6 +1156,26 @@ class RecordingManager(QObject):
         listed = j.pop("_listed", None)
         if listed:
             drop_file(listed)
+
+    def _goes_privately(self, kind: str, exe: str, url: str, j: dict) -> bool:
+        """Whether the recorder reads *url* (no http(s) one) from a private
+        file: an address with a login the app sees always, and every other
+        network address but a multicast group's (player_exec
+        .handed_privately) - a token may stand where carries_login cannot
+        see it. Two stay an argument, as before: a SAT>IP tuning address,
+        which holds the tuning and nothing else, and one an ffmpeg older
+        than 5 would read from a list without its own options."""
+        if carries_login(url):
+            return True
+        if not handed_privately(url):
+            return False
+        from . import rtsp
+        if j.get("source_kind") in rtsp.KINDS:
+            return False
+        if kind != "ffmpeg" or not [*self._input_options(url), *self._rtsp_options(j, kind)]:
+            return True
+        major = ffmpeg_major(exe)
+        return major is None or major >= 5
 
     def _private_list(self, kind: str, exe: str, url: str, j: dict) -> str:
         """A private file the recorder reads *url* from (player_exec

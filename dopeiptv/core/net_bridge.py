@@ -135,7 +135,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote, unquote, urlsplit
 
-from . import cert_pin, dest_guard, doh, net_route, stream_address
+from . import cert_pin, dest_guard, doh, net_route, player_exec, stream_address
 from .log import log
 from .net_route import Route
 
@@ -1452,13 +1452,16 @@ def player_proxy(source: dict | None, url: str, proxy: str = "", n: object = Non
 class Handoff:
     """How a program the app starts (ffmpeg, ffprobe) reads a stream
     (``hand_over``): *address* in place of the real one - an alias through
-    *bridge*, or the address itself where it is no http(s) one - and *env*,
-    its whole environment then (None: the app's own). ``close`` once the
-    program is done: the alias answers no more."""
+    *bridge*, a private list that names it (*listed*: player_exec
+    .private_list, read as ffmpeg_protocols says), or the address itself
+    where it is a file's or a multicast group's - and *env*, its whole
+    environment then (None: the app's own). ``close`` once the program is
+    done: the alias answers no more, the list is gone."""
 
     address: str = field(repr=False)
     env: dict[str, str] | None = field(default=None, repr=False)
     bridge: Bridge | None = None
+    listed: bool = False
 
     @property
     def bridged(self) -> bool:
@@ -1467,6 +1470,8 @@ class Handoff:
     def close(self) -> None:
         if self.bridge is not None:
             self.bridge.forget(self.address)
+        if self.listed:
+            player_exec.drop_file(self.address)
 
 
 _held_said: set[tuple[str, ...]] = set()
@@ -1481,11 +1486,16 @@ def hand_over(source: dict | None, url: str, headers: dict[str, str] | None = No
     environment alone; anything else as it is (the caller's own rules for a
     file or a tuner's address). The program's arguments name nothing of the
     address, its login, the proxy or a header that may hold a token: the
-    caller hands it only split_headers's safe ones. None when an http(s)
-    address cannot be handed over that way - the program is then not
+    caller hands it only split_headers's safe ones. Another network address
+    but a multicast group's (player_exec.handed_privately) in a private list
+    instead: a token may stand in an rtsp or rtmp address's path. None when
+    an address cannot be handed over that way - the program is then not
     started, and the feature says why."""
     if net_route.url_host(url) is None:
-        return Handoff(url)
+        if not player_exec.handed_privately(url):
+            return Handoff(url)
+        listed = player_exec.private_list(url)
+        return Handoff(listed, listed=True) if listed else None
     px = stream_proxy(source, url, n) if proxy is None else proxy
     bridge = guard_for(source, url, n, proxy=px, headers=headers)
     if bridge is None:

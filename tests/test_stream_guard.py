@@ -649,13 +649,31 @@ def test_an_rtsp_address_with_a_login_goes_in_a_private_list(tmp_path, monkeypat
                 assert cmd[-1] == "--playlist=" + listed
             rm._stop_proc(job)
             assert not os.path.exists(listed) and "_listed" not in job    # gone with the recording
-    # Without a login, and udp's empty one: as it always was.
+    # A token where carries_login cannot see it - in the path, under a word
+    # of its own: in the private list all the same (handed_privately).
     monkeypatch.setattr(recording.RecordingManager, "recorder",
                         staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
-    for url in ("rtsp://192.168.1.5/?src=1&freq=11494", "udp://@239.0.0.1:1234"):
+    for url in ("rtmp://h.example/live/9f86d081884c7d659a2feaa0c55ad015",
+                "rtsp://cam.example/stream?x-opaque=s3cret"):
         seen.clear()
-        rm._spawn({"url": url, "title": "T", "stop": None, "status": "scheduled"})
+        job = {"url": url, "title": "T", "stop": None, "status": "scheduled"}
+        rm._spawn(job)
+        assert url not in seen[0] and job.get("_listed"), url
+        rm._stop_proc(job)
+    # A SAT>IP tuning, a multicast group, and what an ffmpeg older than 5
+    # would read without its options: as it always was.
+    for url, kind in (("rtsp://192.168.1.5/?src=1&freq=11494", "satip"),
+                      ("udp://@239.0.0.1:1234", None)):
+        seen.clear()
+        rm._spawn({"url": url, "title": "T", "stop": None, "status": "scheduled",
+                   "source_kind": kind})
         assert seen[0][seen[0].index("-i") + 1] == url
+    monkeypatch.setattr(recording, "ffmpeg_major", lambda _exe: 4)
+    seen.clear()
+    rm._spawn({"url": "rtsp://cam.example/stream", "title": "T", "stop": None,
+               "status": "scheduled"})
+    assert seen[0][seen[0].index("-i") + 1] == "rtsp://cam.example/stream"
+    monkeypatch.setattr(recording, "ffmpeg_major", lambda _exe: 6)
     # No private file to be had: not started, and never the address instead.
     monkeypatch.setattr(recording, "private_file", lambda *_a, **_k: "")
     seen.clear()

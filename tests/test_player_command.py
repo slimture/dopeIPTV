@@ -51,10 +51,12 @@ def test_launch_player_starts_that_command(monkeypatch):
                 "ytdl://https://www.youtube.com/watch?v=x"):
         seen.clear()
         players.launch_player("mpv", url, "T")
-        if url.startswith("http"):
-            # An http(s) address in a playlist file of the user's own,
-            # never in the command line others can read.
+        if url.startswith(("http", "rtsp")):
+            # An http(s) address, and every other network address but a
+            # multicast group's, in a playlist file of the user's own, never
+            # in the command line others can read - the title neither.
             assert len(seen) == 1 and url not in seen[0]
+            assert not any("T" == a or a.endswith("=T") for a in seen[0])
             handoff = seen[0][-1].split("=", 1)[1]
             assert seen[0][-1] == "--playlist=" + handoff
             with open(handoff, encoding="utf-8") as fh:
@@ -99,8 +101,28 @@ def test_a_network_address_with_a_login_goes_in_a_handoff_file(monkeypatch):
         assert not any("pw" in a for a in seen[0]) and seen[0][-1].startswith("--playlist=")
         import os
         os.remove(seen[0][-1].split("=", 1)[1])
-    assert players.handed_over("https://h/x") and not players.handed_over("rtsp://192.168.1.5/?src=1")
+    assert players.handed_over("https://h/x") and players.handed_over("rtsp://192.168.1.5/?src=1")
     assert not players.handed_over("/films/a.mkv") and not players.handed_over("udp://@239.0.0.1:1")
+    # A token where carries_login cannot see it: in the path, under a word
+    # of its own - handed over all the same.
+    for url in ("rtmp://h.invalid/live/9f86d081884c7d659a2feaa0c55ad015", "srt://h.invalid:9?streamid=x",
+                "rtsp://h.invalid/stream?x-opaque=y"):
+        assert players.handed_over(url), url
+    assert players.handed_over("udp://@239.0.0.1:1?pass=pw")
+
+
+@pytest.mark.parametrize("player", ["mpv", "vlc"])
+def test_with_a_handoff_the_title_is_the_playlists_own(player, tmp_path):
+    """A title watched privately is nobody else's to read: with a handoff
+    file it is the playlist's #EXTINF line, which mpv and VLC both show,
+    and stands nowhere in the command line."""
+    path = players.handoff_file("http://h.invalid/1.ts", "Secret title", str(tmp_path))
+    cmd = players.player_command(player, "/usr/bin/" + player, "http://h.invalid/1.ts",
+                                 "Secret title", path)
+    assert not any("Secret title" in a for a in cmd)
+    assert "--force-media-title" not in " ".join(cmd) and "--meta-title" not in cmd
+    with open(path, encoding="utf-8") as fh:
+        assert "#EXTINF:-1,Secret title" in fh.read().splitlines()
 
 
 def test_a_handoff_file_holds_one_line_and_goes(tmp_path, monkeypatch):
@@ -239,18 +261,28 @@ def test_ffmpeg_records_a_stream_with_a_streams_protocols_only(tmp_path, monkeyp
     assert cmd[cmd.index("-i") + 1] == "pipe:0"
     assert cmd[cmd.index("-protocol_whitelist") + 1] == "pipe"
     from dopeiptv.core.player_exec import BRIDGED_PROTOCOLS
-    for url in ("http://h.invalid/live/u/p/1.ts", "https://h.invalid/x.m3u8",
-                "rtsp://box.invalid/?src=1", "udp://@239.0.0.1:1234"):
+    from dopeiptv.core import recording
+    monkeypatch.setattr(recording, "ffmpeg_major", lambda _exe: 6)
+    for url, kind in (("http://h.invalid/live/u/p/1.ts", None), ("https://h.invalid/x.m3u8", None),
+                      ("rtsp://box.invalid/?src=1", "satip"), ("udp://@239.0.0.1:1234", None),
+                      ("rtsp://cam.invalid/live", None)):
         seen.clear()
-        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
+        rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True, "source_kind": kind})
         cmd = seen[0]
         i = cmd.index("-i")
         web = url.startswith("http")
+        listed = url == "rtsp://cam.invalid/live"
         # An http(s) address through the bridge under an alias, what that
-        # needs alone; the rest as it is, a stream's protocols.
-        assert (cmd[i + 1] != url and ".stream.invalid/" in cmd[i + 1]) if web else cmd[i + 1] == url
+        # needs alone; another network address in a private list; a SAT>IP
+        # tuning and a multicast group as they are, a stream's protocols.
+        if web:
+            assert cmd[i + 1] != url and ".stream.invalid/" in cmd[i + 1]
+        elif listed:
+            assert url not in cmd and cmd[i + 1].endswith(".ffconcat")
+        else:
+            assert cmd[i + 1] == url
         assert cmd[cmd.index("-protocol_whitelist") + 1] == (
-            BRIDGED_PROTOCOLS if web else FFMPEG_PROTOCOLS)
+            BRIDGED_PROTOCOLS if web else "file," + FFMPEG_PROTOCOLS if listed else FFMPEG_PROTOCOLS)
         # An input option of that address, before its -i.
         assert cmd.index("-protocol_whitelist") < i
     # A file's own path: ffmpeg's own rule for files, nothing added.
