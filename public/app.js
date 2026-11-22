@@ -174,9 +174,10 @@
 
 /* The feature explorer: the plain list becomes tabs, a small animated
    screen per feature and one line of text at a time. It steps on by itself
-   while it is on screen, until the visitor picks a tab (more slowly, for
-   reduced motion: the scenes only fade). Without script the list stays as
-   it is. */
+   while it is on screen (more slowly, for reduced motion: the scenes only
+   fade); a tab the visitor picks stays a while (RESUME), then it goes on
+   from there. A pointer on the picture, or the keyboard's focus in the
+   tabs, holds it. Without script the list stays as it is. */
 (function () {
   "use strict";
   var sec = document.getElementById("features");
@@ -200,7 +201,17 @@
     p.style.setProperty("--fz", (1.06 + 0.1 * (1 - Math.min(1, Math.max(w, h) * 2))).toFixed(3));
   });
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var DUR = reduce ? 8000 : 6000, cur = -1, timer = null, auto = true, inView = false, held = false;
+  var DUR = reduce ? 8000 : 6000, cur = -1, timer = null, auto = true, inView = false;
+  // What holds it: the pointer on the picture, the keyboard in the tabs, a
+  // tab in the background. Each its own, so one ending does not end another.
+  var hover = false, focused = false, hidden = false;
+  // A pick stays this long, then the slideshow goes on from it.
+  var RESUME = 14000, resumeT = null;
+  function pick() {
+    auto = false;
+    clearTimeout(resumeT);
+    resumeT = setTimeout(function () { auto = true; schedule(); }, RESUME);
+  }
   // It steps on by itself on a computer only: on a phone that was too much
   // movement, and the visitor taps or swipes anyway.
   var narrow = window.matchMedia ? window.matchMedia("(max-width: 860px)") : { matches: false };
@@ -218,7 +229,7 @@
     var bar = document.createElement("i");
     bar.className = "bar";
     b.appendChild(bar);
-    b.addEventListener("click", function () { auto = false; show(i, true); });
+    b.addEventListener("click", function () { pick(); show(i, true); });
     b.addEventListener("keydown", function (e) {
       var k = e.key, rtl = document.documentElement.dir === "rtl", n = null;
       if (k === "ArrowDown" || k === (rtl ? "ArrowLeft" : "ArrowRight")) { n = (i + 1) % feats.length; }
@@ -227,7 +238,7 @@
       if (k === "End") { n = feats.length - 1; }
       if (n === null) { return; }
       e.preventDefault();
-      auto = false;
+      pick();
       show(n, true);
       tabs[n].focus();
     });
@@ -243,7 +254,7 @@
   function schedule() {
     clearTimeout(timer);
     tabs.forEach(function (t) { t.classList.remove("playing"); });
-    if (!auto || !inView || held || cur < 0 || narrow.matches) { return; }
+    if (!auto || !inView || hover || focused || hidden || cur < 0 || narrow.matches) { return; }
     var t = tabs[cur];
     void t.offsetWidth;                     // restart the bar's fill
     t.classList.add("playing");
@@ -261,6 +272,8 @@
     });
     [].forEach.call(scenes, function (sc) { sc.classList.toggle("on", sc.getAttribute("data-k") === k); });
     panel.setAttribute("aria-labelledby", tabs[i].id);
+    // Read out what the visitor picked, not every step the slideshow takes.
+    cap.setAttribute("aria-live", user ? "polite" : "off");
     cap.replaceChildren();
     var h = document.createElement("h3");
     h.textContent = feats[i].querySelector("h3").textContent;
@@ -283,13 +296,22 @@
   } else {
     fxp.classList.add("in-view");
   }
-  // A pointer resting on it holds the slideshow, as Apple's do.
-  fxp.addEventListener("mouseenter", function () { held = true; schedule(); });
-  fxp.addEventListener("mouseleave", function () { held = false; schedule(); });
-  document.addEventListener("visibilitychange", function () { held = document.hidden; schedule(); });
+  // A pointer resting on the picture holds the slideshow - on the picture
+  // alone: over the whole explorer, which fills much of a screen, it stopped
+  // it nearly always and the list never moved. The keyboard in the tabs
+  // holds it too, so it can be stopped without a mouse.
+  var stage = fxp.querySelector(".fxp-stage"), sx = null, sy = 0;
+  if (stage) {
+    stage.addEventListener("mouseenter", function () { hover = true; schedule(); });
+    stage.addEventListener("mouseleave", function () { hover = false; schedule(); });
+  }
+  tabsBox.addEventListener("focusin", function (e) {
+    if (e.target.matches && e.target.matches(":focus-visible")) { focused = true; schedule(); }
+  });
+  tabsBox.addEventListener("focusout", function () { focused = false; schedule(); });
+  document.addEventListener("visibilitychange", function () { hidden = document.hidden; schedule(); });
 
   // A swipe across the screen goes to the next or the previous feature.
-  var stage = fxp.querySelector(".fxp-stage"), sx = null, sy = 0;
   if (stage) {
     stage.addEventListener("touchstart", function (e) {
       sx = e.touches[0].clientX; sy = e.touches[0].clientY;
@@ -301,7 +323,7 @@
       if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) { return; }
       var step = dx < 0 ? 1 : -1;
       if (document.documentElement.dir === "rtl") { step = -step; }
-      auto = false;
+      pick();
       show((cur + step + feats.length) % feats.length, true);
     }, { passive: true });
   }
