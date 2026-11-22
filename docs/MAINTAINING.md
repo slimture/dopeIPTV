@@ -903,6 +903,10 @@ A rule for everything new, and the reason for a review once a batch is in:
   user and why, not only what the diff does.
 - Small, focused commits on `testing`; a test with every fix that can be
   tested headless.
+- A commit that fixes a reported issue ends its message with
+  `Fixes #<number>` on a line of its own: GitHub links the commit on the
+  issue, and closes it once the commit reaches `main` - with the release
+  that ships the fix.
 - A pure move of code between modules or mixins must not change
   behaviour - and tests that patch module globals must follow the code to
   its new module.
