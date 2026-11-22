@@ -20,11 +20,15 @@ disagree, the code is what runs and the sentence is a bug: report it.
   OpenSubtitles' login, the sync code, a Watch together room's code, the
   tokens of the app's own servers. They stay in the
   settings files (`core/settings_files.py`), and out of the log
-  (`core/log.py`: each value the app holds masked wherever it appears, one
-  of three characters or fewer as a word of its own, so a short password
-  is masked without every "abc" in the log; a line that could not be
-  masked is withheld, never written as it was), error reports
-  (`core/report.py`) and any address that is logged.
+  (`core/log.py`: each value the app holds masked wherever it appears -
+  as written, percent-encoded in either case of hex, JSON-escaped, and a
+  user name with its password as HTTP Basic's base64, padded or not, or any
+  base64 that reads as text holding one (`encoded_forms`, `basic_forms`,
+  `base64_masked`) -, one of three characters or fewer as a word of its
+  own, so a short password is masked without every "abc" in the log; a line
+  that could not be masked is withheld, never written as it was), error
+  reports (`core/report.py`, the same forms) and any address that is
+  logged.
 - **What a person watches.** History, resume points, watched marks and
   the viewing statistics stay on the computer (`core/viewing_stats.py`
   is never synced), and dopeiptv.org never learns them: sync carries watch
@@ -55,9 +59,10 @@ disagree, the code is what runs and the sentence is a bug: report it.
 - **The update path.** Only what dopeIPTV's release key signed is
   installed, only a signed file that names the release offered - an
   older release's file under a newer tag is refused, since the
-  signature covers the file and not the tag - and never a version older
-  than the one running (`core/selfupdate.py`, `signed_asset`,
-  `names_version`).
+  signature covers the file and not the tag - and only a version strictly
+  newer than the one running (`core/selfupdate.py`, `signed_asset`,
+  `names_version`, `refuse_older`; the one exception
+  [below](#a-test-build-left-for-releases)).
 
 Outside the model: a program that runs as the person (it can read what
 they can), an administrator of the computer, someone at the unlocked
@@ -117,6 +122,8 @@ requests they send it.
 | A box's XML with a DOCTYPE | `providers/boxes.parse_xml` drops it; a SAT>IP description with an entity is refused (`providers/satip.parse_description`) |
 | A stream address in a box's list | The same `core/stream_address.py` rules as a provider's |
 | Guessing a token of the app's servers | 192 bits from `secrets` for the phone remote, the remote API and server mode, compared with `hmac.compare_digest`; a token bucket per address and a lock-out after wrong tries (`core/phone_remote.RateLimiter`, server mode the same) |
+| Taking the phone remote or the remote API down from address after address, each with a fresh bucket | A budget for every address together beside each one's own (`RateLimiter`'s *total_rate*: 60 requests a second, 360 at once; a list's pictures 120 and 900), 429 once it is spent; lock-outs stay per address, and this computer is neither shut out nor counted (`this_computer`) |
+| Sending the player, through the remote API, to a service on this computer or to a link-local host (a router's page, a cloud's metadata service) | `core/remote_api.play_refusal`, on the server's thread: an address that names this computer - loopback in any spelling, localhost, 0.0.0.0, an IPv4 address inside IPv6, an empty host - or a link-local or metadata host, or whose name resolves to one now, is refused with the reason (400); AceStream's engine at `127.0.0.1:6878/ace/` and the home network stay, and a script on this computer, which reaches them itself, plays as before (`remote_api.asker`) |
 | Opening connections by the thousand, or holding them open | `core/exclusive_bind.py`: 256 at once, 64 per address (`ConnectionLimitMixin`), a client that says nothing let go (`IdleTimeoutMixin`) |
 | Reaching the app's servers from the internet | `core/home_net.is_home_client`: loopback, the private ranges, link-local and IPv6 ULA, never a public address |
 | Making a playlist's addresses name a host of its choosing, so the token goes there | `home_net.host_for_addresses` (`core/remote_api.py`, `services/home_server.py`) |
@@ -169,7 +176,7 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 | They could try | What stops it |
 |---|---|
 | Reading the settings files (every login, the sync code, the tokens) from another account | `core/settings_files.protect`: each file 0600 and the app's folder 0700, set at start before anything writes them, and only ever narrowed; on Windows the registry and the user's own profile. Where the drive keeps no permissions (FAT, exFAT, some shares) the app starts all the same, logs the file by name and says once where it is (`not_private`, `ui/mw_settings._tell_settings_not_private`) |
-| Handing the running app a command | `core/instance.py`: a socket in `$XDG_RUNTIME_DIR` or a 0700 folder of the user's own, never the shared /tmp, nor a folder another account owns; on Windows a random word in the pipe's name (`_pipe_key`) |
+| Handing the running app a command | `core/instance.py`: a socket in `$XDG_RUNTIME_DIR` or a 0700 folder of the user's own, never the shared /tmp, nor a folder another account owns; a folder that could not be made, read or narrowed to the user alone is never listened in - the app starts without the second start's handoff, said once (`_folder_refusal`); on Windows a random word in the pipe's name (`_pipe_key`) |
 | Using the loopback proxy to go out as the person, through their route | A key made for each run (`core/net_bridge.py`) |
 | Reading the rewind buffer's stream | A 144-bit token, loopback only (`core/dvr_server.py`) |
 | Catching the Trakt sign-in's redirect | Its port never shared (`core/exclusive_bind.ExclusiveBindMixin`, `SO_EXCLUSIVEADDRUSE` on Windows), and the code it carries useless without the PKCE verifier that stays in the app (`providers/trakt.py`) |
@@ -231,7 +238,9 @@ is.
   together messages, and see who is in a room
   ([below](#the-watch-together-relay-sees-who-is-in-a-room)).
 - Read the feedback and error reports the person sends - they are for it -
-  as the person saw them before Send, scrubbed (`core/report.py`).
+  exactly as the person saw them before Send: the window scrubs its boxes
+  with the person's own values on Send and shows anything more it hid
+  before it sends (`ui/feedback_dialogs._ShownIsSent`, `core/report.py`).
 - See the Trakt sign-in's one-time code pass through `/trakt/callback`.
 
 **What it could not do.**
@@ -242,8 +251,10 @@ is.
   message is signed by its member's own key (`core/ed25519.py`) and an
   unsigned one is dropped, so no member speaks as another; an earlier copy is
   told to a computer that has
-  seen a later one (`counter`, `RoundResult.older`); an old message out of
-  its time is not acted on (`Room.receive`).
+  seen a later one (`counter`, `RoundResult.older`), and a copy last saved
+  more than a month ago is not taken by a computer that joins until the
+  person says so (`saved_at`, `STALE_DAYS`); an old message out of its time
+  is not acted on (`Room.receive`).
 - Install anything: an update must be on a checksum list signed with a key
   that is never on the web server (`core/update_keys.py`,
   `selfupdate.signed_asset`), and the site mirrors a release's files only
@@ -873,13 +884,43 @@ unsigned members are refused.
 
 ### The sync server can hold a copy back
 
-The sealed counter tells a computer that has seen a later copy; a computer
-that has never synced cannot tell an earlier one, and the server can keep
-a copy back or lose it (`core/sync.py`, `counter`). A slot that only an app
-up to 1.6.8 has written is not bound to its credential until a newer app
-writes it.
+The sealed counter tells a computer that has seen a later copy. A computer
+that has never synced - one that joins, or joins again after a restore -
+has seen no counter. Since 1.6.11 every copy also carries, sealed, when it
+was put there (`core/sync.saved_at`; an unchanged copy is put back once a
+week, `REFRESH_DAYS`, so the time says when a computer last synced), and a
+joining computer handed one last saved more than 30 days ago is asked
+before anything is merged, put back or applied: "This copy was last saved
+N days ago - another computer may have a newer one. Use it anyway?", No
+the default, sync then left off (`STALE_DAYS`, `round_trip`'s *stale_ok*,
+`ui/mw_sync._sync_ask_stale`; the welcome's Bring step the same). The join
+says how old the copy it took was.
+
+*What stays:* a copy handed back from within the month is taken by a
+joining computer without a question, and the server can keep a copy back
+or lose it altogether. An app up to 1.6.10 does not stamp its uploads, so
+a household whose only changes come from such an app is judged by its
+entries' own times. A slot that only an app up to 1.6.8 has written is not
+bound to its credential until a newer app writes it.
 
 *Why:* inherent to a server that stores; written on the transparency page.
+
+### A test build left for Releases
+
+An update is offered and installed only when it is strictly newer than
+the copy running, on either channel and whoever offers it
+(`core/updates.offered`, `selfupdate.refuse_older` for every installer).
+The one exception: a person who switched from Test builds to Releases
+while a test build runs (1.4.0.12) is offered the release that build
+carries the number of (1.4.0), which sorts below it, so the channel means
+releases again. It holds only for that very build and only once the
+window saw the switch (`updates.leave_nightly`, `ui/mw_updates.channel_seen`);
+a test build on Releases that was never switched there waits for the next
+release.
+
+*Why:* without it a person leaving Test builds would stay on one until the
+next release; the release is signed as every one is, and the step is the
+person's choice.
 
 ### Builds are not yet reproducible
 
@@ -937,11 +978,20 @@ yt-dlp's that is itself bad - its key or its build taken over - is not
 seen, and it runs as the person. A new yt-dlp comes only with the next
 release of the app. The copy is checked against that SHA-256 when it is
 installed and then known by its mark - the SHA-256, its size and time - in
-the user's own 0700 folder; since 1.6.11 the file is also hashed again
-once a run before it is first used, and again whenever its size or time
-moves (`ytdlp.own_copy`, `_HASHED`): a copy whose bytes no longer match is
-not run, and the log says so. Whoever could change the file between that
-check and its run could as well change the app itself.
+the user's own 0700 folder. Since 1.6.11 its bytes are hashed against the
+mark right before every run the app starts (`ytdlp.own_copy`, `_may_run`:
+finding it for a page, `resolve`, `version_of`), so a file swapped under
+the same size and time is not run either, and the log says so. mpv's ytdl
+hook runs it by itself - for a page, and as a fallback for a stream that
+would not open -, so on Linux and macOS mpv is handed a small wrapper that
+hashes the copy with the system's sha256sum, shasum or openssl before each
+of those runs and refuses it on a mismatch (`hook_path`, `_hasher`).
+
+*What stays:* on Windows, and where the system has none of those
+programs, mpv is handed the copy itself, hashed before each page the app
+opens but not before mpv's own fallback runs. Whoever could change the
+file between the hash and the run - milliseconds - could as well change
+the app itself.
 
 *Why:* an old yt-dlp is the usual reason a stream stops opening. The app's
 copy can be turned off (`ytdlp_managed`): then only the system's is used.
@@ -1006,7 +1056,9 @@ person outside the project is recorded there yet.
   `test_phone_remote.py`, `test_server_mode.py`, `test_dvr_server.py`,
   `test_settings_files.py`, `test_pins.py`, `test_rec_extras.py`,
   `test_recording_safety.py`, `test_privacy.py`,
-  `test_privacy_playback.py`, `test_privacy_logs.py`, `test_report.py`,
+  `test_privacy_playback.py`, `test_privacy_logs.py`, `test_log_redaction.py`,
+  `test_report.py`, `test_feedback_fit.py`, `test_remote.py`,
+  `test_update_channel.py`, `test_welcome_sync.py`,
   `test_sync.py`, `test_sync_edges.py`, `test_together.py`,
   `test_backup.py`, `test_backup_lock.py`, `test_build_check.py`, `test_selfupdate.py`,
   `test_winupdate.py`, `test_macupdate.py` and `test_ytdlp.py`. CI runs
