@@ -2647,6 +2647,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "together_left_room": {"en": "You left the room. The others go on watching."},
     "together_private_left": {"en": "You left the watch together room: private viewing is on."},
     "together_full": {"en": "That room is full - it already has {most} people in it."},
+    "together_refused": {"en": "dopeiptv.org won't let you into that room - someone without its code is holding it. Start a new room and share its code."},
     "together_joined": {"en": "{name} joined"},
     "together_left": {"en": "{name} left"},
     "together_older": {"en": "Someone in the room uses an older dopeIPTV. Their messages can't be checked, so they are left out until they update."},

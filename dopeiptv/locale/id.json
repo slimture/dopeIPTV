@@ -2001,6 +2001,7 @@
   "together_left_room": "Kamu keluar dari ruang. Yang lain tetap menonton.",
   "together_private_left": "Kamu keluar dari ruang nonton bareng: tontonan pribadi aktif.",
   "together_full": "Ruang itu penuh – sudah ada {most} orang di dalamnya.",
+  "together_refused": "dopeiptv.org tidak mengizinkan Anda masuk ke ruang itu – seseorang tanpa kodenya sedang menahannya. Mulai ruang baru dan bagikan kodenya.",
   "together_joined": "{name} bergabung",
   "together_left": "{name} keluar",
   "together_older": "Seseorang di ruangan memakai dopeIPTV versi lama. Pesannya tidak bisa diperiksa, jadi dia tidak diikutkan sampai memperbarui.",

@@ -2001,6 +2001,7 @@
   "together_left_room": "你已离开房间。其他人会继续观看。",
   "together_private_left": "你已离开一起看房间：隐私观看已开启。",
   "together_full": "这个房间已满——里面已经有 {most} 人。",
+  "together_refused": "dopeiptv.org 不让你进入这个房间——有个没有房间代码的人占用了它。请创建一个新房间并分享它的代码。",
   "together_joined": "{name} 已加入",
   "together_left": "{name} 已离开",
   "together_older": "房间里有人在用旧版 dopeIPTV。其消息无法验证，因此在其更新前不会被纳入。",

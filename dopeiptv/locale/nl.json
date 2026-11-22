@@ -2001,6 +2001,7 @@
   "together_left_room": "Je hebt de kamer verlaten. De anderen kijken verder.",
   "together_private_left": "Je hebt de kamer voor samen kijken verlaten: privé kijken staat aan.",
   "together_full": "Die kamer is vol – er zitten al {most} mensen in.",
+  "together_refused": "dopeiptv.org laat je niet in die kamer – iemand zonder de code houdt hem bezet. Start een nieuwe kamer en deel de code daarvan.",
   "together_joined": "{name} doet mee",
   "together_left": "{name} is weg",
   "together_older": "Iemand in de kamer gebruikt een oudere dopeIPTV. Diens berichten kunnen niet worden gecontroleerd, dus die blijft buiten tot hij bijwerkt.",

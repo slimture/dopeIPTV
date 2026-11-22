@@ -2001,6 +2001,7 @@
   "together_left_room": "Napustio si sobu. Drugi nastavljaju gledati.",
   "together_private_left": "Napustio si sobu za gledanje zajedno: privatno gledanje je uključeno.",
   "together_full": "Soba je puna – u njoj je već {most} osoba.",
+  "together_refused": "dopeiptv.org vas ne pušta u tu sobu – drži je netko tko nema njezin kôd. Napravite novu sobu i podijelite njezin kôd.",
   "together_joined": "{name} se pridružio",
   "together_left": "{name} je otišao",
   "together_older": "Netko u sobi koristi stariji dopeIPTV. Njegove poruke ne mogu se provjeriti pa je izostavljen dok ne ažurira.",

@@ -2001,6 +2001,7 @@
   "together_left_room": "Du hast den Raum verlassen. Die anderen schauen weiter.",
   "together_private_left": "Du hast den Raum zum gemeinsamen Ansehen verlassen: Privates Ansehen ist an.",
   "together_full": "Der Raum ist voll – es sind schon {most} Personen darin.",
+  "together_refused": "dopeiptv.org lässt dich nicht in diesen Raum – jemand ohne seinen Code belegt ihn. Starte einen neuen Raum und teile dessen Code.",
   "together_joined": "{name} ist beigetreten",
   "together_left": "{name} ist gegangen",
   "together_older": "Jemand im Raum nutzt ein älteres dopeIPTV. Seine Nachrichten lassen sich nicht prüfen, daher bleibt er außen vor, bis er aktualisiert.",

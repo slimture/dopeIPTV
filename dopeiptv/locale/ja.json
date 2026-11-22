@@ -2001,6 +2001,7 @@
   "together_left_room": "ルームを退出しました。他の人は視聴を続けます。",
   "together_private_left": "一緒に見るのルームを退出しました: プライベート視聴がオンです。",
   "together_full": "このルームは満員です（すでに {most} 人います）。",
+  "together_refused": "dopeiptv.org がこのルームへの参加を拒否しました。コードを持たない誰かがこのルームを押さえています。新しいルームを始めて、そのコードを共有してください。",
   "together_joined": "{name} が参加しました",
   "together_left": "{name} が退出しました",
   "together_older": "ルームの誰かが古いdopeIPTVを使っています。その人のメッセージは確認できないため、更新するまで参加できません。",

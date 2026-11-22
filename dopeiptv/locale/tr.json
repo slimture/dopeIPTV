@@ -2001,6 +2001,7 @@
   "together_left_room": "Odadan çıktın. Diğerleri izlemeye devam ediyor.",
   "together_private_left": "Birlikte izleme odasından çıktın: gizli izleme açık.",
   "together_full": "Bu oda dolu – içinde zaten {most} kişi var.",
+  "together_refused": "dopeiptv.org sizi bu odaya almıyor – kodu olmayan biri odayı tutuyor. Yeni bir oda başlatın ve kodunu paylaşın.",
   "together_joined": "{name} katıldı",
   "together_left": "{name} ayrıldı",
   "together_older": "Odadaki biri eski bir dopeIPTV kullanıyor. Mesajları doğrulanamıyor, bu yüzden güncelleyene kadar dışarıda kalıyor.",

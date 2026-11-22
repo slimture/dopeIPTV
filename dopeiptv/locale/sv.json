@@ -2001,6 +2001,7 @@
   "together_left_room": "Du lämnade rummet. De andra fortsätter titta.",
   "together_private_left": "Du lämnade rummet för att titta tillsammans: privat läge är på.",
   "together_full": "Rummet är fullt – det är redan {most} personer i det.",
+  "together_refused": "dopeiptv.org släpper inte in dig i det rummet – någon utan dess kod håller det. Starta ett nytt rum och dela dess kod.",
   "together_joined": "{name} gick med",
   "together_left": "{name} gick",
   "together_older": "Någon i rummet använder en äldre dopeIPTV. Deras meddelanden kan inte kontrolleras, så de lämnas utanför tills de uppdaterar.",

@@ -2001,6 +2001,7 @@
   "together_left_room": "Bạn đã rời phòng. Mọi người vẫn xem tiếp.",
   "together_private_left": "Bạn đã rời phòng xem cùng nhau: đang bật xem riêng tư.",
   "together_full": "Phòng đã đầy – đã có {most} người.",
+  "together_refused": "dopeiptv.org không cho bạn vào phòng đó – có người không có mã của phòng đang giữ nó. Hãy tạo phòng mới và chia sẻ mã của phòng đó.",
   "together_joined": "{name} đã vào",
   "together_left": "{name} đã rời đi",
   "together_older": "Có người trong phòng dùng dopeIPTV bản cũ. Tin nhắn của họ không thể kiểm tra, nên họ bị để ngoài cho đến khi cập nhật.",

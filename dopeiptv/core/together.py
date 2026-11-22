@@ -16,6 +16,19 @@ under (64 hex) and the *key* every message is sealed with
 the sizes (padded to a few steps) and when; never the code, the key, the
 names or what plays (donate/together.py on the website branch).
 
+The room's credential (auth_of, AUTH_HEADER): a third value from the same
+stretched code, under a label of its own, sent with every request as
+core/sync.py sends a slot's. The relay keeps only its SHA-256: the first
+request with one binds the room, and from then on a request without it -
+to post, to read or to leave - is turned down ("refused"). Knowing a room
+id is then not enough to put anything in the room, take a seat or read
+its sealed messages. Guessing a code from that hash costs the same
+STRETCH rounds a guess from the room id does. A room only older apps use
+(they send none) stays open as before; those already in it when it is
+bound keep their seat, a newcomer of theirs is turned down, and the
+others are told once ("older" in the relay's answer, as for an unsigned
+member).
+
 Messages. Who is here (a display name chosen for the session: "hi" on
 joining and in answer to one, "ka" now and then, "bye" on leaving) and
 what plays: a *state* - what (a Media), playing or paused, where, and the
@@ -47,18 +60,36 @@ takes about 5 ms and checking about 3.5 ms of plain Python - every
 message is signed, on the link's threads, never the window's.
 
 What is not taken (Room.receive, and Link for the backlog). The relay, or
-anyone who learnt the room id, can hand an old sealed message again. A
-counter per sender ("n") refuses it while this computer remembers the
-sender - kept in memory per room for the app's run (``remembered``: the
-last ROOMS_REMEMBERED rooms), so leaving and joining again still knows
-every number taken; after a restart nothing is remembered, so: what the
-relay already held when this computer's first request was answered is not
-acted on (those in the room answer the hello with what plays now; the
-hello waits for that first answer, and where it could not, the backlog is
-read under the rules below instead); and, once the relay's clock is known
-here, a message is dropped when its moment "t" is more than JOIN_SLACK_MS
-before this computer joined, more than STALE_MS old, or more than AHEAD_MS
-in the future. A message is stamped as it is sent and normally arrives
+anyone in the room, can hand an old sealed message again. A counter per
+sender ("n") refuses it while this computer remembers the sender - kept
+in memory per room for the app's run (``remembered``: the last
+ROOMS_REMEMBERED rooms), so leaving and joining again still knows every
+number taken. After a restart nothing is remembered, and nothing is
+written down to remember it by; what holds then is that nothing said
+before this computer joined is acted on:
+
+- Every message of an app since 1.6.11 says so ("p": PROTO), and such a
+  sender is taken only from its first message that names this computer's
+  id on ("to": its answer to this computer's hello, or to an answer of
+  this computer's that asked for one, "ask"). The id is the hash of a key
+  made for this stay in the room, so nothing that names it was written
+  before the stay began; the sender's numbers go up, so what it said
+  before that message is left out with it. No clock is trusted for this:
+  a relay that says the wrong time cannot make an old message new. Until
+  then its hello is answered, naming it and asking back - which is what
+  lets it take this computer in turn - and, should it speak on without
+  naming this computer (its answer lost on the way), it is asked so now
+  and then (NUDGE_EVERY).
+- An older app's message (no "p") is judged by time: what the relay
+  already held when this computer's first request was answered is not
+  acted on (those in the room answer the hello with what plays now; the
+  hello waits for that first answer, and where it could not, the backlog
+  is read under the rules below instead); and, once the relay's clock is
+  known here, a message is dropped when its moment "t" is more than
+  JOIN_SLACK_MS before this computer joined.
+
+Either way a message more than STALE_MS old or more than AHEAD_MS in the
+future is dropped. A message is stamped as it is sent and normally arrives
 within a second - a slow network, three tries at sending and the long
 poll's 25 s stay far inside these minutes. Senders are forgotten only
 after STALE_MS + AHEAD_MS without a word, when nothing of theirs would be
@@ -101,6 +132,8 @@ from .sync import hkdf
 
 ENDPOINT = "https://dopeiptv.org/together/"
 MEMBER_HEADER = "X-Together-Member"
+#: The header the room's credential goes in (auth_of).
+AUTH_HEADER = "X-Together-Auth"
 #: As the relay counts: more than this many in a room are turned away.
 MAX_MEMBERS = 8
 #: The longest the relay keeps a request waiting for news (seconds).
@@ -126,6 +159,10 @@ MAX_FRAME = 1 + 12 + _PAD[-1] + 16
 MIN_FRAME = 1 + 12 + 16
 
 KINDS = ("hi", "ka", "bye", "st")
+#: What every message of this app says it speaks ("p"): its sender is
+#: taken only once it has named this computer (Room.receive). An older
+#: app's say nothing - 1.
+PROTO = 2
 MEDIA_KINDS = ("movie", "episode", "live")
 #: What a member says of themselves: following along, the title is not in
 #: their source, nothing playing, still looking.
@@ -156,6 +193,9 @@ SENDERS_MAX = 64
 VER_JUMP = 10_000
 #: A member's hello is answered at most this often (seconds).
 HELLO_EVERY = 3.0
+#: A sender of PROTO that speaks without having named this computer (its
+#: answer lost on the way) is asked to, at most this often (seconds).
+NUDGE_EVERY = 20.0
 #: As many messages as the relay keeps for a room: more in one answer are
 #: not read.
 BATCH_MAX = 300
@@ -194,18 +234,34 @@ def is_old_code(text: str) -> bool:
 
 
 @functools.lru_cache(maxsize=8)
-def derive(code: str) -> tuple[str, bytes]:
-    """(room id, key) for a code: the name the relay keeps the room's
-    messages under (64 hex) and the key they are sealed with, each from its
-    own HKDF label - one says nothing about the other."""
+def _stretched(code: str) -> bytes:
+    """The code after STRETCH rounds: what derive and auth_of take apart."""
     shown = parse_code(code)
     if shown is None:
         raise ValueError("not a room code")
     raw = shown.replace("-", "")
     # Whoever has the code is in the room: never in a log.
     register_secrets(shown, raw, shown.lower())
-    seed = hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, STRETCH, 32)
+    return hashlib.pbkdf2_hmac("sha256", raw.encode("ascii"), _SALT, STRETCH, 32)
+
+
+@functools.lru_cache(maxsize=8)
+def derive(code: str) -> tuple[str, bytes]:
+    """(room id, key) for a code: the name the relay keeps the room's
+    messages under (64 hex) and the key they are sealed with, each from its
+    own HKDF label - one says nothing about the other."""
+    seed = _stretched(code)
     return hkdf(seed, _SALT, b"room", 32).hex(), hkdf(seed, _SALT, b"key", 32)
+
+
+def auth_of(code: str) -> str:
+    """The credential every request to the code's room carries (64 hex):
+    from a label of its own, so neither the room id nor the key says
+    anything of it, and from the stretched code, so the hash the relay
+    keeps of it is as hard to guess a code from as the room id."""
+    auth = hkdf(_stretched(code), _SALT, b"auth", 32).hex()
+    register_secrets(auth)
+    return auth
 
 
 @dataclass(frozen=True)
@@ -479,6 +535,11 @@ class Message:
     state: PlayState | None = None
     #: Proven to be its sender's (open_message); Room.receive takes no other.
     signed: bool = False
+    #: What its app speaks ("p"; 1 for an app before 1.6.11), the member it
+    #: names ("to": the one it answers) and whether it asks to be named back.
+    proto: int = 1
+    to: str = ""
+    ask: bool = False
 
 
 def parse(d: Any) -> Message | None:
@@ -497,7 +558,8 @@ def parse(d: Any) -> Message | None:
     status = str(d.get("s") or "")
     return Message(kind=str(d["k"]), sender=sender, n=n, t=t, name=clean_name(d.get("name")),
                    answer=d.get("re") is True, status=status if status in STATUSES else "",
-                   state=state)
+                   state=state, proto=_int(d.get("p"), 1, 1000) or 1,
+                   to=_member_id(d.get("to")) or "", ask=d.get("ask") is True)
 
 
 # -- the relay's clock ------------------------------------------------------------------
@@ -611,17 +673,30 @@ class Room:
         #: seconds) - *seen*, the room's own across rejoins (remembered).
         self._last_n: dict[str, tuple[int, float]] = {} if seen is None else seen
         self._told_unsigned = False
+        #: Senders of PROTO that have named *me* (when): taken from then on.
+        #: This stay's alone - *me* is new each time - so never remembered.
+        self._proven: dict[str, float] = {}
+        #: When a sender was last answered at its asking (Room.receive's
+        #: "answer"): a flood of hellos or asks is answered now and then.
+        self._answered: dict[str, float] = {}
 
     # -- out
     def _make(self, kind: str, **fields: Any) -> dict[str, Any]:
         self._sent += 1
-        msg: dict[str, Any] = {"k": kind, "f": self.me, "n": self._sent, "t": self.clock.now_ms()}
+        msg: dict[str, Any] = {"k": kind, "f": self.me, "n": self._sent, "t": self.clock.now_ms(),
+                               "p": PROTO}
         msg.update({k: v for k, v in fields.items() if v is not None})
         return msg
 
-    def hello(self, answer: bool = False) -> dict[str, Any]:
+    def hello(self, answer: bool = False, to: str | None = None) -> dict[str, Any]:
+        """Who is here and what plays. An answer names the member it is
+        for (*to*): that is what lets a member of PROTO take this
+        computer's messages (Room.receive). It asks to be named back while
+        that member is not taken here yet ("ask")."""
+        named = to if answer and to else None
         return self._make("hi", name=self.name, re=answer or None, s=self.status,
-                          st=self.state.wire() if self.state is not None else None)
+                          st=self.state.wire() if self.state is not None else None,
+                          to=named, ask=True if named and named not in self._proven else None)
 
     def keepalive(self) -> dict[str, Any]:
         return self._make("ka", name=self.name, s=self.status)
@@ -664,12 +739,53 @@ class Room:
         self._last_n[msg.sender] = (msg.n, now)
         return True
 
+    def _prove(self, sender: str, now: float) -> bool:
+        """*sender* named this computer: taken from now on - unless the
+        room remembers SENDERS_MAX others it cannot let go."""
+        if sender not in self._proven and len(self._proven) >= SENDERS_MAX:
+            keep = (STALE_MS + AHEAD_MS) / 1000.0
+            for s in [s for s, at in self._proven.items()
+                      if now - self._last_n.get(s, (0, at))[1] > keep and s not in self.members]:
+                del self._proven[s]
+            if len(self._proven) >= SENDERS_MAX:
+                return False
+        self._proven[sender] = now
+        return True
+
+    def _answer(self, sender: str, now: float, every: float) -> list[tuple[str, Any]]:
+        """("answer", *sender*): an answer naming it is to go out - not
+        within *every* seconds of the last, nor for more than SENDERS_MAX
+        senders at once."""
+        last = self._answered.get(sender)
+        if last is not None and now - last < every:
+            return []
+        if last is None and len(self._answered) >= SENDERS_MAX:
+            keep = (STALE_MS + AHEAD_MS) / 1000.0
+            for s in [s for s, at in self._answered.items() if now - at > keep]:
+                del self._answered[s]
+            if len(self._answered) >= SENDERS_MAX:
+                return []
+        self._answered[sender] = now
+        return [("answer", sender)]
+
+    def _not_yet(self, msg: Message, now: float) -> list[tuple[str, Any]]:
+        """A sender of PROTO that has not named this computer: nothing of
+        it is taken - it may be saying what it said before this stay began.
+        Its hello is answered and, should it speak on, it is asked now and
+        then, naming it either way: that brings the answer that names this
+        computer."""
+        if msg.kind == "hi" and not msg.answer:
+            return self._answer(msg.sender, now, HELLO_EVERY)
+        return self._answer(msg.sender, now, NUDGE_EVERY)
+
     def receive(self, msg: Message, now: float) -> list[tuple[str, Any]]:
         """What *msg* changes, as events: ("joined" | "left" | "status" |
-        "hello", Member), ("state", (old, new)), ("unsigned", None) - once a
+        "hello", Member), ("state", (old, new)), ("answer", sender) - an
+        answer naming *sender* is to go out -, ("unsigned", None) - once a
         room, for the first message no key signs (an app up to 1.6.8, left
         out until it is updated). Nothing for one of this computer's own,
-        an old one handed again or one out of its time."""
+        an old one handed again, one out of its time, or one of a sender of
+        PROTO said before it named this computer."""
         if msg.sender == self.me:
             return []
         if not msg.signed:
@@ -681,7 +797,12 @@ class Room:
         if not self._timely(msg):
             log.debug("together: a message out of its time was ignored")
             return []
+        first = msg.proto >= PROTO and msg.sender not in self._proven
+        if first and msg.to != self.me:
+            return self._not_yet(msg, now)
         if not self._counted(msg, now):
+            return []
+        if first and not self._prove(msg.sender, now):
             return []
         events: list[tuple[str, Any]] = []
         if msg.kind == "bye":
@@ -718,7 +839,11 @@ class Room:
         if state is not None and state.newer_than(self.state):
             old, self.state = self.state, state
             events.append(("state", (old, state)))
-        if (msg.kind == "hi" and not msg.answer and member is not None
+        if msg.ask and msg.to == self.me:
+            # Named and asked to name back: its answer to this computer's
+            # hello, or its ask again when what this computer sent was lost.
+            events += self._answer(msg.sender, now, HELLO_EVERY)
+        elif (msg.kind == "hi" and not msg.answer and member is not None
                 and now - member.greeted >= HELLO_EVERY):
             member.greeted = now
             events.append(("hello", member))
@@ -864,8 +989,9 @@ class LocalWatch:
 class RelayError(Exception):
     """A request the relay did not answer as hoped. *kind*: net (no answer),
     busy (too many rooms, or too many requests), full (the room has
-    MAX_MEMBERS already), bad (refused as malformed), modified (not asked:
-    a modified build)."""
+    MAX_MEMBERS already), refused (the room is bound to another credential
+    than this code's - someone without the code holds it), bad (refused as
+    malformed), modified (not asked: a modified build)."""
 
     def __init__(self, kind: str) -> None:
         super().__init__(kind)
@@ -879,17 +1005,24 @@ class Polled:
     now: int
     members: int
     reset: bool = False
+    #: The relay turned down someone without the room's credential lately:
+    #: an older app, most likely (told as an unsigned member is).
+    older: bool = False
 
 
 class Relay:
-    """POST, GET (a long poll) and DELETE of one room on dopeiptv.org.
-    Blocking: the link's threads'. One per thread (each has a session)."""
+    """POST, GET (a long poll) and DELETE of one room on dopeiptv.org, each
+    with the room's credential (*auth*, auth_of). Blocking: the link's
+    threads'. One per thread (each has a session)."""
 
-    def __init__(self, room: str, member: str, endpoint: str | None = None) -> None:
+    def __init__(self, room: str, member: str, endpoint: str | None = None,
+                 auth: str = "") -> None:
         self.url = (endpoint or ENDPOINT) + room
         from .. import __version__
         self.headers = {MEMBER_HEADER: member, "User-Agent": f"dopeIPTV/{__version__}",
                         **build_check.headers()}
+        if auth:
+            self.headers[AUTH_HEADER] = auth
         self._session: Any = None
 
     def _http(self) -> Any:
@@ -921,7 +1054,12 @@ class Relay:
                 return got
             raise RelayError("net")
         if r.status_code == 403:
-            raise RelayError("full")
+            try:
+                said = r.json()
+            except ValueError:
+                said = None
+            refused = isinstance(said, dict) and said.get("error") == "refused"
+            raise RelayError("refused" if refused else "full")
         if r.status_code in (429, 502, 503, 504):
             raise RelayError("busy")
         if r.status_code in (400, 404, 413):
@@ -946,7 +1084,8 @@ class Relay:
                 continue
         return Polled(seq=_int(got.get("seq"), 0) or 0, msgs=msgs,
                       now=_int(got.get("now"), 0) or 0,
-                      members=_int(got.get("n"), 0, 1000) or 0, reset=got.get("reset") is True)
+                      members=_int(got.get("n"), 0, 1000) or 0, reset=got.get("reset") is True,
+                      older=got.get("older") is True)
 
     def leave(self) -> None:
         try:
@@ -970,7 +1109,8 @@ class Link:
     both on the link's threads. *relay_for(room, member)* makes a relay
     for a thread (tests hand in one of their own). With *identity* (whose
     id is *me*) everything sent is signed - on the sending thread: a
-    signature takes a few milliseconds of plain Python.
+    signature takes a few milliseconds of plain Python. *auth* is the
+    room's credential (auth_of), on every request of the default relay.
 
     What the relay held before this link's first request was answered is
     not delivered (an old room's messages, or old ones handed again), and
@@ -988,7 +1128,7 @@ class Link:
                  on_status: Callable[[str, int], None],
                  relay_for: Callable[[str, str], Any] | None = None,
                  endpoint: str | None = None, identity: Identity | None = None,
-                 on_older: Callable[[], None] | None = None) -> None:
+                 on_older: Callable[[], None] | None = None, auth: str = "") -> None:
         if identity is not None and identity.id != me:
             raise ValueError("the identity is another member's")
         self.room, self.key, self.me, self.clock = room, key, me, clock
@@ -996,10 +1136,11 @@ class Link:
         self._polled = threading.Event()
         self._posted = threading.Event()
         self._on_message, self._on_status = on_message, on_status
-        #: Told once a link: a member of an older app, unsigned (older_frame).
+        #: Told once a link: a member of an older app - unsigned (older_frame),
+        #: or turned down by the relay for want of the credential (Polled.older).
         self._on_older = on_older
         self._older_told = False
-        self._relay_for = relay_for or functools.partial(Relay, endpoint=endpoint)
+        self._relay_for = relay_for or functools.partial(Relay, endpoint=endpoint, auth=auth)
         self._stop = threading.Event()
         self._queue: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=64)
         self._status: tuple[str, int] | None = None
@@ -1088,17 +1229,15 @@ class Link:
                     log.debug("together: %d messages from before joining left unread", len(msgs))
                 msgs = []
             self._polled.set()
+            if got.older:
+                self._tell_older()
             for _seq, blob in msgs:
                 if self._stop.is_set():
                     break
                 msg = open_message(self.key, self.room, blob)
                 if msg is None and not self._older_told and self._on_older is not None \
                         and older_frame(self.key, self.room, blob):
-                    self._older_told = True
-                    try:
-                        self._on_older()
-                    except Exception:
-                        log.debug("together: an older member not told", exc_info=True)
+                    self._tell_older()
                 if msg is None or msg.sender == self.me:
                     continue
                 try:
@@ -1113,6 +1252,16 @@ class Link:
         self._polled.set()
         if hasattr(relay, "close"):
             relay.close()
+
+    def _tell_older(self) -> None:
+        """A member of an older app is left out: said once a link."""
+        if self._older_told or self._on_older is None:
+            return
+        self._older_told = True
+        try:
+            self._on_older()
+        except Exception:
+            log.debug("together: an older member not told", exc_info=True)
 
     def _await_first_poll(self) -> None:
         end = time.monotonic() + self.FIRST_POLL_WAIT
@@ -1142,7 +1291,8 @@ class Link:
                 try:
                     now = relay.post(blob)
                 except RelayError as e:
-                    if e.kind in ("bad", "full", "modified") or attempt == self.SEND_TRIES - 1:
+                    if e.kind in ("bad", "full", "refused", "modified") \
+                            or attempt == self.SEND_TRIES - 1:
                         self._tell(e.kind)
                         break
                     time.sleep(1.0 + attempt)

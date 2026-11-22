@@ -253,8 +253,11 @@ is.
   told to a computer that has
   seen a later one (`counter`, `RoundResult.older`), and a copy last saved
   more than a month ago is not taken by a computer that joins until the
-  person says so (`saved_at`, `STALE_DAYS`); an old message out of its time
-  is not acted on (`Room.receive`).
+  person says so (`saved_at`, `STALE_DAYS`); nor make an old room
+  message new: a member since 1.6.11 is taken only from its first message
+  that names this computer's id for this stay in the room, whatever time
+  the relay says - after a restart too (`Room.receive`, `PROTO`); an older
+  member's message out of its time is not acted on.
 - Install anything: an update must be on a checksum list signed with a key
   that is never on the web server (`core/update_keys.py`,
   `selfupdate.signed_asset`), and the site mirrors a release's files only
@@ -343,7 +346,16 @@ computer, deleting the synced copy when asked, and starting again on one.
 
 **A room code** lets its holder into the room: the display names, what
 plays, and play, pause and seek for everyone, within bounds
-(`MEMBERS_MAX`, `VER_JUMP`, never past a title's end). **The phone
+(`MEMBERS_MAX`, `VER_JUMP`, never past a title's end). **A room's id**
+without the code opens nothing since 1.6.11: every request to the relay
+carries the room's credential (`together.auth_of`, `AUTH_HEADER`: HKDF of
+the stretched code under a label of its own), of which the relay keeps
+only a SHA-256; the first request binds the room, and from then on a
+request without it - a message, a seat, reading the sealed messages,
+leaving - is turned down, compared in constant time (`donate/together.py`,
+`Relay._admit`). The relay also holds a room to `MAX_MEMBERS` seats,
+`MAX_PER_MINUTE` messages a member, `ROOMS_PER_ADDR` rooms an address has
+made (an IPv6 address by its /64), 2 KB a message and a day's life. **The phone
 remote's address** is the remote for whoever is on the home network with
 it; New address shuts out every phone that had the old one. **Server
 mode's playlist** carries its token, which watches but changes nothing: [below](#server-modes-playlist-token-lets-a-device-watch-all-it-serves).
@@ -877,10 +889,29 @@ the sealed messages and the addresses they come from - so who is in a room
 with whom, and when. It keeps rooms in memory only and logs nothing
 (`donate/together.py`; the site's privacy policy). Whoever has the code is
 in the room: a code is 10 characters (about 50 bits, 600 000 PBKDF2 rounds
-before the relay could test a guess); 1.6.7's codes of 8 and 1.6.8's
-unsigned members are refused.
+before the relay could test a guess - from the room id or from the hash of
+the room's credential alike); 1.6.7's codes of 8 and 1.6.8's unsigned
+members are refused.
 
-*Why:* a relay has to know where to pass a message on.
+What the credential leaves:
+
+- A room only apps before 1.6.11 use is not bound: its id is all it takes
+  to post or read there, as before. Once a newer member binds it, the
+  older ones already seated keep their seat while they keep asking; an
+  older one who comes later is turned down - their app says the room is
+  full - and the others are told once that someone on an older app was
+  left out (`Polled.older`).
+- Whoever learns a room's id while the relay does not keep the room -
+  before its first request, or once it was forgotten - could bind it
+  first. The members are then turned down, are told so
+  (`together_refused`), and start a new room.
+- An older member's messages are judged by time alone (`JOIN_SLACK_MS`):
+  after a restart, a relay that says the wrong time could hand an old
+  message of theirs again.
+
+*Why:* a relay has to know where to pass a message on; it cannot check
+what it cannot open, and it cannot tell an older app from someone without
+the code.
 
 ### The sync server can hold a copy back
 

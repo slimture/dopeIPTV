@@ -2001,6 +2001,7 @@
   "together_left_room": "Sei uscito dalla stanza. Gli altri continuano a guardare.",
   "together_private_left": "Sei uscito dalla stanza di Guarda insieme: la visione privata è attiva.",
   "together_full": "La stanza è piena – ci sono già {most} persone.",
+  "together_refused": "dopeiptv.org non ti fa entrare in quella stanza – la occupa qualcuno che non ha il suo codice. Crea una nuova stanza e condividi il suo codice.",
   "together_joined": "{name} è entrato",
   "together_left": "{name} è uscito",
   "together_older": "Qualcuno nella stanza usa una versione vecchia di dopeIPTV. I suoi messaggi non si possono verificare, quindi resta escluso finché non aggiorna.",

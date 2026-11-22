@@ -2001,6 +2001,7 @@
   "together_left_room": "Você saiu da sala. Os outros continuam assistindo.",
   "together_private_left": "Você saiu da sala de assistir junto: o modo privado está ligado.",
   "together_full": "A sala está cheia – já tem {most} pessoas nela.",
+  "together_refused": "O dopeiptv.org não deixa você entrar nessa sala – alguém sem o código dela a está ocupando. Crie uma sala nova e compartilhe o código dela.",
   "together_joined": "{name} entrou",
   "together_left": "{name} saiu",
   "together_older": "Alguém na sala usa uma versão antiga do dopeIPTV. As mensagens dessa pessoa não podem ser verificadas, então ela fica de fora até atualizar.",

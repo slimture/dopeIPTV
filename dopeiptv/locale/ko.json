@@ -2001,6 +2001,7 @@
   "together_left_room": "방에서 나갔습니다. 다른 사람들은 계속 시청합니다.",
   "together_private_left": "함께 보기 방에서 나갔습니다: 비공개 시청이 켜져 있습니다.",
   "together_full": "방이 가득 찼습니다 – 이미 {most}명이 있습니다.",
+  "together_refused": "dopeiptv.org가 이 방에 들여보내 주지 않습니다 – 코드가 없는 누군가가 이 방을 차지하고 있습니다. 새 방을 만들고 그 코드를 공유하세요.",
   "together_joined": "{name} 님이 참여했습니다",
   "together_left": "{name} 님이 나갔습니다",
   "together_older": "방에 있는 누군가가 이전 버전의 dopeIPTV를 쓰고 있습니다. 그 사람의 메시지는 확인할 수 없어 업데이트할 때까지 제외됩니다.",

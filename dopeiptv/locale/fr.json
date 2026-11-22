@@ -2001,6 +2001,7 @@
   "together_left_room": "Tu as quitté le salon. Les autres continuent de regarder.",
   "together_private_left": "Tu as quitté le salon « Regarder ensemble » : le visionnage privé est activé.",
   "together_full": "Ce salon est plein – il compte déjà {most} personnes.",
+  "together_refused": "dopeiptv.org ne vous laisse pas entrer dans ce salon – quelqu'un qui n'a pas son code l'occupe. Créez un nouveau salon et partagez son code.",
   "together_joined": "{name} a rejoint",
   "together_left": "{name} est parti",
   "together_older": "Quelqu'un dans le salon utilise une ancienne version de dopeIPTV. Ses messages ne peuvent pas être vérifiés : il reste à l'écart jusqu'à sa mise à jour.",
