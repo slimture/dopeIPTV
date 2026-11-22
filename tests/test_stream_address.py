@@ -365,6 +365,39 @@ def test_an_acestream_list_on_the_internet_plays_through_the_engine_here_and_not
         assert refusal(address, internet=True), address
 
 
+#: No host for one of the readers: FFmpeg opens such an address on this
+#: computer.
+NO_HOST = ("http://:8080/x", "http:///x", "https://:443/live.m3u8", "http://user@:80/x",
+           "http://u:p@/x", "rtsp://:554/cam", "rtsp://[]:554/s", "rtmp://:1935/app",
+           "mms://:1755/a", "http://\\@tv.example/x", "http://:8080|Referer=x")
+#: No host where it means "listen here": a socket of this computer's.
+LISTEN_HERE = ("udp://@:1234", "rtp://@:5000", "srt://:9000?mode=listener", "tcp://:1234?listen",
+               "rist://@:1968")
+
+
+def test_an_address_with_no_host_is_this_computer():
+    for address in NO_HOST + LISTEN_HERE:
+        assert stream_address.empty_host(address), address
+        assert refusal(address, internet=True), address
+        assert played(address, True, internet=True) == ""
+        assert stream_address.host_refusal(address) == stream_address.THIS_COMPUTER, address
+    # One no source could mean: refused from the home network and a playlist
+    # file too.
+    for address in NO_HOST:
+        assert refusal(address, remote=True) == "no host", address
+        assert refusal(address, remote=False) == "no host", address
+    # Listening here: a home source's or a playlist file's own to name.
+    for address in LISTEN_HERE:
+        assert refusal(address, remote=True) == "", address
+        assert refusal(address, remote=False) == "", address
+    # A host there, as ever.
+    for address in ("http://tv.example:8080/x", "udp://@239.0.0.1:1234", "rtsp://[fd00::5]:554/s",
+                    "http://u:p@tv.example/x", "rtmp://live.example/app playpath=x"):
+        assert not stream_address.empty_host(address), address
+    # A picture with no host, from a source on the internet: not fetched.
+    assert stream_address.picture_refusal("http://:8080/logo.png") == stream_address.THIS_COMPUTER
+
+
 def test_where_a_source_is_read_from_its_own_address_never_looked_up():
     for server in ("http://tv.example/get.php?username=u", "tv.example:8080", "https://abc.plex.direct:32400",
                    "http://8.8.8.8", "http://[2001:db8::1]/", "http://[bad"):

@@ -284,13 +284,45 @@ def _hosts(address: str) -> set[str]:
     return {h for h in found | more if h}
 
 
+#: Network schemes whose address with no host means "here": a socket this
+#: computer listens on (``udp://@:1234``, ``srt://:9000?mode=listener``,
+#: ``tcp://:1234?listen``) - a playlist file's or a home source's to name,
+#: this computer from a source on the internet. Any other network address
+#: without a host is no address at all, whoever lists it: FFmpeg opens one
+#: on this computer.
+_LISTEN = frozenset(("udp", "rtp", "srtp", "srt", "rist", "tcp", "tls"))
+
+
+def empty_host(address: str) -> bool:
+    """Whether *address* names no host for one of its readers
+    (_HOST_ENDS, urlsplit's): ``http://:8080/x``, ``http:///x``,
+    ``http://user@:80/``, ``rtsp://[]:554/``, ``udp://@:1234``."""
+    rest = address.partition("://")[2]
+    for ends in _HOST_ENDS:
+        cut = min((i for i in map(rest.find, ends) if i >= 0), default=len(rest))
+        part = rest[:cut].rpartition("@")[2]
+        if part.startswith("["):
+            close = part.find("]")
+            host = part[1:close] if close > 0 else part[1:]
+        else:
+            host = part.partition(":")[0]
+        if not host.strip():
+            return True
+    try:
+        return not (urlsplit(address).hostname or "").strip()
+    except ValueError:
+        return True
+
+
 def host_refusal(address: str, home: bool = False) -> str:
     """Why *address* names a host a source on the internet may not send the
     player to: THIS_COMPUTER (loopback however it is spelt, localhost, this
-    computer's own name, 0.0.0.0) or LINK_LOCAL (169.254/16, fe80::/10, a
-    cloud's metadata service), and with *home* HOME (a device of the home
-    network: _home_kind); "" for any other host. Read as written, never
-    looked up."""
+    computer's own name, 0.0.0.0 - and no host at all, ``empty_host``, which
+    FFmpeg opens here) or LINK_LOCAL (169.254/16, fe80::/10, a cloud's
+    metadata service), and with *home* HOME (a device of the home network:
+    _home_kind); "" for any other host. Read as written, never looked up."""
+    if "://" in address and empty_host(address):
+        return THIS_COMPUTER
     hosts = _hosts(address)
     kinds = {_host_kind(h) for h in hosts}
     for kind in (THIS_COMPUTER, LINK_LOCAL):
@@ -391,6 +423,8 @@ def refusal(address: str, remote: bool = True, internet: bool = False,
         return f"{scheme}://{_device(address)}"
     if remote and scheme not in NETWORK:
         return f"{scheme}://" if scheme else "no network address"
+    if scheme in NETWORK and scheme not in _LISTEN and empty_host(address):
+        return "no host"            # whoever lists it: FFmpeg would open it here
     if not internet:
         return ""
     if scheme not in MEDIA:
