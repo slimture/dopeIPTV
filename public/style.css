@@ -421,8 +421,10 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
    muted one. Under a hairline one quiet line: the company with the
    copyright, and that no content comes with the app. One logo, dopeIPTV's:
    a second (Solecraft's) under it made two marks fight for the eye. On a
-   phone the brand goes over the groups, two columns of them (the app's
-   beside contact and legal), each link a finger's room. */
+   phone the brand goes over the groups, each group across the whole width
+   with its links in two even columns - the app's group beside contact and
+   legal had left half the column empty -, each link a finger's room and a
+   long word (German's) broken rather than run into its neighbour. */
 footer { background: var(--surface); padding: 44px 0 32px; margin-top: 24px; }
 footer .foot-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: 32px 48px; align-items: start; }
@@ -449,10 +451,11 @@ footer .foot-company a:hover { color: var(--accent); }
 @media (max-width: 720px) {
   footer { padding: 36px 0 30px; }
   footer .foot-top { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-  footer .foot-cols { grid-template-columns: 1fr 1fr; gap: 22px 24px; width: 100%; }
-  footer .foot-col:first-child { grid-row: span 2; }
-  footer .foot-col ul { gap: 2px; }
-  footer .foot-col a { display: inline-block; padding: 8px 0; font-size: 15px; }
+  footer .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 20px; width: 100%; }
+  footer .foot-h { margin-bottom: 4px; }
+  footer .foot-col ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  footer .foot-col a { display: inline-block; max-width: 100%; padding: 8px 0; font-size: 15px;
+    overflow-wrap: anywhere; hyphens: auto; }
   footer .foot-base { margin-top: 28px; }
 }
 
