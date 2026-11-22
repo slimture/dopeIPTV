@@ -148,7 +148,6 @@ def _folder_refusal(name: str) -> str:
     return ""
 
 
-
 def send_to_running(command: dict, timeout_ms: int = 800) -> bool:
     """Hand *command* to the copy running; False when there is none (or
     Qt's network library could not load, UNAVAILABLE)."""

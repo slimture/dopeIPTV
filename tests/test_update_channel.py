@@ -237,6 +237,22 @@ def test_the_window_notes_a_switch_from_test_builds_to_releases(left, tmp_path):
     assert s.value(K_LEFT_NIGHTLY) is None
 
 
+def test_the_window_notes_the_switch_as_it_reads_the_channel(left, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.ui import mw_updates
+    monkeypatch.setattr(mw_updates, "VERSION", "1.4.0.12")
+    monkeypatch.setattr(mw_updates.channel_seen, "__defaults__", ("1.4.0.12",))
+    win = SimpleNamespace(settings=QSettings(str(tmp_path / "w.ini"), QSettings.Format.IniFormat))
+    win.settings.setValue("update_channel", "nightly")
+    assert mw_updates._UpdatesMixin._update_channel(win) == "nightly"
+    win.settings.setValue("update_channel", "stable")              # Settings' switch
+    assert mw_updates._UpdatesMixin._update_channel(win) == "stable"
+    assert updates.left_nightly("1.4.0.12") and offered("v1.4.0", "1.4.0.12", "stable")
+
+
 def test_a_test_build_comes_from_the_site_too_fetched_through_it(github):
     github["site"] = site_json("1.4.0")
     github["site_nightly"] = site_json("1.4.0.16", names=("x86_64.AppImage", "windows-x64-setup.exe"))

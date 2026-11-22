@@ -144,6 +144,10 @@ def test_the_whole_server_has_a_budget_beside_each_address_s():
         assert not lim3.failed("127.0.0.1") and not lim3.failed("::1")
     assert lim3.blocked("192.168.1.20") and not lim3.blocked("192.168.1.21")
     assert not lim3.blocked("127.0.0.1") and not lim3.blocked("::1")
+    for me in ("127.0.0.1", "127.0.0.5", "::1", "::ffff:127.0.0.1"):
+        assert phone_remote.this_computer(me), me
+    for other in ("192.168.1.20", "::ffff:192.168.1.20", "fe80::1%eth0", "", "nope"):
+        assert not phone_remote.this_computer(other), other
 
 
 def test_the_whole_budget_never_bothers_real_phones():

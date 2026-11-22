@@ -304,9 +304,12 @@ def cross_site(headers: Any, host: str | None = None) -> bool:
 def this_computer(who: str) -> bool:
     """Whether *who* is this computer (loopback, however it is written)."""
     try:
-        return ipaddress.ip_address(who.split("%", 1)[0]).is_loopback
+        ip = ipaddress.ip_address(who.split("%", 1)[0])
     except ValueError:
         return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped.is_loopback
+    return ip.is_loopback
 
 
 class RateLimiter:

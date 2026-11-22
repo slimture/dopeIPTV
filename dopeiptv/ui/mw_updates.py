@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QThread, QTimer
 from PyQt6.QtWidgets import (
     QApplication, QFrame, QHBoxLayout, QLabel, QPushButton,
 )
@@ -127,10 +127,13 @@ class _UpdatesMixin:
         and a switch from one to the other noted (channel_seen)."""
         ch = self.settings.value("update_channel", "stable")
         channel = "nightly" if ch == "nightly" else "stable"
-        try:
-            channel_seen(self.settings, channel)
-        except Exception:
-            log.debug("update: the channel's switch not noted", exc_info=True)
+        app = QApplication.instance()
+        if app is None or QThread.currentThread() is app.thread():
+            # Noted on the window's thread only (the update's worker asks too).
+            try:
+                channel_seen(self.settings, channel)
+            except Exception:
+                log.debug("update: the channel's switch not noted", exc_info=True)
         return channel
 
     def _maybe_check_updates(self) -> None:
