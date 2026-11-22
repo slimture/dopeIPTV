@@ -740,3 +740,58 @@ def test_a_real_encrypted_hls_recording_through_the_alias(hls, tmp_path, monkeyp
                             "-of", "csv=p=0", job["path"]], capture_output=True, text=True, timeout=60)
     assert "mpeg2video" in probe.stdout
     assert os.path.getsize(job["path"]) > 20_000
+
+
+def test_a_real_https_hls_recording_the_bridge_checks(tmp_path, monkeypatch, fresh_bridges):
+    """An https list the recorder reads through an alias: the bridge makes
+    the TLS connection, checks the certificate as the player would (here
+    against the test's own authority) and carries whole segments over it."""
+    from dopeiptv.core import nerd, recording
+    from tests.test_net_advanced import _make_ca, _make_signed
+    ff = shutil.which("ffmpeg")
+    if ff is None:
+        pytest.skip("needs ffmpeg")
+    work = tmp_path / "make"
+    work.mkdir()
+    made = subprocess.run(
+        [ff, "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i",
+         "testsrc=duration=3:size=640x360:rate=25", "-c:v", "mpeg2video", "-b:v", "3M",
+         "-f", "mpegts", str(work / "sample.ts")], capture_output=True, timeout=120, check=False)
+    if made.returncode:
+        pytest.skip("this ffmpeg cannot make the sample")
+    subprocess.run([ff, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", str(work / "sample.ts"),
+                    "-c", "copy", "-f", "hls", "-hls_time", "1", "-hls_list_size", "0",
+                    str(work / "index.m3u8")], capture_output=True, timeout=120, check=True)
+    routes = {f"/live/u/p/{f.name}": (200, {"Content-Type": "video/mp2t"}, f.read_bytes())
+              for f in work.glob("*.ts") if f.name != "sample.ts"}
+    routes["/live/u/p/index.m3u8"] = (200, {"Content-Type": "application/vnd.apple.mpegurl"},
+                                      (work / "index.m3u8").read_bytes())
+    assert max(len(b) for _c, _h, b in routes.values()) > 64_000      # many TLS records
+    ca = _make_ca(tmp_path)
+    srv = Server(routes, tls=_make_signed(tmp_path, ca, "cdn.example", "c"))
+    real = socket.getaddrinfo
+
+    def resolve(host, *a, **kw):
+        return real("127.0.0.1" if host == "cdn.example" else host, *a, **kw)
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    monkeypatch.setattr(net_bridge, "place_of", lambda _ip: "")         # the server: the internet
+    monkeypatch.setattr(nerd, "ca_file", lambda: ca[0])                 # the authorities the player has
+    try:
+        rm = _manager(tmp_path, "rechttps", [{"id": "p1", "kind": "m3u", "name": "P",
+                                              "server": "https://cdn.example/list.m3u",
+                                              "options": {}}])
+        monkeypatch.setattr(recording.RecordingManager, "recorder",
+                            staticmethod(lambda: ("ffmpeg", ff)))
+        job = {"id": "s", "url": f"https://cdn.example:{srv.port}/live/u/p/index.m3u8",
+               "title": "S", "stop": None, "status": "scheduled", "start": time.time(),
+               "source": "p1"}
+        rm.jobs = [job]
+        rm._spawn(job)
+        bridge, alias = job["_alias"]
+        assert bridge._alias_of(urlsplit(alias).hostname[:48]).trust == net_bridge.CHECKED
+        assert job["proc"].wait(120) == 0
+        assert len(srv.seen) == len(routes)
+        segments = sum(len(b) for p, (_c, _h, b) in routes.items() if p.endswith(".ts"))
+        assert os.path.getsize(job["path"]) > segments * 0.9
+    finally:
+        srv.close()
