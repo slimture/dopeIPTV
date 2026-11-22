@@ -28,28 +28,16 @@ import transparency  # noqa: E402
 #: Names the next release adds to a part's code, shown when the app has them
 #: (a block taken by its lines gets them in its first named companion).
 #: At the release they move into transparency.CODE, and its tests into
-#: transparency.TESTS (1.6.11: test_an_old_frame_handed_again_after_a_
-#: restart_is_ignored_whatever_the_relays_clock, test_the_rooms_credential_
-#: comes_from_the_stretched_code_and_is_none_of_the_others).
-NEXT = {
-    ("sync", "send"): ["auth_of", "AUTH_HEADER", "Remote.of"],
-    ("updates", "signed"): ["_HOPS", "DOWNLOAD_MAX", "_get_https"],
-    ("together", "key"): ["_stretched", "AUTH_HEADER", "auth_of"],
-    ("together", "replay"): ["PROTO", "Room.hello", "Room._prove", "Room._answer", "Room._not_yet"],
-}
+#: transparency.TESTS - 1.6.11's did.
+NEXT: dict[tuple[str, str], list[str]] = {}
 
 #: Names the next release takes out of a part's code, left out when the app
-#: no longer has them (1.6.9: old room codes refused, so no old rounds).
-GONE = {
-    ("together", "key"): ["OLD_STRETCH"],
-}
+#: no longer has them.
+GONE: dict[tuple[str, str], list[str]] = {}
 
 #: Excerpts whose markers the next release no longer has: (part, block,
 #: file, a marker still there in the released code, the names to show instead).
-MOVED = [
-    ("together", "replay", "dopeiptv/core/together.py", r"self\._last_n\[msg\.sender\] = msg\.n",
-     ["Identity", "encode", "open_message", "Room.receive"]),
-]
+MOVED: list[tuple[str, str, str, str, list[str]]] = []
 
 #: The rest of the app: what to ask, and the files to read (at the commit).
 WHOLE = [
