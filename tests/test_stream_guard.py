@@ -472,33 +472,38 @@ def _no_bridge(*_a, **_k):
     raise OSError("no port to bind")
 
 
-def test_guard_for_child_env_and_the_bridges_kept(monkeypatch):
-    monkeypatch.setattr(net_bridge, "_bridges", type(net_bridge._bridges)())
+@pytest.fixture
+def fresh_bridges(monkeypatch):
+    """The bridges kept by bridge_for, this test's own and closed after it."""
+    kept = type(net_bridge._bridges)()
+    monkeypatch.setattr(net_bridge, "_bridges", kept)
+    yield kept
+    for b in list(kept.values()):
+        b.close()
+
+
+def test_guard_for_child_env_and_the_bridges_kept(monkeypatch, fresh_bridges):
     monkeypatch.setattr(net_bridge, "MAX_BRIDGES", 3)
-    try:
-        src = {"_kind": "m3u", "_server": "http://provider.example/list.m3u"}
-        b = net_bridge.guard_for(src, "http://provider.example/live/1.m3u8")
-        assert b is not None and b.policy.internet and not b.route.active
-        assert net_bridge.guard_for(src, "http://provider.example/live/2.m3u8") is b
-        assert net_bridge.guard_for(src, "rtsp://provider.example/x") is None
-        env = net_bridge.child_env(b)
-        assert env == {"http_proxy": b.address, "no_proxy": ""} and net_bridge.child_env(None) == {}
-        held = b.alias("http://provider.example/live/1.m3u8")
-        others = [net_bridge.guard_for(src, f"http://cdn{i}.example/x.ts") for i in range(4)]
-        # The one used longest ago that holds no alias goes first; one
-        # whose alias a recorder reads stays.
-        assert not b.closed and others[0].closed and len(net_bridge._bridges) == 3
-        assert _get(b, held).startswith(b"HTTP/1.1 ")
-        # The in-app player's: the same bridge's address, key and all; none
-        # for what is no http(s) address (it plays as it always did).
-        assert net_bridge.proxy_for(src, "http://provider.example/live/1.m3u8") == b.address
-        assert net_bridge.proxy_for(src, "udp://@239.0.0.1:1234") == ""
-        monkeypatch.setattr(net_bridge, "Bridge", _no_bridge)
-        assert net_bridge.guard_for(src, "http://elsewhere.example/1.ts") is None
-        assert net_bridge.proxy_for(src, "http://elsewhere.example/1.ts") == ""
-    finally:
-        for kept in list(net_bridge._bridges.values()):
-            kept.close()
+    src = {"_kind": "m3u", "_server": "http://provider.example/list.m3u"}
+    b = net_bridge.guard_for(src, "http://provider.example/live/1.m3u8")
+    assert b is not None and b.policy.internet and not b.route.active
+    assert net_bridge.guard_for(src, "http://provider.example/live/2.m3u8") is b
+    assert net_bridge.guard_for(src, "rtsp://provider.example/x") is None
+    env = net_bridge.child_env(b)
+    assert env == {"http_proxy": b.address, "no_proxy": ""} and net_bridge.child_env(None) == {}
+    held = b.alias("http://127.0.0.1:9/live/1.m3u8")
+    others = [net_bridge.guard_for(src, f"http://cdn{i}.example/x.ts") for i in range(4)]
+    # The one used longest ago that holds no alias goes first; one
+    # whose alias a recorder reads stays.
+    assert not b.closed and others[0].closed and len(net_bridge._bridges) == 3
+    assert _get(b, held).startswith(b"HTTP/1.1 502 ")           # still answering, still guarding
+    # The in-app player's: the same bridge's address, key and all; none
+    # for what is no http(s) address (it plays as it always did).
+    assert net_bridge.proxy_for(src, "http://provider.example/live/1.m3u8") == b.address
+    assert net_bridge.proxy_for(src, "udp://@239.0.0.1:1234") == ""
+    monkeypatch.setattr(net_bridge, "Bridge", _no_bridge)
+    assert net_bridge.guard_for(src, "http://elsewhere.example/1.ts") is None
+    assert net_bridge.proxy_for(src, "http://elsewhere.example/1.ts") == ""
 
 
 # -- what a recorder is handed ---------------------------------------------------
@@ -682,7 +687,6 @@ def _record_for_real(tmp_path, monkeypatch, provider, kind, name):
     exe = shutil.which(kind)
     if exe is None:
         pytest.skip(f"needs {kind}")
-    monkeypatch.setattr(net_bridge, "_bridges", type(net_bridge._bridges)())
     # A source on the internet: its own server is a public name.
     rm = _manager(tmp_path, name, [{"id": "p1", "kind": "m3u", "name": "P",
                                     "server": "http://provider.example/list.m3u", "options": {}}])
@@ -718,7 +722,8 @@ def _record_for_real(tmp_path, monkeypatch, provider, kind, name):
 
 
 @pytest.mark.parametrize("kind", ["ffmpeg", "mpv"])
-def test_a_real_encrypted_hls_recording_through_the_alias(hls, tmp_path, monkeypatch, kind):
+def test_a_real_encrypted_hls_recording_through_the_alias(hls, tmp_path, monkeypatch, kind,
+                                                          fresh_bridges):
     provider, inside = hls
     job, bridge = _record_for_real(tmp_path, monkeypatch, provider, kind, f"recreal{kind}")
     paths = [s["path"] for s in provider.seen]
