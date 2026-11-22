@@ -63,6 +63,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import hashlib
 import importlib.util
 import re
 import sys
@@ -75,7 +76,7 @@ from typing import Any, Callable, cast
 from PyQt6.QtCore import QObject, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-from ..core import nerd
+from ..core import nerd, privacy
 from ..core.log import log, redact, redact_url
 from ..i18n import LocalizedError, tr
 from ..providers import airplay_bridge as ab
@@ -95,6 +96,7 @@ DETECT_SETTLE_S = 3.0   # AVRouteDetector's first answer once it is on
 MENU_HINT_S = 8.0       # Apple's menu closed this long, and still no route
 PANEL_HIDE_S = 4.0      # on the Apple TV this long: the panel steps aside
 ERROR_LOG_MAX = 20      # AVFoundation error-log entries logged per cast
+SEEN_MAX = 256          # streams whose codecs this session remembers
 
 _NEEDS = ("objc", "Foundation", "AppKit", "AVFoundation", "AVKit")
 # AVPlayerItemStatus, AVPlayerTimeControlStatus
@@ -559,6 +561,10 @@ class AirPlayReceiver(QObject):
         self.duration = 0.0
         self.plan: ab.Plan | None = None
         self._req: dict[str, Any] = {}
+        #: What each stream cast this session was found to hold (its
+        #: address's hash -> codecs), in memory alone and never while
+        #: watching privately: a zap back to it needs no look into it.
+        self._seen: dict[str, list[str]] = {}
         self._offset = 0.0
         self._pos = 0.0
         self._volume, self._muted = 1.0, False
@@ -784,8 +790,20 @@ class AirPlayReceiver(QObject):
             # probed (when nothing is known) is the first piece.
             src = feed.first_url or src
         net, own = self._network(src)
-        p = ab.plan(url, src, req["codecs"], req["live"], req["track"],
+        codecs = list(req["codecs"])
+        p = ab.plan(url, src, codecs, req["live"], req["track"],
                     own or force_bridge or feed is not None)
+        found: dict[str, Any] | None = None
+        if codecs:
+            self._remember(url or src, codecs)
+        elif p.direct:
+            # Nothing known of what is in it (a zap, a cast from a list):
+            # HEVC in a provider's HLS plays on an Apple TV with a black
+            # picture (ab.plan), so it is looked into first.
+            codecs, found = self._look_into(p.url, url or src, net, req)
+            if codecs:
+                p = ab.plan(url, src, codecs, req["live"], req["track"],
+                            own or force_bridge or feed is not None)
         duration = req["duration"]
         if p.direct:
             self.bridge.stop()
@@ -814,8 +832,9 @@ class AirPlayReceiver(QObject):
                 p = replace(p, video=last.video, audio=last.audio, hevc=last.hevc,
                             adts=last.adts)
                 log.info("airplay: a seek in the same channel - its stream as before")
-            elif not req["codecs"] or force_bridge:
-                found = ab.probe(p.url, net, self.bridge.exe, headers=self._headers())
+            elif not codecs or force_bridge:
+                if found is None:
+                    found = ab.probe(p.url, net, self.bridge.exe, headers=self._headers())
                 p = ab.refine(p, found)
                 if not duration and found["duration"] > 0 \
                         and req["live"] is not True:
@@ -836,10 +855,45 @@ class AirPlayReceiver(QObject):
         self._open_blocking(target, offset, seek_to)
         # Only once the player has it: until then the strip asks about the
         # stream still playing.
-        self._req = dict(req, codecs=req["codecs"], settle=False)
+        self._req = dict(req, codecs=codecs, settle=False)
         self.plan = p
         self.duration = 0.0 if p.live else duration
         self._gui("row")
+
+    def _remember(self, address: str, codecs: list[str]) -> None:
+        if not address or not codecs or privacy.playing_private():
+            return
+        key = hashlib.sha256(address.encode("utf-8", "replace")).hexdigest()
+        self._seen.pop(key, None)
+        self._seen[key] = list(codecs)
+        while len(self._seen) > SEEN_MAX:
+            self._seen.pop(next(iter(self._seen)))
+
+    def _look_into(self, target: str, address: str, net: list[str],
+                   req: dict[str, Any]) -> tuple[list[str], dict[str, Any] | None]:
+        """What the stream at *target* holds - remembered from this session,
+        else asked of ffmpeg - as codecs ([] when it cannot be told) and
+        ffmpeg's answer (None when remembered). On a zap the stream on the
+        TV lets go first: paused, a moment for the provider, then the look -
+        one connection to the account at a time."""
+        key = hashlib.sha256((address or "").encode("utf-8", "replace")).hexdigest()
+        known = self._seen.get(key)
+        if known:
+            log.info("airplay: the stream is %s, as cast before", ",".join(known))
+            return list(known), None
+        if req.get("settle"):
+            if self.bridge.running():
+                self.bridge.stop()
+            done = threading.Event()
+            self._gui("let_go", done)
+            done.wait(OPEN_WAIT_S)
+            time.sleep(SETTLE_S)
+            req["settle"] = False           # let go once: not again before the bridge
+        found = ab.probe(target, net, self.bridge.exe, headers=self._headers())
+        codecs = [c for c in [str(found.get("video") or "")]
+                  + [str(a) for a in found.get("audio") or []] if c]
+        self._remember(address, codecs)
+        return codecs, found
 
     def _open_blocking(self, target: str, offset: float, seek_to: float) -> None:
         box: dict[str, Any] = {}
@@ -878,6 +932,15 @@ class AirPlayReceiver(QObject):
                 return
             if name == "close":
                 self._close()
+                return
+            if name == "let_go":
+                # The stream on the TV stops asking the provider: paused,
+                # the route and the window kept for the next one.
+                try:
+                    if self._player is not None:
+                        self._player.pause()
+                finally:
+                    arg.set()
                 return
             if name == "row":
                 self._show_row()

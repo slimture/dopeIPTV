@@ -997,6 +997,73 @@ def test_the_airplay_window_floats_over_the_app_only_while_it_is_in_front(qapp, 
     rx.stop()
 
 
+def test_a_zap_to_an_unknown_stream_looks_into_it_once_the_tv_let_go(
+        qapp, macos, fake_ffmpeg, monkeypatch):
+    """A zap knows nothing of the next channel. HEVC in a provider's HLS
+    plays on an Apple TV with a black picture, so the stream is looked
+    into first - after the TV has paused the last one and the provider had
+    its moment, so the account sees one connection at a time - and HEVC
+    goes through the bridge. A channel cast before is not looked into
+    again; one watched privately is not remembered."""
+    from dopeiptv.core import privacy
+    am, _ = macos
+    seen = fake_ffmpeg(4, "live")
+    monkeypatch.setattr(am, "SETTLE_S", 0.0)
+    what = {"http://p/live/u/pw/1.m3u8": "h264", "http://p/live/u/pw/2.m3u8": "hevc",
+            "http://p/live/u/pw/3.m3u8": "h264"}
+    order, probed = [], []
+
+    def probe(url, *a, **k):
+        probed.append(url)
+        order.append(("probe", _plays(_Player.made[-1])[-1:] if _Player.made else []))
+        return {"video": what[url], "audio": ["aac"], "duration": 0.0}
+
+    monkeypatch.setattr(am.ab, "probe", probe)
+    rx = am.AirPlayReceiver()
+    rx.bridge.exe = sys.executable
+    rx.context = lambda: {"kind": "live"}
+    out = {}
+
+    def cast(url, settle=False):
+        def run():
+            try:
+                out["name"] = rx.cast(am.NAME, url, "TV", settle=settle)
+            except Exception as e:                 # pragma: no cover
+                out["error"] = e
+        out.clear()
+        t = threading.Thread(target=run)
+        t.start()
+        while t.is_alive():
+            _pump(qapp, 0.02)
+        assert out.get("name") == am.NAME, out
+
+    cast("http://p/live/u/pw/1.m3u8")
+    p = _Player.made[-1]
+    assert probed == ["http://p/live/u/pw/1.m3u8"] and not rx.bridged()
+    assert p.item.url == "http://p/live/u/pw/1.m3u8"     # H.264: the TV fetches it
+    p.route(True)
+    _pump(qapp)
+    _settle(am, rx)
+    assert _plays(p)[-1] == "play"
+    cast("http://p/live/u/pw/2.m3u8", settle=True)       # a zap to HEVC
+    assert order[-1] == ("probe", ["pause"])             # the TV let go first
+    assert rx.bridged() and rx.plan.hevc and rx.plan.video == "copy"
+    assert seen["plan"].hevc and p.item.url == rx.bridge.url
+    assert len(_Player.made) == 1 and len(_NSPanel.made) == 1
+    cast("http://p/live/u/pw/1.m3u8", settle=True)       # back: known, not looked into
+    assert probed == ["http://p/live/u/pw/1.m3u8", "http://p/live/u/pw/2.m3u8"]
+    assert not rx.bridged() and p.item.url == "http://p/live/u/pw/1.m3u8"
+    cast("http://p/live/u/pw/2.m3u8", settle=True)       # HEVC known: the bridge
+    assert len(probed) == 2 and rx.bridged() and rx.plan.hevc
+    # Watched privately: looked into, never remembered.
+    monkeypatch.setattr(privacy, "playing_private", lambda: True)
+    cast("http://p/live/u/pw/3.m3u8", settle=True)
+    cast("http://p/live/u/pw/3.m3u8", settle=True)
+    assert probed[2:] == ["http://p/live/u/pw/3.m3u8"] * 2
+    assert all(len(k) == 64 and "u/pw" not in k for k in rx._seen)
+    rx.stop()
+
+
 def test_a_zap_through_the_bridge_stops_the_old_ffmpeg_first(
         qapp, macos, fake_ffmpeg, monkeypatch):
     am, _ = macos
