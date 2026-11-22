@@ -1009,7 +1009,9 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
         says what the page showed stays unstored (an untouched window
         changes nothing)."""
         for key, value in values().items():
-            if settings.value(key) is None and value == shown[key]:
+            # A key the page did not hold as it was built (the tuner's
+            # mode, once chosen) is written as it now is.
+            if settings.value(key) is None and value == shown.get(key):
                 continue
             put(key, value)
 
