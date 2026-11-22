@@ -24,6 +24,12 @@ class _Settings(dict):
     def setValue(self, key, value):
         self[key] = value
 
+    def contains(self, key):
+        return key in self
+
+    def remove(self, key):
+        self.pop(key, None)
+
 
 def test_the_two_heart_themes_are_their_own():
     assert set(HEARTS) <= set(THEMES)
@@ -206,3 +212,24 @@ def test_the_icon_is_picked_in_settings_and_shown_live():
     out = subprocess.run([sys.executable, "-c", _WINDOW], cwd=_REPO_ROOT, env=env,
                          capture_output=True, text=True, timeout=180)
     assert "WINDOW_OK" in out.stdout, out.stdout + out.stderr[-3000:]
+
+
+def test_1_6_10s_heart_switch_is_kept_as_the_pickers_heart():
+    """Turned on by hand in 1.6.10, the heart stays after the update; off,
+    never touched, or with a choice already made, nothing changes - and the
+    old switch goes either way."""
+    from dopeiptv.ui import app_icon
+    for before, after in (({"heart_icon": "true"}, "heart"),
+                          ({"heart_icon": "false"}, "classic"),
+                          ({}, "classic"),
+                          ({"heart_icon": "true", "app_icon": "forest"}, "forest"),
+                          ({"supporter_icon": "true", "supporter_key": "DS1-x"}, "classic")):
+        s = _Settings(before)
+        app_icon.carry_over(s)
+        assert app_icon.chosen(s) == after, (before, dict(s))
+        assert "heart_icon" not in s
+
+    class Broken:
+        def value(self, *_a, **_k):
+            raise RuntimeError("unreadable")
+    app_icon.carry_over(Broken())                    # never raises

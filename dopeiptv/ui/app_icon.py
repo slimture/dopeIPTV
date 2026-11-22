@@ -213,6 +213,24 @@ def platform_icon(look: str = "", accent: str = "") -> QIcon:
         look=look, accent=accent)
 
 
+#: 1.6.10's switch for the heart icon (Settings > General), read once.
+OLD_SWITCH = "heart_icon"
+
+
+def carry_over(settings) -> None:
+    """1.6.10's heart switch, turned on by hand, becomes the picker's heart
+    - a choice made is kept - and the switch goes. Nothing else from before
+    picks an icon: a supporter key never does."""
+    try:
+        if (str(settings.value(OLD_SWITCH, "") or "") == "true"
+                and not settings.contains(SETTING)):
+            settings.setValue(SETTING, "heart")
+        if settings.contains(OLD_SWITCH):
+            settings.remove(OLD_SWITCH)
+    except Exception as e:
+        log.warning("app icon: 1.6.10's switch not carried over: %s", e)
+
+
 def chosen(settings) -> str:
     """The icon to show, a key of LOOKS: the one picked, else - never
     picked, one not known, anything unreadable - the blue one."""

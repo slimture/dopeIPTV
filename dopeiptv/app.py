@@ -603,7 +603,10 @@ def main() -> int:
     from .core import profiles
     settings = profiles.ProfileSettings(ORG, ORG)
     # The supporter key and its icon switch are gone (1.6.11): what an older
-    # app kept of them is removed from the settings file.
+    # app kept of them is removed from the settings file; 1.6.10's heart
+    # switch, turned on by hand, is the picker's heart (app_icon.carry_over).
+    from .ui import app_icon as _icon
+    _icon.carry_over(settings)
     for gone in ("supporter_key", "supporter_icon"):
         try:
             if settings.contains(gone):

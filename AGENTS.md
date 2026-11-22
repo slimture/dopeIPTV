@@ -460,7 +460,7 @@ map and the one-way import rule.
 | `ui/category_flags.py` | Bundled SVG flags for category names (flag emoji, "SE \| …" prefixes) |
 | `ui/player_resize.py` | The handle under the docked video that sets its height |
 | `ui/theme.py` | Theming engine |
-| `ui/app_icon.py` | The app's own icon - the blue tile with its white play by default, or the one picked on Settings > Appearance (`LOOKS`: the heart icon, the tile in the accent - `accent`, followed as it changes -, midnight, paper, ocean, forest, sunset, grape, round, a retro TV; `chosen`, `SETTING` `app_icon`, the household's; `draw_look`): drawn at every size, the window icon, on Linux the user's icon theme |
+| `ui/app_icon.py` | The app's own icon - the blue tile with its white play by default, or the one picked on Settings > Appearance (`LOOKS`: the heart icon, the tile in the accent - `accent`, followed as it changes -, midnight, paper, ocean, forest, sunset, grape, round, a retro TV; `chosen`, `SETTING` `app_icon`, the household's; `draw_look`; 1.6.10's heart switch turned on by hand kept as the heart, `carry_over`): drawn at every size, the window icon, on Linux the user's icon theme |
 
 ## Working with individual modules
 

@@ -60,7 +60,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   failed and rests for a moment is asked for again when the rest is over
   (`series_cards.ImageSource`, `LogoLoader.cooldown_left`).
 - Updating to 1.6.10 could switch the app to the heart icon by itself; the
-  icon is now the blue one until another is picked.
+  icon is now the blue one until another is picked. A heart turned on by
+  hand in 1.6.10 stays the heart.
 - The app could crash as Settings opened, before anything had played, on a
   system whose language writes numbers with a decimal comma (Swedish,
   German...) and that sets `LC_ALL`: Nerd's check of the mpv options made
