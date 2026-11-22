@@ -67,6 +67,13 @@ looked up for its own host (an HLS playlist's segments are often on another,
 a panel redirects to its load balancer). Without a route the bridge connects
 as the system does - it is there for the guard.
 
+**Through the person's own proxy** (Nerd's, ``upstream``): every connection
+goes through it - a tunnel (CONNECT) for https and for what the client
+tunnels, the absolute address for plain http, the proxy's login sent with
+each - and there the proxy connects: what is judged is the address as
+written (dest_guard's rule for a proxied connection too). An http proxy
+only; another (socks) is none the bridge can take.
+
 A pinned certificate cannot be read inside the tunnel (TLS 1.3 sends it
 encrypted). Before a tunnel to a pinned host opens, the bridge makes a TLS
 connection of its own to it and checks the fingerprint - again after
@@ -598,18 +605,54 @@ def _is_ip(host: str) -> bool:
     return net_route.is_ip(host)
 
 
+@dataclass(frozen=True)
+class Upstream:
+    """An http proxy a bridge's connections go through (``upstream_of``)."""
+
+    host: str
+    port: int
+    login: bytes | None = None      # its Proxy-Authorization, from the address's login
+
+
+def upstream_of(proxy: str) -> Upstream | None:
+    """The http proxy at *proxy* (http://[user:password@]host[:port], Nerd's
+    as nerd.proxy gives it) as a bridge goes through it; None for "".
+    ValueError for one a bridge cannot go through (socks, https, no host)."""
+    text = str(proxy or "").strip()
+    if not text:
+        return None
+    parts = urlsplit(text if "://" in text else "http://" + text)
+    if parts.scheme.lower() != "http" or not parts.hostname:
+        raise ValueError("only an http:// proxy")
+    login = (_basic(unquote(parts.username), unquote(parts.password or ""))
+             if parts.username is not None else None)
+    return Upstream(_name(parts.hostname), parts.port or 8080, login)
+
+
+def _via(head: bytes, absolute: str, login: bytes | None) -> bytes:
+    """A request's *head* as a proxy takes it: *absolute* on its first line,
+    the proxy's login beside."""
+    line, _sep, rest = head.partition(b"\r\n")
+    method, _target, version = line.split(b" ", 2)
+    first = method + b" " + absolute.encode("latin-1") + b" " + version + b"\r\n"
+    return first + (b"Proxy-Authorization: " + login + b"\r\n" if login else b"") + rest
+
+
 class Bridge:
     """One route's and policy's proxy on 127.0.0.1. *cafile*: the
     authorities another host than the pinned one, and an alias's server the
     player would check, are checked against, in place of the system's and
     certifi's. *policy*: where its connections may land (HOME_POLICY - the
-    least any bridge checks - when none is given)."""
+    least any bridge checks - when none is given). *upstream*: the person's
+    http proxy every connection goes through (the module's docstring), ""
+    for none; ValueError for one it cannot go through."""
 
     def __init__(self, route: Route, cafile: str | None = None,
-                 policy: Policy | None = None) -> None:
+                 policy: Policy | None = None, upstream: str = "") -> None:
         self.route = route
         self.cafile = cafile
         self.policy = policy if policy is not None else HOME_POLICY
+        self._up = upstream_of(upstream)
         self._trust_ctx: ssl.SSLContext | None = None
         self._checked_ctx: ssl.SSLContext | None = None
         self._trust_ok: dict[tuple[str, int], float] = {}
@@ -754,10 +797,13 @@ class Bridge:
     def _open(self, host: str, port: int) -> socket.socket:
         """A connection to *host*:*port* on this bridge's route, where its
         policy lets it land: judged as written, then by the socket's peer
-        before a byte is sent (Guarded otherwise)."""
+        before a byte is sent (Guarded otherwise) - or, through the person's
+        proxy, a tunnel it opens there."""
         why = self.policy.written(host, port)
         if why:
             raise Guarded(host, port, why, self.policy.internet)
+        if self._up is not None:
+            return self._tunnel(host, port)
         sock = net_route.open_connection(self.route, host, port, CONNECT_TIMEOUT)
         try:
             peer = str(sock.getpeername()[0])
@@ -768,6 +814,39 @@ class Bridge:
         if why:
             sock.close()
             raise Guarded(host, port, why, self.policy.internet)
+        return sock
+
+    def _open_plain(self, host: str, port: int) -> tuple[socket.socket, bool]:
+        """For a plain http request to *host*:*port*: (the connection, whether
+        it is to the person's proxy - the request then goes there in its
+        absolute form, ``_via``)."""
+        if self._up is None:
+            return self._open(host, port), False
+        why = self.policy.written(host, port)
+        if why:
+            raise Guarded(host, port, why, self.policy.internet)
+        return socket.create_connection((self._up.host, self._up.port), CONNECT_TIMEOUT), True
+
+    def _tunnel(self, host: str, port: int) -> socket.socket:
+        """A tunnel to *host*:*port* through the person's proxy."""
+        up = self._up
+        if up is None:
+            raise Refused("no proxy to go through")
+        sock = socket.create_connection((up.host, up.port), CONNECT_TIMEOUT)
+        name = host if host.isascii() else host.encode("idna").decode("ascii")
+        target = f"{_shown(name)}:{port}"
+        try:
+            sock.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n".encode("ascii")
+                         + (b"Proxy-Authorization: " + up.login + b"\r\n" if up.login else b"")
+                         + b"\r\n")
+            got = _read_head(sock, CONNECT_TIMEOUT)
+            status = got[0].split(b" ", 2)[1:2] if got is not None else []
+            if got is None or not status or not status[0].startswith(b"2") or got[1]:
+                raise Refused(f"the proxy opened no tunnel to {target} "
+                              f"({status[0].decode('latin-1') if status else 'no answer'})")
+        except BaseException:
+            sock.close()
+            raise
         return sock
 
     def _peer_certificate(self, host: str, port: int) -> bytes:
@@ -834,12 +913,13 @@ class Bridge:
                 self._checked_ctx = cert_pin.trust_context(self.cafile or nerd.ca_file() or None)
             return self._checked_ctx
 
-    def _upstream(self, alias: Alias) -> socket.socket:
+    def _upstream(self, alias: Alias) -> tuple[socket.socket, bool]:
         """A connection to the server *alias* stands for - TLS made here for
-        an https one, with its own trust (Alias.trust)."""
-        sock = self._open(alias.host, alias.port)
+        an https one, with its own trust (Alias.trust) - and whether it is to
+        the person's proxy for a plain http request (``_open_plain``)."""
         if alias.scheme != "https":
-            return sock
+            return self._open_plain(alias.host, alias.port)
+        sock = self._open(alias.host, alias.port)
         name = None if _is_ip(alias.host) else alias.host
         try:
             if alias.trust == CHECKED:
@@ -857,7 +937,14 @@ class Bridge:
                 raise Refused(str(cert_pin.PinMismatch(alias.host, alias.port,
                                                        alias.pin or "", got)))
             cert_pin.clear_mismatch(alias.host, alias.port)
-        return tls
+        return tls, False
+
+    def _alias_request(self, alias: Alias, proxied: bool, method: str, real: str,
+                       version: str, fields: bytes, login: bytes | None = None) -> bytes:
+        head = alias_head(method, real, version, fields, alias, login)
+        if not proxied:
+            return head
+        return _via(head, f"http://{alias.netloc}{real}", self._up.login if self._up else None)
 
     def _serve_alias(self, client: socket.socket, method: str, target: str, version: str,
                      fields: bytes, rest: bytes) -> socket.socket | None:
@@ -872,9 +959,9 @@ class Bridge:
             _reply(client, 404, "no such stream")
             return None
         real = real_target(alias, u.path, u.query)
-        up = self._upstream(alias)
+        up, proxied = self._upstream(alias)
         try:
-            up.sendall(alias_head(method, real, version, fields, alias) + rest)
+            up.sendall(self._alias_request(alias, proxied, method, real, version, fields) + rest)
             if alias.user is None or method.upper() not in ("GET", "HEAD"):
                 return up
             # The login: basic went with the request; a 401 that asks for
@@ -893,9 +980,9 @@ class Bridge:
             up.close()
             raise
         up.close()
-        up = self._upstream(alias)
+        up, proxied = self._upstream(alias)
         try:
-            up.sendall(alias_head(method, real, version, fields, alias, login))
+            up.sendall(self._alias_request(alias, proxied, method, real, version, fields, login))
         except BaseException:
             up.close()
             raise
@@ -948,7 +1035,12 @@ class Bridge:
                 else:
                     host, port, request = origin_head(method, target, version, fields)
                     where = f"{_shown(host)}:{port}"
-                    up = self._open(host, port)
+                    up, proxied = self._open_plain(host, port)
+                    if proxied:
+                        u = urlsplit(target)
+                        absolute = u._replace(netloc=u.netloc.rsplit("@", 1)[-1],
+                                              fragment="").geturl()
+                        request = _via(request, absolute, self._up.login if self._up else None)
                     up.sendall(request)
             if rest:
                 up.sendall(rest)
@@ -980,7 +1072,7 @@ class Bridge:
                         pass
 
 
-_bridges: dict[tuple[Route, Policy], Bridge] = OrderedDict()
+_bridges: dict[tuple[Route, Policy, str], Bridge] = OrderedDict()
 _lock = threading.Lock()
 #: Bridges kept at once: one per route and policy - a source's stream host
 #: in it - in use this session. Past them the one used longest ago that
@@ -988,10 +1080,11 @@ _lock = threading.Lock()
 MAX_BRIDGES = 32
 
 
-def bridge_for(route: Route, policy: Policy | None = None) -> Bridge:
-    """The bridge for *route* and *policy* (HOME_POLICY when none), made
-    when there is none yet."""
-    key = (route, policy if policy is not None else HOME_POLICY)
+def bridge_for(route: Route, policy: Policy | None = None, upstream: str = "") -> Bridge:
+    """The bridge for *route*, *policy* (HOME_POLICY when none) and the
+    person's *upstream* proxy ("" none), made when there is none yet;
+    ValueError for a proxy a bridge cannot go through."""
+    key = (route, policy if policy is not None else HOME_POLICY, upstream)
     with _lock:
         b = _bridges.pop(key, None)
         if b is not None and not b.closed:
@@ -1000,8 +1093,9 @@ def bridge_for(route: Route, policy: Policy | None = None) -> Bridge:
         while len(_bridges) >= MAX_BRIDGES:
             idle = next((k for k, v in _bridges.items() if not v.aliases), None)
             _bridges.pop(idle if idle is not None else next(iter(_bridges))).close()
-        b = _bridges[key] = Bridge(route, policy=key[1])
-        log.info("net bridge on %s (%s; %s)", b.where, describe(route), key[1].describe())
+        b = _bridges[key] = Bridge(route, policy=key[1], upstream=upstream)
+        log.info("net bridge on %s (%s; %s%s)", b.where, describe(route), key[1].describe(),
+                 "; through a proxy" if upstream else "")
         return b
 
 
@@ -1055,20 +1149,26 @@ def child_env(bridge: Bridge | None) -> dict[str, str]:
     return recorder_env(bridge.address) if bridge is not None else {}
 
 
-def guard_for(source: dict | None, url: str, n: object = None) -> Bridge | None:
+def guard_for(source: dict | None, url: str, n: object = None,
+              proxy: str = "") -> Bridge | None:
     """The bridge for a stream of *source* (its options and kind as
     core/nerd.set_source keeps them - with ``_server``, make_client's form,
     where its server is) at *url*: its route (Nerd's, else none) and the
-    policy of where the source is, the stream's own host and port let in.
-    None when *url* is no http(s) address or the bridge cannot start: a
-    program the app starts must then not be given the address (a recording
-    fails, say why); the in-app player, which takes no arguments, may play
-    it as before."""
+    policy of where the source is, the stream's own host and port let in;
+    *proxy*: the person's http proxy it goes through (what the caller would
+    have handed the program as -http_proxy, nerd.proxy's), "" for none.
+    None when *url* is no http(s) address, *proxy* no http proxy, or the
+    bridge cannot start: a program the app starts must then not be given
+    the address (a recording fails, say why); the in-app player, which takes
+    no arguments, may play it as before."""
     if net_route.url_host(url) is None:
         return None
     route = net_route.route_for(source, n)
     try:
-        return bridge_for(route, policy_for(source, url))
+        return bridge_for(route, policy_for(source, url), proxy)
+    except ValueError as e:
+        log.warning("net bridge: not through that proxy (%s)", e)
+        return None
     except OSError as e:
         log.warning("net bridge: not started (%s)", e)
         return None

@@ -466,6 +466,46 @@ def test_an_https_alias_is_checked_as_the_player_checks_it(servers, bridges, tmp
     assert [s["path"] for s in nas.seen] == ["/live/1.m3u8", "/live/1.m3u8"]
 
 
+# -- through the person's own proxy (Nerd's) ---------------------------------------
+
+def test_through_the_persons_own_proxy(servers, bridges, tmp_path, monkeypatch):
+    """Every connection goes through it - plain http in its absolute form, a
+    tunnel otherwise, the proxy's login with each; the address as written is
+    still judged here, and what is refused never reaches the proxy."""
+    srv = servers({"/live/u/p/1.ts": (200, {}, TS), "/x": (200, {}, b"plain")})
+    proxy = bridges()                   # an http proxy that asks for its login: another bridge
+    chain = bridges(policy=Policy(internet=True, entry=("127.0.0.1", srv.port)),
+                    upstream=proxy.address)
+    assert _get(chain, chain.alias(f"http://u:pw@127.0.0.1:{srv.port}/live/u/p/1.ts")).endswith(TS)
+    assert srv.seen[0] == {"path": "/live/u/p/1.ts", "host": f"127.0.0.1:{srv.port}",
+                           "auth": "Basic " + base64.b64encode(b"u:pw").decode()}
+    assert _get(chain, f"http://127.0.0.1:{srv.port}/x").endswith(b"plain")
+    assert _ask(chain, f"CONNECT 127.0.0.1:{srv.port} HTTP/1.1\r\nHost: x\r\n\r\n").startswith(
+        b"HTTP/1.1 200 Connection established")
+    refused = _ask(chain, "GET http://127.0.0.1:9/ HTTP/1.1\r\nHost: x\r\n\r\n")
+    assert refused.startswith(b"HTTP/1.1 502 ") and b"this computer" in refused
+    assert chain.guarded == 1 and proxy.unkeyed == 0 and proxy.guarded == 0
+    # An https alias: a tunnel through the proxy, the TLS and its check here.
+    ca, signed, _own, _fp = _certs(tmp_path)
+    cdn = servers({"/live/1.m3u8": (200, {}, b"#EXTM3U cdn\n")}, tls=signed)
+    real = socket.getaddrinfo
+    monkeypatch.setattr(socket, "getaddrinfo",
+                        lambda host, *a, **kw: real("127.0.0.1" if host == "cdn.example" else host,
+                                                    *a, **kw))
+    monkeypatch.setattr(net_bridge, "place_of", lambda _ip: "")
+    secure = bridges(policy=Policy(internet=True), upstream=proxy.address, cafile=ca[0])
+    assert _get(secure, secure.alias(f"https://cdn.example:{cdn.port}/live/1.m3u8")).endswith(
+        b"#EXTM3U cdn\n")
+    # A proxy the bridge cannot go through: none, and no bridge for it.
+    for other in ("socks5://h.example:1080", "https://h.example:3128", "http://"):
+        with pytest.raises(ValueError):
+            net_bridge.upstream_of(other)
+    assert net_bridge.upstream_of("") is None
+    assert net_bridge.upstream_of("http://a%40b:p@px.example") == net_bridge.Upstream(
+        "px.example", 8080, b"Basic " + base64.b64encode(b"a@b:p"))
+    assert net_bridge.guard_for({}, "http://p.example/1.m3u8", proxy="socks5://h.example:1080") is None
+
+
 # -- the API for what the app starts -----------------------------------------------
 
 def _no_bridge(*_a, **_k):
@@ -594,6 +634,31 @@ def test_an_old_ffmpeg_reads_the_list_without_its_options(tmp_path, monkeypatch)
         "ffconcat version 1.0\nfile 'rtsp://h/it'\\''s'\noption rtsp_transport 'tcp'\n")
     assert recording.ffmpeg_major(shutil.which("ffmpeg") or "/nonexistent/ffmpeg") in (
         None, *range(3, 20))
+
+
+def test_a_recording_goes_through_nerds_proxy_as_the_player_does(tmp_path, monkeypatch,
+                                                                   fresh_bridges):
+    from dopeiptv.core import nerd, recording
+    from tests.test_net_advanced import S
+    rm = _manager(tmp_path, "recproxy")
+    monkeypatch.setattr(recording.subprocess, "Popen", lambda cmd, **_k: type(
+        "P", (), {"poll": lambda self: None, "args": cmd})())
+    monkeypatch.setattr(recording.RecordingManager, "recorder",
+                        staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
+    url = "http://p.example/live/u/p/1.m3u8"
+    try:
+        for proxy, through, alone in (("http://me:pw@10.0.0.1:3128", True, "true"),
+                                      ("socks5://10.0.0.1:1080", False, "true"),
+                                      ("http://10.0.0.1:3128", False, "false")):
+            nerd.install(S(nerd_enabled="true", nerd_proxy=proxy, nerd_proxy_player=alone))
+            job = {"url": url, "title": "T", "stop": None, "status": "scheduled"}
+            rm._spawn(job)
+            bridge = job["_alias"][0]
+            assert (bridge._up is not None) == through, proxy
+            assert not any("pw" in a or "10.0.0.1" in a for a in job["proc"].args)
+            rm._let_go(job)
+    finally:
+        nerd.install(S(nerd_enabled="false"))
 
 
 def test_no_bridge_no_recording(tmp_path, monkeypatch):

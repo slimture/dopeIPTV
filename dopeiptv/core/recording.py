@@ -1040,7 +1040,7 @@ class RecordingManager(QObject):
         env: dict[str, str] | None = None
         if web and not feed:
             from . import net_bridge
-            bridge = net_bridge.guard_for(src, url)
+            bridge = net_bridge.guard_for(src, url, proxy=self._proxy_for(src, url))
             try:
                 read = bridge.alias(url, src) if bridge is not None else ""
             except ValueError:
@@ -1131,6 +1131,23 @@ class RecordingManager(QObject):
             self._let_go(j)
             j["status"] = "failed"
             j["error"] = str(e)
+
+    @staticmethod
+    def _proxy_for(src: dict | None, url: str) -> str:
+        """Nerd's proxy for a stream the recorder reads through the bridge,
+        as the player and a recording's own connection take it (while
+        "streams through the proxy too" is on). The bridge goes through an
+        http proxy only: through another (socks) it connects itself, as the
+        recorder always did."""
+        from . import nerd, net_bridge
+        n = nerd.current()
+        proxy = n.proxy(src, url) if n.on and n.flag("nerd_proxy_player", True) else ""
+        try:
+            net_bridge.upstream_of(proxy)
+        except ValueError:
+            log.info("record: Nerd's proxy is no http proxy - the recorder's bridge connects itself")
+            return ""
+        return proxy
 
     @staticmethod
     def _not_started(j: dict, why: str) -> None:

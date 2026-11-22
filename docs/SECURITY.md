@@ -671,9 +671,11 @@ what a playlist names themselves, judged by the address as written
 (`core/stream_address.host_refusal`) - FFmpeg kept to a stream's protocols
 (`ffmpeg_protocols`), so what such a request can reach is a web service on
 this computer or the home network, not a file. A stream through Nerd's
-proxy is the proxy's to connect. An external player is the person's own
-program. The bridge's own connection to a source's server is the system's
-(or the route's) - it does not chain on to Nerd's proxy. Open work: the
+proxy is the proxy's to connect - the in-app player's goes to the proxy
+itself; a recorder's bridge goes through it as the player does (an http
+proxy: `net_bridge.upstream_of`; through a socks one the bridge connects
+itself, as the recorder always did), and there only the address as written
+is judged. An external player is the person's own program. Open work: the
 same bridge for those (`net_bridge.guard_for`, `child_env`), which puts a
 copy of each such stream through the app's process.
 
