@@ -130,6 +130,16 @@ def test_a_login_in_the_address_goes_as_the_servers_login():
     assert lines[-3:] == ["Connection: close", "", ""]
     with pytest.raises(ValueError):
         _alias("rtsp://h.example/x")
+    # Nothing that may hold a login in what an alias shows of itself.
+    shown = repr(_alias("http://us:p4ss@h.example/live/us/p4ss/1.m3u8?token=t0k"))
+    assert "p4ss" not in shown and "t0k" not in shown and "t" * 48 not in shown
+
+
+def test_a_name_outside_ascii_goes_as_a_browser_sends_it():
+    a = _alias("http://h.example/канал 1/ström.m3u8?q=ä b")
+    assert real_target(a, a.path) == "/%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB%201/str%C3%B6m.m3u8?q=%C3%A4%20b"
+    head = net_bridge.alias_head("GET", real_target(a, "/~/seg2.ts"), "HTTP/1.1", b"", a)
+    assert head.startswith(b"GET /%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB%201/seg2.ts HTTP/1.1\r\n")
 
 
 # -- where a connection may land ---------------------------------------------------

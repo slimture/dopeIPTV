@@ -118,8 +118,8 @@ import ssl
 import threading
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
-from urllib.parse import unquote, urlsplit
+from dataclasses import dataclass, field
+from urllib.parse import quote, unquote, urlsplit
 
 from . import cert_pin, dest_guard, doh, net_route, stream_address
 from .log import log
@@ -341,19 +341,20 @@ def _neutral(last: str) -> str:
 
 @dataclass(frozen=True)
 class Alias:
-    """What an alias stands for (``Bridge.alias``)."""
+    """What an alias stands for (``Bridge.alias``) - shown without what may
+    hold a login (its repr, in a traceback or a test's words)."""
 
-    token: str
+    token: str = field(repr=False)
     scheme: str
     host: str               # lower case, no brackets
     port: int
     netloc: str             # the Host header's: host and a port it named
-    dirs: tuple[str, ...]   # the real path's folders, as written
-    last: str               # its last part
-    neutral: str            # the alias's last part
-    query: str
-    user: str | None
-    password: str
+    dirs: tuple[str, ...] = field(repr=False)   # the real path's folders, as written
+    last: str = field(repr=False)               # its last part
+    neutral: str = ""                           # the alias's last part
+    query: str = field(default="", repr=False)
+    user: str | None = field(default=None, repr=False)
+    password: str = field(default="", repr=False)
     trust: str = CHECKED
     pin: str | None = None
 
@@ -364,6 +365,16 @@ class Alias:
     @property
     def address(self) -> str:
         return f"http://{self.token}{ALIAS_HOST}{self.path}"
+
+
+#: What stays as it is when a real address's path or query is written for a
+#: request line: printable ASCII; the rest (a non-ASCII name, a space) as
+#: UTF-8 in %XX, as a browser sends it.
+_KEPT = "".join(chr(c) for c in range(33, 127))
+
+
+def _ascii(text: str) -> str:
+    return quote(text, safe=_KEPT)
 
 
 def make_alias(url: str, token: str, trust: str = CHECKED, pin: str | None = None) -> Alias:
@@ -377,13 +388,13 @@ def make_alias(url: str, token: str, trust: str = CHECKED, pin: str | None = Non
     shown = host.encode("idna").decode("ascii") if not host.isascii() else host
     shown = f"[{shown}]" if ":" in shown else shown
     netloc = shown + (f":{port}" if port else "")
-    path = parts.path or "/"
+    path = _ascii(parts.path or "/")
     segs = (path[1:] if path.startswith("/") else path).split("/")
     user = unquote(parts.username) if parts.username is not None else None
     return Alias(token=token, scheme=scheme, host=host,
                  port=port or (443 if scheme == "https" else 80), netloc=netloc,
                  dirs=tuple(segs[:-1]), last=segs[-1], neutral=_neutral(segs[-1]),
-                 query=parts.query, user=user, password=unquote(parts.password or ""),
+                 query=_ascii(parts.query), user=user, password=unquote(parts.password or ""),
                  trust=trust, pin=pin)
 
 
@@ -611,7 +622,8 @@ class Upstream:
 
     host: str
     port: int
-    login: bytes | None = None      # its Proxy-Authorization, from the address's login
+    #: Its Proxy-Authorization, from the address's login (never shown).
+    login: bytes | None = field(default=None, repr=False)
 
 
 def upstream_of(proxy: str) -> Upstream | None:
@@ -1063,6 +1075,9 @@ class Bridge:
         except OSError as e:
             self._failed(f"{where}: {type(e).__name__}: {e}")
             _reply(client, 502, f"{where}: {e}")
+        except Exception as e:          # a request the bridge cannot read: its kind alone
+            self._failed(f"{where}: {type(e).__name__}")
+            _reply(client, 400 if where == "?" else 502, f"{where}: {type(e).__name__}")
         finally:
             for s in (up, client):
                 if s is not None:
