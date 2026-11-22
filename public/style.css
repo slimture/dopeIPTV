@@ -422,9 +422,10 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
    copyright, and that no content comes with the app. One logo, dopeIPTV's:
    a second (Solecraft's) under it made two marks fight for the eye. On a
    phone the brand goes over the groups, each group across the whole width
-   with its links in two even columns - the app's group beside contact and
-   legal had left half the column empty -, each link a finger's room and a
-   long word (German's) broken rather than run into its neighbour. */
+   with its links in one row that wraps where the line ends - two even
+   columns left a link alone on its row whenever a group had an odd number,
+   and made the footer almost a screen tall -, each link a finger's room and
+   a long word (German's) broken rather than run into its neighbour. */
 footer { background: var(--surface); padding: 44px 0 32px; margin-top: 24px; }
 footer .foot-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: 32px 48px; align-items: start; }
@@ -449,14 +450,15 @@ footer .foot-company a { color: inherit; }
 footer .foot-company bdi { white-space: nowrap; }
 footer .foot-company a:hover { color: var(--accent); }
 @media (max-width: 720px) {
-  footer { padding: 36px 0 30px; }
-  footer .foot-top { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-  footer .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 20px; width: 100%; }
-  footer .foot-h { margin-bottom: 4px; }
-  footer .foot-col ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
-  footer .foot-col a { display: inline-block; max-width: 100%; padding: 8px 0; font-size: 15px;
+  footer { padding: 28px 0 26px; }
+  footer .foot-top { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  footer .foot-brand { max-width: none; }
+  footer .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 14px; width: 100%; }
+  footer .foot-h { margin-bottom: 0; }
+  footer .foot-col ul { display: flex; flex-wrap: wrap; gap: 0 20px; }
+  footer .foot-col a { display: inline-block; max-width: 100%; padding: 7px 0; font-size: 15px;
     overflow-wrap: anywhere; hyphens: auto; }
-  footer .foot-base { margin-top: 28px; }
+  footer .foot-base { margin-top: 22px; }
 }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -1609,6 +1611,9 @@ dialog.howdlg::backdrop { background: rgba(5, 7, 10, .66); }
 .is-phone main > #download { order: 1; overflow-anchor: none; }
 .is-phone #support { background: var(--surface); }
 .is-phone #download { background: var(--bg); }
+/* Last on a phone, over the footer: a section's room above the footer's
+   hairline as well made a blank band under the last card. */
+.is-phone main > #download { padding-bottom: 24px; }
 .is-phone #download .dlx-card { background: var(--surface); }
 /* Opened on a phone, the downloads are for a look, not for installing:
    each system a row that folds out (app.js). */
