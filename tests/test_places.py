@@ -104,7 +104,9 @@ def test_homes_settings_carried_over_once_and_taken_away():
 # -- the real window -----------------------------------------------------------------------
 
 _CHILD = r"""
-import os, sys, tempfile, time
+import faulthandler, os, sys, tempfile, time
+# A native crash (once on CI, in Qt's offscreen platform) says where it was.
+faulthandler.enable()
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
@@ -305,4 +307,5 @@ def _child_env(tmp_path) -> dict:
 def test_the_window_opens_where_left_and_every_place_shows(tmp_path):
     out = subprocess.run([sys.executable, "-c", _CHILD], cwd=_REPO_ROOT,
                          env=_child_env(tmp_path), capture_output=True, text=True, timeout=240)
-    assert "PLACES_OK" in out.stdout, out.stdout[-2000:] + out.stderr[-4000:]
+    assert "PLACES_OK" in out.stdout, (f"exit {out.returncode}\n" + out.stdout[-2000:]
+                                       + out.stderr[-4000:])
