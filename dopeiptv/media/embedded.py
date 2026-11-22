@@ -1710,8 +1710,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             try:
                 from ..core import live_latency, nerd
                 # A web page is no source's: not its proxy or headers; nor
-                # an address from outside its lists. Nor the bridge: mpv
-                # hands its proxy on to yt-dlp's arguments.
+                # an address from outside its lists. Nor the bridge: a page
+                # of the person's own, which yt-dlp opens and resolves
+                # itself - played as it always was.
                 self._nerd_applied = nerd.apply_stream(
                     m, None if web or outside else nerd.source(),
                     getattr(self, "_nerd_applied", False),

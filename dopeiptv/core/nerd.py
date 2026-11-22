@@ -3,9 +3,12 @@
 Everything here is off until the user turns Nerd on (Settings > Nerd >
 Status, or seven taps on the version in About), and a setting
 left empty changes nothing: with Nerd off the app plays exactly as it does
-without this module. The window installs a profile (``install``) at start
-and after each Settings change; the player, the provider clients and the
-rewind buffer ask it what to do.
+without this module - but for what is everyone's, set before every stream
+(``apply_stream``): an internet stream's certificate checked, and an
+internet source's stream through the app's guard (core/net_bridge.py). The
+window installs a profile (``install``) at start and after each Settings
+change; the player, the provider clients and the rewind buffer ask it what
+to do.
 
 Options that break the embedded player (another video output, a window of
 mpv's own) are refused, whatever the user types; every other one is applied
@@ -551,8 +554,9 @@ class Nerd:
         (core/net_bridge.player_proxy), Nerd on or off, so that what mpv
         fetches itself - an HLS playlist's segments, its keys, a redirect -
         never lands on this computer, a link-local host or the home network;
-        not with *guard* False (a web page through yt-dlp, the person's own:
-        mpv hands its proxy on to yt-dlp's arguments)."""
+        not with *guard* False: a web page through yt-dlp, an address of the
+        person's own that yt-dlp - a program the bridge does not see - opens
+        and resolves itself, played as it always was."""
         from . import net_bridge
         target = opened or url
         # Never the proxy for the rewind buffer's own server on this

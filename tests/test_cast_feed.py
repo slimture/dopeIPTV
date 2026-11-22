@@ -55,7 +55,7 @@ write(end=True)
 def readers(monkeypatch):
     calls = []
 
-    def args(exe, url, start=0.0, ts_offset=0.0, net=None, audio=0):
+    def args(exe, url, start=0.0, ts_offset=0.0, net=None, audio=0, read=""):
         calls.append({"url": url, "start": start, "ts_offset": ts_offset,
                       "net": net})
         return [sys.executable, "-c", _READER, url, "30"]
@@ -177,7 +177,7 @@ def test_archive_pieces_go_on_one_airplay_playlist_without_a_restart(
         monkeypatch, readers):
     seen = {}
 
-    def args(exe, p, start=0.0, net=None, feed=False):
+    def args(exe, p, start=0.0, net=None, feed=False, read=""):
         seen.update(feed=feed)
         return [sys.executable, "-c", _CONVERTER]
     monkeypatch.setattr(ab, "ffmpeg_args", args)
@@ -258,7 +258,7 @@ def test_a_piece_that_gives_nothing_is_asked_again(monkeypatch):
     is a retry from the same moment, not the end of the cast."""
     calls = []
 
-    def args(exe, url, start=0.0, ts_offset=0.0, net=None, audio=0):
+    def args(exe, url, start=0.0, ts_offset=0.0, net=None, audio=0, read=""):
         calls.append(url)
         secs = "0" if len(calls) == 1 else "30"
         return [sys.executable, "-c", _READER, url, secs]

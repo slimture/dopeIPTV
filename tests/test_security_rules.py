@@ -350,3 +350,30 @@ def test_labels_with_outside_words_are_plain_text():
                  and n.args and ast.unparse(n.args[0]) == "Qt.TextFormat.PlainText"}
         found += [f"{rel}: {name}" for name in sorted(wanted - plain)]
     assert not found, "not PlainText: " + ", ".join(found)
+
+
+# -- rule 8: no address, proxy or token header in a program's arguments --------------
+
+#: Where ffmpeg is handed "-headers": only the headers that open nothing
+#: (core/net_bridge.split_headers) - the rest the bridge adds.
+HEADER_ARGUMENTS = {"providers/airplay_bridge.py", "core/restream.py"}
+
+
+def test_no_program_is_handed_a_proxy_or_a_secret_header_in_its_arguments():
+    """Every account on a Linux computer reads a program's arguments: a
+    proxy (its login with it) goes to the app's bridge, a program is given
+    the bridge in its environment (net_bridge.hand_over, child_env), and
+    "-headers" only where the safe ones are picked out first."""
+    found = []
+    for rel, tree in _modules():
+        words = {n.value for n in ast.walk(tree)
+                 if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+        for word in ("-http_proxy", "--http-proxy", "--http-proxy="):
+            if word in words:
+                found.append(f"{rel}: {word}")
+        if "-headers" in words:
+            calls = {_dotted(c.func).rsplit(".", 1)[-1] for c in ast.walk(tree)
+                     if isinstance(c, ast.Call)}
+            if rel not in HEADER_ARGUMENTS or "split_headers" not in calls:
+                found.append(f"{rel}: -headers")
+    assert not found, "in a program's arguments: " + ", ".join(found)

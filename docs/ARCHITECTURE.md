@@ -207,9 +207,10 @@ dopeiptv/
     net_adapter.py     The app's own requests on a source's route (a requests
                        adapter)
     net_bridge.py      The one way out for the programs the app starts on a
-                       stream, and the player's onto a route: a loopback proxy
-                       that judges where each connection lands and hands out
-                       aliases that name nothing of an address
+                       stream, and the player's for every internet source's
+                       stream: a loopback proxy that judges where each
+                       connection lands and hands out aliases that name
+                       nothing of an address
     cert_pin.py        Trusting one certificate for one source: read,
                        fingerprinted, pinned, a change noted
     http_login.py      A login in a stream's address answered as the server

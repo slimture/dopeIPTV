@@ -266,9 +266,12 @@ nothing - while Nerd is off or nothing is set.
 - **The player and recordings** (mpv, ffmpeg) go through
   `core/net_bridge.py`, a loopback proxy set as the player's `http-proxy`
   and a recorder's `http_proxy` (its environment, never its arguments). A
-  recorder always goes through it - for the guard on where each
-  connection lands (`Policy`) and the alias it reads (`Bridge.alias`), route
-  or none; the player on a route. Putting the IP in the address with a Host header would work
+  recorder - and every other program the app starts on a stream: a cast's
+  converter, server mode's HLS copy (`hand_over`) - always goes through it,
+  for the guard on where each connection lands (`Policy`) and the alias it
+  reads (`Bridge.alias`), route or none; the player on a route, and for
+  every http(s) stream of a source on the internet with no route of its
+  own (`player_proxy`). Putting the IP in the address with a Host header would work
   for plain http only: ffmpeg takes the TLS server name from the address, so
   an https stream would send no SNI and a CDN would refuse it, and a
   redirect or a playlist segment on another host would get the wrong Host.

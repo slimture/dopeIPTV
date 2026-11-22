@@ -86,7 +86,7 @@ change a playlist file on its web server.
 | From a source on the internet: an `smb://` address (on Windows a sign-in there with the person's account), raw `tcp://` or `tls://` to any service, ftp, WebDAV, a gateway - or an address on this computer or a link-local one (the printer's page, a local engine, a cloud's metadata service) | `core/stream_address.py`: a source whose own address is on the internet (`on_internet`, its backup addresses too) hands out only the media protocols (`MEDIA`), never a host on this computer or link-local in any spelling (`host_refusal`: 127.1, 2130706433, `::ffff:127.0.0.1`, localhost, this computer's name, 0.0.0.0, 169.254/16, fe80::/10, and no host at all - `http://:8080/`, `http:///x`, which FFmpeg opens here: `empty_host`); a private address of the home network stays. An address with no host is no address from any source, but a socket listening here (`udp://@:1234`, `_LISTEN`) from a playlist file or the home network A home network's source and a playlist file as before; what the person's rewrite rules or udpxy make is theirs |
 | From a source on the internet: a logo or poster on this computer or a link-local host, so the app itself sends requests there | `providers/client._pictures_kept`: such a picture is taken out of that source's lists and pages by the same rule (`stream_address.picture_refusal`) |
 | A public name whose DNS answer is this computer or a link-local host (DNS rebinding), or a redirect from the internet to this computer, a link-local host or the home network - for the app's own requests (guides, pictures, the APIs, the rewind buffer, a cast's address) | `core/dest_guard.py`: every request through `core/_lazy_requests.py` and `core/net_adapter.py` is checked on its socket after it connects and before a byte is sent (`check_peer`: this computer only for a name that says so, link-local only for a link-local or home name, a cloud's metadata service only by its address); every redirect requests follows, and each one the cast follows by hand, judged by its target as written and as it resolves (`redirect_refusal`: http(s) only, never from the internet inward, the same host again allowed); a request through a proxy - whose connection is the proxy's - has its name looked up here first and judged the same way before anything is sent (`proxied_refusal`, `DestinationRefused`): best effort, the proxy's own lookup is the proxy's |
-| An HLS playlist whose segments, keys or redirects send the recorder (FFmpeg, mpv) to this computer's services, a link-local or metadata host or a device at home - by an address, or by a public name that resolves there | `core/net_bridge.py`: a recorder that fetches an http(s) stream itself (an HLS playlist; any other the app reads for it, `dest_guard`'s) does so only through the app's bridge, which judges every connection it opens - each segment, key and redirect hop, CONNECT or plain http - by its host as written and then on its socket, before a byte is sent (`Policy`, `written`, `landed`): a source on the internet's never this computer, link-local, a metadata service or the home network, but the stream's own server (`entry`: AceStream's engine, udpxy at home, what `home_addresses` lets in), the person's own names and `.plex.direct`; a home source's by `dest_guard`'s rule. A refusal is a 502, said once per host and reason. The in-app player goes through it on a Nerd route today ([below](#what-the-in-app-player-opens-itself)) |
+| An HLS playlist whose segments, keys or redirects send the player or a program the app starts (FFmpeg, mpv) to this computer's services, a link-local or metadata host or a device at home - by an address, or by a public name that resolves there | `core/net_bridge.py`: the in-app player (the docked one and each multiview cell) for every http(s) stream of a source on the internet, Nerd on or off (`player_proxy`), and every program the app starts on such a stream - the recorder, a cast's converter and its probe, the pieces of a cast's archive, AirPlay's converter, server mode's HLS copy (`hand_over`) - go out only through the app's bridge, which judges every connection it opens - each segment, key and redirect hop, CONNECT or plain http - by its host as written and then on its socket, before a byte is sent (`Policy`, `written`, `landed`): a source on the internet's never this computer, link-local, a metadata service or the home network, but the stream's own server (`entry`: AceStream's engine, udpxy at home, what `home_addresses` lets in), the person's own names and `.plex.direct`; a home source's by `dest_guard`'s rule. A refusal is a 502, said once per host and reason ([below](#what-the-in-app-player-opens-itself)) |
 | A line read as an option of an external mpv or VLC, or of the recorder (`--log-file=`, `--include=`) | The address after `--`, and nothing but a stream's address or a file's path handed over (`media/players.py`, `core/recording.py`) |
 | ffmpeg reading `concat:`, `subfile:`, `unix:` or a local file behind an address | `core/player_exec.ffmpeg_protocols`: `-protocol_whitelist` with a stream's protocols wherever ffmpeg or ffprobe is started for a stream |
 | A picture that names a file: `/dev/zero`, or `\\host\share\x.png` (on Windows a login at that host) | `core/picture_files.py`: a file is read as a picture only inside the app's own picture folders, only a plain file, at most 64 MB |
@@ -102,7 +102,7 @@ change a playlist file on its web server.
 - The ceilings are far above any real answer, so a hostile source can still
   make the app read and work up to them.
 - A list chooses where its pictures come from: [below](#a-list-chooses-where-its-pictures-come-from).
-- What the in-app player, a cast's converter and server mode's HLS copy open themselves: [below](#what-the-in-app-player-opens-itself).
+- What a TV that fetches a stream itself, a source at home's stream and a web page through yt-dlp open: [below](#what-the-in-app-player-opens-itself).
 - A provider on plain http: [below](#a-provider-on-plain-http).
 - A stream's own bytes are decoded by FFmpeg and libmpv: [below](#bugs-in-the-media-libraries-are-theirs).
 
@@ -184,7 +184,7 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 | Reading the settings files (every login, the sync code, the tokens) from another account | `core/settings_files.protect`: each file 0600 and the app's folder 0700, set at start before anything writes them, and only ever narrowed; on Windows the registry and the user's own profile. Where the drive keeps no permissions (FAT, exFAT, some shares) the app starts all the same, logs the file by name and says once where it is (`not_private`, `ui/mw_settings._tell_settings_not_private`) |
 | Handing the running app a command | `core/instance.py`: a socket in `$XDG_RUNTIME_DIR` or a 0700 folder of the user's own, never the shared /tmp, nor a folder another account owns; a folder that could not be made, read or narrowed to the user alone is never listened in - the app starts without the second start's handoff, said once (`_folder_refusal`); on Windows a random word in the pipe's name (`_pipe_key`) |
 | Using the loopback proxy to go out as the person, through their route | A key made for each run (`core/net_bridge.py`), and its guard: from it nothing reaches what the stream's source may not (`Policy`) |
-| Reading a provider's address - an Xtream login, a token - from a recorder's or an external player's command line (`ps`, `/proc/<pid>/cmdline`) | `core/recording.py`: never an address in a recorder's arguments - the app reads the stream and hands it over on its input (`Feed`), or the recorder reads an alias through the bridge that names nothing of it (`net_bridge.Bridge.alias`: a `.stream.invalid` host under a 192-bit token, the path's shape alone), or - another address with a login, `rtsp://user:pw@` - a 0600 file (ffmpeg's concat list, mpv's playlist); the bridge's key in its environment alone (`net_bridge.child_env`), which only the same user reads. An external player gets a 0600 playlist file, or is not started (`players.handoff_file`) |
+| Reading a provider's address - an Xtream login, a token - Nerd's proxy with its login or a header that holds a token from the command line of a program the app starts (`ps`, `/proc/<pid>/cmdline`) | `core/recording.py`: never an address in a recorder's arguments - the app reads the stream and hands it over on its input (`Feed`), or the recorder reads an alias through the bridge that names nothing of it (`net_bridge.Bridge.alias`: a `.stream.invalid` host under a 192-bit token, the path's shape alone), or - another address with a login, `rtsp://user:pw@` - a 0600 file (ffmpeg's concat list, mpv's playlist). A cast's converter and ffprobe, the readers of a cast's archive and rewind buffer (the buffer's token too), AirPlay's converter and probe and server mode's HLS copy read an alias the same way (`net_bridge.hand_over`); a proxy is the bridge's to go through, a header that may hold a token the bridge's to add - only the user agent and the headers that open nothing are arguments (`net_bridge.split_headers`; `tests/test_security_rules.py` fails on a `-http_proxy`); the bridge's key in the program's environment alone (`net_bridge.child_env`), which only the same user reads. An external player gets a 0600 playlist file, or is not started (`players.handoff_file`) |
 | Reading the rewind buffer's stream | A 144-bit token, loopback only (`core/dvr_server.py`) |
 | Catching the Trakt sign-in's redirect | Its port never shared (`core/exclusive_bind.ExclusiveBindMixin`, `SO_EXCLUSIVEADDRUSE` on Windows), and the code it carries useless without the PKCE verifier that stays in the app (`providers/trakt.py`) |
 | A socket of its own where Discord or lircd would be | `core/discord_rpc.py`: a socket this user owns only; `core/tv_input.lirc_socket_ok`: lircd's when root or this user owns it, or in a folder nobody else can write to |
@@ -194,7 +194,7 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 **What is left.**
 
 - A program running as the person reads what the person can: [below](#logins-are-in-the-settings-files-not-a-keyring).
-- A cast's converter and server mode's HLS copy still take the stream's address as an argument: [below](#programs-started-by-the-app-show-their-arguments).
+- An address that is not http(s) and holds a login the app does not see as one, and the page yt-dlp is given, are still arguments: [below](#programs-started-by-the-app-show-their-arguments).
 - The cache and the logs keep the system's folder modes: [below](#the-cache-and-the-logs-keep-the-folder-modes-the-system-gives).
 - Any program on the session bus can drive the app: [below](#any-program-on-the-session-bus-can-drive-the-app).
 - An administrator of the computer can read and change everything.
@@ -210,7 +210,7 @@ provider.
 | Changing what dopeiptv.org sends | https to dopeiptv.org itself only (`core/build_check.secure`), no redirect followed; an update installs only what the signed list names (`selfupdate.signed_asset`), and its download follows redirects only over https (`selfupdate._get_https`) |
 | Reading or changing a third party's answers (TMDB, Trakt, Simkl, OpenSubtitles, Plex.tv, radio-browser.info, GitHub...) | https with the certificate checked; `verify=False` is nowhere - `core/cert_pin.py` reads a certificate unchecked only to show it before it is pinned, and a pinned server is checked by its fingerprint instead (`core/net_adapter.py`) |
 | The app's own requests to an https provider (its lists, guide, logos, the rewind buffer's connection, a recording's own connection) | The certificate checked against the system's authorities, or Nerd's pin for that one server (`core/net_adapter.py`) |
-| The player's and recorder's https streams from the internet | The certificate checked against certifi's authorities (`nerd.checks_certificate`), unless the person let that source play unchecked when asked; a recorder reading an alias has the bridge make the TLS connection, with that same check (`net_bridge.Alias.trust`) |
+| The player's and recorder's https streams from the internet | The certificate checked against certifi's authorities (`nerd.checks_certificate`), unless the person let that source play unchecked when asked - a player whose core will not take the check plays nothing and says so (`nerd.CertificateUnchecked`); a program reading an alias has the bridge make the TLS connection, with that same check (`net_bridge.Alias.trust`) |
 | Changing DNS answers | Nerd's own DNS over HTTPS, the presets reached by IP (`core/doh.py`) |
 | Watching while a VPN has dropped | Nerd's VPN guard starts nothing while it is down (`core/nerd.py`, `vpn_blocks`) |
 | Reading the MQTT broker's traffic | TLS on 8883, the broker's certificate checked (`core/mqtt.py`) |
@@ -554,8 +554,10 @@ stream for the TV - a sound or picture it cannot play, a chosen track,
 subtitle or quality, the archive or the rewind buffer in pieces
 (`providers/cast_bridge.py`, `providers/cast_feed.py`,
 `providers/airplay_bridge.py`) - does the TV get an address of the app's
-own under a token, the provider's staying here. A Chromecast is Google's
-device running Google's receiver.
+own under a token, the provider's staying here, and what the converter
+fetches goes through the app's guard
+([below](#what-the-in-app-player-opens-itself)); what a TV fetches itself
+is the TV's. A Chromecast is Google's device running Google's receiver.
 
 *Why:* a DLNA TV, a Kodi and an Apple TV are made to fetch a stream
 themselves, and a cast through the converter costs the computer's
@@ -581,6 +583,15 @@ unless Nerd's strict check asks for it too (Nerd > Network, "Check every
 stream's certificate", `nerd_tls_strict`). A host whose certificate the
 source pins is the bridge's to check (below); a `tls-verify` the person
 typed into mpv's options or mpv.conf wins (`Nerd.typed_tls`).
+
+**A player that cannot check it.** Where the certificate is to be checked
+and the player's core does not take the check - `tls-verify` or
+`tls-ca-file` refused, or `tls-verify` not on when read back - the stream
+is not opened at all, the one before it stops, and the video says why
+("This player cannot check this stream's certificate, so it was not
+opened"): `nerd.CertificateUnchecked`, `EmbeddedPlayer.refusal`, a
+multiview cell's title. Such a stream is never handed to an external
+player instead, as play()'s other failures are (`main_window._start_playback`).
 
 **One that does not check out.** The stream plays nothing, its diagnosis
 says why (`diagnostics._probe_url`: "the provider's certificate could not
@@ -609,9 +620,10 @@ system's authorities before its tunnel opens. A changed certificate is
 noted and offered for review (`cert_pin.PinMismatch`,
 `cert_trust.offer_review`). Its limits: it holds only while Nerd is on
 (`net_route.route_for`); it covers https, not rtmp, rtsp or udp; with a
-proxy of Nerd's for the player the stream goes through that proxy, not the
-bridge (`nerd.player_route`); and a cast cannot carry it - the app asks
-first (`ui/mw_cast._cast_pin_ok`).
+proxy of Nerd's for the player the stream goes through that proxy and the
+guard's bridge, not the route's - the pin is not checked there
+(`nerd.player_route`); and a cast cannot carry it - the app asks first
+(`ui/mw_cast._cast_pin_ok`).
 
 ### A provider on plain http
 
@@ -685,35 +697,68 @@ films; turning them off is one choice away, said where it is chosen.
 (Before 1.6.11: "The player and the recorder look names up themselves".)
 
 The app's own requests are checked where they land (`core/dest_guard.py`).
-A **recorder** reading an http(s) stream itself - an HLS playlist, segment
-by segment - goes out only through the app's bridge, and so does the in-app
-player on a Nerd route (own DNS, IP version, a pinned certificate:
-`nerd.player_route`): every connection FFmpeg or mpv makes there - each
-segment, key and redirect hop - is judged by its host as written and on its
-socket before a byte is sent (`core/net_bridge.py`, `Policy`), so a public
-name whose DNS answer is 127.0.0.1, a redirect there, or a playlist whose
-segments or key are on this computer, a link-local host or - for a source
-on the internet - the home network, gets a 502 and nothing is sent.
+FFmpeg and mpv fetch an HLS playlist's segments, its keys and the redirects
+they meet themselves, so the app hands every stream it does not read itself
+to the app's bridge (`core/net_bridge.py`):
 
-*What is left:* off a Nerd route the in-app player (the docked player and
-each multiview cell, libmpv inside the app), a cast's converter
-(`providers/cast_bridge.py`), the Apple TV's (`providers/airplay_bridge.py`),
-a cast's archive or buffer reader (`providers/cast_feed.py`) and server
-mode's copy of an HLS channel (`core/restream.ffmpeg_opener`) still open
-what a playlist names themselves, judged by the address as written
-(`core/stream_address.host_refusal`) - FFmpeg kept to a stream's protocols
-(`ffmpeg_protocols`), so what such a request can reach is a web service on
-this computer or the home network, not a file. A stream through Nerd's
-proxy is the proxy's to connect - the in-app player's goes to the proxy
-itself; a recorder's bridge goes through it as the player does (an http
-proxy: `net_bridge.upstream_of`; through a socks one the bridge connects
-itself, as the recorder always did), and there only the address as written
-is judged. An external player is the person's own program. Open work: the
-same bridge for those (`net_bridge.guard_for`, `child_env`), which puts a
-copy of each such stream through the app's process.
+* **The in-app player** - the docked player and each multiview cell, libmpv
+  inside the app - for every http(s) stream of a source on the internet,
+  Nerd on or off: its `http-proxy` is the bridge (`net_bridge.player_proxy`,
+  set in `nerd.apply_stream` - an option of the core in the app's own
+  process, no program's argument), put back to none for the next stream
+  that needs none. On a Nerd route (own DNS, IP version, a pinned
+  certificate) the route's own bridge, which guards the same way. A radio
+  station is judged as what it is, no source's.
+* **Every program the app starts on a stream** - the recorder, a cast's
+  converter and ffprobe, the readers of a cast's archive and rewind buffer,
+  AirPlay's converter and probe, server mode's HLS copy - reads an alias
+  through it (`net_bridge.hand_over`); with no bridge it is not started.
+
+Every connection FFmpeg or mpv makes there - each segment, key and redirect
+hop - is judged by its host as written and on its socket before a byte is
+sent (`Policy`), so a public name whose DNS answer is 127.0.0.1, a redirect
+there, or a playlist whose segments or key are on this computer, a
+link-local host or - for a source on the internet - the home network, gets
+a 502 and nothing is sent. Nerd's proxy, where it takes streams, is
+chained behind the bridge (an http proxy: `upstream`; a socks one FFmpeg
+never went through, nor does the bridge), and without one the environment's
+`http_proxy` as FFmpeg itself takes it (`system_proxy`): the way out stays
+the person's. A connection the client has left is closed at once, so a
+stalled provider's is not held against the account's one connection
+(`pipe`). With no bridge to be had the player plays as before and says so
+once in the log - never no playback.
+
+*What is left:*
+
+- **A source of the home network, a playlist file, this computer's own
+  servers.** Their streams in the player go out as before, judged by the
+  address as written (`core/stream_address.host_refusal`); a home source is
+  the person's own network, and its programs' aliases are judged by
+  `dest_guard`'s rule (a name an internet source named never at home).
+  The rewind buffer's own server and AceStream's engine on this computer
+  are not bridged at all.
+- **A TV that fetches the stream itself.** A Chromecast on a direct cast, a
+  DLNA TV, a Kodi and an Apple TV given the original address open what it
+  names on their own; that is outside the app
+  ([A cast hands the TV the stream address](#a-cast-hands-the-tv-the-stream-address)).
+- **A web page through yt-dlp.** The person's own web streams (YouTube,
+  Twitch and the like) are left out (`apply_stream`'s *guard*): yt-dlp is
+  a program of its own that opens the page and resolves it itself, which
+  the bridge does not see, and an address the person typed is no
+  provider's; what it resolves to is played as it always was.
+- **Through Nerd's proxy** only the address as written is judged - the
+  proxy connects. On such a stream the player goes through the guard's
+  bridge, not a route's, so a pinned certificate is not checked there.
+- **An external player** is the person's own program.
+- **A public name of the stream's own server** that the home's DNS answers
+  with a home address is let in (split-horizon DNS for one's own server),
+  and so are the person's own names and `.plex.direct` (`Policy.entry`,
+  `dest_guard.note_own`).
 
 *Why:* the libraries resolve and connect inside themselves; the app cannot
-see their sockets, only what they ask a proxy for.
+see their sockets, only what they ask a proxy for - so the proxy is the
+app's, and every stream from the internet goes through it, at the cost of
+a copy of each through the app's process.
 
 ### Logins are in the settings files, not a keyring
 
@@ -735,8 +780,9 @@ maintainer's decision.
 
 On Linux, by default, every account on the computer can read another's
 program arguments (`ps`, `/proc/<pid>/cmdline`), and an Xtream address
-carries the login. A recorder and an external player are never given a
-provider's address as an argument:
+carries the login. No program the app starts on a stream - a recorder, a
+cast's converter, an external player - is given a provider's address, Nerd's
+proxy or a header that may hold a token as an argument:
 
 * **A recording over its own connection** is read by the app itself - the
   rewind buffer's way in, with its reconnects, its route and its check of
@@ -756,9 +802,27 @@ provider's address as an argument:
   TLS connection with the stream's own check. ffmpeg reads only what that
   needs (`player_exec.BRIDGED_PROTOCOLS`); the alias is forgotten as the
   recording ends; with no bridge there is no recording (`NO_BRIDGE`).
-* **The bridge's address and key** are in the recorder's environment,
+* **A cast's converter and ffprobe** (`providers/cast_bridge.py`), the
+  **readers of a cast's archive and rewind buffer** (`providers/cast_feed.py`
+  - the buffer's own token in its address kept out too), **the Apple TV's
+  converter and probe** (`providers/airplay_bridge.py`) and **server mode's
+  copy of an HLS channel** (`core/restream.ffmpeg_opener`) read an alias the
+  same way (`net_bridge.hand_over`): the options are still chosen by the
+  real address (live or an archive window), ffmpeg reads
+  `BRIDGED_PROTOCOLS` alone, the alias is forgotten as the run ends, and
+  with no bridge nothing is started - the cast says so
+  (`cast_err_no_bridge`), server mode's channel is not copied
+  (`restream.NO_PRIVATE_WAY`).
+* **The bridge's address and key** are in the program's environment,
   which only the same user can read (`net_bridge.child_env`), never in its
   arguments.
+* **Nerd's proxy** is the bridge's to go through (`stream_proxy`,
+  `upstream`), never `-http_proxy`; **Nerd's headers** are the bridge's to
+  add to every request it reads - one to the alias and any plain http one -
+  and only those that open nothing (`net_bridge.SAFE_HEADERS`: Referer,
+  Origin, Accept... - a value with a login in it never) are ffmpeg's
+  `-headers` (`split_headers`). `tests/test_security_rules.py` fails on a
+  `-http_proxy` or an unsplit `-headers` anywhere in the app.
 * **Another address with a login** - `rtsp://user:pw@`, srt's passphrase,
   a token in the query (`player_exec.carries_login`) - is put in a 0600
   file the recorder reads: ffmpeg's concat list (its input's options in it
@@ -771,15 +835,16 @@ provider's address as an argument:
   `players.handoff_file`); with none to be made it is not started, and the
   person is told (`status_player_no_handoff`).
 
-*What stays:* a cast's converter (`providers/cast_bridge.py`), the Apple
-TV's (`providers/airplay_bridge.py`), a cast's archive reader
-(`providers/cast_feed.py`) and server mode's copy of an HLS channel
-(`core/restream.ffmpeg_opener`) still take the stream's address as an
-argument - the Apple TV's converter, the pieces it reads and server mode's
-copy Nerd's proxy (its login with it) and headers too
-(`airplay_bridge.input_options`); yt-dlp is given the page it opens. An address that is not http(s) and
+*What stays:* a header that may hold a token does not reach an https host
+other than the stream's own server - a segment on a CDN of its own, which
+the bridge only tunnels - from a program the app starts: it would have to
+be an argument (FFmpeg's `-/opt <file>` reads only its own options' values
+from a file, not an input's, so there is no private way to hand it over);
+the log says once which headers were left out of such hops, by name. The
+in-app player, which takes no arguments, still sends them everywhere it
+did. yt-dlp is given the page it opens. An address that is not http(s) and
 holds a login the app does not see as one (a stream key in an rtmp path)
-goes as an argument. An alias's token is in the recorder's arguments: it is
+goes as an argument, to the recorder and a cast's converter alike. An alias's token is in the program's arguments: it is
 of no use without the bridge's key. A playlist that names an absolute path
 whose folder is itself "~" is read under the real folder at that place
 (`real_target`'s one difference from the real address). The docked player and multiview are
@@ -1174,7 +1239,8 @@ person outside the project is recorded there yet.
   `test_picture_safety.py`, `test_response_cap.py`,
   `test_epg_index_safe.py`, `test_epg_limits.py`, `test_commands.py`,
   `test_commands_outside.py`, `test_local_servers.py`,
-  `test_net_bridge_key.py`, `test_exclusive_bind.py`,
+  `test_net_bridge_key.py`, `test_stream_guard.py`, `test_player_guard.py`,
+  `test_exclusive_bind.py`,
   `test_phone_remote.py`, `test_server_mode.py`, `test_dvr_server.py`,
   `test_settings_files.py`, `test_pins.py`, `test_rec_extras.py`,
   `test_recording_safety.py`, `test_privacy.py`,
