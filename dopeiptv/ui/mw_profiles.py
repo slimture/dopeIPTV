@@ -123,13 +123,13 @@ class KidsFilter:
             m: (allowed(m) if callable(allowed) else None) for m in _CATS}
         self.only = any(v is not None for v in self.allowed.values())
 
-    def category_ok(self, mode: str, cid: Any, *names: Any) -> bool:
-        """Whether a category of the source in use (of *mode*, *names* the
-        one shown and the provider's own) may be listed for a kids profile:
+    def category_ok(self, mode: str, cid: Any, name: Any, own: Any = "") -> bool:
+        """Whether a category of the source in use (of *mode*, *name* the
+        one shown, *own* the provider's) may be listed for a kids profile:
         none named for adults - and, with "Only what a grown-up allows",
         only one a grown-up chose. The lists' one rule for categories, as
         __call__ is for rows."""
-        if adult_category(*names):
+        if adult_category(name, own):
             return False
         allow = self.allowed.get(_KIDS_KIND.get(mode, mode))
         return allow is None or str(cid) in allow
@@ -278,12 +278,12 @@ class _ProfilesMixin:
         p = self._profile()
         return bool(p is not None and p.allow_only)
 
-    def _kids_cat_ok(self, mode: str, cid: Any, *names: Any) -> bool:
+    def _kids_cat_ok(self, mode: str, cid: Any, name: Any, own: Any = "") -> bool:
         """Whether a category of the source in use may be listed for the
         profile in use (KidsFilter.category_ok): every one for anyone but a
         kids profile."""
         keep = self._kids_keep(mode)
-        return keep is None or keep.category_ok(mode, cid, *names)
+        return keep is None or keep.category_ok(mode, cid, name, own)
 
     def _kids_never_places(self) -> set[str]:
         """The places a kids profile never has: Local files and Recordings
