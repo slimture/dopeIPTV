@@ -70,6 +70,18 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.6.12" date="2026-11-22">
+      <description>
+        <p>A security round from two independent reviews of 1.6.11, and guide descriptions without HTML code.</p>
+        <ul>
+          <li>Nothing the app sends to dopeiptv.org can carry your logins</li>
+          <li>Updates are checked once more right before they run</li>
+          <li>Private viewing asks when a recording or a cast still writes the channel to the disk</li>
+          <li>Watch together works with members on 1.6.11 and later</li>
+          <li>A programme's description shows its words, not the provider's HTML</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.11" date="2026-11-22">
       <description>
         <p>Pick the app's icon and a calmer TV list, and a large round of security work: no stream address or login on another program's command line, every internet stream's certificate checked, and a backup without a password holds no login.</p>
