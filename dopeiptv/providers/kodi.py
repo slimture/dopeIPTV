@@ -11,6 +11,15 @@ added by hand with its address, and remembered with the web server's login
 KodiManager answers to the same calls as DlnaManager and ChromecastManager;
 CastHub (providers/casting.py) puts it beside them. Credentials are never
 logged: a log line names a Kodi by its name and host:port only.
+
+A login over plain http crosses the network as it is - HTTP's basic login
+is the password in the clear - so it is sent to a Kodi only once the person
+said so for that Kodi (``plain_ok``, kept in its kodi_devices entry): until
+then a request that would carry it raises KodiPlainLogin before anything is
+sent (``KodiDevice.asks_first``), and the window asks (ui/mw_cast.py
+``_kodi_plain_ask``: send anyway, or the same Kodi over https -
+``KodiManager.use_https``, tried first). A Kodi without a login, or one
+asked over https, is never asked.
 """
 from __future__ import annotations
 
@@ -69,6 +78,14 @@ class KodiAuthError(KodiError):
         super().__init__(401, "unauthorized")
 
 
+class KodiPlainLogin(KodiError):
+    """A request would carry this Kodi's login over plain http, and the
+    person has not said it may (``KodiDevice.asks_first``): nothing sent."""
+
+    def __init__(self) -> None:
+        super().__init__(-1, "its login would go over plain http - not sent")
+
+
 @dataclass
 class KodiDevice:
     name: str
@@ -78,9 +95,17 @@ class KodiDevice:
     password: str = ""
     manual: bool = False
     secure: bool = False      # typed as https://: asked over https, never http
+    #: The person said its login may go over plain http ("Send anyway").
+    plain_ok: bool = False
 
     def __repr__(self) -> str:          # never the login
         return f"KodiDevice({self.name!r}, {self.address})"
+
+    @property
+    def asks_first(self) -> bool:
+        """Whether a request would carry its login over plain http without
+        the person's answer: then nothing goes until they give it."""
+        return self.login is not None and not self.secure and not self.plain_ok
 
     @property
     def address(self) -> str:
@@ -107,6 +132,8 @@ class KodiDevice:
                                "user": self.user, "password": self.password}
         if self.secure:
             out["secure"] = True
+        if self.plain_ok:
+            out["plain_login"] = True
         return out
 
 
@@ -220,7 +247,8 @@ def load_devices(settings: Any) -> list[KodiDevice]:
                               host=str(d["host"]), port=port,
                               user=str(d.get("user") or ""),
                               password=str(d.get("password") or ""),
-                              manual=True, secure=d.get("secure") is True))
+                              manual=True, secure=d.get("secure") is True,
+                              plain_ok=d.get("plain_login") is True))
     return out
 
 
@@ -238,6 +266,9 @@ class KodiRpc:
 
     def call(self, method: str, params: dict[str, Any] | None = None,
              timeout: float = 6.0) -> Any:
+        if self.device.asks_first:
+            # Its login in the clear, unasked: nothing goes (KodiPlainLogin).
+            raise KodiPlainLogin()
         self._ident += 1
         http = self.session or requests
         # To this Kodi and nowhere it points on to: a redirect would carry
@@ -386,14 +417,19 @@ class KodiManager:
         return sorted(devices)
 
     def add(self, host: str, port: int, user: str = "", password: str = "",
-            name: str = "", secure: bool = False) -> str:
+            name: str = "", secure: bool = False, plain_ok: bool = False) -> str:
         """Remember a Kodi (or its new login) and return its name in the
         device list. Checks that it answers first: LocalizedError when it
-        wants a login or does not answer."""
+        wants a login or does not answer. *plain_ok*: the person said its
+        login may go over plain http - else a login over http is not sent
+        (``asks_first``: the window asks before it adds one)."""
         dev = KodiDevice(name="", host=host, port=port, user=user,
-                         password=password, manual=True, secure=secure)
+                         password=password, manual=True, secure=secure,
+                         plain_ok=bool(plain_ok))
         try:
             dev.name = _clean_name(name or describe(dev, self.session))
+        except KodiPlainLogin as e:
+            raise LocalizedError("cast_err_kodi_plain", name=dev.address) from e
         except KodiAuthError as e:
             raise LocalizedError("kodi_needs_login") from e
         except (KodiError, requests.RequestException) as e:
@@ -431,6 +467,63 @@ class KodiManager:
         if dev is None:
             dev = self._merge([]).get(label)
         return dev
+
+    # -- its login over plain http ------------------------------------------------
+
+    def asks_first(self, label: str) -> bool:
+        """Whether casting to *label* would send its login over plain http
+        unasked (``KodiDevice.asks_first``) - the window asks first."""
+        dev = self.device(label)
+        return bool(dev is not None and dev.asks_first)
+
+    def _keep(self, dev: KodiDevice, **changed: Any) -> None:
+        """*dev*'s *changed* fields here and in its remembered entry (by its
+        address) - never logged with its login."""
+        with self._lock:
+            for d in [dev, *(d for d in self.devices.values() if d.address == dev.address)]:
+                for k, v in changed.items():
+                    setattr(d, k, v)
+        if self.settings is None:
+            return
+        mine = self.remembered()
+        for d in mine:
+            if d.address == dev.address:
+                for k, v in changed.items():
+                    setattr(d, k, v)
+        save_devices(self.settings, mine)
+
+    def allow_plain(self, label: str) -> None:
+        """The person's "Send anyway": *label*'s login may go over plain
+        http from now on - kept with it (kodi_devices), never asked again."""
+        dev = self.device(label)
+        if dev is None:
+            return
+        self._keep(dev, plain_ok=True)
+        log.info("kodi: %s at %s - its login may go over plain http (asked)",
+                 dev.name, dev.address)
+
+    def use_https(self, label: str) -> str:
+        """(worker) The person's "Use HTTPS": *label* asked over https at the
+        same address, its certificate checked. Kept so once it answers -
+        from then on never asked over http. Returns *label*; LocalizedError
+        when it does not answer over https (nothing changed)."""
+        dev = self.device(label)
+        if dev is None:
+            raise LocalizedError("cast_err_not_found", name=label)
+        trial = KodiDevice(name=dev.name, host=dev.host, port=dev.port, user=dev.user,
+                           password=dev.password, manual=dev.manual, secure=True)
+        try:
+            describe(trial, self.session)
+        except KodiAuthError as e:
+            raise LocalizedError("kodi_needs_login") from e
+        except (KodiError, requests.RequestException) as e:
+            log.info("kodi: %s did not answer over https at %s (%s)", dev.name, dev.address,
+                     type(e).__name__)
+            raise LocalizedError("kodi_https_failed", name=dev.name,
+                                 address=dev.address) from e
+        self._keep(dev, secure=True)
+        log.info("kodi: %s at %s is asked over https from now on", dev.name, dev.address)
+        return label
 
     def find(self, label: str) -> bool:
         """Whether *label* is a Kodi here - looked for first when this run
@@ -486,6 +579,11 @@ class KodiManager:
                 dev = self.devices.get(device_name)
             if dev is None:
                 raise LocalizedError("cast_err_not_found", name=device_name)
+        if dev.asks_first:
+            # Its login in the clear, and the person not asked: nothing goes.
+            log.info("kodi: %s at %s - its login is not sent over plain http unasked",
+                     dev.name, dev.address)
+            raise LocalizedError("cast_err_kodi_plain", name=dev.name)
         if settle:
             time.sleep(1.5)
         # The address the player itself reads, as the provider serves it:

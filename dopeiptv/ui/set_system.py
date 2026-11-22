@@ -519,6 +519,7 @@ def build_parental(ctx: SettingsContext) -> None:
     pin_row = c.row(tr("pin_none_set"), None)
     c.layout_row(hbox(set_pin_btn, remove_pin_btn, lock_now_btn))
     c.note(tr("parental_hint"))
+    c.note(tr("pin_hint_long"))
 
     def refresh_pin_status():
         if win.parental.has_pin():
@@ -535,7 +536,7 @@ def build_parental(ctx: SettingsContext) -> None:
     def set_pin():
         if win.parental.has_pin() and not win._request_unlock():
             return
-        pin = win._ask_new_parental_pin(d, tr("pin_new_prompt"))
+        pin = win._ask_new_parental_pin(d, tr("pin_hint_long") + "\n\n" + tr("pin_new_prompt"))
         if pin:
             win.parental.set_pin(pin)
         refresh_pin_status()

@@ -598,6 +598,13 @@ class CastDialog(QDialog):
         if not item:
             return
         name = item.text()
+        # A Kodi whose login would go over plain http: asked first, before
+        # the player here lets go of anything (mw_cast._kodi_plain_ask).
+        ask = getattr(self.window, "_kodi_plain_ask", None)
+        kodi = ask(name) if self._is_kodi(name) and callable(ask) else "send"
+        if not kodi:
+            self._set_status(tr("cast_err_kodi_plain", name=name))
+            return
         self._set_status(tr("cast_starting", name=name))
 
         # Free the provider connection BEFORE the receiver goes for the
@@ -668,19 +675,21 @@ class CastDialog(QDialog):
                        audio=audio, subs=subs, duration=self.duration,
                        tracks={"audio": self.audio_list,
                                "subtitle": self.subs_list})
-        run_async(self.window.pool,
-                  lambda: self.window.cast.cast(name, self.url,
-                                                 self.stream_title,
-                                                 self.codecs, audio, subs,
-                                                 self.start, self.duration,
-                                                 settle, self.source,
-                                                 "original" if (
-                                                     self._is_dlna(name) or
-                                                     self._is_airplay(name))
-                                                 else self.quality(),
-                                                 self.height,
-                                                 self.fps, dvr, **more),
-                  done, failed)
+        quality = ("original" if self._is_dlna(name) or self._is_airplay(name)
+                   else self.quality())
+
+        def work():
+            if kodi == "https":
+                # "Use HTTPS": that Kodi tried over https first - kept so once
+                # it answers, else nothing is sent to it.
+                self.window.cast.kodi.use_https(name)
+            return self.window.cast.cast(name, self.url, self.stream_title,
+                                         self.codecs, audio, subs,
+                                         self.start, self.duration,
+                                         settle, self.source, quality,
+                                         self.height, self.fps, dvr, **more)
+
+        run_async(self.window.pool, work, done, failed)
 
     def _add_by_address(self) -> None:
         """Add a Chromecast, a TV or a Kodi by its address - or forget the

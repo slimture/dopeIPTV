@@ -378,9 +378,11 @@ def test_add_kodi_checks_before_it_keeps(app):
 
     class Kodi:
         def device(self, label):
-            return kodi.KodiDevice("Den", "10.0.0.5", 8081, "kodi", "pw", manual=True)
+            # Its login over plain http allowed before ("Send anyway").
+            return kodi.KodiDevice("Den", "10.0.0.5", 8081, "kodi", "pw", manual=True,
+                                   plain_ok=True)
 
-        def add(self, host, port, user, password, name="", secure=False):
+        def add(self, host, port, user, password, name="", secure=False, plain_ok=False):
             asked.append((host, port, user, password))
             done.set()
             if host == "10.0.0.9":
@@ -392,7 +394,9 @@ def test_add_kodi_checks_before_it_keeps(app):
 
     parent = QWidget()
     pool = QThreadPool()
-    d = _KodiAddDialog(parent, Kodi(), "Den (Kodi)", pool)
+    questions = []
+    d = _KodiAddDialog(parent, Kodi(), "Den (Kodi)", pool,
+                       ask=lambda address: questions.append(address) or "send")
     assert d.address.text() == "10.0.0.5:8081" and d.user.text() == "kodi"
     assert d.forget_btn is not None
     d.show()
@@ -405,6 +409,8 @@ def test_add_kodi_checks_before_it_keeps(app):
     for _ in range(20):
         app.processEvents()
     assert asked[-1] == ("10.0.0.9", 8080, "kodi", "pw")
+    # Another address: its login over plain http asked about first.
+    assert questions == ["10.0.0.9:8080"]
     assert d.status.text() == tr("kodi_needs_login") and d.ok_btn.isEnabled()
     d.address.setText("10.0.0.5:8081")
     d._check()
@@ -412,6 +418,7 @@ def test_add_kodi_checks_before_it_keeps(app):
     for _ in range(20):
         app.processEvents()
     assert d.result() == QDialog.DialogCode.Accepted and d.result_label == "Den (Kodi)"
+    assert questions == ["10.0.0.9:8080"]          # its own address: allowed before
     d2 = _KodiAddDialog(parent, Kodi(), "Den (Kodi)", pool)
     d2.show()
     QTimer.singleShot(0, d2.forget_btn.click)

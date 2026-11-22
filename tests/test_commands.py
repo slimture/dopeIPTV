@@ -32,7 +32,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     (["https://h/live.m3u8"], {"play": "https://h/live.m3u8"}),
     (["udp://@239.0.0.1:1234"], {"play": "udp://@239.0.0.1:1234"}),
     (["dopeiptv://open"], {"open": True}),
-    (["--no-x11", "dopeiptv://channel/SVT1%20HD"], {"channel": "SVT1 HD"}),
+    (["--no-x11", "dopeiptv://channel/SVT1%20HD"], {"channel": "SVT1 HD", "link": True}),
     # Nothing to do: the options the app already reads, a bare word, a
     # --play of something that is no address, macOS's -psn_ argument.
     ([], None),
@@ -74,8 +74,8 @@ def test_a_file_address_is_the_path_it_names(url, posix, windows):
 @pytest.mark.parametrize("link, want", [
     # A link's address is marked as one: the window asks before it plays.
     ("dopeiptv://play?url=http%3A%2F%2Fh%2Fx.ts", {"play": "http://h/x.ts", "link": True}),
-    ("dopeiptv://channel?name=TV4%20HD", {"channel": "TV4 HD"}),
-    ("dopeiptv://channel/Kanal%205", {"channel": "Kanal 5"}),
+    ("dopeiptv://channel?name=TV4%20HD", {"channel": "TV4 HD", "link": True}),
+    ("dopeiptv://channel/Kanal%205", {"channel": "Kanal 5", "link": True}),
     ("DOPEIPTV://OPEN", {"open": True}),
     ("dopeiptv://", {"open": True}),
     # Any web page can open a link: it plays a stream, never a file here.

@@ -306,6 +306,44 @@ class _CastMixin(_CastMomentMixin):
         allowed.add(sid)
         return True
 
+    def _kodi_plain_ask(self, name: str, address: str = "") -> str:
+        """A Kodi's login about to go over plain http, the person not asked
+        yet for it (providers/kodi.py ``asks_first``; *address* for one not
+        kept yet - "Add Kodi…"): asked first, once per Kodi, nothing sent
+        before the answer - through _choice_dialog, so a cast started from
+        the phone or in TV mode is asked there. "send" (Send anyway - kept
+        with that Kodi), "https" (the same Kodi over https, for the caller
+        to try first: ``KodiManager.use_https``) or "" (Cancel, the default,
+        or no answer). "send" for a Kodi that needs no question."""
+        kodi = getattr(getattr(self, "cast", None), "kodi", None)
+        dev = None
+        if not address:
+            asks = getattr(kodi, "asks_first", None)
+            if not callable(asks) or not asks(name):
+                return "send"
+            dev = kodi.device(name)
+            address = dev.address if dev is not None else ""
+        idx = self._choice_dialog(
+            tr("kodi_plain_title"),
+            tr("kodi_plain_body", name=getattr(dev, "name", "") or name, address=address),
+            [(tr("kodi_plain_send"), "normal"), (tr("kodi_plain_https"), "normal"),
+             (tr("common_cancel"), "primary")])
+        log.info("kodi: its login over plain http - %s",
+                 {0: "send anyway", 1: "https"}.get(idx if idx is not None else -1, "not sent"))
+        if idx == 0:
+            if dev is not None:
+                kodi.allow_plain(name)
+            return "send"
+        return "https" if idx == 1 else ""
+
+    def _cast_kodi_https(self, device: str) -> None:
+        """(worker) The "Use HTTPS" answer: *device* tried over https before
+        anything else is sent to it (LocalizedError when it does not
+        answer so)."""
+        kodi = getattr(self.cast, "kodi", None)
+        if kodi is not None:
+            kodi.use_https(device)
+
     # The list vocabulary and the resume store's do not match: a movie row is
     # "vod" in one and "movie" in the other, and History rows carry their own.
     _CAST_RESUME_KIND = {"vod": "movie", "movie": "movie",
@@ -652,6 +690,9 @@ class _CastMixin(_CastMomentMixin):
         if (not self._cast_pin_ok(hls, url, source_id=src)
                 or not self._conn_ok_cast(url, source_id=src)):
             return True
+        kodi = self._kodi_plain_ask(device) if self._cast_is_kodi(device) else "send"
+        if not kodi:
+            return True                 # its login not sent: the TV left as it is
         self._cast_route_from(src)
         # The one on the TV ends as it would here: a film keeps its point,
         # its scrobbles end, failover may try again.
@@ -676,6 +717,7 @@ class _CastMixin(_CastMomentMixin):
             "url": hls, "source": url, "codecs": [], "height": 0, "fps": 0.0,
             "audio": None, "subs": None, "duration": 0.0, "tracks": {},
             "_zap_pending": True,       # picked, not sent yet
+            "_kodi_https": kodi == "https",
         }
         # Play after Stop, the media keys and the phone go on from here.
         self._last_playback = {"url": url, "title": title,
@@ -705,6 +747,9 @@ class _CastMixin(_CastMomentMixin):
         if old.get("key") == key and old.get("kind") == kind:
             log.info("cast: that title is on %s already", device)
             return True
+        kodi = self._kodi_plain_ask(device) if self._cast_is_kodi(device) else "send"
+        if not kodi:
+            return True                 # its login not sent: the TV left as it is
         self._cast_route_from(src)
         self._save_cast_position()
         self._failover_leave(url, key)
@@ -730,6 +775,7 @@ class _CastMixin(_CastMomentMixin):
             "audio": audio, "subs": subs, "duration": 0.0, "tracks": {},
             "start": float(start or 0.0),
             "_zap_pending": True,
+            "_kodi_https": kodi == "https",
         }
         self._last_playback = {"url": url, "title": title,
                                "icon_url": icon_url, "key": key,
@@ -804,6 +850,8 @@ class _CastMixin(_CastMomentMixin):
         device it is on (AirPlay swaps the item in the player it has)."""
         if gen != self._cast_zap_gen:
             raise LocalizedError("cast_stopped")
+        if ctx.pop("_kodi_https", False):
+            self._cast_kodi_https(device)       # "Use HTTPS": tried first
         audio, subs = ctx.get("audio"), ctx.get("subs")
         duration = float(ctx.get("duration") or 0.0)
         if ctx.get("kind") in ("movie", "episode") \
@@ -1788,7 +1836,9 @@ class _CastMixin(_CastMomentMixin):
         kodi = getattr(self.cast, "kodi", None)
         if kodi is None:
             return None
-        d = _KodiAddDialog(parent, kodi, current, self.pool)
+        # Its login over plain http is asked about before it is first sent.
+        d = _KodiAddDialog(parent, kodi, current, self.pool,
+                           ask=lambda address: self._kodi_plain_ask("Kodi", address))
         if d.exec() != QDialog.DialogCode.Accepted:
             return None
         return d.result_label

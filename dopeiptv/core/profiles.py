@@ -23,7 +23,8 @@ profile (MAIN_ID, "Me" in their language) - copied, not moved: the old keys
 stay until the next version, so a downgrade still finds them (migrate()).
 
 A profile: a name, a colour from a fixed palette (COLOURS - ui/theme.py's
-ACCENTS) or an emoji for its avatar, an optional PIN of 4 to 8 digits (kept as the
+ACCENTS) or an emoji for its avatar, an optional PIN of 4 to 12 digits
+(PIN_SHORTEST, PIN_LONGEST - six or more are much harder to guess; kept as the
 parental PIN is - core/pins.py: PBKDF2 with a salt of its own, an older
 value written anew on the next right entry), and a parental level: "kids"
 sees only what the parental lock leaves open and never asks for the rest.
@@ -358,7 +359,11 @@ def adult_item(item: dict) -> bool:
 # -- a profile -------------------------------------------------------------------
 
 _WORD = re.compile(r"[^\W_]+")
-_PIN = re.compile(r"\d{4,8}")
+#: A profile's PIN: 4 to 12 digits - a remote types digits. Four are 10,000
+#: PINs; six or more are what the app suggests (core/pins.py).
+PIN_SHORTEST = 4
+PIN_LONGEST = 12
+_PIN = re.compile(r"\d{%d,%d}" % (PIN_SHORTEST, PIN_LONGEST))
 
 
 def initials(name: str) -> str:

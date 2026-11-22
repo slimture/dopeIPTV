@@ -411,13 +411,19 @@ def test_a_simkl_sign_in_is_the_profiles_own_with_its_refresh_token(tmp_path):
 
 # -- the PIN, kids, removing one --------------------------------------------------------------
 
-def test_a_pin_is_four_to_eight_digits_kept_hashed(tmp_path):
+def test_a_pin_is_four_to_twelve_digits_kept_hashed(tmp_path):
     views, store, kid = _two(tmp_path)
     me = store.get(MAIN_ID)
     assert not profiles.valid_pin("123") and not profiles.valid_pin("12a4")
     assert profiles.valid_pin("12345") and profiles.valid_pin("12345678")
+    assert profiles.valid_pin("123456789") and profiles.valid_pin("123456789012")
+    assert (profiles.PIN_SHORTEST, profiles.PIN_LONGEST) == (4, 12)
     with pytest.raises(ValueError):
-        store.set_pin(MAIN_ID, "123456789")
+        store.set_pin(MAIN_ID, "1234567890123")
+    # A twelve-digit PIN is kept and opens the profile; an old four-digit one
+    # set before still does.
+    store.set_pin(MAIN_ID, "135791357913")
+    assert store.verify(MAIN_ID, "135791357913") and not store.verify(MAIN_ID, "1357913579")
     store.set_pin(MAIN_ID, "2468")
     store.reload()
     me = store.get(MAIN_ID)
@@ -894,6 +900,7 @@ def test_the_pin_fields_take_what_the_rules_take():
     import inspect
     from dopeiptv.ui import mw_context, mw_profiles, profiles_ui
     src = inspect.getsource(profiles_ui)
-    assert "self.pin.setMaxLength(8)" in src and "setMaxLength(4)" not in src
+    assert "self.pin.setMaxLength(profiles.PIN_LONGEST)" in src and "setMaxLength(4)" not in src
+    assert "longest: int = profiles.PIN_LONGEST" in src
     assert "longest=64" in inspect.getsource(mw_profiles._ProfilesMixin._grown_up_unlock)
     assert "SHORTEST" in inspect.getsource(mw_context)
