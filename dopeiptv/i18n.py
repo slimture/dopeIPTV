@@ -430,6 +430,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "diag_generic": {"en": "The stream couldn't be reached — the provider may be down"},
     "status_player_not_found": {"en": "Player not found"},
     "status_player_not_found_msg": {"en": "{name} was not found. Install it and try again."},
+    "status_player_no_handoff": {"en": "{name} was not started. The app hands it the address in a private file, which could not be made - and never puts the address where other users of this computer can read it."},
     "embedded_gl_failed": {"en": "In-app video isn't available on this system's graphics (often a virtual machine without GPU acceleration). You can still open channels in an external player."},
 
     # ── Search ────────────────────────────────────────────────────────────

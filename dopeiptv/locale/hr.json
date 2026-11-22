@@ -226,6 +226,7 @@
   "diag_generic": "Nije moguće doći do prijenosa — pružatelj je možda ugašen",
   "status_player_not_found": "Player nije pronađen",
   "status_player_not_found_msg": "{name} nije pronađen. Instaliraj ga i pokušaj ponovno.",
+  "status_player_no_handoff": "{name} nije pokrenut. Aplikacija mu predaje adresu u privatnoj datoteci, koju nije bilo moguće stvoriti – i nikad ne stavlja adresu tamo gdje je drugi korisnici ovog računala mogu pročitati.",
   "embedded_gl_failed": "Video u aplikaciji nije dostupan na grafici ovog sustava (često virtualni stroj bez GPU ubrzanja). I dalje možeš otvarati kanale u vanjskom playeru.",
   "detail_select_something": "Odaberi nešto s popisa",
   "setting_check_updates": "Provjeri ažuriranja pri pokretanju",

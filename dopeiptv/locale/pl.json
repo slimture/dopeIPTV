@@ -226,6 +226,7 @@
   "diag_generic": "Nie udało się połączyć z transmisją — dostawca może być wyłączony",
   "status_player_not_found": "Nie znaleziono odtwarzacza",
   "status_player_not_found_msg": "Nie znaleziono {name}. Zainstaluj i spróbuj ponownie.",
+  "status_player_no_handoff": "Nie uruchomiono {name}. Aplikacja przekazuje adres w prywatnym pliku, którego nie udało się utworzyć – i nigdy nie umieszcza adresu tam, gdzie mogą go odczytać inni użytkownicy tego komputera.",
   "embedded_gl_failed": "Wideo w aplikacji nie jest dostępne na grafice tego systemu (często maszyna wirtualna bez akceleracji GPU). Nadal możesz otwierać kanały w zewnętrznym odtwarzaczu.",
   "detail_select_something": "Wybierz coś z listy",
   "setting_check_updates": "Sprawdzaj aktualizacje przy uruchomieniu",

@@ -226,6 +226,7 @@
   "diag_generic": "Nije moguće doći do prenosa — provajder je možda nedostupan",
   "status_player_not_found": "Plejer nije pronađen",
   "status_player_not_found_msg": "{name} nije pronađen. Instalirajte ga i pokušajte ponovo.",
+  "status_player_no_handoff": "{name} nije pokrenut. Aplikacija mu predaje adresu u privatnoj datoteci, koja nije mogla da se napravi – i nikad ne stavlja adresu tamo gde drugi korisnici ovog računara mogu da je pročitaju.",
   "embedded_gl_failed": "Video u aplikaciji nije dostupan na grafici ovog sistema (često virtuelna mašina bez GPU ubrzanja). I dalje možete otvarati kanale u spoljnom plejeru.",
   "detail_select_something": "Izaberite nešto sa liste",
   "setting_check_updates": "Proveri ažuriranja pri pokretanju",

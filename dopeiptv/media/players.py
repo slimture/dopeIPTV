@@ -16,7 +16,9 @@ from PyQt6.QtWidgets import QMessageBox
 
 from ..i18n import english, tr
 
-from ..core.player_exec import address_scheme, fetchable, find_player_executable
+from ..core.player_exec import HANDOFF_S as _HANDOFF_S
+from ..core.player_exec import (address_scheme, carries_login, fetchable,
+                                find_player_executable, private_file)
 
 _libmpv_error: str | None = None
 
@@ -321,64 +323,31 @@ def player_command(player: str, exe: str, url: str, title: str,
 
 #: How long a handoff file waits for its player before it is deleted: the
 #: player reads it as it starts.
-HANDOFF_S = 60.0
+HANDOFF_S = _HANDOFF_S
 _HANDOFF_PREFIX = "dopeiptv-play-"
-
-
-def _handoff_dir() -> str | None:
-    """Where a handoff file is made: on Linux the user's own runtime folder
-    (in memory, 0700, theirs), else the system's temporary folder, where
-    the file is made 0600 under a name nobody can guess."""
-    run = os.environ.get("XDG_RUNTIME_DIR") or ""
-    if sys.platform.startswith("linux") and os.path.isabs(run):
-        try:
-            st = os.stat(run)
-            if st.st_uid == os.getuid() and not st.st_mode & 0o077:
-                return run
-        except OSError:
-            pass
-    return None
 
 
 def handoff_file(url: str, title: str, folder: str | None = None) -> str:
     """A one-entry playlist holding *url*, this user's alone (0600, a name
-    nobody can guess), deleted once its player has had HANDOFF_S to read
-    it; "" when it cannot be made. An http(s) address goes to an external
+    nobody can guess, in their runtime folder on Linux), deleted once its
+    player has had HANDOFF_S to read it; "" when it cannot be made. An
+    http(s) address, and any other with a login in it, goes to an external
     player this way, never as an argument: every account on a Linux
     computer can read a process's command line (/proc/<pid>/cmdline), and
     an Xtream address there is its login."""
-    import tempfile
-    import threading
-    import time
     if any(c in url for c in "\r\n"):
         return ""
     name = "".join(c for c in title if c.isprintable()) or "dopeIPTV"
-    where = folder if folder is not None else _handoff_dir()
-    try:
-        for old in os.listdir(where or tempfile.gettempdir()):
-            path = os.path.join(where or tempfile.gettempdir(), old)
-            if (old.startswith(_HANDOFF_PREFIX)
-                    and time.time() - os.path.getmtime(path) > 10 * HANDOFF_S):
-                os.remove(path)             # one a crash left behind
-    except OSError:
-        pass
-    try:
-        fd, path = tempfile.mkstemp(prefix=_HANDOFF_PREFIX, suffix=".m3u", dir=where)
-    except OSError as e:
-        log.warning("external player: no playlist file for its address (%s)", e)
-        return ""
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write(f"#EXTM3U\n#EXTINF:-1,{name}\n{url}\n")
+    return private_file(f"#EXTM3U\n#EXTINF:-1,{name}\n{url}\n", _HANDOFF_PREFIX, ".m3u",
+                        folder, keep=HANDOFF_S)
 
-    def gone() -> None:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-    timer = threading.Timer(HANDOFF_S, gone)
-    timer.daemon = True
-    timer.start()
-    return path
+
+def handed_over(url: str) -> bool:
+    """Whether *url* goes to an external player in a handoff file: an
+    http(s) address, or another network address with a login in it
+    (player_exec.carries_login)."""
+    scheme = address_scheme(url)
+    return scheme in ("http", "https") or (scheme not in ("", "file") and carries_login(url))
 
 
 def allowed_page(player: str, url: str) -> bool:
@@ -411,8 +380,13 @@ def launch_player(player: str, url: str, title: str | None = None,
         QMessageBox.warning(parent, tr("status_player_not_found"),
                             tr("status_player_not_found_msg", name=name))
         return
-    handoff = (handoff_file(url, title)
-               if address_scheme(url) in ("http", "https") else "")
+    handoff = handoff_file(url, title) if handed_over(url) else ""
+    if handed_over(url) and not handoff:
+        # Never the address in its command line instead, where every
+        # account on this computer could read it: not started, and said.
+        log.warning("external %s not started: no private file for its address", name)
+        QMessageBox.warning(parent, name, tr("status_player_no_handoff", name=name))
+        return
     cmd = player_command(player, exe, url, title, handoff)
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, env=_system_env())

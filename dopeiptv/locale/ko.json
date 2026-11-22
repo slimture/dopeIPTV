@@ -226,6 +226,7 @@
   "diag_generic": "스트림에 연결할 수 없습니다 — 공급자가 다운되었을 수 있습니다",
   "status_player_not_found": "플레이어를 찾을 수 없음",
   "status_player_not_found_msg": "{name}을(를) 찾을 수 없습니다. 설치하고 다시 시도하세요.",
+  "status_player_no_handoff": "{name}을(를) 시작하지 않았습니다. 앱은 주소를 비공개 파일로 넘기는데, 그 파일을 만들 수 없었습니다. 주소를 이 컴퓨터의 다른 사용자가 읽을 수 있는 곳에 두지 않습니다.",
   "embedded_gl_failed": "이 시스템의 그래픽에서 앱 내 비디오를 사용할 수 없습니다 (대개 GPU 가속이 없는 가상 머신). 여전히 외부 플레이어에서 채널을 열 수 있습니다.",
   "detail_select_something": "목록에서 항목을 선택하세요",
   "setting_check_updates": "시작 시 업데이트 확인",

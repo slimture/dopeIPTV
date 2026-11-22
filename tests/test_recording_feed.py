@@ -201,6 +201,9 @@ def test_the_tick_starts_the_old_way_once_when_the_feed_says_so(tmp_path, monkey
     monkeypatch.setattr(recording, "Feed", FakeFeed)
     monkeypatch.setattr(recording.RecordingManager, "recorder",
                         staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
+    from urllib.parse import urlsplit
+
+    from dopeiptv.core import net_bridge
     url = "http://h.invalid/live/u/p/1.ts"
     j = {"id": "a", "url": url, "title": "T", "stop": None, "status": "scheduled",
          "start": time.time()}
@@ -208,7 +211,13 @@ def test_the_tick_starts_the_old_way_once_when_the_feed_says_so(tmp_path, monkey
     rm._spawn(j)
     assert seen[-1][seen[-1].index("-i") + 1] == "pipe:0"
     rm.tick()
-    assert len(seen) == 2 and seen[-1][seen[-1].index("-i") + 1] == url
-    assert j["_classic"] and j["status"] == "recording"
-    rm.tick()                                   # the old way ended too: failed, no third try
+    # The recorder reads it itself now - through the bridge, under an alias
+    # that names nothing of the address.
+    alias = seen[-1][seen[-1].index("-i") + 1]
+    assert len(seen) == 2 and (urlsplit(alias).hostname or "").endswith(net_bridge.ALIAS_HOST)
+    assert not any("/u/p/" in a or "h.invalid" in a for a in seen[-1])
+    bridge = j["_alias"][0]
+    assert j["_classic"] and j["status"] == "recording" and bridge.aliases == 1
+    rm.tick()                                   # that ended too: failed, no third try
     assert len(seen) == 2 and j["status"] == "failed"
+    assert "_alias" not in j and bridge.aliases == 0       # the alias forgotten with it

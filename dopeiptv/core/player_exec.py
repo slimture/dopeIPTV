@@ -36,7 +36,18 @@ STREAM_SCHEMES = frozenset({
 FFMPEG_PROTOCOLS = ("http,https,tcp,tls,udp,udplite,rtp,srtp,crypto,httpproxy,data,"
                     "rtmp,rtmpe,rtmps,rtmpt,rtmpte,rtmpts,ffrtmpcrypt,ffrtmphttp,"
                     "mmsh,mmst,srt,rist,ftp")
+#: What ffmpeg reads for an address it is handed through the bridge (an
+#: alias, core/net_bridge.py): http to the bridge, an https segment elsewhere
+#: through its tunnel (httpproxy, tls), an HLS list's keys (crypto, data) -
+#: nothing more, since nothing but the bridge is reached.
+BRIDGED_PROTOCOLS = "http,https,tcp,tls,httpproxy,crypto,data"
 _SCHEME_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.")
+#: A query's words that name what opens an account: a password, a key, a
+#: token (srt's passphrase, an rtmp server's token...).
+LOGIN_WORDS = frozenset((
+    "user", "username", "login", "pass", "password", "passwd", "pwd", "passphrase",
+    "token", "auth", "key", "secret", "sig", "signature", "apikey", "api_key",
+    "access_token", "session", "sessionid"))
 
 
 def address_scheme(address: str) -> str:
@@ -73,15 +84,98 @@ def fetchable(address: str) -> bool:
     return scheme in STREAM_SCHEMES or scheme in ("", "file")
 
 
-def ffmpeg_protocols(address: str) -> list[str]:
+def ffmpeg_protocols(address: str, bridged: bool = False) -> list[str]:
     """ffmpeg's input options that keep what it reads for a stream at
     *address* to a stream's protocols (FFMPEG_PROTOCOLS) - the address
-    itself, a redirect's, and whatever a playlist behind it names. None for
-    a file's own path: ffmpeg's own rule for a file stands (the file and
-    what lies beside it)."""
+    itself, a redirect's, and whatever a playlist behind it names; with
+    *bridged* (an alias read through core/net_bridge.py) to what the bridge
+    needs, BRIDGED_PROTOCOLS. None for a file's own path: ffmpeg's own rule
+    for a file stands (the file and what lies beside it)."""
     if is_local_file(address):
         return []
-    return ["-protocol_whitelist", FFMPEG_PROTOCOLS]
+    return ["-protocol_whitelist", BRIDGED_PROTOCOLS if bridged else FFMPEG_PROTOCOLS]
+
+
+def carries_login(address: str) -> bool:
+    """Whether *address* holds what opens an account: a login before its
+    host (user:password@), or a query word for a password, a key or a token
+    (LOGIN_WORDS). An Xtream login in an http path is not seen here - every
+    http(s) address is handed to a program as if it held one."""
+    from urllib.parse import parse_qsl, urlsplit
+    try:
+        parts = urlsplit(str(address or ""))
+        netloc = parts.netloc
+    except ValueError:
+        return True
+    if "@" in netloc and netloc.rpartition("@")[0]:
+        return True
+    words = {k.strip().lower() for k, _v in parse_qsl(parts.query, keep_blank_values=True)}
+    return bool(words & LOGIN_WORDS)
+
+
+#: How long a private file that hands a program its address waits before it
+#: is deleted: the program reads it as it starts.
+HANDOFF_S = 60.0
+
+
+def private_folder() -> str | None:
+    """Where a private file is made: on Linux the user's own runtime folder
+    (in memory, 0700, theirs); None for the system's temporary folder, where
+    the file is made 0600 under a name nobody can guess."""
+    run = os.environ.get("XDG_RUNTIME_DIR") or ""
+    if sys.platform.startswith("linux") and os.path.isabs(run):
+        try:
+            st = os.stat(run)
+            if st.st_uid == os.getuid() and not st.st_mode & 0o077:
+                return run
+        except OSError:
+            pass
+    return None
+
+
+def private_file(text: str, prefix: str, suffix: str, folder: str | None = None,
+                 keep: float = HANDOFF_S) -> str:
+    """A file holding *text* for a program the app starts, this user's
+    alone (0600, a name nobody can guess, in *folder* or private_folder()),
+    deleted after *keep* seconds; one a crash left behind is swept. Its path,
+    or "" when it cannot be made. An address goes to a program this way, not
+    as an argument: every account on a Linux computer can read a process's
+    command line (/proc/<pid>/cmdline)."""
+    import tempfile
+    import threading
+    import time
+    where = folder if folder is not None else private_folder()
+    base = where or tempfile.gettempdir()
+    try:
+        for old in os.listdir(base):
+            path = os.path.join(base, old)
+            if old.startswith(prefix) and time.time() - os.path.getmtime(path) > 10 * max(keep, 1.0):
+                os.remove(path)
+    except OSError:
+        pass
+    try:
+        fd, path = tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=where)
+    except OSError as e:
+        from .log import log
+        log.warning("no private file to hand a program its address (%s)", e)
+        return ""
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+    def gone() -> None:
+        drop_file(path)
+    timer = threading.Timer(keep, gone)
+    timer.daemon = True
+    timer.start()
+    return path
+
+
+def drop_file(path: str) -> None:
+    """A private file gone (one already gone too)."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def system_program(*parts: str) -> str:

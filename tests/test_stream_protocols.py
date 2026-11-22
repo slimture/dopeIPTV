@@ -135,8 +135,9 @@ def served(tmp_path):
         srv.server_close()
 
 
-def _record_command(tmp_path, monkeypatch, url) -> list[str]:
-    """The recorder's own command for *url*, with the real ffmpeg."""
+def _record_command(tmp_path, monkeypatch, url) -> tuple[list[str], dict[str, str]]:
+    """The recorder's own command for *url*, with the real ffmpeg, and what
+    its environment adds (the bridge it reads an alias through)."""
     from PyQt6.QtCore import QSettings
 
     from dopeiptv.core import recording
@@ -146,11 +147,11 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
     s.clear()
     s.setValue("recordings_dir", str(tmp_path / "rec"))
     rm = RecordingManager(s)
-    seen: list[list[str]] = []
+    seen: list[tuple[list[str], dict[str, str]]] = []
 
     class FakeProc:
-        def __init__(self, cmd, **_kw):
-            seen.append(cmd)
+        def __init__(self, cmd, **kw):
+            seen.append((cmd, kw.get("env") or {}))
 
         def poll(self):
             return None
@@ -160,10 +161,12 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
         m.setattr(RecordingManager, "recorder",
                   staticmethod(lambda: ("ffmpeg", shutil.which("ffmpeg"))))
         # The recorder reading the address itself - an HLS playlist's way,
-        # and the way back for what the app cannot read (Feed.classic); a
-        # stream the app reads and pipes over is tests/test_recording_feed.py's.
+        # and the way back for what the app cannot read (Feed.classic) -
+        # through the bridge under an alias; a stream the app reads and pipes
+        # over is tests/test_recording_feed.py's.
         rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
-    return seen[0]
+    cmd, env = seen[0]
+    return cmd, {k: v for k, v in env.items() if k in ("http_proxy", "no_proxy")}
 
 
 @needs_ffmpeg
@@ -171,10 +174,10 @@ def _record_command(tmp_path, monkeypatch, url) -> list[str]:
 def test_the_real_ffmpeg_still_records_a_stream_and_an_hls_list(what, served, tmp_path,
                                                                monkeypatch):
     base, _root = served
-    cmd = _record_command(tmp_path, monkeypatch, f"{base}/{what}")
-    assert "-protocol_whitelist" in cmd
+    cmd, through = _record_command(tmp_path, monkeypatch, f"{base}/{what}")
+    assert "-protocol_whitelist" in cmd and base not in " ".join(cmd)
     done = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, timeout=120,
-                          env=_clean_env(), check=False)
+                          env={**_clean_env(), **through}, check=False)
     assert done.returncode == 0, done.stderr.decode("utf-8", "replace")[-400:]
     assert os.path.getsize(cmd[-1]) > 10_000
 

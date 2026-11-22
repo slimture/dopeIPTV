@@ -226,6 +226,7 @@
   "diag_generic": "Mtiririko haukuweza kufikiwa — mtoa huduma huenda amezimwa",
   "status_player_not_found": "Kicheza hakikupatikana",
   "status_player_not_found_msg": "{name} hakikupatikana. Kisakinishe na ujaribu tena.",
+  "status_player_no_handoff": "{name} haikuanzishwa. Programu huikabidhi anwani katika faili ya faragha, ambayo haikuweza kutengenezwa – na kamwe haiweki anwani mahali ambapo watumiaji wengine wa kompyuta hii wanaweza kuisoma.",
   "embedded_gl_failed": "Video ndani ya programu haipatikani kwenye grafiki ya mfumo huu (mara nyingi mashine pepe bila kuongeza kasi ya GPU). Bado unaweza kufungua vituo katika kicheza cha nje.",
   "detail_select_something": "Chagua kitu kutoka kwenye orodha",
   "setting_check_updates": "Angalia masasisho wakati wa kuanzisha",

@@ -226,6 +226,7 @@
   "diag_generic": "Strömmen kunde inte nås — leverantören kan vara nere",
   "status_player_not_found": "Spelaren hittades inte",
   "status_player_not_found_msg": "{name} hittades inte. Installera och försök igen.",
+  "status_player_no_handoff": "{name} startades inte. Appen lämnar över adressen i en privat fil, som inte gick att skapa – och lägger aldrig adressen där andra användare på den här datorn kan läsa den.",
   "embedded_gl_failed": "Inbäddad video stöds inte av den här datorns grafik (ofta en virtuell maskin utan GPU-acceleration). Du kan fortfarande öppna kanaler i en extern spelare.",
   "detail_select_something": "Välj något från listan",
   "setting_check_updates": "Sök efter uppdateringar vid start",

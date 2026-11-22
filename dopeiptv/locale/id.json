@@ -226,6 +226,7 @@
   "diag_generic": "Siaran tidak dapat dijangkau — penyedia mungkin mati",
   "status_player_not_found": "Pemutar tidak ditemukan",
   "status_player_not_found_msg": "{name} tidak ditemukan. Instal dan coba lagi.",
+  "status_player_no_handoff": "{name} tidak dijalankan. Aplikasi menyerahkan alamatnya dalam file pribadi, yang tidak dapat dibuat – dan tidak pernah menaruh alamat di tempat yang dapat dibaca pengguna lain di komputer ini.",
   "embedded_gl_failed": "Video dalam aplikasi tidak tersedia pada grafis sistem ini (sering kali mesin virtual tanpa akselerasi GPU). Anda masih dapat membuka saluran di pemutar eksternal.",
   "detail_select_something": "Pilih sesuatu dari daftar",
   "setting_check_updates": "Periksa pembaruan saat mulai",

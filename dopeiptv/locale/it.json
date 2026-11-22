@@ -226,6 +226,7 @@
   "diag_generic": "Impossibile raggiungere la diretta — il fornitore potrebbe essere offline",
   "status_player_not_found": "Lettore non trovato",
   "status_player_not_found_msg": "{name} non è stato trovato. Installalo e riprova.",
+  "status_player_no_handoff": "{name} non è stato avviato. L'app gli passa l'indirizzo in un file privato che non è stato possibile creare, e non mette mai l'indirizzo dove altri utenti di questo computer possono leggerlo.",
   "embedded_gl_failed": "Il video nell'app non è disponibile sulla grafica di questo sistema (spesso una macchina virtuale senza accelerazione GPU). Puoi comunque aprire i canali in un lettore esterno.",
   "detail_select_something": "Seleziona qualcosa dall'elenco",
   "setting_check_updates": "Controlla gli aggiornamenti all'avvio",

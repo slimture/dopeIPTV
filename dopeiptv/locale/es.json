@@ -226,6 +226,7 @@
   "diag_generic": "No se pudo acceder a la transmisión — el proveedor puede estar caído",
   "status_player_not_found": "Reproductor no encontrado",
   "status_player_not_found_msg": "No se encontró {name}. Instálalo e inténtalo de nuevo.",
+  "status_player_no_handoff": "{name} no se inició. La app le pasa la dirección en un archivo privado que no se pudo crear, y nunca deja la dirección donde otros usuarios de este equipo puedan leerla.",
   "embedded_gl_failed": "El vídeo integrado no está disponible con los gráficos de este sistema (a menudo una máquina virtual sin aceleración por GPU). Aún puedes abrir canales en un reproductor externo.",
   "detail_select_something": "Selecciona algo de la lista",
   "setting_check_updates": "Buscar actualizaciones al iniciar",

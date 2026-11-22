@@ -18,8 +18,9 @@ from PyQt6.QtCore import QObject, QSettings, Qt, QTimer, pyqtSignal
 
 from . import rec_mp4
 from .log import log
-from .player_exec import (NO_WINDOW, address_scheme, fetchable, ffmpeg_protocols,
-                          find_player_executable, find_program)
+from .player_exec import (FFMPEG_PROTOCOLS, NO_WINDOW, address_scheme, carries_login,
+                          drop_file, fetchable, ffmpeg_protocols, find_player_executable,
+                          find_program, private_file)
 from .privacy import for_log
 from .rec_extras import not_a_device
 
@@ -36,7 +37,8 @@ def piped(url: str) -> bool:
     can read (/proc/<pid>/cmdline), and the connection is the app's own,
     under core/dest_guard.py and the source's route like the rewind
     buffer's. An HLS playlist the recorder must fetch itself, segment by
-    segment: its address stays an argument (docs/SECURITY.md)."""
+    segment, is read through the app's bridge under an alias that names
+    nothing of it (core/net_bridge.py, ``Bridge.alias``)."""
     try:
         parts = urlsplit(url)
     except ValueError:
@@ -73,12 +75,13 @@ class Feed:
     reconnects that carry on where they left off, a page or a message told
     from a stream) and handed to the recorder on its standard input.
 
-    ``classic`` says why the recorder is to be started again the old way,
-    reading the address itself: the address is an HLS playlist after all,
-    or its certificate is one the app cannot check while the player would
-    play it unchecked (a server at home, or a source the person let play
-    unchecked) - never for a stream whose certificate the player checks
-    (core/nerd.checks_certificate, *strict*)."""
+    ``classic`` says why the recorder is to be started again reading the
+    address itself - through the bridge, under an alias (core/net_bridge.py):
+    the address is an HLS playlist after all, or its certificate is one the
+    app cannot check while the player would play it unchecked (a server at
+    home, or a source the person let play unchecked; the bridge then does
+    not check it either) - never for a stream whose certificate the player
+    checks (core/nerd.checks_certificate, *strict*)."""
 
     def __init__(self, proc: subprocess.Popen, url: str, src: dict | None,
                  live: bool = True, opener: Callable[..., Any] | None = None,
@@ -139,9 +142,57 @@ class Feed:
     @property
     def alive(self) -> bool:
         return self._thread.is_alive()
+
+
 #: Why a recording was not started for an address that is no stream's
 #: (player_exec.fetchable): the recorder is never handed one.
 NOT_A_STREAM = "its address is not a stream's"
+#: Why one was not started when the app's bridge, which hands the recorder
+#: an alias of its address (core/net_bridge.py), could not start: never the
+#: address itself in its command line instead.
+NO_BRIDGE = "the app could not hand the recorder its address privately"
+#: Why one was not started whose address (not http) holds a login and no
+#: private file to hand it over in could be made.
+NO_PRIVATE_FILE = "its address holds a login and no private file for it could be made"
+_LIST_PREFIX = "dopeiptv-rec-"
+
+
+def _concat_word(text: str) -> str:
+    """*text* as one word of ffmpeg's concat list: in single quotes, a quote
+    in it closed, escaped and opened again."""
+    return "'" + text.replace("'", "'\\''") + "'"
+
+
+def concat_list(url: str, options: list[str]) -> str:
+    """ffmpeg's concat list (ffconcat) that reads *url* - the one way to hand
+    ffmpeg an address that is not its argument - with *options* (["-key",
+    "value", ...], the input's own) as its ``option`` lines (which an
+    ffmpeg older than 5 does not know: its caller gives none then)."""
+    lines = ["ffconcat version 1.0", f"file {_concat_word(url)}"]
+    for key, value in zip(options[0::2], options[1::2], strict=False):
+        lines.append(f"option {key.lstrip('-')} {_concat_word(value)}")
+    return "\n".join(lines) + "\n"
+
+
+_ffmpeg_majors: dict[str, int | None] = {}
+
+
+def ffmpeg_major(exe: str) -> int | None:
+    """*exe*'s major version ("ffmpeg version 6.1.1-3ubuntu5": 6), asked
+    once; None for a build that does not say (a git build: new)."""
+    if exe in _ffmpeg_majors:
+        return _ffmpeg_majors[exe]
+    major: int | None = None
+    try:
+        out = subprocess.run([exe, "-hide_banner", "-version"], capture_output=True, text=True,
+                             timeout=10, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL)
+        word = (out.stdout.split() + ["", "", ""])[2].lstrip("nN")
+        head = word.split(".", 1)[0]
+        major = int(head) if head.isdecimal() else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        major = None
+    _ffmpeg_majors[exe] = major
+    return major
 
 
 def _bundled_ffmpeg() -> str | None:
@@ -460,7 +511,7 @@ class RecordingManager(QObject):
     def _save(self) -> None:
         keep = [{k: v for k, v in j.items()
                  if k not in ("proc", "recorder", "_asking", "_held", "_go_ahead",
-                              "_feed", "_classic")}
+                              "_feed", "_classic", "_alias", "_listed")}
                 for j in self.jobs if j.get("status") == "scheduled"]
         self.settings.setValue("recording_jobs", json.dumps(keep))
 
@@ -970,6 +1021,41 @@ class RecordingManager(QObject):
             j["status"] = "failed"
             j["error"] = "neither ffmpeg nor mpv found"
             return
+        url = str(j["url"])
+        src = self._source_of(j)
+        # How the recorder gets the address, which never stands in its
+        # command line (every account on a Linux computer reads that):
+        # - read by the app and handed over on its input (Feed);
+        # - an HLS playlist, and once more an address the app could not
+        #   read, through the app's bridge under an alias that names nothing
+        #   of it (core/net_bridge.py), the bridge in its environment - the
+        #   bridge also keeps its segments, keys and redirects off this
+        #   computer and the home network for a source on the internet;
+        # - another address with a login in it (rtsp://user:pw@...) in a
+        #   private file: ffmpeg's concat list, mpv's playlist;
+        # - anything else (a tuner's rtsp address, udp, a file) as before.
+        feed = piped(url) and not j.get("_classic")
+        web = address_scheme(url) in ("http", "https")
+        read, listed = url, ""
+        env: dict[str, str] | None = None
+        if web and not feed:
+            from . import net_bridge
+            bridge = net_bridge.guard_for(src, url)
+            try:
+                read = bridge.alias(url, src) if bridge is not None else ""
+            except ValueError:
+                read = ""
+            if bridge is None or not read:
+                self._not_started(j, NO_BRIDGE)
+                return
+            j["_alias"] = (bridge, read)
+            env = {**os.environ, **net_bridge.child_env(bridge)}
+        elif not web and carries_login(url):
+            listed = self._private_list(kind, exe, url, j)
+            if not listed:
+                self._not_started(j, NO_PRIVATE_FILE)
+                return
+            j["_listed"] = listed
         if self.before_spawn is not None:
             try:
                 self.before_spawn(j)
@@ -981,54 +1067,45 @@ class RecordingManager(QObject):
         except (OSError, ValueError) as e:
             # ValueError: a name no file system takes (a NUL in the folder a
             # damaged job names) - failed here, not raised out of the tick.
+            self._let_go(j)
             j["status"] = "failed"
             j["error"] = str(e)
             return
         secs = (max(1, int(j["stop"] - time.time()))
                 if j.get("stop") else None)
-        url = str(j["url"])
-        # Read by the app and handed over on the recorder's input (Feed):
-        # the address never in its command line. The old way - the recorder
-        # reading the address itself - for an HLS playlist, an RTSP tuner,
-        # a file, and once more for an address the app could not read.
-        feed = piped(url) and not j.get("_classic")
-        through: list[str] = []
-        env: dict[str, str] | None = None
-        if not feed:
-            from .net_bridge import recorder_env, recorder_options
-            bridge, pinned = self._bridge(j)
-            through = recorder_options(kind, bridge, pinned)
-            if bridge:
-                env = {**os.environ, **recorder_env(bridge)}
-            if not pinned:
-                # Its certificate as the player checks it (a pinned stream
-                # is checked by the bridge instead).
-                from .nerd import strict_tls_recorder
-                through += strict_tls_recorder(kind, url, self._source_of(j))
+        through = [] if feed else self._certificate_options(kind, url, src, bridged=read != url)
+        if not feed and not (listed and kind == "ffmpeg"):
+            # The RTSP transport a SAT>IP source asks for (ffmpeg's goes in
+            # its list with an address read from one).
             through = [*self._rtsp_options(j, kind), *through]
         if kind == "ffmpeg":
             if feed:
                 # Its input only: no network protocol at all for ffmpeg.
                 way_in = ["-protocol_whitelist", "pipe", "-i", "pipe:0"]
+            elif listed:
+                # The list on this computer, what it names a stream's.
+                way_in = ["-f", "concat", "-safe", "0", "-protocol_whitelist",
+                          "file," + FFMPEG_PROTOCOLS, "-i", listed]
             else:
                 # ffmpeg_protocols: what the address leads to (a redirect, a
-                # playlist's segments) stays a stream's too.
-                way_in = [*self._input_options(url), *ffmpeg_protocols(url),
-                          *through, "-i", url]
+                # playlist's segments) stays a stream's too - through the
+                # bridge only what it needs.
+                way_in = [*self._input_options(url), *ffmpeg_protocols(read, bridged=read != url),
+                          *through, "-i", read]
             cmd = [exe, "-y", "-loglevel", "error", *way_in, "-c", "copy"]
             if secs:
                 cmd += ["-t", str(secs)]
             cmd.append(path)
         else:
             cmd = [exe, f"--stream-record={path}", "--vo=null",
-                   "--ao=null", "--no-terminal", f"--user-agent={RECORD_UA}"]
+                   "--ao=null", "--no-terminal", "--ytdl=no", f"--user-agent={RECORD_UA}"]
             cmd += through
             if secs:
                 cmd.append(f"--length={secs}")
             # The address last, after "--": a playlist's line that starts
             # with a dash is a file that does not open, never an option of
             # mpv's (media/players.player_command). "-": its input.
-            cmd += ["--", "-" if feed else url]
+            cmd += [f"--playlist={listed}"] if listed else ["--", "-" if feed else read]
         try:
             j["proc"] = subprocess.Popen(
                 cmd, stdin=subprocess.PIPE if feed else subprocess.DEVNULL,
@@ -1037,11 +1114,13 @@ class RecordingManager(QObject):
                 bufsize=0, env=env)
             if feed:
                 from .nerd import checks_certificate
-                src = self._source_of(j)
                 j["_feed"] = Feed(j["proc"], url, src, live=live_address(url),
                                   strict=checks_certificate(src, url))
                 j["_feed"].start()
                 log.info("record: %s - read by the app, handed to %s on its input",
+                         for_log(j.get("title")), kind)
+            elif read != url:
+                log.info("record: %s - %s reads it through the app's bridge, under an alias",
                          for_log(j.get("title")), kind)
             j["path"] = path
             j["status"] = "recording"
@@ -1049,13 +1128,70 @@ class RecordingManager(QObject):
                 self.write_info(path, "", "", icon=j.get("stream_icon") or "",
                                 channel=j.get("channel") or "", start=time.time())
         except Exception as e:
+            self._let_go(j)
             j["status"] = "failed"
             j["error"] = str(e)
 
+    @staticmethod
+    def _not_started(j: dict, why: str) -> None:
+        j["status"] = "failed"
+        j["error"] = why
+        log.warning("record: %s not started - %s", for_log(j.get("title")), why)
+
+    @staticmethod
+    def _let_go(j: dict) -> None:
+        """What a recording held to hand its recorder the address: the
+        bridge's alias forgotten, the private list deleted."""
+        held = j.pop("_alias", None)
+        if held is not None:
+            held[0].forget(held[1])
+        listed = j.pop("_listed", None)
+        if listed:
+            drop_file(listed)
+
+    def _private_list(self, kind: str, exe: str, url: str, j: dict) -> str:
+        """A private file the recorder reads *url* from (player_exec
+        .private_file): ffmpeg's concat list with the input's own options -
+        an ffmpeg older than 5 knows no options there, and then reads it with
+        its own defaults (said in the log) - or mpv's one-entry playlist. ""
+        when none can be made."""
+        if any(c in url for c in "\r\n"):
+            return ""
+        if kind != "ffmpeg":
+            return private_file(f"#EXTM3U\n{url}\n", _LIST_PREFIX, ".m3u")
+        options = [*self._input_options(url), *self._rtsp_options(j, kind)]
+        major = ffmpeg_major(exe)
+        if options and major is not None and major < 5:
+            log.info("record: ffmpeg %d reads a list without its own options - %s left to "
+                     "its defaults", major, " ".join(options[0::2]))
+            options = []
+        return private_file(concat_list(url, options), _LIST_PREFIX, ".ffconcat")
+
+    def _certificate_options(self, kind: str, url: str, src: dict | None,
+                             bridged: bool) -> list[str]:
+        """The recorder's arguments for *url*'s certificate, as the player
+        checks it (core/nerd.strict_tls_recorder). Through the bridge
+        (*bridged*) ffmpeg reads the alias over plain http to the bridge,
+        which makes the TLS connection itself with the stream's own check
+        (core/net_bridge.Alias.trust) - and refuses a TLS option it has no
+        use for - so it takes none; mpv's apply to what else it opens (an
+        HLS segment on another https host, through a tunnel), and where the
+        source pins the stream's host the bridge checks the pin and mpv the
+        chain no more (net_bridge.checks_pin)."""
+        from . import net_bridge
+        from .nerd import strict_tls_recorder
+        if bridged and kind == "ffmpeg":
+            return []
+        if bridged and net_bridge.checks_pin(src, url):
+            return ["--tls-verify=no"]
+        return strict_tls_recorder(kind, url, src)
+
     def _source_of(self, j: dict) -> dict | None:
         """The source a recording was made from, as core/nerd.set_source
-        keeps one (its options and kind), read again as it is now; the one
-        playing when the job names none or it is gone."""
+        keeps one (its options and kind) with its server (``_server``,
+        make_client's form - where it is: core/net_bridge.policy_for), read
+        again as it is now; the one playing when the job names none or it
+        is gone."""
         from . import nerd
         pid = str(j.get("source") or "")
         if pid:
@@ -1066,33 +1202,9 @@ class RecordingManager(QObject):
                 log.debug("record: no source %s: %s", pid, e)
                 pl = None
             if pl:
-                return dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream")
+                return dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream",
+                            _server=str(pl.get("server") or ""))
         return nerd.source()
-
-    def _bridge(self, j: dict) -> tuple[str, bool]:
-        """Nerd: the bridge (core/net_bridge.py) a recording connects
-        through when its source's own DNS, IP version or pinned certificate
-        asks for one - the source it was made from, else the one playing;
-        "" otherwise (and always while Nerd is off) - and whether the bridge
-        checks the stream's pinned certificate (the recorder then does not
-        check the chain itself)."""
-        from . import nerd, net_bridge
-        if not nerd.current().on:
-            return "", False
-        src = nerd.source()
-        pid = str(j.get("source") or "")
-        if pid:
-            try:
-                from .stores import PlaylistStore
-                pl = PlaylistStore(self.settings).get(pid)
-            except Exception as e:
-                log.debug("record: no source %s for its route: %s", pid, e)
-                pl = None
-            if pl:
-                src = dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream")
-        url = str(j.get("url") or "")
-        address = net_bridge.address_for(src, url)
-        return address, bool(address) and net_bridge.checks_pin(src, url)
 
     def _rtsp_options(self, j: dict, kind: str) -> list[str]:
         """The RTSP transport a SAT>IP source asks for, for a recording of
@@ -1148,6 +1260,7 @@ class RecordingManager(QObject):
                 p.wait(5)
             except subprocess.TimeoutExpired:
                 p.kill()
+        RecordingManager._let_go(j)
 
     def _max_bytes(self) -> int:
         """Size cap for recordings (0 = no cap). Session override wins."""
@@ -1264,11 +1377,13 @@ class RecordingManager(QObject):
                         feed.stop()
                         continue        # its last word is still on its way
                     j.pop("_feed", None)
+                    self._let_go(j)
                     if feed is not None and feed.classic and not j.get("_classic"):
                         # An HLS playlist after all, or a certificate the
-                        # app cannot check: the recorder reads it itself.
-                        log.info("record: %s - %s; the recorder reads the address itself",
-                                 for_log(j.get("title")), feed.classic)
+                        # app cannot check: the recorder reads it itself,
+                        # through the bridge under an alias.
+                        log.info("record: %s - %s; the recorder reads it itself, through "
+                                 "the app's bridge", for_log(j.get("title")), feed.classic)
                         self._drop_empty(j.get("path"))
                         j["_classic"] = True
                         self._spawn(j)

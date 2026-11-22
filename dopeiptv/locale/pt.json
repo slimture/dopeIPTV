@@ -226,6 +226,7 @@
   "diag_generic": "Não foi possível acessar a transmissão — o provedor pode estar fora do ar",
   "status_player_not_found": "Reprodutor não encontrado",
   "status_player_not_found_msg": "{name} não foi encontrado. Instale-o e tente novamente.",
+  "status_player_no_handoff": "{name} não foi iniciado. O app entrega o endereço num arquivo privado, que não pôde ser criado – e nunca deixa o endereço onde outros usuários deste computador possam lê-lo.",
   "embedded_gl_failed": "O vídeo no app não está disponível no sistema gráfico deste computador (muitas vezes uma máquina virtual sem aceleração de GPU). Você ainda pode abrir canais em um reprodutor externo.",
   "detail_select_something": "Selecione algo na lista",
   "setting_check_updates": "Verificar atualizações ao iniciar",

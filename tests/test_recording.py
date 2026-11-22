@@ -136,7 +136,10 @@ def test_ffmpeg_records_with_the_players_user_agent(tmp_path, monkeypatch):
         rm._spawn({"url": url, "title": "T", "stop": None, "_classic": True})
     cmd_live, cmd_arch = seen
     i = cmd_live.index("-i")
-    assert cmd_live[i + 1] == live
+    # Read through the app's bridge under an alias (core/net_bridge.py); the
+    # options are still the address's own.
+    assert cmd_live[i + 1].endswith("/~/~/~/~.ts") and ".stream.invalid/" in cmd_live[i + 1]
+    assert live not in cmd_live
     before = cmd_live[:i]
     assert before[before.index("-user_agent") + 1] == RECORD_UA
     assert "-reconnect_streamed" in before
@@ -202,10 +205,21 @@ def test_a_recordings_address_is_never_in_its_command_line(tmp_path, monkeypatch
             else:
                 assert cmd[-2:] == ["--", "-"]
     assert fed == [(live, True), (arch, False)] * 2      # an archive's stretch: one connection
-    # What the recorder must fetch itself keeps the old way.
+    # What the recorder must fetch itself: an HLS playlist through the
+    # bridge under an alias, the rest as it is (none holds a login).
     for url in ("http://h.tv/live/u/p/1.m3u8", "rtsp://192.168.1.5/?src=1", "/tmp/x.ts"):
         assert not recording.piped(url)
     assert recording.piped(live) and recording.piped(arch)
+    monkeypatch.setattr(RecordingManager, "recorder",
+                        staticmethod(lambda: ("ffmpeg", "/usr/bin/ffmpeg")))
+    seen.clear()
+    rm._spawn({"url": "https://h.tv/live/user/secretpass/1.m3u8?token=t0ken", "title": "T",
+               "stop": None})
+    cmd, kw = seen[0]
+    assert not any("secretpass" in a or "t0ken" in a or "h.tv" in a for a in cmd), cmd
+    assert kw["stdin"] == recording.subprocess.DEVNULL
+    assert kw["env"]["http_proxy"].startswith("http://dopeiptv:")
+    assert not any(kw["env"]["http_proxy"] in a for a in cmd)         # the key: its environment alone
 
 
 def test_a_rename_or_move_never_replaces_another_recording(tmp_path):

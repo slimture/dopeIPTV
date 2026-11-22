@@ -226,6 +226,7 @@
   "diag_generic": "Không thể tiếp cận luồng — nhà cung cấp có thể đang tắt",
   "status_player_not_found": "Không tìm thấy trình phát",
   "status_player_not_found_msg": "Không tìm thấy {name}. Cài đặt nó và thử lại.",
+  "status_player_no_handoff": "Không khởi động {name}. Ứng dụng trao địa chỉ qua một tệp riêng tư nhưng không tạo được tệp đó – và không bao giờ đặt địa chỉ ở nơi người dùng khác trên máy tính này có thể đọc.",
   "embedded_gl_failed": "Video trong ứng dụng không khả dụng trên đồ họa của hệ thống này (thường là máy ảo không có tăng tốc GPU). Bạn vẫn có thể mở kênh trong trình phát bên ngoài.",
   "detail_select_something": "Chọn một mục từ danh sách",
   "setting_check_updates": "Kiểm tra cập nhật khi khởi động",

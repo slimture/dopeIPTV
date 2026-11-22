@@ -226,6 +226,7 @@
   "diag_generic": "Yayına ulaşılamadı — sağlayıcı kapalı olabilir",
   "status_player_not_found": "Oynatıcı bulunamadı",
   "status_player_not_found_msg": "{name} bulunamadı. Yükleyin ve tekrar deneyin.",
+  "status_player_no_handoff": "{name} başlatılmadı. Uygulama adresi özel bir dosyayla iletir; bu dosya oluşturulamadı. Adresi asla bu bilgisayarın diğer kullanıcılarının okuyabileceği bir yere koymaz.",
   "embedded_gl_failed": "Uygulama içi video bu sistemin grafik donanımında kullanılamıyor (genellikle GPU hızlandırması olmayan bir sanal makine). Yine de kanalları harici bir oynatıcıda açabilirsiniz.",
   "detail_select_something": "Listeden bir şey seçin",
   "setting_check_updates": "Başlangıçta güncellemeleri denetle",

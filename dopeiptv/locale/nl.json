@@ -226,6 +226,7 @@
   "diag_generic": "De stream kon niet worden bereikt — de provider is mogelijk offline",
   "status_player_not_found": "Speler niet gevonden",
   "status_player_not_found_msg": "{name} is niet gevonden. Installeer het en probeer opnieuw.",
+  "status_player_no_handoff": "{name} is niet gestart. De app geeft het adres door in een privébestand, dat niet kon worden gemaakt – en zet het adres nooit waar andere gebruikers van deze computer het kunnen lezen.",
   "embedded_gl_failed": "Video in de app is niet beschikbaar op de graphics van dit systeem (vaak een virtuele machine zonder GPU-versnelling). Je kunt kanalen nog steeds in een externe speler openen.",
   "detail_select_something": "Selecteer iets uit de lijst",
   "setting_check_updates": "Bij het opstarten op updates controleren",

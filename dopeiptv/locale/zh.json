@@ -226,6 +226,7 @@
   "diag_generic": "无法访问该流 — 提供商可能已宕机",
   "status_player_not_found": "未找到播放器",
   "status_player_not_found_msg": "未找到 {name}。请安装后重试。",
+  "status_player_no_handoff": "未启动 {name}。应用通过一个私有文件把地址交给它，但无法创建该文件；它从不把地址放在本机其他用户可读的地方。",
   "embedded_gl_failed": "此系统的显卡不支持应用内视频（通常是没有 GPU 加速的虚拟机）。你仍可以在外部播放器中打开频道。",
   "detail_select_something": "请从列表中选择",
   "setting_check_updates": "启动时检查更新",

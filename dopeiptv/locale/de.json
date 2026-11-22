@@ -226,6 +226,7 @@
   "diag_generic": "Der Stream war nicht erreichbar — der Anbieter ist evtl. offline",
   "status_player_not_found": "Player nicht gefunden",
   "status_player_not_found_msg": "{name} wurde nicht gefunden. Bitte installieren und erneut versuchen.",
+  "status_player_no_handoff": "{name} wurde nicht gestartet. Die App übergibt die Adresse in einer privaten Datei, die sich nicht anlegen ließ – und legt die Adresse nie dort ab, wo andere Benutzer dieses Computers sie lesen können.",
   "embedded_gl_failed": "In-App-Video wird von der Grafik dieses Systems nicht unterstützt (oft eine virtuelle Maschine ohne GPU-Beschleunigung). Du kannst Kanäle weiterhin in einem externen Player öffnen.",
   "detail_select_something": "Wähle etwas aus der Liste",
   "setting_check_updates": "Beim Start nach Updates suchen",

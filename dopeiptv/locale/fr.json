@@ -226,6 +226,7 @@
   "diag_generic": "Le flux est inaccessible — le fournisseur est peut-être hors service",
   "status_player_not_found": "Lecteur introuvable",
   "status_player_not_found_msg": "{name} n'a pas été trouvé. Installez-le et réessayez.",
+  "status_player_no_handoff": "{name} n'a pas été lancé. L'application lui transmet l'adresse dans un fichier privé qui n'a pas pu être créé, et ne met jamais l'adresse là où d'autres utilisateurs de cet ordinateur peuvent la lire.",
   "embedded_gl_failed": "La vidéo intégrée n'est pas disponible avec les graphismes de ce système (souvent une machine virtuelle sans accélération GPU). Vous pouvez toujours ouvrir les chaînes dans un lecteur externe.",
   "detail_select_something": "Sélectionnez un élément dans la liste",
   "setting_check_updates": "Rechercher les mises à jour au démarrage",
