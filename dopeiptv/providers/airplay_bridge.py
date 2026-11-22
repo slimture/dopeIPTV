@@ -161,12 +161,18 @@ def plan(url: str, source: str = "", codecs: list[str] | tuple[str, ...] = (),
     video, audio = split_codecs(codecs)
     v_ok = all(c in COPY_VIDEO for c in video)
     a_ok = all(c in COPY_AUDIO for c in audio)
-    if v_ok and a_ok and audio_track == 0 and not own_network:
+    # HEVC never goes as it is: an Apple TV plays HEVC in HLS only in fMP4
+    # segments tagged hvc1, and a provider's HLS is MPEG-TS - the sound
+    # plays, the picture stays black. The bridge copies it into fMP4 with
+    # that tag; no picture is converted.
+    hevc = "hevc" in video
+    if v_ok and a_ok and audio_track == 0 and not own_network and not hevc:
         for cand in (url, source):
             if cand and direct_ok(cand):
                 return Plan(True, cand, live, why="already HLS or MP4")
     reasons = [r for r, bad in (
         (f"picture {','.join(video)} to h264", not v_ok),
+        ("HEVC copied into fMP4, the only HLS an Apple TV plays it in", v_ok and hevc),
         (f"sound {','.join(audio)} to aac", not a_ok),
         (f"sound track {audio_track}", audio_track > 0),
         ("the source's own user agent, headers or proxy", own_network))

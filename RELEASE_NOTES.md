@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- A channel in HEVC cast to an Apple TV played sound over a black picture; it now plays, nothing converted - the computer repackages it as the Apple TV wants it.
 - The app closed at start when it had been left on Radio.
 - Posters went blank after a while in long lists, and stayed so until the app started again.
 - The app could crash as Settings opened on a system that writes numbers with a decimal comma (Swedish, German...).

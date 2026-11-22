@@ -78,7 +78,7 @@
           <li>Recordings, casting and server mode read streams through the app's own guarded bridge, never with the address on a command line</li>
           <li>Every https stream from the internet has its certificate checked in the player and in recordings</li>
           <li>A backup without a password holds no login; a restore brings nothing risky unless it is ticked</li>
-          <li>The app no longer closes at start when it was left on Radio, and posters no longer go blank in long lists</li>
+          <li>An HEVC channel cast to an Apple TV shows its picture, the app no longer closes at start when it was left on Radio, and posters no longer go blank</li>
         </ul>
       </description>
     </release>

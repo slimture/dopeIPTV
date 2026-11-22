@@ -56,6 +56,13 @@ def test_what_the_apple_tv_refuses_is_converted_and_only_that():
     assert (p.video, p.audio) == ("h264", "copy") and p.costs_cpu
     p = ab.plan("", "http://p/1.ts", ["hevc", "eac3"])
     assert p.hevc and p.video == "copy"
+    # HEVC in a provider's HLS is MPEG-TS, which an Apple TV plays with a
+    # black picture: copied into fMP4 tagged hvc1 instead, nothing converted.
+    for url in ("http://p/live/u/pw/1.m3u8", "http://p/movie/u/pw/7.mp4"):
+        p = ab.plan(url, url, ["hevc", "aac"], live=True)
+        assert not p.direct and p.hevc and (p.video, p.audio) == ("copy", "copy")
+        assert not p.costs_cpu and "fMP4" in p.why
+        assert ab.ffmpeg_args("ffmpeg", p, read=url).count("hvc1") == 1
     # mpv's names and aliases; a name that is neither is assumed fine.
     assert ab.split_codecs(["H264", "ac-3", "e-ac-3", "something"]) == (
         ["h264"], ["ac3", "eac3"])

@@ -143,6 +143,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- A channel in HEVC cast to an Apple TV played its sound over a black
+  picture: the Apple TV was handed the provider's HLS, whose MPEG-TS
+  segments it plays HEVC in only as fMP4. HEVC now goes through the
+  bridge, copied into fMP4 and tagged hvc1 - nothing is converted
+  (`airplay_bridge.plan`).
 - The app closed at start when it had been left on Radio: building the
   window filtered Radio's list before any of its rows was picked.
 - Posters went blank after a while in Movies, Series, Mine, Search, a
