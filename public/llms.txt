@@ -25,8 +25,8 @@ Key facts:
 - [Help](https://dopeiptv.org/help/): setup (Xtream, M3U, Stalker portals and their catch-up, VDR, DVBViewer, NextPVR and MythTV servers, SAT>IP servers and a Fritz!Box Cable, Jellyfin, Emby and Plex), playback, a series' page with its seasons, teletext and DVB subtitles, night mode, the visualiser for music and radio channels, the command palette, viewing statistics, YouTube and Twitch, TV mode and the phone remote, rewinding live TV, the guide, timeshift, recording, multiview, casting (and an Apple TV), dopeIPTV as the home's server (an HDHomeRun tuner for Plex, Jellyfin and Emby, a playlist for VLC and Kodi, also without a window on a NAS or a Raspberry Pi), watching together, internet radio, Trakt and Simkl, profiles, settings sync (and bringing settings to a new computer), an Enigma2 box's channel lists, Mine, the support heart, test builds and troubleshooting.
 - [Privacy policy](https://dopeiptv.org/privacy/): what the app, the website and its services process (no analytics in the app; cookieless site statistics), for how long, and GDPR rights.
 - [Terms of use](https://dopeiptv.org/terms/): dopeIPTV is a player only and provides no channels or content; the GPL licence; the user's responsibility for the services they add.
-- [Support dopeIPTV](https://dopeiptv.org/support/): a tip or monthly support, what it pays for, and the supporter key (a thank-you, not a purchase).
-- [Payment terms](https://dopeiptv.org/payments/): tips and monthly support, the supporter key, cancelling and refunds.
+- [Support dopeIPTV](https://dopeiptv.org/support/): a tip for the app - any amount, never a subscription, nothing given for it.
+- [Payment terms](https://dopeiptv.org/payments/): tips, how they are paid and refunds.
 - [About us and contact](https://dopeiptv.org/about/): made by Solecraft AB, Sweden; company details and contact.
 
 ## Source & documentation
