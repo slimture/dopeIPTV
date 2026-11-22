@@ -28,6 +28,11 @@ download to disk, a guide read with its own ceiling) is never counted. And
 JSON (a ``ValueError``, as for any other), instead of a RecursionError no
 caller expects.
 
+**What goes to dopeiptv.org** (core/site_out.py): every request through
+the adapter is asked ``site_out.check`` first, and one for dopeiptv.org
+that holds a login of a source is not sent (``LoginHeld``, a
+RequestException).
+
 **Where it lands** (core/dest_guard.py): every connection is looked at once
 it is made (``check_peer``), every redirect before it is followed
 (``redirect_refusal``, ``RedirectRefused``), and a request that goes
@@ -69,10 +74,14 @@ def _classes() -> dict[str, Any]:
             """A request through a proxy whose name leads where
             core/dest_guard.py lets no request land: not sent."""
 
+        class LoginHeld(real.exceptions.RequestException):
+            """A request to dopeiptv.org that held a login of a source
+            (core/site_out.py): not sent."""
+
         from urllib3.connection import HTTPConnection, HTTPSConnection
         from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
-        from . import dest_guard
+        from . import dest_guard, site_out
 
         class _Http(HTTPConnection):
             def _new_conn(self) -> Any:
@@ -147,6 +156,12 @@ def _classes() -> dict[str, Any]:
                 self.poolmanager.pool_classes_by_scheme = {"http": _HttpPool, "https": _HttpsPool}
 
             def send(self, request: Any, stream: bool = False, *args: Any, **kwargs: Any) -> Any:
+                # Nothing for dopeiptv.org that holds a login of a source,
+                # whoever asks (core/site_out.py) - a redirect's hop too.
+                try:
+                    site_out.check(request.url, request.headers, request.body)
+                except site_out.LoginRefused as e:
+                    raise LoginHeld(str(e), request=request) from None
                 # requests' own order: timeout, verify, cert, proxies.
                 proxies = kwargs.get("proxies", args[3] if len(args) > 3 else None)
                 if proxies and real.utils.select_proxy(request.url, proxies):
@@ -226,7 +241,7 @@ def _classes() -> dict[str, Any]:
         _made.update(Session=Session, session=Session, request=request,
                      CappedAdapter=CappedAdapter, ResponseTooLarge=ResponseTooLarge,
                      RedirectRefused=RedirectRefused, DestinationRefused=DestinationRefused,
-                     Response=Response, **{m: _verb(m) for m in verbs})
+                     LoginHeld=LoginHeld, Response=Response, **{m: _verb(m) for m in verbs})
         # requests' own, as they were when it was imported: one replaced
         # since (a test's stand-in for the network) is the one to call.
         _made["_real"] = real
@@ -237,7 +252,8 @@ def _classes() -> dict[str, Any]:
 _POSITIONAL = {"get": ("params",), "post": ("data", "json"), "put": ("data",), "patch": ("data",)}
 #: What this stand-in answers itself; every other name is requests' own.
 _OWN = frozenset(("Session", "session", "request", "get", "post", "put", "patch", "delete",
-                  "head", "options", "ResponseTooLarge", "RedirectRefused", "DestinationRefused"))
+                  "head", "options", "ResponseTooLarge", "RedirectRefused", "DestinationRefused",
+                  "LoginHeld"))
 
 
 def capped_adapter() -> Any:

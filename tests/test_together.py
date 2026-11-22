@@ -159,11 +159,18 @@ class _Clock(together.Clock):
         return self.ms
 
 
+#: The id most rooms here are made with.
+ME = "aa" * 20
+
+
 def _msg(kind, sender, n, t, **kw):
-    """A message as open_message hands it on: its signature checked."""
+    """A message as open_message hands it on: its signature checked - of an
+    app since 1.6.11 (PROTO), naming ME, so its sender is taken from it on
+    (Room.receive). ``p=None``: an older app's, with no PROTO."""
     import dataclasses
-    d = {"k": kind, "f": sender, "n": n, "t": t}
+    d = {"k": kind, "f": sender, "n": n, "t": t, "p": together.PROTO, "to": ME}
     d.update(kw)
+    d = {k: v for k, v in d.items() if v is not None}
     msg = together.parse(d)
     return dataclasses.replace(msg, signed=True) if msg is not None else None
 
@@ -201,9 +208,11 @@ def test_a_rejoin_in_the_same_run_still_knows_what_it_took():
     # Left and joined again (a new key pair here): Bob's old message handed
     # again by the relay is not taken.
     again = together.Room(code, "ee" * 20, "Me", clock, seen=together.remembered(code))
-    assert again.receive(_msg("hi", bob, 5, clock.ms, name="Bob"), now=20.0) == []
-    assert again.receive(_msg("hi", bob, 4, clock.ms, name="Bob"), now=20.0) == []
-    assert [k for k, _ in again.receive(_msg("hi", bob, 6, clock.ms, name="Bob"), now=21.0)][0] == "joined"
+    me_again = "ee" * 20
+    assert again.receive(_msg("hi", bob, 5, clock.ms, name="Bob", to=me_again), now=20.0) == []
+    assert again.receive(_msg("hi", bob, 4, clock.ms, name="Bob", to=me_again), now=20.0) == []
+    ev = again.receive(_msg("hi", bob, 6, clock.ms, name="Bob", to=me_again), now=21.0)
+    assert [k for k, _ in ev][0] == "joined"
     # Another room has counters of its own; only the last few rooms are kept.
     other = together.Room("ZZZZZ-ZZZZZ", "aa" * 20, "Me", clock, seen=together.remembered("ZZZZZ-ZZZZZ"))
     assert other.receive(_msg("hi", bob, 1, clock.ms, name="Bob"), now=22.0)
@@ -1090,8 +1099,8 @@ def test_an_unsigned_message_never_speaks_for_anyone():
         assert room.receive(unsigned, now=11.0) == []
     assert room.members == {} and room.state is None and not lines.records
     signed = together.open_message(KEY, ROOM, together.seal(
-        KEY, ROOM, {"k": "st", "f": anna.id, "n": 3, "t": clock.ms,
-                    "st": _state_wire(b=anna.id, v=8, t=clock.ms)}, anna))
+        KEY, ROOM, {"k": "st", "f": anna.id, "n": 3, "t": clock.ms, "p": together.PROTO,
+                    "to": me.id, "st": _state_wire(b=anna.id, v=8, t=clock.ms)}, anna))
     assert signed is not None and signed.signed
     room.receive(signed, now=13.0)
     assert room.state.by == anna.id and room.state.ver == 8
@@ -1133,7 +1142,7 @@ def test_an_old_frame_handed_again_after_a_rejoin_is_ignored():
     assert again.receive(seek, now=1.0) == [] and again.state is None and again.members == {}
     assert again._last_n == {}
     # What Bob says now is taken.
-    now_msg = _msg("st", bob, 8, later.ms, st=_state_wire(v=6, b=bob, t=later.ms))
+    now_msg = _msg("st", bob, 8, later.ms, to="a1" * 20, st=_state_wire(v=6, b=bob, t=later.ms))
     assert again.receive(now_msg, now=2.0)[-1][0] == "state"
 
 
@@ -1491,7 +1500,9 @@ def test_a_room_held_for_another_credential_is_left_and_said():
 
 
 def _msg2(kind, sender, n, t, **kw):
-    """A message of an app since 1.6.11 (PROTO), its signature checked."""
+    """A message of an app since 1.6.11 (PROTO), its signature checked -
+    naming nobody unless *to* says whom."""
+    kw.setdefault("to", None)
     return _msg(kind, sender, n, t, p=together.PROTO, **kw)
 
 
@@ -1524,10 +1535,12 @@ def test_an_old_frame_handed_again_after_a_restart_is_ignored_whatever_the_relay
     assert [k for k, _ in again.receive(now_hi, now=3.0)] == ["joined", "state"]
     # ...and nothing he said before it, handed again.
     assert again.receive(seek, now=4.0) == [] and again.state.ver == 6
-    # An older app's message (no "p") is still judged by time alone.
+    # An older app's message (no "p": its only guard the relay's clock) is
+    # left out since 1.6.12, said once.
     cleo = "cc" * 20
-    legacy = _msg("st", cleo, 7, lied.ms, st=_state_wire(v=7, b=cleo, t=lied.ms))
-    assert again.receive(legacy, now=5.0)[-1][0] == "state"
+    legacy = _msg("st", cleo, 7, lied.ms, p=None, to=None, st=_state_wire(v=7, b=cleo, t=lied.ms))
+    assert again.receive(legacy, now=5.0) == [("unsigned", None)]
+    assert again.receive(legacy, now=6.0) == [] and again.state.ver == 6 and cleo not in again.members
 
 
 def test_two_members_take_each_other_in_through_their_answers():

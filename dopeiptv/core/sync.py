@@ -111,7 +111,7 @@ from typing import Any
 from . import build_check
 from . import chacha20poly1305 as aead
 from . import profiles as _profiles
-from . import shortcut_keys
+from . import shortcut_keys, site_out
 from .backup import RISKY_SOURCE
 from .cert_pin import KEY as _PIN
 from .cert_pin import KEY_FOR as _PIN_FOR
@@ -1414,8 +1414,8 @@ class Remote:
     def put(self, version_seen: int, blob: bytes) -> tuple[bool, Any]:
         """(True, the new version) - or (False, (version, blob) | None) when
         the site has a newer copy than *version_seen*."""
-        r = self._call("PUT", {"version_seen": version_seen,
-                               "blob": base64.b64encode(blob).decode("ascii")})
+        sealed = site_out.sealed(base64.b64encode(blob).decode("ascii"))
+        r = self._call("PUT", {"version_seen": version_seen, "blob": sealed})
         if r.status_code == 200:
             try:
                 return True, int(r.json()["version"])
@@ -1995,4 +1995,5 @@ def code_of(settings: Any) -> bytes | None:
         # The code is the key to every synced setting: never in a log.
         shown = format_code(raw)
         register_secrets(shown, shown.replace("-", ""), shown.lower())
+        site_out.never(shown, shown.replace("-", ""), shown.lower())
     return raw

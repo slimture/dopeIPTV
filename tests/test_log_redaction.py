@@ -495,3 +495,36 @@ def test_encoded_forms_keep_the_short_rule_and_leave_ordinary_text_alone():
                  "dopeiptv-remote listening on port 3673",
                  "QWxhZGRpbjpvcGVuIHNlc2FtZQ== is someone else's"):
         assert _filtered("%s", keep) == keep, keep
+
+
+def test_a_fault_while_masking_text_withholds_it_never_half_masked(monkeypatch):
+    """redact_text fails closed: a step that raises gives the withheld line,
+    never the text with the rest of its masking skipped."""
+    from dopeiptv.core import log as logmod
+
+    class Broken:
+        def sub(self, *a, **k):
+            raise RuntimeError("pattern fault")
+
+    monkeypatch.setattr(logmod, "AUTH_LINE", Broken())
+    out = logmod.redact_text("Authorization: Basic dXNlcjpwYXNz and http://h/get.php?password=x")
+    assert out == logmod.WITHHELD
+
+
+def test_the_exception_itself_leaves_the_record_once_masked():
+    """A handler that read exc_info would see what the masked text left out:
+    once its traceback is masked into exc_text, the exception goes - and a
+    formatter still prints the masked traceback."""
+    import logging
+    import sys
+
+    logmod.register_secrets("tracebackpw1")
+    try:
+        raise ValueError("login tracebackpw1 refused")
+    except ValueError:
+        rec = logging.LogRecord("dopeiptv", logging.ERROR, __file__, 1, "failed", (), sys.exc_info())
+    assert _RedactFilter().filter(rec) is True
+    assert rec.exc_info is None
+    assert "tracebackpw1" not in rec.exc_text and "ValueError" in rec.exc_text
+    text = logging.Formatter().format(rec)
+    assert "ValueError" in text and "tracebackpw1" not in text

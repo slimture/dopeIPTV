@@ -3196,5 +3196,9 @@
   "tls_offer": "Sertifikat za {name} nije mogao da se proveri: istekao je, sam sebe potpisuje ili je izdat za drugo ime. Svako usput bi mogao da pročita ono što šalje, i prijavu u adresama. Pustiti {name} bez provere?",
   "tls_offer_go": "Pusti bez provere",
   "src_tls_unchecked": "Puštaj bez provere sertifikata",
-  "src_tls_unchecked_hint": "Strimovi se puštaju i kada sertifikat nije ispravan. Svako usput bi mogao da ih pročita, zajedno sa prijavom u adresama. Isključeno, svaki strim sa interneta se proverava."
+  "src_tls_unchecked_hint": "Strimovi se puštaju i kada sertifikat nije ispravan. Svako usput bi mogao da ih pročita, zajedno sa prijavom u adresama. Isključeno, svaki strim sa interneta se proverava.",
+  "upd_err_folder_shared": "Drugi nalozi na ovom računaru mogu da menjaju fasciklu {folder}, pa se ažuriranje ne stavlja tamo. Premesti dopeIPTV u svoju fasciklu ili ručno preuzmi novu verziju.",
+  "private_kept_title": "Još se upisuje na disk",
+  "private_kept_body": "Snimak ili emitovanje još upisuje ovaj kanal na disk. Zaustavi ga sada ili ga pusti da završi - ništa drugo sa ovog kanala se ne čuva dok gledaš privatno.",
+  "private_kept_stop": "Zaustavi"
 }

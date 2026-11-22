@@ -171,40 +171,52 @@ class _SettingsMixin:
     def _tell_settings_not_private(self) -> None:
         """Once a start, when a settings file could not be made readable by
         this user alone (core/settings_files.py: a drive that keeps no
-        permissions): asked in a window that waits for an answer - it holds
-        every login - until the person says to go on for that file; after
-        that a calm message each start. Its button opens the folder."""
+        permissions, a file another account owns, a link to nothing): asked
+        in a window that waits for an answer - it holds logins - for every
+        such file the person has not said to go on with, one after another;
+        after that a calm message each start. Its button opens the folder.
+        It fails closed: a question that could not be asked closes the
+        window rather than go on with an unanswered file."""
+        from ..core import settings_files
         try:
-            from ..core import settings_files
             found = settings_files.not_private()
-            if not found or getattr(self, "_settings_open_told", False):
-                return
-            self._settings_open_told = True
-            path = found[0]
-            folder = os.path.dirname(path)
+        except Exception as e:
+            log.warning("settings: their permissions could not be read: %s", e)
+            return
+        if not found or getattr(self, "_settings_open_told", False):
+            return
+        self._settings_open_told = True
+        pending: str | None = None
+        try:
+            for path in settings_files.waiting(self.settings.value(settings_files.ACCEPTED_KEY, "")):
+                pending = path
+                answer = self._ask_settings_open(path)
+                if answer != "go":
+                    if answer == "open":
+                        from ..core import xdg
+                        xdg.open_folder(os.path.dirname(path))
+                    log.warning("settings: the app closes - its settings file is not private")
+                    self.close()
+                    return
+                self.settings.setValue(settings_files.ACCEPTED_KEY, settings_files.with_accepted(
+                    self.settings.value(settings_files.ACCEPTED_KEY, ""), path))
+                log.warning("settings: kept on a drive other accounts may read, as the "
+                            "person said")
+                pending = None
+            folder = os.path.dirname(found[0])
 
             def show() -> None:
                 from ..core import xdg
                 xdg.open_folder(folder)
-            accepted = str(self.settings.value(settings_files.ACCEPTED_KEY, "") or "")
-            if accepted != settings_files.accepted_mark(path):
-                answer = self._ask_settings_open(path)
-                if answer == "go":
-                    self.settings.setValue(settings_files.ACCEPTED_KEY,
-                                           settings_files.accepted_mark(path))
-                    log.warning("settings: kept on a drive other accounts may read, as the "
-                                "person said")
-                    return
-                if answer == "open":
-                    show()
-                log.warning("settings: the app closes - its settings file is not private")
-                self.close()
-                return
-            hub_of(self).post(tr("settings_open_body", path=path), title=tr("settings_open_title"),
+            hub_of(self).post(tr("settings_open_body", path=found[0]), title=tr("settings_open_title"),
                               level="warning", action=show, action_label=tr("btn_open_folder"),
                               key="settings_not_private")
-        except Exception as e:      # never in the way of starting
+        except Exception as e:
             log.warning("settings: the note on their permissions was not shown: %s", e)
+            if pending is not None:
+                log.warning("settings: the app closes - a question about a settings file "
+                            "others may read could not be asked")
+                self.close()
 
     def _ask_settings_open(self, path: str) -> str:
         """The question a settings file others may read asks: "go" (go on

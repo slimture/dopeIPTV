@@ -12,6 +12,7 @@ from ..i18n import tr
 from .theme import ACCENT, P
 from .widgets import _ClickableWidget, plain_text
 from ..core import film_view as fv
+from ..core import tagless
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.workers import run_async, tmdb_url_from_provider
@@ -919,9 +920,9 @@ class _DetailMixin:
             return
         self._clear_epg_rows()
         td = self._tmdb_details or {}
-        plot = str(
+        plot = tagless.plain(str(
             info.get("plot") or info.get("description")
-            or td.get("overview") or "").strip()
+            or td.get("overview") or "")).strip()
         # Explicitly plain: the music panel switches this label to rich
         # text, and a QLabel left in that mode renders provider/TMDB prose
         # as markup - including <img src="http://...">, which would fetch a

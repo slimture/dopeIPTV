@@ -697,3 +697,54 @@ def test_a_size_beyond_any_release_file_is_not_fetched(monkeypatch, tmp_path):
     with pytest.raises(UpdateError) as e:
         selfupdate.download(asset, tmp_path / "x.part")
     assert e.value.key == "upd_err_checksum"
+
+
+def test_a_folder_others_may_change_gets_no_update(tmp_path):
+    """Another account that may write to the AppImage's folder could swap
+    the checked file for its own before it runs: no update put there."""
+    import os
+    import stat as st
+    if os.name != "posix":
+        pytest.skip("POSIX folders")
+    mine = tmp_path / "mine"
+    mine.mkdir(mode=0o755)
+    os.chmod(mine, 0o755)
+    assert not selfupdate.shared_folder(mine)
+    open_to_all = tmp_path / "all"
+    open_to_all.mkdir()
+    os.chmod(open_to_all, 0o777)
+    assert selfupdate.shared_folder(open_to_all)
+    sticky = tmp_path / "sticky"
+    sticky.mkdir()
+    os.chmod(sticky, 0o777 | st.S_ISVTX)
+    assert not selfupdate.shared_folder(sticky), "the sticky bit keeps ours ours"
+
+
+def test_the_appimage_is_checked_again_before_it_runs_and_before_it_is_put_in_place(monkeypatch, tmp_path):
+    import hashlib
+    order = []
+    current = tmp_path / "dopeIPTV-1.6.11-x86_64.AppImage"
+    current.write_bytes(b"old")
+    monkeypatch.setattr(selfupdate, "appimage_path", lambda: current)
+    monkeypatch.setattr(selfupdate, "arch", lambda: "x86_64")
+    monkeypatch.setattr(selfupdate, "refuse_older", lambda tag: None)
+    monkeypatch.setattr(selfupdate, "pick_asset", lambda assets, tag, cpu: {"name": "n"})
+    monkeypatch.setattr(selfupdate, "signed_asset", lambda rel, asset: asset)
+    monkeypatch.setattr(selfupdate.build_check, "refuse", lambda what: None)
+    monkeypatch.setattr(selfupdate, "repoint_desktop_entry", lambda new, old=None: False)
+
+    def fake_download(asset, dest, progress, cancel):
+        dest.write_bytes(b"new version")
+        selfupdate._VERIFIED[str(dest)] = hashlib.sha256(b"new version").hexdigest()
+    monkeypatch.setattr(selfupdate, "download", fake_download)
+    real_verify = selfupdate.verify_again
+    monkeypatch.setattr(selfupdate, "verify_again", lambda p: (order.append("verify"), real_verify(p)))
+
+    def tampered_check(path, tag, cur):
+        order.append("self_check")
+        path.write_bytes(b"swapped in")        # changed after it ran
+    monkeypatch.setattr(selfupdate, "self_check", tampered_check)
+    with pytest.raises(selfupdate.UpdateError):
+        selfupdate.install({"tag": "v1.6.12"}, "1.6.11")
+    assert order == ["verify", "self_check", "verify"]
+    assert not list(tmp_path.glob("*1.6.12*")), "nothing put in place"

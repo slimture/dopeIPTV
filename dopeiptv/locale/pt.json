@@ -3196,5 +3196,9 @@
   "tls_offer": "Não foi possível verificar o certificado de {name}: ele expirou, é autoassinado ou foi emitido para outro nome. Qualquer pessoa no caminho poderia ler o que ele envia, inclusive o login nos endereços. Reproduzir {name} sem verificar?",
   "tls_offer_go": "Reproduzir sem verificar",
   "src_tls_unchecked": "Reproduzir sem verificar o certificado",
-  "src_tls_unchecked_hint": "As transmissões tocam mesmo quando o certificado não confere. Qualquer pessoa no caminho poderia lê-las, e o login nos endereços delas. Desligado, toda transmissão da internet é verificada."
+  "src_tls_unchecked_hint": "As transmissões tocam mesmo quando o certificado não confere. Qualquer pessoa no caminho poderia lê-las, e o login nos endereços delas. Desligado, toda transmissão da internet é verificada.",
+  "upd_err_folder_shared": "Outras contas deste computador podem alterar a pasta {folder}, então a atualização não é colocada lá. Mova o dopeIPTV para uma pasta só sua ou baixe a nova versão manualmente.",
+  "private_kept_title": "Ainda gravando no disco",
+  "private_kept_body": "Uma gravação ou transmissão ainda está gravando este canal no disco. Pare agora ou deixe terminar - nada mais deste canal é guardado enquanto você assiste em privado.",
+  "private_kept_stop": "Parar"
 }

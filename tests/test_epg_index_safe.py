@@ -134,7 +134,8 @@ def test_what_is_no_index_of_the_apps_is_a_miss():
             whole[:-1], whole[:len(whole) // 2],                       # cut short
             whole + b"\x00",                                           # more than it says
             _with_head(None, magic=b"dpIPTVgX"),
-            _with_head(None, version=3), _with_head(None, version=5),
+            _with_head(None, version=epg._INDEX_VERSION - 1),       # an older app's
+            _with_head(None, version=epg._INDEX_VERSION + 1),
             _with_head(None, time_size=4), _with_head(None, ref_size=8),
             _with_head(None, texts=7), _with_head(None, texts=9),      # texts it does not hold
             _with_head(None, programmes=4),                            # the table says three

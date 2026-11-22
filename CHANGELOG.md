@@ -5,7 +5,44 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [Unreleased]
+## [1.6.12]
+
+### Security
+
+- Nothing that goes to dopeiptv.org can carry a login of yours: every
+  request the app makes passes one check before a byte is sent, and one to
+  dopeiptv.org that holds a source's user name, password, token or box
+  MAC - or your Trakt, Simkl, OpenSubtitles, proxy or Kodi login, or the
+  sync code - readable in its address, headers or body, in any encoded
+  form, is not sent. What is end-to-end encrypted (a synced copy, a room's
+  messages) is the only thing it does not read. Every source's login is
+  known to the log's mask from the start, not only once the source is
+  opened.
+- The log fails closed in one more place: a fault while masking a line
+  withholds it instead of writing it half-masked, and a logged exception
+  keeps only its masked traceback.
+- An update is checked again right before it starts or is put in place,
+  and an AppImage in a folder other accounts may change is not updated
+  there (move it to a folder of your own, or update by hand).
+- **Watch together** takes messages only from 1.6.11 and later: an older
+  app's only guard against an old message handed again was the relay's
+  clock. Someone with an older app is told to update, as before for 1.6.8.
+- **Private viewing** asks when a recording or a cast keeps the channel's
+  rewind buffer on the disk as it is turned on: Stop it, or let it finish -
+  nothing is stopped by itself.
+- The macOS build's signing certificate and notary key are read by the
+  macOS build alone, in an environment of their own.
+- A settings file another account owns, or a link to nowhere, counts as
+  not private; every settings file others may read is asked about, not the
+  first alone, and a question that cannot be asked closes the window.
+
+### Fixed
+
+- A programme's description with HTML from the provider in it (a web
+  page's time widget: `Matchen börjar: <span class="…">15:00.`) showed the
+  code under the video; the tags are left out now and only the words show.
+  The same for a film's plot. Each guide is read again from its copy on
+  disk once after the update.
 
 ## [1.6.11]
 

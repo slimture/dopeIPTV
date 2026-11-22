@@ -111,6 +111,39 @@ class _PrivacyMixin:
             log.info("private viewing: %s - opened again", why)
             QTimer.singleShot(0, self._retry_last_stream)
 
+    def _private_ask_kept(self) -> None:
+        """Private viewing turned on while a recording or a cast keeps the
+        channel's buffer on the disk: nothing is stopped by itself - a card
+        asks, Stop it ending what keeps it there (the recording, the cast),
+        dismissed letting it finish. Once it is done the channel moves off
+        the disk (_private_buffer_on_disk)."""
+        p = getattr(self, "player", None)
+        pool = getattr(p, "_dvr_pool", None)
+        kept = getattr(pool, "kept_on_disk_private", None)
+        s = kept() if callable(kept) else None
+        if s is None:
+            return
+        recorders = [r for r in list(getattr(s, "recorders", [])) if getattr(r, "alive", False)]
+        rec = getattr(self, "rec", None)
+        jobs = [j["id"] for j in (getattr(rec, "jobs", None) or [])
+                if j.get("status") == "recording" and j.get("recorder") in recorders]
+        casting = bool(s.held and getattr(self, "_cast_device", None))
+        log.info("private viewing: a %s keeps the channel's buffer on the disk - asked",
+                 "recording and a cast" if jobs and casting else "cast" if casting else "recording")
+
+        def stop() -> None:
+            for jid in jobs:
+                try:
+                    self.rec.cancel(jid)
+                except Exception:
+                    log.debug("private viewing: a recording not stopped", exc_info=True)
+            if casting and hasattr(self, "_end_cast"):
+                self._end_cast("private viewing asked it")
+        from .notices import hub_of
+        hub_of(self).post(tr("private_kept_body"), title=tr("private_kept_title"), level="warning",
+                          action=stop, action_label=tr("private_kept_stop"),
+                          key="private_kept_on_disk", decide=True)
+
     def _private_buffer_on_disk(self) -> None:
         """The recording or cast that kept a private channel's buffer on the
         disk is done (core/dvr_pool.on_private_disk): nothing more of it is
@@ -184,6 +217,8 @@ class _PrivacyMixin:
                 # nothing more of it: the channel opened again, its buffer
                 # in memory out of a disk's reach, or none (core/dvr_pool).
                 self._private_reopen_if_on_disk("the channel's buffer is on the disk")
+                # One a recording or a cast keeps on the disk: asked about.
+                self._private_ask_kept()
             # A cast whose converter works on the disk: sent again, its work
             # in memory out of a disk's reach - or stopped and said so.
             if hasattr(self, "_cast_private_on"):

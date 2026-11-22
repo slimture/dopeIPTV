@@ -7,7 +7,7 @@ name = "dopeiptv"
 # MUST stay in lock-step with dopeiptv/__init__.py's __version__. A test
 # (tests/test_version.py) fails the build if they drift, so a release can't
 # ship an sdist named after the wrong version again. Bump BOTH on a release.
-version = "1.6.11"
+version = "1.6.12"
 description = "IPTV player for Xtream Codes, M3U playlists and Stalker portals, the TV servers at home and Jellyfin, Emby and Plex"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -186,6 +186,8 @@ files = [
     "dopeiptv/providers/dlna.py",
     "dopeiptv/providers/device_urls.py",
     "dopeiptv/core/safe_xml.py",
+    "dopeiptv/core/tagless.py",
+    "dopeiptv/core/site_out.py",
     "dopeiptv/core/source_files.py",
     "dopeiptv/providers/stalker.py",
     "dopeiptv/core/stores.py",

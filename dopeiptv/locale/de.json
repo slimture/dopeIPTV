@@ -3196,5 +3196,9 @@
   "tls_offer": "Das Zertifikat von {name} konnte nicht geprüft werden: Es ist abgelaufen, selbst signiert oder für einen anderen Namen ausgestellt. Jeder auf dem Weg könnte dann mitlesen, was gesendet wird, auch die Anmeldedaten in den Adressen. {name} ohne Prüfung abspielen?",
   "tls_offer_go": "Ohne Prüfung abspielen",
   "src_tls_unchecked": "Ohne Zertifikatsprüfung abspielen",
-  "src_tls_unchecked_hint": "Die Streams laufen auch, wenn ihr Zertifikat nicht stimmt. Jeder auf dem Weg könnte sie dann mitlesen, samt den Anmeldedaten in ihren Adressen. Aus: Jeder Stream aus dem Internet wird geprüft."
+  "src_tls_unchecked_hint": "Die Streams laufen auch, wenn ihr Zertifikat nicht stimmt. Jeder auf dem Weg könnte sie dann mitlesen, samt den Anmeldedaten in ihren Adressen. Aus: Jeder Stream aus dem Internet wird geprüft.",
+  "upd_err_folder_shared": "Andere Konten auf diesem Computer können den Ordner {folder} ändern, deshalb wird das Update dort nicht abgelegt. Verschiebe dopeIPTV in einen eigenen Ordner oder lade die neue Version von Hand herunter.",
+  "private_kept_title": "Wird noch auf die Festplatte geschrieben",
+  "private_kept_body": "Eine Aufnahme oder ein Cast schreibt diesen Sender noch auf die Festplatte. Beende sie jetzt oder lass sie zu Ende laufen - sonst wird von diesem Sender beim privaten Ansehen nichts behalten.",
+  "private_kept_stop": "Beenden"
 }

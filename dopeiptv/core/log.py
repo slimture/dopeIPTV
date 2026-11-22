@@ -329,7 +329,8 @@ def redact_text(text: str) -> str:
     exception's message - safe to log: every address in it masked
     (_address_masked), a query or an Xtream account without its address,
     a login header, a bearer token, a login written name=value and a box's
-    MAC, then every registered value. Never raises."""
+    MAC, then every registered value. Never raises - and fails closed: a
+    fault in any step gives WITHHELD, never the text half-masked."""
     try:
         if "://" in text:
             text = URL_IN_TEXT.sub(lambda m: _address_masked(m.group(0)), text)
@@ -341,9 +342,9 @@ def redact_text(text: str) -> str:
         text = BEARER.sub(lambda m: f"{m.group(1)} ***", text)
         text = MAC.sub("***", text)
         text = KEYVAL.sub(_value_masked, text)
+        return redact(text)
     except Exception:
-        pass
-    return redact(text)
+        return WITHHELD
 
 
 def _escaped(text: str) -> str:
@@ -408,6 +409,9 @@ class _RedactFilter(logging.Filter):
                 record.exc_text = logging.Formatter().formatException(record.exc_info)
             if record.exc_text:
                 record.exc_text = _escaped(redact_text(record.exc_text))
+            # The exception itself goes: a handler that read it would see
+            # what the masked text left out. Formatters print exc_text.
+            record.exc_info = None
             if record.stack_info:
                 record.stack_info = _escaped(redact_text(record.stack_info))
         except Exception as e:

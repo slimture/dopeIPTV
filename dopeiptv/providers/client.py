@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import html
 import os
 import re
 import threading
@@ -13,7 +12,7 @@ from typing import Any
 
 from ..core._lazy_requests import requests
 
-from ..core import dest_guard, m3u_ids, mirrors, stream_address
+from ..core import dest_guard, m3u_ids, mirrors, stream_address, tagless
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
@@ -1693,11 +1692,12 @@ def _sane_link_netloc(url: str) -> bool:
 
 
 def b64(text: str | None) -> str:
-    """Decode Xtream's base64-encoded EPG text fields."""
+    """Decode Xtream's base64-encoded EPG text fields - as plain text, the
+    HTML a provider copied in from a web page left out (tagless.plain)."""
     if not text:
         return ""
     try:
-        return html.unescape(base64.b64decode(text).decode("utf-8", "replace")).strip()
+        return tagless.plain(base64.b64decode(text).decode("utf-8", "replace")).strip()
     except Exception:
         return str(text)
 

@@ -33,7 +33,7 @@ from pathlib import Path
 
 from . import build_check
 from .log import log
-from .selfupdate import UpdateError, download, refuse_older, signed_asset
+from .selfupdate import UpdateError, download, refuse_older, signed_asset, verify_again
 
 # What the update dialog says once the installer is downloaded (i18n key:
 # install it, and dopeIPTV opens again); the download is checked as it
@@ -138,6 +138,8 @@ def restart_into(setup: Path, pid: int | None = None) -> None:
     two minutes at most - and opens the new version when done. The caller
     closes the app straight after."""
     pid = pid or os.getpid()
+    # The very installer that was checked, right before it runs.
+    verify_again(setup)
     proc = subprocess.Popen(
         [str(setup), "/update", "/relaunch", f"/waitpid={pid}"],
         env=_child_env(), close_fds=True, stdin=subprocess.DEVNULL,
