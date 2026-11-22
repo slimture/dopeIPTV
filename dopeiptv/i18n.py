@@ -1398,6 +1398,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "restore_holds": {"en": "It holds:"},
     "restore_missing_paths": {"en": "Folders it names that this computer does not have: {n}. Those settings stay as they are here."},
     "restore_risky": {"en": "It has Nerd settings that run programs, send your connections or what you watch to another server, or let other devices control the app. Restore it only if you made it yourself:"},
+    "restore_risky_ticks": {"en": "None of them is brought unless you tick it; what you leave unticked stays as it is here."},
     "restore_replace": {"en": "Replace everything on this computer"},
     "restore_replace_hint": {"en": "Playlists, favorites, history and every setting become what the backup holds. dopeIPTV then closes; start it again to carry on with the backup."},
     "restore_add": {"en": "Add its playlists only"},

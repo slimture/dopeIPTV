@@ -39,6 +39,12 @@ and only those: a file it does not have stays exactly as it is here. One
 whose app settings hold neither playlists nor settings is not put back over
 everything at all (replaceable()): it would only empty what is here.
 
+What runs something, lets others in or sends the connections elsewhere
+(risky, risky_sources - one choice each, risky_choices) is brought only when
+the person ticks it, in either way of restoring (without): a setting not
+ticked stays as it is here (Backup.keep, kept with a staged restore), a
+playlist not ticked comes without those options.
+
 That is done as the app starts: stage() now, apply_pending() at the next
 start, before anything reads the settings.
 The running window holds its stores in memory and writes them back as it
@@ -70,7 +76,7 @@ import re
 import secrets
 import tempfile
 import unicodedata
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -176,6 +182,24 @@ SIGN_INS = ("trakt_access_token", "simkl_access_token")
 #: backup addresses, a certificate trusted for it, its own DNS server).
 RISKY_SOURCE = ("proxy", "headers", "rewrite", "udpxy", "catchup_template",
                 "backup_servers", "dns_url", "cert_pin", "tls_unchecked")
+#: A playlist's options that are one setting with one of RISKY_SOURCE (as
+#: core/sync.py holds them back together): left out with it.
+_SOURCE_WITH = {"cert_pin": ("cert_pin_for",), "catchup_template": ("catchup_mode",),
+                "dns_url": ("dns",)}
+#: What a risky setting brings with it, brought only with it: server mode's
+#: reach with its switch, a sync's own with its code, a watch history's
+#: whole sign-in with its token (a renewal token alone would sign in again;
+#: providers/trakt.SIGN_IN_KEYS, providers/simkl.SIGN_IN_KEYS).
+_WITH = {"nerd_server": (_SERVER_ADULT, "nerd_server_open", "nerd_server_open_hosts"),
+         SYNC_CODE: ("sync_cats", "sync_source_ids"),
+         "trakt_access_token": ("trakt_refresh_token", "trakt_expires_at"),
+         "simkl_access_token": ("simkl_refresh_token", "simkl_token_expires")}
+#: The remote API's and sharing's reach: brought only with one of them.
+_LAN = "nerd_remote_lan"
+#: A choice of risky_choices() that is a playlist's: "source:<its place>".
+SOURCE_CHOICE = "source:"
+#: The most keys a restore keeps as they are here (Backup.keep).
+_KEEP_MAX = 256
 _HEADERS = frozenset({"nerd_headers", "nerd_hooks_header", "headers"})
 _HEADER_NAME = re.compile(r"^\s*([A-Za-z0-9!#$%&'*+.^_`|~-]+)\s*[:=]")
 #: The kinds a summary counts, by the file that holds them.
@@ -221,21 +245,28 @@ class BackupError(ValueError):
 
 @dataclass
 class Backup:
-    """A backup as read: *kind* "full", or "playlists" for an old export."""
+    """A backup as read: *kind* "full", or "playlists" for an old export.
+    *keep*: the app settings (by their names without a profile's part) a
+    restore over everything leaves as they are here - the risky ones the
+    person did not tick (``without``)."""
 
     kind: str
     stores: dict[str, dict[str, Any]] = field(default_factory=dict)
     sources: list[dict] = field(default_factory=list)
     app_version: str = ""
     created: str = ""
+    keep: list[str] = field(default_factory=list)
 
     @property
     def full(self) -> bool:
         return self.kind == "full"
 
     def document(self) -> dict[str, Any]:
-        return {MAGIC: FORMAT, "app_version": self.app_version,
-                "created": self.created, "stores": self.stores}
+        doc: dict[str, Any] = {MAGIC: FORMAT, "app_version": self.app_version,
+                               "created": self.created, "stores": self.stores}
+        if self.keep:
+            doc["keep"] = list(self.keep)
+        return doc
 
 
 # -- what goes in ----------------------------------------------------------------
@@ -623,8 +654,14 @@ def parse(data: Any) -> Backup:
             if not _good_key(key) or not _plain(value):
                 raise BackupError("invalid", f"{name}/{key}")
         clean[name] = dict(values)
+    # What a restore keeps here (a staged one's: the risky settings not
+    # ticked). From someone else's file it can only keep more of what is
+    # here; anything that is not a short list of keys is passed over.
+    keep = data.get("keep")
+    keep = ([k for k in keep if _good_key(k)][:_KEEP_MAX]
+            if isinstance(keep, list) and all(isinstance(k, str) for k in keep) else [])
     return Backup("full", clean, _sources(clean.get("main", {}).get("playlists")),
-                  app_version, created if isinstance(created, str) else "")
+                  app_version, created if isinstance(created, str) else "", keep)
 
 
 # -- what it holds ---------------------------------------------------------------
@@ -816,19 +853,81 @@ def risky(b: Backup) -> list[tuple[str, str]]:
     return out
 
 
-def risky_sources(b: Backup) -> list[tuple[str, list[str]]]:
-    """(playlist name, its RISKY_SOURCE options set) of each playlist in *b*
-    that has any."""
+def _risky_keys(options: Any) -> list[str]:
+    """The RISKY_SOURCE options a playlist's *options* set."""
+    if not isinstance(options, dict):
+        return []
+    return [k for k in RISKY_SOURCE if isinstance(options.get(k), str) and options[k].strip()]
+
+
+def _risky_rows(b: Backup) -> list[tuple[int, str, list[str]]]:
+    """(its place in b.sources, its name, its RISKY_SOURCE options) of each
+    playlist in *b* that sets any."""
     out = []
-    for p in b.sources:
-        options = p.get("options")
-        if not isinstance(options, dict):
-            continue
-        keys = [k for k in RISKY_SOURCE if isinstance(options.get(k), str) and options[k].strip()]
+    for i, p in enumerate(b.sources):
+        keys = _risky_keys(p.get("options"))
         if keys:
             name = p.get("name") if isinstance(p.get("name"), str) else ""
             server = p.get("server") if isinstance(p.get("server"), str) else ""
-            out.append((name or server or "?", keys))
+            out.append((i, name or server or "?", keys))
+    return out
+
+
+def risky_sources(b: Backup) -> list[tuple[str, list[str]]]:
+    """(playlist name, its RISKY_SOURCE options set) of each playlist in *b*
+    that has any."""
+    return [(name, keys) for _i, name, keys in _risky_rows(b)]
+
+
+def risky_choices(b: Backup) -> list[str]:
+    """Each risky thing *b* would bring, as one choice the person ticks or
+    not: the keys risky() names, in its order, then SOURCE_CHOICE + the
+    place in b.sources of each playlist risky_sources() names, in its order
+    - one per line the restore shows."""
+    return ([key for key, _shown in risky(b)]
+            + [f"{SOURCE_CHOICE}{i}" for i, _name, _keys in _risky_rows(b)])
+
+
+def without(b: Backup, take: Iterable[str] = ()) -> Backup:
+    """*b* bringing only the risky things in *take* (risky_choices' names)
+    and everything else as it is: a risky setting not ticked - with what is
+    one setting with it (_WITH, the remote's reach _LAN unless the remote
+    or sharing is ticked) - is not taken, and a restore over everything
+    leaves this computer's own as it is (``Backup.keep``); a playlist not
+    ticked comes without its RISKY_SOURCE options (and their companions,
+    _SOURCE_WITH), in either way of restoring. Nothing is ticked by default:
+    ``without(b)`` brings none of them."""
+    take = set(take)
+    main = dict(b.stores.get("main", {}))
+    keep = set(b.keep)
+    choices = risky_choices(b)
+    left = [key for key in choices if key not in take]
+    for key in left:
+        if key.startswith(SOURCE_CHOICE):
+            continue
+        keep.update((key, *_WITH.get(key, ())))
+    if any(key in _LAN_ON for key in left) and not take & set(_LAN_ON):
+        keep.add(_LAN)
+    for k in list(main):
+        if _base(k) in keep:
+            del main[k]
+    gone = {int(key[len(SOURCE_CHOICE):]) for key in left if key.startswith(SOURCE_CHOICE)}
+    sources = []
+    for i, p in enumerate(b.sources):
+        if i in gone:
+            keys = _risky_keys(p.get("options"))
+            drop = set(keys) | {c for k in keys for c in _SOURCE_WITH.get(k, ())}
+            p = dict(p, options={k: v for k, v in p["options"].items() if k not in drop})
+        sources.append(p)
+    stores = dict(b.stores)
+    if "main" in stores:
+        if gone and isinstance(main.get("playlists"), str):
+            main["playlists"] = json.dumps(sources, ensure_ascii=False)
+        stores["main"] = main
+    out = Backup(b.kind, stores, sources, b.app_version, b.created,
+                 sorted(keep)[:_KEEP_MAX] if b.full else [])
+    if gone or left:
+        log.info("restore: %d risky setting(s) not brought", len(left))
     return out
 
 
@@ -862,6 +961,13 @@ def restore(b: Backup, stores: Mapping[str, Settings | None],
         incoming = {k: v for k, v in b.stores.get(name, {}).items()
                     if covered(name, k)}
         keep_here: set[str] = set()
+        if name == "main" and b.keep:
+            # The risky settings not ticked (without): this computer's own
+            # stay as they are, whichever profile's they are.
+            kept_names = set(b.keep)
+            incoming = {k: v for k, v in incoming.items() if _base(k) not in kept_names}
+            with _no_fallbacks(s):
+                keep_here |= {k for k in s.allKeys() if _base(k) in kept_names}
         if name == "main":
             for key, kind in _PATHS.items():
                 if key not in incoming:

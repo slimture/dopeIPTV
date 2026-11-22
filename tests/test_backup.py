@@ -688,7 +688,7 @@ def test_the_dialog_says_what_a_restore_replaces_and_keeps(qapp, tmp_path):
                  "playlists": json.dumps([{**SOURCES[1], "options": {"proxy": "http://p.invalid"}}])}}})
     d = _dialog(b)
     assert d.replace.isEnabled() and d.replace.isChecked() and d.choice() == "replace"
-    notes = d.notes.text()
+    notes = d.shown_text()
     assert tr("restore_kept", what=", ".join(tr(f"backup_kind_{k}") for k in
                                              ("resume", "followed", "watched", "watchlist"))) in notes
     assert tr("restore_risky_source", name="B", what=tr("nerd_proxy")) in notes

@@ -75,7 +75,7 @@ def test_the_restore_window_holds_those_lines(qapp):
                 playlists="[]")
     d = RestoreBackupDialog(None, b, backup.summary(b), 0, backup.risky(b))
     try:
-        notes = d.notes.text()
+        notes = d.shown_text()
         assert tr("restore_risky") in notes
         for part in (tr("nerd_server"), tr("sync_title"), "notify-send {title}"):
             assert part in notes
