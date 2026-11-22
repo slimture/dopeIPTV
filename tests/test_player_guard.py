@@ -175,6 +175,22 @@ def test_a_program_is_handed_an_alias_and_its_environment(_clean, caplog):
     assert "t0k" not in repr(way) and "s3cret" not in repr(way)
 
 
+def test_a_program_goes_out_the_way_it_went_before(_clean, monkeypatch):
+    """A program's http_proxy is the bridge now: the bridge goes on through
+    what it would have taken itself - Nerd's proxy where streams take it,
+    else the environment's."""
+    from dopeiptv.core.recording import RecordingManager
+    url = "http://provider.example/live/1.m3u8"
+    monkeypatch.setenv("http_proxy", "http://system.example:8080")
+    assert RecordingManager._proxy_for(INTERNET_SRC, url) == "http://system.example:8080"
+    way = net_bridge.hand_over(INTERNET_SRC, url)
+    assert way is not None and way.bridge._up == net_bridge.Upstream("system.example", 8080, None)
+    nerd.install(S(nerd_enabled="true", nerd_proxy="http://10.0.0.1:3128"))
+    assert RecordingManager._proxy_for(INTERNET_SRC, url) == "http://10.0.0.1:3128"
+    way = net_bridge.hand_over(INTERNET_SRC, url)
+    assert way is not None and way.bridge._up.host == "10.0.0.1"
+
+
 def test_no_bridge_no_program(monkeypatch):
     monkeypatch.setattr(net_bridge, "guard_for", lambda *_a, **_k: None)
     assert net_bridge.hand_over(INTERNET_SRC, "http://provider.example/1.ts") is None

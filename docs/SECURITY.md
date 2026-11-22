@@ -750,6 +750,11 @@ once in the log - never no playback.
   proxy connects. On such a stream the player goes through the guard's
   bridge, not a route's, so a pinned certificate is not checked there.
 - **An external player** is the person's own program.
+- **What it costs.** Every such stream is copied through the app's process,
+  and a plain http request through the bridge is a connection of its own
+  (`Connection: close`, so each is looked up for its own host): an HLS
+  segment over plain http opens a new connection where it might have
+  reused one.
 - **A public name of the stream's own server** that the home's DNS answers
   with a home address is let in (split-horizon DNS for one's own server),
   and so are the person's own names and `.plex.direct` (`Policy.entry`,
