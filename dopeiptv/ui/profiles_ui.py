@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from PyQt6 import sip
 from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPaintEvent, QPen
 from PyQt6.QtWidgets import (
@@ -333,10 +334,13 @@ class _Swatch(QAbstractButton):
 
 class ProfileDialog(QDialog):
     """A new profile, or one to edit: its name, the avatar's colour or
-    emoji, a PIN (four digits, or none) and whether it is a kids profile."""
+    emoji, a PIN (4 to 12 digits, or none), whether it is a kids profile -
+    and for one, whether it sees only what a grown-up allows, and what
+    (``AllowedPicker``, with *window*: the sources and their categories)."""
 
     def __init__(self, parent: QWidget, store: profiles.ProfileStore,
-                 profile: Profile | None = None, parental: Any = None) -> None:
+                 profile: Profile | None = None, parental: Any = None,
+                 window: Any = None) -> None:
         super().__init__(parent)
         self.store, self.profile, self.parental = store, profile, parental
         self.setWindowTitle(tr("profile_edit_title") if profile else tr("profile_add_title"))
@@ -395,6 +399,31 @@ class ProfileDialog(QDialog):
         self.kids.setAccessibleName(tr("profile_kids"))
         krow.addWidget(self.kids, 0, Qt.AlignmentFlag.AlignVCenter)
         lay.addLayout(krow)
+        # A kids profile that sees only what a grown-up chose, per source
+        # (core/profiles.py ``only_allowed``) - off unless turned on here.
+        self.allowed = {sid: {m: list(ids) for m, ids in modes.items()}
+                        for sid, modes in (profile.allowed if profile else {}).items()}
+        self.only_box = QWidget()
+        orow = QHBoxLayout(self.only_box)
+        orow.setContentsMargins(18, 0, 0, 0)
+        ocol = QVBoxLayout()
+        ocol.addWidget(QLabel(tr("profile_only_allowed")))
+        ohint = QLabel(tr("profile_only_allowed_hint"))
+        ohint.setWordWrap(True)
+        ohint.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+        ocol.addWidget(ohint)
+        self.choose = QPushButton(tr("profile_allowed_choose"))
+        self.choose.clicked.connect(self._choose_allowed)
+        self.choose.setVisible(window is not None)
+        ocol.addWidget(self.choose, 0, Qt.AlignmentFlag.AlignLeft)
+        orow.addLayout(ocol, 1)
+        self.only = ToggleSwitch(bool(profile and profile.only_allowed))
+        self.only.setAccessibleName(tr("profile_only_allowed"))
+        orow.addWidget(self.only, 0, Qt.AlignmentFlag.AlignTop)
+        lay.addWidget(self.only_box)
+        self.only_box.setVisible(self.kids.isChecked())
+        self.kids.toggled.connect(self.only_box.setVisible)
+        self._win = window
         prow = QHBoxLayout()
         pcol = QVBoxLayout()
         pcol.addWidget(QLabel(tr("profile_pin")))
@@ -466,6 +495,15 @@ class ProfileDialog(QDialog):
         self.error.setText(tr(key))
         self.error.show()
 
+    def _choose_allowed(self) -> None:
+        """What this kids profile may watch, per source (AllowedPicker):
+        kept with the profile once it is saved."""
+        dlg = AllowedPicker(self, self._win, self.allowed)
+        if dlg.exec():
+            self.allowed = dlg.chosen()
+            if not self.only.isChecked():
+                self.only.setChecked(True)      # chosen: the mode is what it is for
+
     def _save(self) -> None:
         name = profiles.clean_name(self.name.text())
         pin = self.pin.text().strip()
@@ -491,6 +529,8 @@ class ProfileDialog(QDialog):
                 p = self.profile
                 self.store.update(p.id, name=name, colour=self._colour(),
                                   emoji=self._emoji(), kids=self.kids.isChecked())
+            self.store.update(p.id, only_allowed=self.kids.isChecked() and self.only.isChecked(),
+                              allowed=self.allowed)
         except ValueError as e:
             self._fail({"full": "profile_err_full", "taken": "profile_err_taken"}.get(str(e), "profile_err_name"))
             return
@@ -500,6 +540,156 @@ class ProfileDialog(QDialog):
             self.store.clear_pin(p.id)
         self.saved = self.store.get(p.id)
         self.accept()
+
+
+def _categories_of(window: Any, pl: dict) -> dict[str, list[dict]]:
+    """(worker) Source *pl*'s categories of each catalogue (ALLOW_MODES):
+    the window's own client for the source in use, else one made for it -
+    the source's own lists, nothing else asked."""
+    store = getattr(window, "playlist_store", None)
+    if str(pl.get("id")) == str(getattr(store, "active_id", "") or "") \
+            and getattr(window, "client", None) is not None:
+        client = window.client
+    else:
+        from ..providers.client import make_client
+        client = make_client(pl)
+    out: dict[str, list[dict]] = {}
+    for mode, fn in (("live", "live_categories"), ("vod", "vod_categories"),
+                     ("series", "series_categories")):
+        get = getattr(client, fn, None)
+        try:
+            out[mode] = [c for c in (get() if callable(get) else []) or []
+                         if isinstance(c, dict) and c.get("category_id") is not None]
+        except Exception as e:
+            from ..core.log import log
+            log.info("profiles: %s categories not read (%s)", mode, type(e).__name__)
+            out[mode] = []
+    return out
+
+
+class AllowedPicker(QDialog):
+    """What a kids profile with "Only what a grown-up allows" may watch: a
+    source picked, its channel, film and series categories ticked - none
+    named for adults is offered. Read off the window's thread; ``chosen()``
+    the profile's ``allowed`` as it is then (each source's own, kept as it
+    was for one not opened here)."""
+
+    def __init__(self, parent: QWidget, window: Any, allowed: dict) -> None:
+        super().__init__(parent)
+        from PyQt6.QtWidgets import QComboBox, QListWidget
+        self.w = window
+        self.picked = {sid: {m: set(ids) for m, ids in modes.items()}
+                       for sid, modes in (allowed or {}).items()}
+        self.setWindowTitle(tr("profile_allowed_title"))
+        self.setMinimumSize(460, 520)
+        lay = QVBoxLayout(self)
+        hint = QLabel(tr("profile_only_allowed_hint"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
+        lay.addWidget(hint)
+        self.source = QComboBox()
+        self.source.setAccessibleName(tr("profile_allowed_source"))
+        store = getattr(window, "playlist_store", None)
+        sources = [p for p in (store.playlists() if store is not None else [])
+                   if p.get("id") and p.get("kind") != "local"]
+        active = str(getattr(store, "active_id", "") or "")
+        sources.sort(key=lambda p: str(p.get("id")) != active)
+        for p in sources:
+            self.source.addItem(str(p.get("name") or p.get("server") or p.get("id")), p)
+        lay.addWidget(self.source)
+        self.note = QLabel("")
+        self.note.setTextFormat(Qt.TextFormat.PlainText)
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet(f"color:{P['muted']};")
+        lay.addWidget(self.note)
+        self.list = QListWidget()
+        self.list.setAccessibleName(tr("profile_allowed_title"))
+        self.list.itemChanged.connect(self._ticked)
+        lay.addWidget(self.list, 1)
+        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save
+                               | QDialogButtonBox.StandardButton.Cancel)
+        box.accepted.connect(self.accept)
+        box.rejected.connect(self.reject)
+        lay.addWidget(box)
+        self._pid = ""
+        self._gen = 0
+        self.source.currentIndexChanged.connect(lambda _i: self._load())
+        self._load()
+
+    def _load(self) -> None:
+        pl = self.source.currentData()
+        self.list.clear()
+        if not isinstance(pl, dict):
+            self.note.setText(tr("profile_allowed_none"))
+            return
+        self._pid = str(pl.get("id"))
+        self._gen += 1
+        gen = self._gen
+        self.note.setText(tr("common_loading"))
+        from ..core.workers import run_async
+        run_async(self.w.pool, lambda: _categories_of(self.w, pl),
+                  lambda got: self._fill(gen, pl, got),
+                  lambda msg: self._failed(gen, msg))
+
+    def _failed(self, gen: int, msg: str) -> None:
+        if gen == self._gen and not sip.isdeleted(self):
+            self.note.setText(tr("profile_allowed_failed", msg=msg))
+
+    def _fill(self, gen: int, pl: dict, got: dict) -> None:
+        """The source's categories with the ones ticked that were chosen -
+        none for adults, by the name the lists show or the provider's own."""
+        if gen != self._gen or sip.isdeleted(self):
+            return
+        from PyQt6.QtWidgets import QListWidgetItem
+
+        from ..core.stores import CategoryOverrides
+        pid = str(pl.get("id"))
+        names = CategoryOverrides(self.w.settings, f"category_overrides_{pid}")
+        mine = self.picked.get(pid, {})
+        self.list.blockSignals(True)
+        heads = {"live": "nav_tv", "vod": "nav_movies", "series": "nav_series"}
+        offered = 0
+        for mode in profiles.ALLOW_MODES:
+            cats = got.get(mode) or []
+            if not cats:
+                continue
+            head = QListWidgetItem(tr(heads[mode]))
+            font = QFont(head.font())
+            font.setBold(True)
+            head.setFont(font)
+            head.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.list.addItem(head)
+            for c in cats:
+                cid, own = str(c.get("category_id")), str(c.get("category_name") or "")
+                shown = names.display_name(mode, cid, own) or own or cid
+                if profiles.adult_category(shown, own):
+                    continue
+                it = QListWidgetItem(shown)
+                it.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+                it.setCheckState(Qt.CheckState.Checked if cid in mine.get(mode, set())
+                                 else Qt.CheckState.Unchecked)
+                it.setData(Qt.ItemDataRole.UserRole, (mode, cid))
+                self.list.addItem(it)
+                offered += 1
+        self.list.blockSignals(False)
+        self.note.setText("" if offered else tr("profile_allowed_none"))
+        self.note.setVisible(not offered)
+
+    def _ticked(self, it: Any) -> None:
+        data = it.data(Qt.ItemDataRole.UserRole)
+        if not data or not self._pid:
+            return
+        mode, cid = data
+        ids = self.picked.setdefault(self._pid, {}).setdefault(mode, set())
+        if it.checkState() == Qt.CheckState.Checked:
+            ids.add(cid)
+        else:
+            ids.discard(cid)
+
+    def chosen(self) -> dict[str, dict[str, list[str]]]:
+        """The profile's ``allowed`` as ticked (core/profiles.clean_allowed)."""
+        return profiles.clean_allowed({sid: {m: sorted(ids) for m, ids in modes.items()}
+                                       for sid, modes in self.picked.items()})
 
 
 # -- Settings > Profiles -------------------------------------------------------------
@@ -563,6 +753,8 @@ class ProfilesPage:
         controls.addWidget(edit)
         controls.addWidget(remove)
         tags = [tr("profile_kids_tag") if p.kids else tr("profile_everyone")]
+        if p.allow_only:
+            tags.append(tr("profile_only_allowed"))
         tags.append(tr("profile_pin_on") if p.has_pin else tr("profile_pin_off"))
         badge = None
         if active:
@@ -575,7 +767,8 @@ class ProfilesPage:
         return row
 
     def _add(self) -> None:
-        dlg = ProfileDialog(self.d, self.w.profiles, parental=getattr(self.w, "parental", None))
+        dlg = ProfileDialog(self.d, self.w.profiles, parental=getattr(self.w, "parental", None),
+                            window=self.w)
         if dlg.exec() and dlg.saved is not None:
             self.w._profiles_changed()
             self.refresh()
@@ -584,7 +777,8 @@ class ProfilesPage:
         p = self.w.profiles.get(pid)
         if p is None or not self.w._profile_unlock(p, self.d):
             return
-        dlg = ProfileDialog(self.d, self.w.profiles, p, parental=getattr(self.w, "parental", None))
+        dlg = ProfileDialog(self.d, self.w.profiles, p, parental=getattr(self.w, "parental", None),
+                            window=self.w)
         if dlg.exec():
             self.w._profiles_changed()
             self.refresh()

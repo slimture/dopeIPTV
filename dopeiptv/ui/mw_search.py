@@ -141,6 +141,7 @@ class _SearchMixin:
         # a locked one while the lock is shut by its name alone, marked as
         # the list marks it - nothing of what is in it.
         kids = getattr(self, "_profile_kids", lambda: False)()
+        cat_ok = getattr(self, "_kids_cat_ok", None)     # with what a grown-up allows
         for c in getattr(self, "_raw_categories", []):
             cid = c.get("category_id")
             if self.overrides.is_hidden(self.mode, cid):
@@ -149,7 +150,9 @@ class _SearchMixin:
                 self.mode, cid, c.get("category_name", "?"))
             locked = (self.overrides.is_locked(self.mode, cid)
                       and not self.parental.session_unlocked)
-            if kids and (adult_category(cname, c.get("category_name")) or locked):
+            if kids and (locked or adult_category(cname, c.get("category_name"))
+                         or (callable(cat_ok)
+                             and not cat_ok(self.mode, cid, cname, c.get("category_name")))):
                 continue
             name_match = q in cname.lower()
             if locked:

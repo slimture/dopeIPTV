@@ -85,12 +85,17 @@ def adult_ids(categories: Iterable[Any], names: Mapping[str, str] | None = None)
 
 
 def visible(rows: Iterable[Any], keep: Callable[[dict], bool] | None = None,
-            kids: bool = False, adult: frozenset[str] | None = frozenset()) -> list[dict]:
+            kids: bool = False, adult: frozenset[str] | None = frozenset(),
+            known: frozenset[str] | None = None,
+            allowed: frozenset[str] | None = None) -> list[dict]:
     """*rows* as a source's lists show them: none *keep* turns down (its
     hidden categories, locked ones while locked, rows hidden by hand) and,
-    for a kids profile, none marked for adults and none in a category named
-    for them - *adult* those ids, None when they could not be read: then
-    none of its rows that has a category."""
+    for a kids profile, as its lists have them (ui/mw_profiles.KidsFilter):
+    none marked for adults, none without a category or of one the source
+    does not list (*known*, its category ids, where given), none in a
+    category named for adults (*adult* those ids; None when they could not
+    be read: then none at all) - and with "Only what a grown-up allows"
+    only those of *allowed*."""
     out: list[dict] = []
     for r in rows or []:
         if not isinstance(r, dict) or (keep is not None and not keep(r)):
@@ -99,7 +104,11 @@ def visible(rows: Iterable[Any], keep: Callable[[dict], bool] | None = None,
             if adult_item(r):
                 continue
             cid = r.get("category_id")
-            if cid not in (None, "") and (adult is None or str(cid) in adult):
+            if cid in (None, "") or adult is None or str(cid) in adult:
+                continue
+            if known is not None and str(cid) not in known:
+                continue
+            if allowed is not None and str(cid) not in allowed:
                 continue
         out.append(r)
     return out

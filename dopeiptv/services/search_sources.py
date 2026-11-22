@@ -71,6 +71,10 @@ class Plan:
     playlist: Mapping[str, Any]
     shown: Mapping[str, Shown] = field(default_factory=dict)
     kids: bool = False
+    #: "Only what a grown-up allows": by "live", "vod", "series" the
+    #: categories of this source the kids profile may see (None, or no
+    #: entry: every one not for adults).
+    allowed: Mapping[str, frozenset[str] | None] = field(default_factory=dict)
     client: Any = None
     guide: Any = None
     key: tuple = ()
@@ -124,8 +128,12 @@ def build_catalogue(plan: Plan, client: Any,
         shown = plan.shown.get(mode) or Shown()
         given = dict(shown.names)
         adult = sa.adult_ids(cats, given) if cats is not None else None
+        known = (frozenset(str(c.get("category_id")) for c in cats
+                           if isinstance(c, dict) and c.get("category_id") is not None)
+                 if cats is not None else None)
         keep = shown.keep
-        found[group] = [r for r in sa.visible(rows, keep, plan.kids, adult)
+        found[group] = [r for r in sa.visible(rows, keep, plan.kids, adult, known,
+                                              plan.allowed.get(mode))
                         if r.get(ident) is not None]
         names[mode] = {str(c.get("category_id")): given.get(str(c.get("category_id")))
                        or str(c.get("category_name") or "")

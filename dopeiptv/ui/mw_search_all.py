@@ -287,9 +287,14 @@ class _SearchAllMixin:
                 cats = CategoryOverrides(self.settings, f"category_overrides_{pid}")
                 chans = ChannelOverrides(self.settings, f"channel_overrides_{pid}")
             shown = {m: Shown.of(cats, chans, locked, m) for m in _MODES}
+            # "Only what a grown-up allows": this source's own (mw_profiles).
+            allowed_of = getattr(self, "_kids_allowed", None)
+            allowed = ({m: allowed_of(m, pid) for m in _MODES} if kids and callable(allowed_of)
+                       else {})
             key = (ss.signature(pl), str(pl.get("name") or ""), who,
-                   json.dumps(cats.data, sort_keys=True), json.dumps(chans.data, sort_keys=True))
-            plans.append(ss.Plan(ss.source_of(pl), pl, shown, kids,
+                   json.dumps(cats.data, sort_keys=True), json.dumps(chans.data, sort_keys=True),
+                   tuple(sorted((m, tuple(sorted(v))) for m, v in allowed.items() if v is not None)))
+            plans.append(ss.Plan(ss.source_of(pl), pl, shown, kids, allowed,
                                  client=self.client if here else None,
                                  guide=getattr(self, "xmltv", None) if here else None,
                                  key=key))

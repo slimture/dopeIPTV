@@ -23,13 +23,13 @@ from PyQt6.QtWidgets import (
 
 from ..core import series_view as sv
 from ..core.log import log
-from ..core.profiles import adult_category, adult_item
+from ..core.profiles import adult_item
 from ..core.workers import run_async
 from ..i18n import tr
 from .epg_grid import EpgGrid
 from .theme import P
 from .tv_mode import (
-    ChannelsScreen, TvPage, TvScreen, _art, _kids, _set_image, _sig, now_next,
+    ChannelsScreen, TvPage, TvScreen, _art, _cat_ok, _kids, _set_image, _sig, now_next,
 )
 from .tv_widgets import TvGrid, TvKeyboard, TvList, TvShelf, TvTile, colour, font, px
 
@@ -358,7 +358,7 @@ class MediaScreen(TvScreen):
             if w.overrides.is_locked(self.kind, cid) and not unlocked:
                 continue
             name = w.overrides.display_name(self.kind, cid, c.get("category_name", "?"))
-            if kids and adult_category(name, c.get("category_name")):
+            if kids and not _cat_ok(w, self.kind, cid, name, c.get("category_name")):
                 continue
             rows.append({"name": name, "_cat": cid})
         self.cats.set_items(rows, "cat", 1 if len(rows) > 1 else 0)

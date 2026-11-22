@@ -122,7 +122,8 @@ class _PlacesMixin:
         the Guide, Search, a series - gives way); *reload* reads its list
         again even then. True once it shows."""
         name = places.valid(name) or places.DEFAULT_PLACE
-        if name in ("local", "rec") and getattr(self, "_profile_kids", lambda: False)():
+        never = getattr(self, "_kids_never_places", None)
+        if name in (never() if callable(never) else ()):
             name = "tv"     # never a kids profile's (mw_profiles.KIDS_NEVER), by any way in
         if name == "guide":
             self._open_epg_guide()

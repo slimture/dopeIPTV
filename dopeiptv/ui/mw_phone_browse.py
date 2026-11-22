@@ -190,6 +190,7 @@ class _PhoneBrowseMixin:
 
         def build() -> list[dict]:
             from ..core.profiles import adult_category
+            cat_ok = getattr(snap.get("keep"), "category_ok", None)
             out = []
             for c in _source_cats(client, mode):
                 cid = c.get("category_id")
@@ -197,6 +198,10 @@ class _PhoneBrowseMixin:
                     continue
                 name = shown.names.get(str(cid)) or str(c.get("category_name") or "?")
                 if snap["kids"] and adult_category(name, c.get("category_name")):
+                    continue
+                # With "Only what a grown-up allows": only what one chose
+                # (the kids profile's test, read on the window's thread).
+                if callable(cat_ok) and not cat_ok(mode, cid, name, c.get("category_name")):
                     continue
                 ref = refs.put("cat", f"{mode}:{cid}", (mode, cid, name))
                 out.append({"k": "dir", "p": f"{mode}/{ref}", "name": name})
