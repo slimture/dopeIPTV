@@ -122,16 +122,15 @@ CODE: dict[str, list[dict]] = {
     "together": [
         {"id": "key", "repo": "app", "path": "dopeiptv/core/together.py",
          "names": ["ALPHABET", "CODE_LEN", "OLD_LEN", "STRETCH", "_PAD", "new_code", "is_old_code",
-                   "_stretched", "derive", "AUTH_HEADER", "auth_of", "FORMAT", "_AAD", "MIN_FRAME",
-                   "MAX_FRAME", "seal", "_seal_text", "_open_text", "open_frame"]},
+                   "derive", "FORMAT", "_AAD", "MIN_FRAME", "MAX_FRAME", "seal", "_seal_text", "_open_text",
+                   "open_frame"]},
         {"id": "signed", "repo": "app", "path": "dopeiptv/core/together.py",
          "names": ["Identity", "member_of", "new_identity", "_signed", "encode",
                    "_signature_holds", "open_message"]},
         {"id": "replay", "repo": "app", "path": "dopeiptv/core/together.py",
          "from": r"^    def _make\(", "to": r"^        return msg$",
          "with": [{"repo": "app", "path": "dopeiptv/core/together.py",
-                   "names": ["PROTO", "Room.hello", "Room._timely", "Room._counted", "Room._prove",
-                             "Room._answer", "Room._not_yet", "remembered"]},
+                   "names": ["Room._timely", "Room._counted", "remembered"]},
                   {"repo": "app", "path": "dopeiptv/core/together.py",
                    "from": r"^    def receive\(", "to": r"^        if not self\._counted\(msg, now\):"}]},
         {"id": "backlog", "repo": "app", "path": "dopeiptv/core/together.py",
@@ -214,8 +213,6 @@ TESTS: dict[str, list[tuple[str, str]]] = {
     "together": [("tests/test_together.py", n) for n in (
         "test_an_unsigned_message_never_speaks_for_anyone",
         "test_an_old_frame_handed_again_after_a_rejoin_is_ignored",
-        "test_an_old_frame_handed_again_after_a_restart_is_ignored_whatever_the_relays_clock",
-        "test_the_rooms_credential_comes_from_the_stretched_code_and_is_none_of_the_others",
         "test_an_old_code_of_eight_joins_nothing")],
 }
 
@@ -514,7 +511,9 @@ inside = together.encode(msg, room, me).decode("utf-8")
 print(json.dumps({"code": code, "inside": inside,
                   "request": "POST " + together.ENDPOINT + room,
                   "member": together.MEMBER_HEADER + ": " + me.id,
-                  "auth": together.AUTH_HEADER + ": " + together.auth_of(code),
+                  # The room's credential, from 1.6.11 (an older app sends none).
+                  "auth": together.AUTH_HEADER + ": " + together.auth_of(code)
+                          if hasattr(together, "auth_of") else "",
                   "size": len(frame), "body": base64.b64encode(frame).decode("ascii")}))
 '''
 
@@ -595,8 +594,8 @@ def examples_of(app: str, site: str) -> dict:
         "sync": {"inside": syn["inside"],
                  "request": syn["request"] + "\n" + json.dumps({"version_seen": 0, "blob": shorten(blob)})},
         "together": {"inside": tog["inside"],
-                     "request": tog["request"] + "\n" + tog["member"] + "\n" + tog["auth"] + "\n\n"
-                     + shorten(tog["body"])},
+                     "request": "\n".join(x for x in (tog["request"], tog["member"], tog["auth"]) if x)
+                     + "\n\n" + shorten(tog["body"])},
         "private": {"lines": pri["off"] + "\n" + pri["on"]},
         "updates": {"lines": upd["agent"] + "\n" + upd["build"]},
         "website": {"log": web["log"], "visit": pretty(web["visit"]), "anon": pretty(web["anon"])},

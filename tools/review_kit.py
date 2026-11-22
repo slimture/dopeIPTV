@@ -25,10 +25,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import transparency  # noqa: E402
 
-#: Names the next release adds to a part's code, shown when the app has them.
+#: Names the next release adds to a part's code, shown when the app has them
+#: (a block taken by its lines gets them in its first named companion).
+#: At the release they move into transparency.CODE, and its tests into
+#: transparency.TESTS (1.6.11: test_an_old_frame_handed_again_after_a_
+#: restart_is_ignored_whatever_the_relays_clock, test_the_rooms_credential_
+#: comes_from_the_stretched_code_and_is_none_of_the_others).
 NEXT = {
     ("sync", "send"): ["auth_of", "AUTH_HEADER", "Remote.of"],
     ("updates", "signed"): ["_HOPS", "DOWNLOAD_MAX", "_get_https"],
+    ("together", "key"): ["_stretched", "AUTH_HEADER", "auth_of"],
+    ("together", "replay"): ["PROTO", "Room.hello", "Room._prove", "Room._answer", "Room._not_yet"],
 }
 
 #: Names the next release takes out of a part's code, left out when the app
@@ -178,12 +185,13 @@ def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
     shown = f"{version.group(1) if version else '?'} @ {ref}"
     for (part, bid), names in NEXT.items():
         for block in transparency.CODE.get(part, []):
-            if block["id"] == bid:
-                src = open(os.path.join(app, block["path"]), encoding="utf-8").read()
+            into = next((b for b in [block] + block.get("with", []) if "names" in b), None)
+            if block["id"] == bid and into is not None:
+                src = open(os.path.join(app, into["path"]), encoding="utf-8").read()
                 for n in names:
                     leaf = n.split(".")[-1]
-                    if n not in block["names"] and re.search(rf"^\s*(def|class)?\s*{re.escape(leaf)}\b", src, re.M):
-                        block["names"].append(n)
+                    if n not in into["names"] and re.search(rf"^\s*(def|class)?\s*{re.escape(leaf)}\b", src, re.M):
+                        into["names"].append(n)
     for (part, bid), names in GONE.items():
         for block in transparency.CODE.get(part, []):
             if block["id"] == bid:
