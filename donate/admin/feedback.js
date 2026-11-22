@@ -625,23 +625,31 @@
   // Answering: one report, or a group (everyone who reported that problem,
   // and whoever reports it later). Only reports whose sender asked for
   // answers in the app can be told; the rest are counted. One report's
-  // answer may let them reply, once ("Let them reply"; never a group's).
+  // answer may let them reply, once ("Let them reply"; never a group's) -
+  // in a problem too, answered to the sender of the report shown alone.
   function answerBox(r, key, group) {
     const box = mk("div", "fb-answer");
-    const can = group ? group.answerable : (r.answerable ? 1 : 0);
-    const head = mk("p", "fb-answer-head", group
-      ? (can ? "Answer everyone with this problem - " + num.format(can) + " of " + num.format(group.count) +
-               " asked for answers in the app, and anyone who reports it later is told too."
-             : "Nobody who reported this asked for answers in the app - an answer still reaches whoever reports it later.")
-      : (can ? "Answer - shown in their app, in their language (your own words as written)."
-             : "This person did not ask for answers in the app."));
+    let one = !group;                         // to one report's sender
+    const head = mk("p", "fb-answer-head");
+    const headText = () => {
+      if (one) {
+        if (!r.answerable) { return "This person did not ask for answers in the app."; }
+        return group ? "Answer only the person behind the report below - shown in their app, in their language."
+                     : "Answer - shown in their app, in their language (your own words as written).";
+      }
+      const can = group.answerable;
+      return can ? "Answer everyone with this problem - " + num.format(can) + " of " + num.format(group.count) +
+                   " asked for answers in the app, and anyone who reports it later is told too."
+                 : "Nobody who reported this asked for answers in the app - an answer still reaches whoever reports it later.";
+    };
+    head.textContent = headText();
     box.append(head);
     if (group) {
       (r.replies || []).forEach((a) => {
         box.append(mk("p", "fb-said", when.format(new Date(a.t * 1000)) + " · " + saidText(a)));
       });
     }
-    if (!can && !group) { return box; }
+    if (!group && !r.answerable) { return box; }
     // Nothing picked at first: often the answer is words of one's own. A
     // picked one picked again goes back to none; none with words sends them
     // as they are ("note").
@@ -658,7 +666,7 @@
     tick.addEventListener("change", () => { touched = true; });
     letReply.append(tick, mk("span", "", "Let them reply"),
                     mk("span", "muted", "once, in the app - then it waits for your next answer"));
-    letReply.hidden = !!group;
+    letReply.hidden = !one;
     const byCode = () => { if (!touched) { tick.checked = code === "needinfo"; } };
     REPLY.filter(([k]) => k !== "note").forEach(([k, label]) => {
       const b = mk("button", "chip-f", label);
@@ -680,15 +688,15 @@
     const words = mk("textarea", "fb-words-in");
     Object.assign(words, { rows: 3, maxLength: 1500,
                            placeholder: "Your own words - shown as written (after the answer picked above, if any)" });
-    const send = mk("button", "btn", group ? "Send to all of them" : "Send answer");
+    const send = mk("button", "btn", one ? "Send answer" : "Send to all of them");
     send.type = "button";
     const said = mk("span", "muted");
     send.addEventListener("click", () => {
       if (!code && !words.value.trim()) { said.textContent = "Pick an answer or write something first."; return; }
       send.disabled = true;
-      const body = { target: group ? "group" : "report", key: key, code: code || "note", text: words.value,
-                     version: version.value.trim() };
-      if (!group) { body.open = tick.checked; }
+      const body = { target: one ? "report" : "group", key: one ? r.id : key, code: code || "note",
+                     text: words.value, version: version.value.trim() };
+      if (one) { body.open = tick.checked; }
       post("/admin/feedback-reply", body).then((ok) => {
         if (!ok) { said.textContent = "Could not save it."; send.disabled = false; return; }
         if (open) { open.fbForm = null; }        // a fresh box for the next answer
@@ -698,7 +706,36 @@
     });
     const line = mk("div", "fb-actions");
     line.append(send, said);
-    box.append(chips, version, letReply, words, line);
+    // A problem whose report below asked for answers: everyone with it, or
+    // that one person - who may then reply.
+    let who = null;
+    if (group && r.answerable) {
+      who = mk("div", "fb-chips fb-who");
+      who.setAttribute("role", "group");
+      who.setAttribute("aria-label", "Who the answer goes to");
+      who.append(mk("span", "fb-who-to", "To:"));
+      const whoBtns = [];
+      [[false, "Everyone with this problem"], [true, "Only the sender of the report below"]].forEach(([v, label]) => {
+        const b = mk("button", "chip-f" + (v === one ? " on" : ""), label);
+        b.type = "button";
+        b.setAttribute("aria-pressed", v === one ? "true" : "false");
+        whoBtns.push([v, b]);
+        b.addEventListener("click", () => {
+          one = v;
+          whoBtns.forEach(([w, c]) => {
+            const on = w === one;
+            c.classList.toggle("on", on);
+            c.setAttribute("aria-pressed", on ? "true" : "false");
+          });
+          head.textContent = headText();
+          letReply.hidden = !one;
+          send.textContent = one ? "Send answer" : "Send to all of them";
+          byCode();
+        });
+        who.append(b);
+      });
+    }
+    box.append(...[who, chips, version, letReply, words, line].filter(Boolean));
     return box;
   }
 
@@ -796,7 +833,13 @@
     if (r.copy) { copies.set(r.id, r.copy); }
     const bar = actions(r, key, group);
     if (group) {
-      body.replaceChildren(bar, answerBox(r, key, group), mk("pre", "fb-text", r.text));
+      // The answer being written - to everyone or to one - stays as it is
+      // when the problem is drawn again, as one report's does.
+      const kept = !first && body.fbForm && body.fbForm.fbFor === r.id ? body.fbForm : null;
+      const form = kept || answerBox(r, key, group);
+      form.fbFor = r.id;                        // a newer report below: a fresh box
+      body.fbForm = form;
+      body.replaceChildren(bar, form, mk("pre", "fb-text", r.text));
     } else {
       // The answer being written stays as it is when the conversation is
       // drawn again (a reply came, a mark changed).

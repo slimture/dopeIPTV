@@ -824,6 +824,9 @@ tr:last-child td { border-bottom: 0; }
 .fb-open { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13.5px; color: var(--text); cursor: pointer; }
 .fb-open input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
 .fb-open .muted { font-size: 12.5px; }
+.fb-answer .fb-who { margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); align-items: center; }
+.fb-who-to { font-size: 13px; font-weight: 650; color: var(--text-2); margin-inline-end: 2px; }
+@media (hover: none) { .fb-open input { width: 22px; height: 22px; } .fb-open { min-height: 40px; } }
 /* A card's muted line keeps 10px above it (.card .muted): not in the answer
    box, where it sits beside a switch or a button, on their line. */
 .fb-answer .muted { margin: 0; }
