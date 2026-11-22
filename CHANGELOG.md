@@ -7,6 +7,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Fixed
+
+- A programme's description with HTML from the provider in it (a web
+  page's time widget: `Matchen börjar: <span class="…">15:00.`) showed the
+  code under the video; the tags are left out now and only the words show.
+  The same for a film's plot. Each guide is read again from its copy on
+  disk once after the update.
+
 ## [1.6.11]
 
 ### Security

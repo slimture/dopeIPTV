@@ -23,7 +23,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QStandardPaths
 
-from ..core import safe_xml
+from ..core import safe_xml, tagless
 from ..core.log import log
 from ..core.source_files import file_part
 from .client import XtreamClient
@@ -34,8 +34,9 @@ from .client import XtreamClient
 # strings) instead of one dict per programme - a ~260 MB guide used to cost
 # ~1 GB of RAM. v3: channels in pieces. v4: a plain format of its own, no
 # pickle - v1 to v3 were pickles, and are never read now (a cache miss).
+# v5: titles and descriptions without the HTML a provider copied in.
 _INDEX_MAGIC = b"dpIPTVgi"
-_INDEX_VERSION = 4
+_INDEX_VERSION = 5
 #: magic, version, the size of a time and of a text's number, then how many
 #: channels, names, texts and programmes, and the bytes the texts take.
 _HEAD = struct.Struct("<8sHBBIIIQQ")
@@ -309,10 +310,15 @@ def parse_xmltv(data: bytes, keep_past_days: int
     # daily shows, episode blurbs); keeping one str object per unique
     # text instead of one per programme cuts the string heap by well
     # over half - and the index on disk keeps each text once too.
+    # A text is made plain once - HTML a provider copied in from a web page
+    # dropped (tagless.plain) - and the plain one kept for every rerun.
     text_pool: dict[str, str] = {}
 
     def pooled(s: str) -> str:
-        return text_pool.setdefault(s, s)
+        got = text_pool.get(s)
+        if got is None:
+            got = text_pool[s] = tagless.plain(s)
+        return got
 
     for _, el in ET.iterparse(io.BytesIO(data)):
         if el.tag == "channel":
@@ -327,7 +333,7 @@ def parse_xmltv(data: bytes, keep_past_days: int
             cid = (el.get("channel") or "").strip().lower()
             start = parse_xmltv_time(el.get("start"))
             stop = parse_xmltv_time(el.get("stop"))
-            title = (el.findtext("title") or "").strip()
+            title = pooled((el.findtext("title") or "").strip())
             if cid and start and stop and stop.timestamp() > cutoff:
                 dedup_key = (cid, int(start.timestamp()), title.lower())
                 if dedup_key not in seen:
@@ -335,7 +341,7 @@ def parse_xmltv(data: bytes, keep_past_days: int
                     rows.setdefault(cid, []).append((
                         int(start.timestamp()),
                         int(stop.timestamp()),
-                        pooled(title),
+                        title,
                         pooled((el.findtext("desc") or "").strip()),
                     ))
             el.clear()
