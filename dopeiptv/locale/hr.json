@@ -1181,6 +1181,7 @@
   "update_later": "Kasnije",
   "update_failed_title": "Ažuriranje nije instalirano",
   "update_nothing_changed": "Ništa nije promijenjeno.",
+  "update_blocked_windows": "Windows nije dopustio pokretanje instalacijskog programa: zaustavio ga je Smart App Control, antivirusni program ili pravilo na ovom računalu. Ništa nije promijenjeno. Instalacijski program možeš preuzeti s dopeiptv.org i sam ga pokrenuti; ako ga Windows i tamo zaustavi, ta postavka mora ga dopustiti (Sigurnost sustava Windows → Kontrola aplikacija i preglednika).",
   "upd_err_no_checksum": "Nova verzija ne navodi kontrolni zbroj pa se ne može provjeriti.",
   "upd_err_not_https": "Adresa nove verzije nije sigurna (https).",
   "upd_err_unsigned": "Nova verzija nije potpisana ključem dopeIPTV-a.",

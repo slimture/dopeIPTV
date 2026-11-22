@@ -1181,6 +1181,7 @@
   "update_later": "Baadaye",
   "update_failed_title": "Sasisho halikusakinishwa",
   "update_nothing_changed": "Hakuna kilichobadilishwa.",
+  "update_blocked_windows": "Windows haikuruhusu kisakinishi kuanza: Smart App Control, programu ya kuzuia virusi au sera kwenye kompyuta hii iliizuia. Hakuna kilichobadilishwa. Unaweza kupakua kisakinishi kutoka dopeiptv.org na kukianzisha mwenyewe; Windows ikikizuia huko pia, mpangilio huo lazima ukiruhusu (Usalama wa Windows → Udhibiti wa programu na kivinjari).",
   "upd_err_no_checksum": "Toleo jipya halina checksum, kwa hiyo haliwezi kukaguliwa.",
   "upd_err_not_https": "Anwani ya toleo jipya si salama (https).",
   "upd_err_unsigned": "Toleo jipya halijasainiwa kwa ufunguo wa dopeIPTV.",

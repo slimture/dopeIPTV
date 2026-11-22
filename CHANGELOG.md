@@ -69,6 +69,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   then, and python-mpv crashed on the nothing it got. Every core is now made
   after the numeric locale is put back to "C", and the start puts it back
   as soon as Qt has set it (`players.numeric_c`).
+- On Windows, an update whose installer Windows would not start - Smart
+  App Control, an antivirus or a policy on the computer - was reported as a
+  crash. The update window now says what stopped it, that nothing was
+  changed and how to install it by hand (`winupdate.blocked_by_policy`).
 
 ## [1.6.10]
 

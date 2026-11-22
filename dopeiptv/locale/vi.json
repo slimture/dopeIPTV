@@ -1181,6 +1181,7 @@
   "update_later": "Để sau",
   "update_failed_title": "Bản cập nhật chưa được cài",
   "update_nothing_changed": "Không có gì bị thay đổi.",
+  "update_blocked_windows": "Windows không cho trình cài đặt khởi động: Smart App Control, một chương trình diệt virus hoặc một chính sách trên máy tính này đã chặn nó. Không có gì thay đổi. Bạn có thể tải trình cài đặt từ dopeiptv.org và tự chạy; nếu Windows cũng chặn nó, thiết lập đó phải cho phép (Bảo mật Windows → Kiểm soát ứng dụng & trình duyệt).",
   "upd_err_no_checksum": "Phiên bản mới không có mã kiểm tra (checksum), nên không thể kiểm tra.",
   "upd_err_not_https": "Địa chỉ của phiên bản mới không an toàn (https).",
   "upd_err_unsigned": "Phiên bản mới không được ký bằng khóa của dopeIPTV.",

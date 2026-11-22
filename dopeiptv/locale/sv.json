@@ -1181,6 +1181,7 @@
   "update_later": "Senare",
   "update_failed_title": "Uppdateringen installerades inte",
   "update_nothing_changed": "Ingenting har ändrats.",
+  "update_blocked_windows": "Windows lät inte installationsprogrammet starta: Smart App Control, ett antivirusprogram eller en policy på den här datorn stoppade det. Ingenting har ändrats. Du kan ladda ner installationsprogrammet från dopeiptv.org och starta det själv; stoppar Windows det där också måste den inställningen tillåta det (Windows-säkerhet → Säkerhet för appar och webbläsare).",
   "upd_err_no_checksum": "Den nya versionen anger ingen kontrollsumma, så den kan inte kontrolleras.",
   "upd_err_not_https": "Den nya versionens adress är inte en säker (https).",
   "upd_err_unsigned": "Den nya versionen är inte signerad med dopeIPTV:s nyckel.",

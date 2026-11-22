@@ -511,6 +511,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "update_later": {"en": "Later"},
     "update_failed_title": {"en": "The update was not installed"},
     "update_nothing_changed": {"en": "Nothing was changed."},
+    "update_blocked_windows": {"en": "Windows did not let the installer start: Smart App Control, an antivirus program or a policy on this computer stopped it. Nothing was changed. You can download the installer from dopeiptv.org and start it yourself; if Windows stops it there too, that setting has to allow it (Windows Security → App & browser control)."},
     "about_made_by": {"en": "Made by"},
     "about_tmdb_credit": {"en": "Movie and TV metadata and artwork provided by TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB."},
     "menu_about": {"en": "About dopeIPTV"},

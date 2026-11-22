@@ -1181,6 +1181,7 @@
   "update_later": "Sonra",
   "update_failed_title": "Güncelleme yüklenmedi",
   "update_nothing_changed": "Hiçbir şey değiştirilmedi.",
+  "update_blocked_windows": "Windows yükleyicinin başlamasına izin vermedi: Smart App Control, bir virüsten koruma programı ya da bu bilgisayardaki bir ilke onu durdurdu. Hiçbir şey değişmedi. Yükleyiciyi dopeiptv.org'dan indirip kendin başlatabilirsin; Windows onu da durdurursa o ayarın izin vermesi gerekir (Windows Güvenliği → Uygulama ve tarayıcı denetimi).",
   "upd_err_no_checksum": "Yeni sürüm bir sağlama toplamı belirtmiyor, bu yüzden denetlenemiyor.",
   "upd_err_not_https": "Yeni sürümün adresi güvenli (https) değil.",
   "upd_err_unsigned": "Yeni sürüm dopeIPTV'nin anahtarıyla imzalanmamış.",

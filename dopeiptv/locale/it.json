@@ -1181,6 +1181,7 @@
   "update_later": "Più tardi",
   "update_failed_title": "L'aggiornamento non è stato installato",
   "update_nothing_changed": "Non è stato modificato nulla.",
+  "update_blocked_windows": "Windows non ha lasciato avviare il programma di installazione: Smart App Control, un antivirus o un criterio di questo computer lo ha bloccato. Non è stato modificato nulla. Puoi scaricare il programma di installazione da dopeiptv.org e avviarlo tu; se Windows lo blocca anche lì, quell'impostazione deve consentirlo (Sicurezza di Windows → Controllo app e browser).",
   "upd_err_no_checksum": "La nuova versione non indica alcun checksum, quindi non può essere verificata.",
   "upd_err_not_https": "L'indirizzo della nuova versione non è sicuro (https).",
   "upd_err_unsigned": "La nuova versione non è firmata con la chiave di dopeIPTV.",

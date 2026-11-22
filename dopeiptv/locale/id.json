@@ -1181,6 +1181,7 @@
   "update_later": "Nanti",
   "update_failed_title": "Pembaruan tidak terpasang",
   "update_nothing_changed": "Tidak ada yang diubah.",
+  "update_blocked_windows": "Windows tidak membiarkan penginstal berjalan: Smart App Control, program antivirus, atau kebijakan di komputer ini menghentikannya. Tidak ada yang diubah. Anda bisa mengunduh penginstal dari dopeiptv.org dan menjalankannya sendiri; jika Windows menghentikannya juga, pengaturan itu harus mengizinkannya (Keamanan Windows → Kontrol aplikasi & browser).",
   "upd_err_no_checksum": "Versi baru tidak mencantumkan checksum, jadi tidak bisa diperiksa.",
   "upd_err_not_https": "Alamat versi baru bukan alamat aman (https).",
   "upd_err_unsigned": "Versi baru tidak ditandatangani dengan kunci dopeIPTV.",
