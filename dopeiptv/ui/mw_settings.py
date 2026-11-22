@@ -469,9 +469,9 @@ class _SettingsMixin:
                          for kind, n in counts.items() if n)
 
     def _backup_without_password_ok(self, parent) -> bool:
-        """The file holds every login, token and the sync code: kept
-        without a password only when the person says so, Cancel the
-        default."""
+        """Without a password the file leaves every login, token and the
+        sync code out (core/backup.without_logins): made so only when the
+        person says so, Cancel the default."""
         box = QMessageBox(QMessageBox.Icon.Warning, tr("backup_title"),
                           tr("backup_no_pw_warn"), QMessageBox.StandardButton.Cancel, parent)
         plain = box.addButton(tr("backup_no_pw_go"), QMessageBox.ButtonRole.AcceptRole)
@@ -509,7 +509,7 @@ class _SettingsMixin:
                 run_working(parent, tr("backup_title"), tr("backup_locking"),
                             lambda: backup.write(path, backup.for_file(doc, password)))
             else:
-                backup.write(path, doc)
+                backup.write(path, backup.for_file(doc))
         except OSError as exc:
             log.warning("backup: not written: %s", exc)
             QMessageBox.warning(parent, tr("backup_title"),

@@ -376,6 +376,8 @@ class RestoreBackupDialog(QDialog):
             notes.append(tr("restore_missing_paths", n=missing))
         if backup.full and bk.new_token_here(backup):
             notes.append(tr("restore_token_note"))
+        if backup.logins_out:
+            notes.append(tr("restore_no_logins"))
         if replaceable and syncing:
             notes.append(tr("restore_sync_note"))
         self.notes = QLabel("\n\n".join(notes))

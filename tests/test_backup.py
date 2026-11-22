@@ -768,3 +768,101 @@ def test_a_start_that_hands_its_command_over_never_puts_a_restore_in_place(qapp,
     for path in config.rglob("*"):
         if path.is_file() and path != pending:
             assert "nord" not in path.read_text(encoding="utf-8", errors="replace"), path
+
+
+# -- without a password: no logins ----------------------------------------------------
+
+LOGIN_SOURCES = [
+    {"id": "a", "name": "A", "kind": "xtream", "server": "http://a.invalid",
+     "username": "user", "password": "pl-secret", "epg_url": "", "refresh": "never"},
+    {"id": "m", "name": "M", "kind": "m3u",
+     "server": "http://m.invalid/get.php?username=u&password=m3u-secret&type=m3u_plus",
+     "epg_url": "http://m.invalid/xmltv.php?username=u&password=m3u-secret",
+     "options": {"proxy": "http://px:proxy-secret@10.0.0.1:3128",
+                 "headers": "Authorization: Bearer hdr-secret\nReferer: http://m.invalid/",
+                 "backup_servers": "http://u:mirror-secret@m2.invalid"}},
+    {"id": "p", "name": "P", "kind": "stalker", "server": "http://p.invalid/c/",
+     "mac": "00:1A:79:12:34:56"},
+    {"id": "j", "name": "J", "kind": "jellyfin", "server": "http://192.168.1.9:8096",
+     "token": "jf-secret", "username": "me"},
+]
+SECRETS = ("pl-secret", "m3u-secret", "proxy-secret", "hdr-secret", "mirror-secret",
+           "00:1A:79:12:34:56", "jf-secret", "trakt-secret", "simkl-secret", "sync-secret", "os-secret",
+           "kodi-secret", "mqtt-secret", "hook-secret", "prof-secret")
+
+
+def _with_logins(st: dict) -> None:
+    _fill(st)
+    m = st["main"]
+    m.setValue("playlists", json.dumps(LOGIN_SOURCES))
+    for key, value in (("trakt_access_token", "trakt-secret"), ("simkl_access_token", "simkl-secret"),
+                       ("sync_code", "sync-secret"), ("os_password", "os-secret"),
+                       ("nerd_mqtt_pass", "mqtt-secret"), ("nerd_hooks_header", "X-Token: hook-secret"),
+                       ("nerd_proxy", "http://me:proxy-secret@10.0.0.1:3128"),
+                       ("kodi_devices", json.dumps([{"host": "10.0.0.5", "user": "kodi",
+                                                     "password": "kodi-secret"}])),
+                       ("profiles/me/trakt_access_token", "prof-secret")):
+        m.setValue(key, value)
+    m.sync()
+
+
+def test_a_backup_without_a_password_holds_no_login(tmp_path):
+    """A file anyone can read: every login the app keeps stays out of it -
+    the settings that are one, a playlist's password, token and box MAC, a
+    login in its addresses, proxy and headers - and it says so."""
+    src = _stores(tmp_path, "src")
+    _with_logins(src)
+    path = str(tmp_path / "b.json")
+    backup.write(path, backup.for_file(backup.collect(src, "1.6.11")))
+    text = open(path, encoding="utf-8").read()
+    for secret in SECRETS:
+        assert secret not in text, secret
+    b = backup.read(path)
+    assert b.logins_out and {"trakt_access_token", "sync_code", "kodi_devices",
+                             "nerd_proxy"} <= set(b.keep)
+    rows = {p["id"]: p for p in b.sources}
+    assert rows["a"]["password"] == "" and rows["a"]["username"] == "user"
+    assert rows["m"]["server"] == "http://m.invalid/get.php?username=&password=&type=m3u_plus"
+    assert rows["m"]["options"]["proxy"] == "http://10.0.0.1:3128"
+    assert rows["m"]["options"]["headers"] == "Referer: http://m.invalid/"
+    assert rows["p"]["mac"] == "" and rows["j"]["token"] == ""
+    # The rest as it always was: playlists, favourites, the theme.
+    assert b.stores["main"]["theme"] == "nord" and len(b.sources) == 4
+    assert b.document()[backup.NO_LOGINS] == "left out"
+
+
+def test_put_back_where_the_logins_are_it_keeps_them(tmp_path):
+    """Over everything on a computer that has them, a backup without
+    logins never signs it out: the settings left out stay as they are here,
+    a playlist it has too keeps its password and the login in its address."""
+    src = _stores(tmp_path, "src")
+    _with_logins(src)
+    b = backup.parse(backup.for_file(backup.collect(src, "1.6.11")))
+    dst = _stores(tmp_path, "dst")
+    _with_logins(dst)
+    backup.restore(b, dst)
+    after = _on_disk(dst)["main"]
+    assert after["trakt_access_token"] == "trakt-secret" and after["sync_code"] == "sync-secret"
+    assert after["profiles/me/trakt_access_token"] == "prof-secret"
+    rows = {p["id"]: p for p in json.loads(after["playlists"])}
+    assert rows["a"]["password"] == "pl-secret" and rows["p"]["mac"] == "00:1A:79:12:34:56"
+    assert rows["m"]["server"] == LOGIN_SOURCES[1]["server"]
+    assert rows["m"]["options"]["proxy"] == LOGIN_SOURCES[1]["options"]["proxy"]
+    assert rows["m"]["options"]["headers"] == LOGIN_SOURCES[1]["options"]["headers"]
+    assert rows["j"]["token"] == "jf-secret"
+
+
+def test_put_back_on_a_new_computer_it_brings_no_login(tmp_path):
+    src = _stores(tmp_path, "src")
+    _with_logins(src)
+    b = backup.parse(backup.for_file(backup.collect(src, "1.6.11")))
+    dst = _stores(tmp_path, "new")
+    backup.restore(b, dst)
+    after = _on_disk(dst)["main"]
+    assert "trakt_access_token" not in after and "sync_code" not in after
+    assert {p["id"] for p in json.loads(after["playlists"])} == {"a", "m", "p", "j"}
+    assert not any(s in json.dumps(after) for s in SECRETS)
+    # Staged for the next start, it still knows it holds none.
+    staged = str(tmp_path / "pending.json")
+    backup.stage(b, staged)
+    assert backup.read(staged).logins_out

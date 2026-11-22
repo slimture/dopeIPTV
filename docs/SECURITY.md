@@ -317,15 +317,22 @@ GitHub Action, a build runner, GitHub itself - or the release key.
 
 ### Someone with a backup or the sync code
 
-**A backup** holds every setting a person would miss, logins included -
-playlists' passwords, Trakt's and OpenSubtitles' sign-ins, the sync code -
-and every profile with its PIN as kept (`core/backup.py`). Without a
-password they are plain text in it; with one the file is encrypted
-([below](#a-backups-password)). The app says so where the file is made, and
-writes it readable only by its owner where the system has such a thing.
-Left out: the remote API's, the phone remote's and server mode's tokens,
-the media servers' device id, where the windows sit, caches. Whoever has a
-file without a password has those logins.
+**A backup** holds every setting a person would miss and every profile
+with its PIN as kept (`core/backup.py`). Its logins - playlists'
+passwords, tokens and box MACs, a login in their addresses, proxy and
+headers, Trakt's, Simkl's and OpenSubtitles' sign-ins, the sync code, a
+Kodi's password, MQTT's and the webhooks' - go in only with a password,
+and then the file is encrypted ([below](#a-backups-password)). Without
+one they are left out (`backup.without_logins`, `LOGIN_SETTINGS`,
+`LOGIN_FIELDS`): the file says so, and putting it back keeps the logins of
+the computer it is put back on - a playlist that is there too keeps its
+own (`_logins_from_here`). The honest limit: a login written into an
+address's path (`/live/user/pass/`, a playlist's own form) cannot be told
+from a folder and stays; a source's server holds none. The file is
+written readable only by its owner where the system has such a thing.
+Left out either way: the remote API's, the phone remote's and server
+mode's tokens, the media servers' device id, where the windows sit,
+caches.
 
 **A backup someone else made** is outside input. Before it is put back,
 the window names what would run something, let others in or send the
@@ -380,8 +387,9 @@ The design behind a backup's optional password, with its test vectors
 (AGENTS.md rule 9; its line on the transparency page belongs to the
 `website` branch's `tools/transparency.py`). A person
 may give the backup a password where it is made (Settings > General >
-Backup, a field and its repeat). Without one the file is exactly what a
-backup always was, and a plain or an old file restores as before.
+Backup, a field and its repeat). Without one the file leaves every login
+out (`without_logins`, above), and a plain or an old file restores as
+before.
 
 **The file** (`core/backup.py`: `seal`, `lock`, `for_file`) is one JSON
 object, written as every backup is (`backup.write`: whole or not at all,

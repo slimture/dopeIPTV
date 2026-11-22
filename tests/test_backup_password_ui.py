@@ -277,12 +277,15 @@ def run(self):
     restore.click()
     assert shown and tr("backup_count", what=tr("backup_kind_sources"), n=1) in shown[-1].holds.text()
     assert said[-1] == tr("pl_import_done", n=0), said[-1]
-    # Without a password: the file as it always was.
+    # Without a password: the file without its logins.
     os.remove(out)
     back.click()
     assert asked_plain == [1], "made only once the person said so"
-    doc = json.load(open(out, encoding="utf-8"))
-    assert doc["dopeiptv_backup"] == 1 and json.loads(doc["stores"]["main"]["playlists"])[0]["password"] == "pl-secret"
+    raw = open(out, "rb").read()
+    doc = json.loads(raw)
+    assert doc["dopeiptv_backup"] == 1 and doc["logins"] == "left out"
+    assert json.loads(doc["stores"]["main"]["playlists"])[0]["password"] == ""
+    assert b"pl-secret" not in raw
     assert said[-1].startswith(tr("backup_done", what="", path="").split("\n")[0])
     return 0
 
