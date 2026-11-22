@@ -154,6 +154,10 @@ NO_BRIDGE = "the app could not hand the recorder its address privately"
 #: Why one was not started whose address (not http) holds a login and no
 #: private file to hand it over in could be made.
 NO_PRIVATE_FILE = "its address holds a login and no private file for it could be made"
+#: Why one stopped while less than DISK_FLOOR was left where it is written:
+#: a stream with no end and no size cap never fills the disk.
+DISK_FULL = "the disk the recordings are saved on is nearly full"
+DISK_FLOOR = 1024 ** 3
 _LIST_PREFIX = "dopeiptv-rec-"
 
 
@@ -1322,6 +1326,24 @@ class RecordingManager(QObject):
         except OSError:
             return False
 
+    @staticmethod
+    def _disk_low(j: dict) -> bool:
+        """Less than DISK_FLOOR left on the disk *j* is written to."""
+        path = j.get("path")
+        if not path:
+            return False
+        try:
+            return shutil.disk_usage(os.path.dirname(path) or ".").free < DISK_FLOOR
+        except OSError:
+            return False
+
+    def _limit_of(self, j: dict, cap: int) -> str:
+        """Why a running recording must stop now: its size cap or a disk
+        nearly full ("" for neither)."""
+        if self._over_size_cap(j, cap):
+            return "size limit reached"
+        return DISK_FULL if self._disk_low(j) else ""
+
     def tick(self) -> None:
         now = time.time()
         cap = self._max_bytes()
@@ -1361,18 +1383,20 @@ class RecordingManager(QObject):
                 self._save()
                 changed = True
             elif j["status"] == "recording" and j.get("inplayer"):
+                why = self._limit_of(j, cap)
                 if j.get("stop") is not None and j["stop"] <= now:
                     self.finish_inplayer(j["id"], "finished")
-                elif self._over_size_cap(j, cap):
-                    self.finish_inplayer(j["id"], "size limit reached")
+                elif why:
+                    self.finish_inplayer(j["id"], why)
             elif j["status"] == "recording" and j.get("recorder") is not None:
                 # From the rewind buffer, in the background.
                 rec = j["recorder"]
+                why = self._limit_of(j, cap)
                 if j.get("stop") is not None and j["stop"] <= now:
                     self._finish_buffer(j, "finished")
                     changed = True
-                elif self._over_size_cap(j, cap):
-                    self._finish_buffer(j, "size limit reached")
+                elif why:
+                    self._finish_buffer(j, why)
                     changed = True
                 elif not rec.alive:
                     # Its buffer went (the app's buffer turned off, ...).
@@ -1380,14 +1404,11 @@ class RecordingManager(QObject):
                     changed = True
             elif j["status"] == "recording":
                 rc = j["proc"].poll() if j.get("proc") else 0
-                if ((j.get("stop") is not None and j["stop"] <= now)
-                        or self._over_size_cap(j, cap)):
+                why = self._limit_of(j, cap)
+                if (j.get("stop") is not None and j["stop"] <= now) or why:
                     self._stop_proc(j)
                     j["status"] = "done"
-                    self.recording_stopped.emit(
-                        j["title"],
-                        "size limit reached" if self._over_size_cap(j, cap)
-                        else "finished")
+                    self.recording_stopped.emit(j["title"], why or "finished")
                     self._after(j)
                     changed = True
                 elif rc is not None:

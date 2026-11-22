@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "żadne połączenie z twoim kontem nie było wolne",
   "rec_reason_not_a_stream": "jego adres nie jest adresem strumienia",
   "rec_reason_no_bridge": "aplikacja nie mogła prywatnie przekazać adresu nagrywarce",
+  "rec_reason_disk_full": "dysk z nagraniami jest prawie pełny",
   "rec_reason_no_private_file": "jego adres zawiera dane logowania i nie udało się utworzyć dla niego prywatnego pliku",
   "phone_page_show_in_list": "Pokaż na liście",
   "setting_video_thread": "Rysuj obraz we własnym wątku",

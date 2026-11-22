@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "nijedna veza prema tvom računu nije bila slobodna",
   "rec_reason_not_a_stream": "njegova adresa nije adresa streama",
   "rec_reason_no_bridge": "aplikacija nije mogla privatno predati adresu snimaču",
+  "rec_reason_disk_full": "disk na koji se spremaju snimke gotovo je pun",
   "rec_reason_no_private_file": "njegova adresa sadrži prijavu i za nju nije bilo moguće napraviti privatnu datoteku",
   "phone_page_show_in_list": "Prikaži na popisu",
   "setting_video_thread": "Crtaj sliku u vlastitoj niti",

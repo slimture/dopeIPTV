@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "hesabına boş bağlantı yoktu",
   "rec_reason_not_a_stream": "adresi bir yayın adresi değil",
   "rec_reason_no_bridge": "uygulama adresi kaydediciye gizli olarak veremedi",
+  "rec_reason_disk_full": "kayıtların kaydedildiği disk neredeyse dolu",
   "rec_reason_no_private_file": "adresi bir oturum bilgisi içeriyor ve onun için gizli bir dosya oluşturulamadı",
   "phone_page_show_in_list": "Listede göster",
   "setting_video_thread": "Görüntüyü kendi iş parçacığında çiz",

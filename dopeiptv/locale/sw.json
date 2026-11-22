@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "hakukuwa na muunganisho huru kwa akaunti yako",
   "rec_reason_not_a_stream": "anwani yake si ya mtiririko",
   "rec_reason_no_bridge": "programu haikuweza kukabidhi anwani kwa kirekodi kwa faragha",
+  "rec_reason_disk_full": "diski ambapo rekodi huhifadhiwa imekaribia kujaa",
   "rec_reason_no_private_file": "anwani yake ina maelezo ya kuingia na hakuna faili ya faragha iliyoweza kuundwa kwa ajili yake",
   "phone_page_show_in_list": "Onyesha kwenye orodha",
   "setting_video_thread": "Chora picha kwenye uzi wake yenyewe",

@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "لم يكن هناك اتصال متاح بحسابك",
   "rec_reason_not_a_stream": "عنوانه ليس عنوان بث",
   "rec_reason_no_bridge": "تعذّر على التطبيق تسليم العنوان إلى أداة التسجيل بشكل خاص",
+  "rec_reason_disk_full": "القرص الذي تُحفظ عليه التسجيلات ممتلئ تقريبًا",
   "rec_reason_no_private_file": "عنوانه يحتوي على بيانات دخول، وتعذّر إنشاء ملف خاص له",
   "phone_page_show_in_list": "إظهار في القائمة",
   "setting_video_thread": "رسم الصورة في مسار خاص بها",

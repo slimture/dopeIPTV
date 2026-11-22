@@ -277,3 +277,45 @@ def test_damaged_scheduled_jobs_are_skipped_not_crashed_on(tmp_path):
     assert [j["url"] for j in rm.jobs] == ["http://ok"]
     assert rm.jobs[0]["id"] and rm.jobs[0]["title"] == ""
     rm.tick()                       # and the scheduler runs over it
+
+
+def test_a_recording_stops_while_a_gibibyte_is_still_free(tmp_path, monkeypatch):
+    """A stream with no end and no size cap never fills the disk: below
+    DISK_FLOOR free where it is written, it stops and says why."""
+    import shutil as _shutil
+    from collections import namedtuple
+
+    from PyQt6.QtCore import QSettings
+
+    from dopeiptv.core import recording
+    s = QSettings("dopeIPTV-test", "recdiskfloor")
+    s.clear()
+    s.setValue("recordings_dir", str(tmp_path))
+    rm = recording.RecordingManager(s)
+    path = tmp_path / "r.ts"
+    path.write_bytes(b"x" * 1000)
+
+    class Proc:
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, *_a):
+            return 0
+
+    j = {"id": "d", "title": "T", "status": "recording", "path": str(path),
+         "proc": Proc(), "stop": None, "start": 0}
+    rm.jobs = [j]
+    said = []
+    rm.recording_stopped.connect(lambda title, why: said.append(why))
+    usage = namedtuple("usage", "total used free")
+    monkeypatch.setattr(_shutil, "disk_usage",
+                        lambda _p: usage(10**12, 10**12, recording.DISK_FLOOR * 2))
+    rm.tick()
+    assert j["status"] == "recording" and said == []
+    monkeypatch.setattr(_shutil, "disk_usage",
+                        lambda _p: usage(10**12, 10**12, recording.DISK_FLOOR - 1))
+    rm.tick()
+    assert j["status"] == "done" and said == [recording.DISK_FULL]

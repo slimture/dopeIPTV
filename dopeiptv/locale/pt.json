@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "nenhuma conexão com a sua conta estava livre",
   "rec_reason_not_a_stream": "seu endereço não é de um stream",
   "rec_reason_no_bridge": "o app não conseguiu passar o endereço ao gravador de forma privada",
+  "rec_reason_disk_full": "o disco das gravações está quase cheio",
   "rec_reason_no_private_file": "seu endereço contém um login e não foi possível criar um arquivo privado para ele",
   "phone_page_show_in_list": "Mostrar na lista",
   "setting_video_thread": "Desenhar a imagem em uma thread própria",

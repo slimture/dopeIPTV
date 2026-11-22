@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "계정에 사용할 수 있는 빈 연결이 없었음",
   "rec_reason_not_a_stream": "주소가 스트림 주소가 아님",
   "rec_reason_no_bridge": "앱이 녹화 도구에 주소를 비공개로 넘길 수 없음",
+  "rec_reason_disk_full": "녹화가 저장되는 디스크가 거의 가득 찼습니다",
   "rec_reason_no_private_file": "주소에 로그인 정보가 있고 이를 위한 비공개 파일을 만들 수 없음",
   "phone_page_show_in_list": "목록에서 보기",
   "setting_video_thread": "영상을 전용 스레드에서 그리기",

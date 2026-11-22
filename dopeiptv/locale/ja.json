@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "アカウントへの接続に空きがありませんでした",
   "rec_reason_not_a_stream": "アドレスがストリームのものではありません",
   "rec_reason_no_bridge": "アプリは録画ツールにアドレスを非公開で渡せませんでした",
+  "rec_reason_disk_full": "録画の保存先ディスクの空きがほとんどありません",
   "rec_reason_no_private_file": "アドレスにログイン情報が含まれ、そのための非公開ファイルを作成できませんでした",
   "phone_page_show_in_list": "リストで表示",
   "setting_video_thread": "映像を専用のスレッドで描画",

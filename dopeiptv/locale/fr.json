@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "aucune connexion à ton compte n'était libre",
   "rec_reason_not_a_stream": "son adresse n'est pas celle d'un flux",
   "rec_reason_no_bridge": "l'application n'a pas pu transmettre l'adresse à l'enregistreur en privé",
+  "rec_reason_disk_full": "le disque des enregistrements est presque plein",
   "rec_reason_no_private_file": "son adresse contient un identifiant et aucun fichier privé n'a pu être créé pour elle",
   "phone_page_show_in_list": "Afficher dans la liste",
   "setting_video_thread": "Dessiner l'image dans son propre thread",

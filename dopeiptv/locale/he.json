@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "לא היה חיבור פנוי לחשבון שלכם",
   "rec_reason_not_a_stream": "הכתובת שלו אינה כתובת של שידור",
   "rec_reason_no_bridge": "האפליקציה לא הצליחה למסור את הכתובת למקליט באופן פרטי",
+  "rec_reason_disk_full": "הדיסק שבו נשמרות ההקלטות כמעט מלא",
   "rec_reason_no_private_file": "הכתובת שלו מכילה פרטי התחברות ולא ניתן היה ליצור עבורה קובץ פרטי",
   "phone_page_show_in_list": "הצגה ברשימה",
   "setting_video_thread": "ציור התמונה בתהליכון משלה",

@@ -1481,6 +1481,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "rec_reason_no_room": {"en": "no connection to your account was free"},
     "rec_reason_not_a_stream": {"en": "its address is not a stream's"},
     "rec_reason_no_bridge": {"en": "the app could not hand the recorder its address privately"},
+    "rec_reason_disk_full": {"en": "the disk the recordings are saved on is nearly full"},
     "rec_reason_no_private_file": {"en": "its address holds a login and no private file could be made for it"},
     "rec_reason_exit_code": {"en": "the recorder quit early (code {code})"},
     "series_record_menu": {"en": "Record series…"},

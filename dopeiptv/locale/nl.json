@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "er was geen verbinding met je account vrij",
   "rec_reason_not_a_stream": "het adres is geen streamadres",
   "rec_reason_no_bridge": "de app kon de recorder het adres niet privé geven",
+  "rec_reason_disk_full": "de schijf voor de opnamen is bijna vol",
   "rec_reason_no_private_file": "het adres bevat een login en er kon geen privébestand voor worden gemaakt",
   "phone_page_show_in_list": "Toon in lijst",
   "setting_video_thread": "Beeld in een eigen thread tekenen",

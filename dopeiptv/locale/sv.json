@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "ingen anslutning till ditt konto var ledig",
   "rec_reason_not_a_stream": "adressen är ingen strömadress",
   "rec_reason_no_bridge": "appen kunde inte lämna adressen till inspelaren privat",
+  "rec_reason_disk_full": "disken där inspelningarna sparas är nästan full",
   "rec_reason_no_private_file": "adressen innehåller en inloggning och ingen privat fil kunde skapas för den",
   "phone_page_show_in_list": "Visa i listan",
   "setting_video_thread": "Rita bilden i en egen tråd",

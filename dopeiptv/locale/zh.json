@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "你的账户没有空闲连接",
   "rec_reason_not_a_stream": "其地址不是流地址",
   "rec_reason_no_bridge": "应用无法私密地把地址交给录制工具",
+  "rec_reason_disk_full": "保存录像的磁盘快满了",
   "rec_reason_no_private_file": "其地址包含登录信息，且无法为其创建私密文件",
   "phone_page_show_in_list": "在列表中显示",
   "setting_video_thread": "在独立线程中绘制画面",

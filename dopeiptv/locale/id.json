@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "tidak ada koneksi ke akunmu yang kosong",
   "rec_reason_not_a_stream": "alamatnya bukan alamat stream",
   "rec_reason_no_bridge": "aplikasi tidak dapat menyerahkan alamat ke perekam secara pribadi",
+  "rec_reason_disk_full": "disk tempat rekaman disimpan hampir penuh",
   "rec_reason_no_private_file": "alamatnya berisi login dan tidak ada file pribadi yang bisa dibuat untuknya",
   "phone_page_show_in_list": "Tampilkan di daftar",
   "setting_video_thread": "Gambar video di thread tersendiri",

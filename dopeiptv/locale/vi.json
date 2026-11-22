@@ -2915,6 +2915,7 @@
   "rec_reason_no_room": "không có kết nối nào đến tài khoản của bạn còn rảnh",
   "rec_reason_not_a_stream": "địa chỉ của nó không phải là địa chỉ luồng",
   "rec_reason_no_bridge": "ứng dụng không thể chuyển địa chỉ cho trình ghi một cách riêng tư",
+  "rec_reason_disk_full": "ổ đĩa lưu bản ghi gần đầy",
   "rec_reason_no_private_file": "địa chỉ của nó chứa thông tin đăng nhập và không thể tạo tệp riêng tư cho nó",
   "phone_page_show_in_list": "Hiện trong danh sách",
   "setting_video_thread": "Vẽ hình trên luồng riêng",
