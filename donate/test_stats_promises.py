@@ -223,6 +223,9 @@ def test_swap_is_asked_of_the_system():
     assert sc.swap_state(now=sc._SWAP["at"] + sc.SWAP_TTL + 1)["state"] == "none"
     src = open(os.path.join(HERE, "donate.py"), encoding="utf-8").read()
     assert "swap = stats_collect.swap_state()" in src and "SWAP NOT ENCRYPTED" in src
+    # No swap for the tests after this one: plain swap now stops a run.
+    sc._SWAP.clear()
+    sc._SWAP.update(at=1e18, answer={"state": "none", "plain": []})
 
 
 def test_seven_days_means_seven_dates():
@@ -292,3 +295,25 @@ if __name__ == "__main__":
         fn()
         print("ok", name)
     print(f"{len(tests)} passed")
+
+
+def test_swap_that_keeps_what_it_is_given_stops_the_count():
+    """A hard stop, not a warning: while swap keeps what it is given, the
+    run makes or reads no month key and looks at no line - each holds an
+    address; the lines waiting are dropped, uncounted, and said."""
+    import stats_collect as sc
+    sc._SWAP.clear()
+    sc._SWAP.update(at=1e18, answer={"state": "plain", "plain": ["/dev/ada0p3"]})
+    sc.INBOX.put("iptv_stats", '{"ip": "203.0.113.9", "p": "/"}')
+    made = []
+    real = sc.keys_now
+    sc.keys_now = lambda *a, **k: made.append(1) or real(*a, **k)
+    try:
+        before = sc.SWAP_HELD["lines"]
+        sc.collect()
+        assert made == [], "no month key made or read"
+        assert len(sc.INBOX) == 0 and sc.SWAP_HELD["lines"] == before + 1
+    finally:
+        sc.keys_now = real
+        sc._SWAP.clear()
+        sc._SWAP.update(at=1e18, answer={"state": "none", "plain": []})

@@ -1594,12 +1594,38 @@ def _lines(path: str, state: dict, key: str) -> list:
     return _read_new(path, state.setdefault("logs", {}).setdefault(key, {}))
 
 
+#: Lines dropped uncounted because swap kept what it was given (swap_state).
+SWAP_HELD = {"lines": 0, "said": False}
+
+
+def _swap_holds() -> bool:
+    """Swap that keeps what it is given ("plain"): the run stops before a
+    month key is made or read, or a line - each an address - is looked at;
+    the lines waiting are dropped, uncounted, and said as a number. Swap
+    that could not be asked ("unknown") is warned about on the admin page,
+    as before - a jail that cannot ask its host would otherwise count
+    nothing ever."""
+    return swap_state()["state"] == "plain"
+
+
 def collect(with_fetch: bool = False, lines: list | None = None) -> None:
     """One run: the lines waiting in memory (INBOX, or *lines*: [(tag, line)])
     counted, the touched days' visits judged and written as they are kept,
-    and what has aged made counts alone (_forget_old)."""
+    and what has aged made counts alone (_forget_old). Not while swap keeps
+    what it is given (_swap_holds): then nothing is counted."""
     stats_path = os.path.join(STATS_DIR, "stats.json")
     state_path = os.path.join(STATS_DIR, "state.json")
+    if _swap_holds():
+        if lines is None:
+            lines, _dropped = INBOX.take()
+        SWAP_HELD["lines"] += len(lines)
+        del lines
+        if not SWAP_HELD["said"]:
+            SWAP_HELD["said"] = True
+            print("[stats] swap keeps what it is given - nothing is counted until it is "
+                  "encrypted (the server's runbook); the lines that come are dropped", flush=True)
+        return
+    SWAP_HELD["said"] = False
     with _RUN, _locked():
         today = datetime.now().astimezone().date()
         IGNORED[:] = _ignored_nets()
