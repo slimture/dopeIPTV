@@ -11,7 +11,11 @@ it never sees the code or the key, and cannot read a byte of what is kept.
 Nor can it change one unnoticed: the tag refuses a changed copy. What it
 could do is hand back an earlier copy of its own; every copy carries a
 counter, sealed with the rest (counter()), so a computer that has seen a
-later one says so, keeps its own and puts it back (RoundResult.older).
+later one says so, keeps its own and puts it back (RoundResult.older). A
+computer that joins has seen none: every copy also carries when it was put
+there (saved_at, put back unchanged once a week), and one older than a
+month is not taken by a joining computer until the person says so
+(round_trip's *stale_ok*, SyncError "stale").
 No account, no e-mail and no name go along: nothing that
 says who asks (donate/sync.py on the website branch). A copy no computer
 has read or written for 180 days is deleted there.
@@ -145,12 +149,15 @@ class SyncError(Exception):
     full (the site has no room for a new copy; one kept there already can
     still be written), big (too much to sync), none (nothing under this
     code), read (the copy there could not be read with this code), newer (a
-    newer app made it), modified (not asked: a modified build)."""
+    newer app made it), modified (not asked: a modified build), stale (a
+    computer new to the slot was handed a copy last saved more than
+    STALE_DAYS ago, at *saved*: asked about first)."""
 
-    def __init__(self, kind: str, size: int = 0) -> None:
+    def __init__(self, kind: str, size: int = 0, saved: int = 0) -> None:
         super().__init__(kind)
         self.kind = kind
         self.size = size
+        self.saved = saved
 
 
 # -- the code, the slot and the key ---------------------------------------------
@@ -234,6 +241,20 @@ def empty_doc() -> dict[str, Any]:
 #: as it keeps any entry (its merge takes the higher) without counting.
 _META = "~"
 _COUNTER = "n"
+#: When the copy was put there, in the same category: sealed with the rest,
+#: so the site cannot make an old copy look new (saved_at).
+_SAVED = "s"
+#: A time no copy was made before (2020): a counter or a newcomer's 0 is
+#: no time.
+_EPOCH = 1_577_836_800
+#: A computer that joins - or joins again after a restore - and has no
+#: memory of the newest copy is asked before it takes one older than this
+#: (round_trip's *stale_ok*): another computer may have a newer one, and
+#: the site could hand back an earlier copy it cannot tell.
+STALE_DAYS = 30
+#: A copy unchanged this long is put back by the next round all the same,
+#: so its time says when a computer last synced, not only last changed.
+REFRESH_DAYS = 7
 
 
 def counter(doc: dict[str, Any]) -> int:
@@ -243,11 +264,51 @@ def counter(doc: dict[str, Any]) -> int:
     return max(0, int(e["v"]))
 
 
-def _counted(doc: dict[str, Any], n: int) -> dict[str, Any]:
-    """*doc* with the counter *n* (its categories copied, so a shared one
-    is not changed)."""
+def _saved_stamp(doc: dict[str, Any]) -> int:
+    e = (doc["c"].get(_META) or {}).get(_SAVED)
+    if not isinstance(e, dict) or not isinstance(e.get("v"), int) or e["v"] < _EPOCH:
+        return 0
+    return int(e["v"])
+
+
+def saved_at(doc: dict[str, Any]) -> int:
+    """When the copy *doc* was last put there, as far as it says itself:
+    its own stamp (a copy an app up to 1.6.10 made has none) or the newest
+    time of an entry in it, whichever is later - seconds since the epoch, 0
+    when it tells no time. Everything it reads is sealed: the site can hand
+    back an old copy, never make one look newer."""
+    newest = _saved_stamp(doc)
+    for cat, entries in doc["c"].items():
+        if cat == _META:
+            continue
+        for e in entries.values():
+            t = e.get("t") if isinstance(e, dict) else None
+            if isinstance(t, int) and t > newest:
+                newest = t
+    return newest if newest >= _EPOCH else 0
+
+
+def age_days(saved: int, now: int | None = None) -> int:
+    """Whole days since *saved* (saved_at), 0 for none or a time ahead."""
+    if saved <= 0:
+        return 0
+    now = int(time.time()) if now is None else now
+    return max(0, (now - saved) // 86400)
+
+
+def is_stale(saved: int, now: int | None = None) -> bool:
+    """Whether a copy saved at *saved* is older than STALE_DAYS."""
+    return saved > 0 and age_days(saved, now) > STALE_DAYS
+
+
+def _counted(doc: dict[str, Any], n: int, saved: int = 0) -> dict[str, Any]:
+    """*doc* with the counter *n* - and, with *saved*, the time it is put
+    there (its categories copied, so a shared one is not changed)."""
     out = _copy(doc)
-    out["c"][_META] = dict(out["c"].get(_META) or {}, **{_COUNTER: {"t": n, "v": n}})
+    meta = dict(out["c"].get(_META) or {}, **{_COUNTER: {"t": n, "v": n}})
+    if saved >= _EPOCH:
+        meta[_SAVED] = {"t": saved, "v": saved}
+    out["c"][_META] = meta
     return out
 
 
@@ -1385,13 +1446,16 @@ class RoundResult:
     #: The copy there was older than one this computer had seen (its
     #: counter lower): this computer's was kept and put back.
     older: bool = False
+    #: When the copy there was last put there, as it came (saved_at; 0 for
+    #: none or no time): what a computer that joins is told.
+    saved: int = 0
 
 
 def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
                cats: tuple[str, ...] | list[str], now: int | None = None,
                fresh: bool = False, joining: bool = False,
                seen: set[str] | frozenset[str] | None = None,
-               bind: bool = False) -> RoundResult:
+               bind: bool = False, stale_ok: bool = True) -> RoundResult:
     """One sync, on a worker thread: the site's copy fetched, this
     computer's copy brought up to *snap* and merged in, and the result put
     back if it is any different - on a conflict (another computer was
@@ -1405,13 +1469,26 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
     and the result is put back and said (*older*). *bind*: this computer
     has not yet written the slot with its credential (auth_of) - put it
     back even unchanged, so the site binds the slot on this first round
-    and from then on refuses anyone without the credential."""
+    and from then on refuses anyone without the credential.
+
+    Freshness. A computer new to the slot (*fresh*: joining, or again after
+    a restore) has seen no counter, so it cannot tell an earlier copy the
+    site hands back. Unless *stale_ok*, such a round stops before anything
+    is merged, put back or applied when the copy says it was last saved
+    more than STALE_DAYS ago (SyncError "stale", its *saved*): the window
+    asks the person first. Every upload carries the time it was put there,
+    and an unchanged copy is put back once it is REFRESH_DAYS old, so that
+    time says when a computer last synced."""
     now = int(time.time()) if now is None else now
     highest = counter(doc)
     got = remote.get()
     if got is None and joining:
         raise SyncError("none")
     theirs = unseal(key, got[1]) if got else empty_doc()
+    saved = saved_at(theirs) if got is not None else 0
+    if fresh and not stale_ok and got is not None and is_stale(saved, now):
+        log.info("sync: the copy there was last saved %d days ago - asked first", age_days(saved, now))
+        raise SyncError("stale", saved=saved)
     older = got is not None and counter(theirs) < highest
     if older:
         log.warning("sync: the copy there is older than one seen here (%d < %d) - "
@@ -1422,21 +1499,25 @@ def round_trip(remote: Remote, key: bytes, doc: dict[str, Any], snap: Snapshot,
     stamp(stamped, snap, cats, now, new_here, newcomer(seen, theirs, snap.platform))
     for attempt in range(4):
         if attempt:
-            # Another computer was quicker: its copy is the latest now.
+            # Another computer was quicker: its copy is the latest now -
+            # asked about as the first was, should it be an old one.
             theirs = unseal(key, got[1]) if got else empty_doc()
             older = older or (got is not None and counter(theirs) < highest)
+            if fresh and not stale_ok and got is not None and is_stale(saved_at(theirs), now):
+                raise SyncError("stale", saved=saved_at(theirs))
         version = got[0] if got else 0
         merged = merge(theirs, stamped)
         prune(merged, now)
-        if got is not None and _canon(merged) == _canon(theirs) and not bind:
-            return RoundResult(merged, stamped, version, False, len(got[1]), older)
-        merged = _counted(merged, max(counter(merged), highest) + 1)
+        refresh = _saved_stamp(theirs) < now - REFRESH_DAYS * 86400
+        if got is not None and _canon(merged) == _canon(theirs) and not bind and not refresh:
+            return RoundResult(merged, stamped, version, False, len(got[1]), older, saved)
+        merged = _counted(merged, max(counter(merged), highest) + 1, saved=now)
         blob = seal(key, merged)
         if len(blob) > MAX_BLOB:
             raise SyncError("big", len(blob))
         ok, info = remote.put(version, blob)
         if ok:
-            return RoundResult(merged, stamped, int(info), True, len(blob), older)
+            return RoundResult(merged, stamped, int(info), True, len(blob), older, saved)
         got = info
     raise SyncError("busy")
 

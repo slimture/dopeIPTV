@@ -79,9 +79,10 @@ def site(monkeypatch):
     return s
 
 
-def _other_computer(tmp_path, site, with_source: bool) -> tuple[str, str]:
+def _other_computer(tmp_path, site, with_source: bool, now: int | None = None) -> tuple[str, str]:
     """A computer that syncs already: its code, and its source's id ("" for
-    none). With a source it syncs sources too (turned on there)."""
+    none). With a source it syncs sources too (turned on there). *now*: when
+    it last synced (a while ago, for a copy left old)."""
     st = QSettings(str(tmp_path / "other.ini"), QSettings.Format.IniFormat)
     rs = QSettings(str(tmp_path / "other-r.ini"), QSettings.Format.IniFormat)
     store = PlaylistStore(st)
@@ -94,7 +95,7 @@ def _other_computer(tmp_path, site, with_source: bool) -> tuple[str, str]:
     ctx = sync.Context(st, rs, store)
     code = sync.new_code()
     slot, key = sync.derive(sync.parse_code(code))
-    sync.round_trip(site.Remote(slot), key, sync.empty_doc(), sync.collect(ctx, cats), cats)
+    sync.round_trip(site.Remote(slot), key, sync.empty_doc(), sync.collect(ctx, cats), cats, now=now)
     site.calls = 0
     return code, pid
 
@@ -236,8 +237,12 @@ def test_a_good_code_without_sources_goes_to_connect_with_the_note(qapp, tmp_pat
     assert ov.isVisible() and ov._stack.currentIndex() == PAGE_CONNECT
     page = ov._stack.widget(PAGE_CONNECT)
     assert ov._c_note.isVisibleTo(page)
-    assert ov._c_note.text() == tr("onb_sync_no_sources", what=tr("tab_playlists"),
-                                   where=tr("sync_nav"))
+    note = ov._c_note.text()
+    assert note.startswith(tr("onb_sync_no_sources", what=tr("tab_playlists"), where=tr("sync_nav")))
+    # How old what came is, said with it.
+    from dopeiptv.ui.qt_i18n import format_when
+    assert w._sync_joined_saved and note.endswith(
+        tr("sync_joined_saved", when=format_when(w._sync_joined_saved, "d MMM yyyy HH:mm")))
     assert w.switched == [] and w.picked == 0
     assert w.settings.value("theme") == "nord" and w._sync_on()
     # Nothing to follow: this computer's switches stay as they were.
@@ -270,6 +275,39 @@ def test_a_bad_code_nothing_there_and_no_network_are_said(qapp, tmp_path, site):
     assert ov._b_err.text() == tr("onb_sync_err_net")
     assert not w._sync_on() and not w._sync_state_file.exists()   # nothing left joined
     assert not ov._b_busy and ov._b_code.isEnabled()
+
+
+def test_a_copy_a_month_old_is_asked_about_before_it_is_taken(qapp, tmp_path, site, monkeypatch):
+    """The welcome's Bring step and Settings' join: a copy last saved more
+    than a month ago - another computer may have a newer one - is asked
+    about first, in plain words, No the default. No: nothing taken, sync
+    left off, said why. Yes: joined as ever."""
+    from dopeiptv.ui import widgets
+    asked = []
+    answer = {"yes": False}
+
+    def confirm(parent, title, text, *, default_yes=True):
+        asked.append((text, default_yes))
+        return answer["yes"]
+    monkeypatch.setattr(widgets, "confirm", confirm)
+    code, pid = _other_computer(tmp_path, site, with_source=True, now=int(time.time()) - 45 * 86400)
+    w, ov = _window(tmp_path)
+    _ask(ov, code)
+    assert _settle(w)
+    assert asked == [(tr("sync_stale_ask", n=45), False)]
+    assert not w._sync_on() and w.settings.value("theme") is None and w.switched == []
+    assert ov._b_err.text() == tr("sync_err_stale") and not ov._b_busy
+    assert w._sync_status_text()[1] == tr("sync_err_stale")
+    # Settings' join, answered Yes: taken.
+    answer["yes"] = True
+    assert w._sync_join(code) and _settle(w)
+    assert len(asked) == 2 and w._sync_on() and w._sync_status[0] == "ok"
+    assert w.settings.value("theme") == "nord"
+    assert w._sync_state is not None and not w._sync_state.fresh and not w._sync_stale_ok
+    # Synced from then on: never asked again, the copy now this week's.
+    assert w.sync_now(manual=True) and _settle(w) and len(asked) == 2
+    w._sync_forget()
+    w._sync_pool.waitForDone(2000)
 
 
 def test_back_while_fetching_stops_the_sync(qapp, tmp_path, site):

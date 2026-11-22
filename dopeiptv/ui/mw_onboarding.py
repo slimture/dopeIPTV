@@ -11,7 +11,10 @@ The join takes favorites and settings, and the profiles with them; the
 other computer's sources and watch history come along only where that
 computer syncs them - this one then syncs them too, as it would with their
 switches turned on in Settings. A miss before anything came leaves sync
-off again here. Nothing of it opens a stream, and the code is never logged.
+off again here. A copy last saved more than a month ago is asked about
+first, as in Settings (mw_sync's stale question): No leaves sync off and
+the step says why. Nothing of it opens a stream, and the code is never
+logged.
 """
 from __future__ import annotations
 
@@ -31,7 +34,7 @@ from .welcome import WelcomeOverlay
 _FOLLOWED = ("sources", "history")
 #: The welcome's words for a sync that did not finish (mw_sync's kinds).
 _SYNC_MISS = {"net": "onb_sync_err_net", "none": "onb_sync_err_none",
-              "read": "sync_err_read", "newer": "sync_err_newer"}
+              "read": "sync_err_read", "newer": "sync_err_newer", "stale": "sync_err_stale"}
 
 
 def _a_source(ident: str) -> bool:
@@ -219,7 +222,11 @@ class _OnboardingMixin:
         log.info("welcome: synced from another computer, %d source(s) with it", len(came))
         if not came:
             if ov is not None:
-                ov.sync_no_sources()
+                # How old what came is (mw_sync says so too, once it is in).
+                saved = int(getattr(self, "_sync_joined_saved", 0) or 0)
+                from .qt_i18n import format_when
+                ov.sync_no_sources(tr("sync_joined_saved", when=format_when(saved, "d MMM yyyy HH:mm"))
+                                   if saved else "")
             return
         self._wizard_load(came)
         # "Who's watching?" as at start, with two profiles or more.

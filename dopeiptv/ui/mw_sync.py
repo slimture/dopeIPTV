@@ -27,6 +27,7 @@ encrypted here, under a random number - nothing about the person.
 from __future__ import annotations
 
 import time
+from functools import partial
 from pathlib import Path
 
 from PyQt6 import sip
@@ -78,12 +79,12 @@ class _SyncSignals(QObject):
 
 def _work(remote: sync.Remote, key: bytes, doc: dict, snap: sync.Snapshot,
           cats: tuple[str, ...], fresh: bool, joining: bool,
-          seen: frozenset[str], bind: bool = False) -> object:
+          seen: frozenset[str], bind: bool = False, stale_ok: bool = True) -> object:
     """The round on the sync thread: its result, or the SyncError (which
     the pool's fail signal would turn into a bare string)."""
     try:
         return sync.round_trip(remote, key, doc, snap, cats, fresh=fresh,
-                               joining=joining, seen=seen, bind=bind)
+                               joining=joining, seen=seen, bind=bind, stale_ok=stale_ok)
     except sync.SyncError as e:
         return e
     except Exception:
@@ -150,6 +151,10 @@ class _SyncMixin:
         self._sync_sent: str | None = None
         self._sync_unwritten = False
         self._sync_held_said = False
+        #: A joining computer's answer to "use this old copy anyway?" (yes),
+        #: and when the copy it joined was last saved (core/sync.saved_at).
+        self._sync_stale_ok = False
+        self._sync_joined_saved = 0
         self._sync_timer = QTimer(self)
         self._sync_timer.setInterval(TICK_MS)
         self._sync_timer.timeout.connect(self._sync_tick)
@@ -315,7 +320,8 @@ class _SyncMixin:
                            timeout_ms=180_000)
         run_async(self._sync_pool, _work, self._sync_done, self._sync_crashed,
                   remote, key, state.doc, snap, cats, state.fresh, state.joining,
-                  frozenset(state.seen), not state.bound)
+                  frozenset(state.seen), not state.bound,
+                  not state.fresh or self._sync_stale_ok)
         return True
 
     # -- what came back ------------------------------------------------------------
@@ -335,6 +341,13 @@ class _SyncMixin:
             self._sync_set_status(self._sync_status[0])
             return
         _gen, snap, cats, state = job
+        if isinstance(result, sync.SyncError) and result.kind == "stale" and state.fresh:
+            # A copy a month old for a computer new to it: asked first, the
+            # round's own question - busy until it is answered.
+            self._sync_busy = True
+            self._sync_set_status("running")
+            QTimer.singleShot(0, partial(self._sync_ask_stale, self._sync_gen, result.saved))
+            return
         if isinstance(result, sync.SyncError):
             self._sync_failed(result)
             # What waited from before is still said once, offline too.
@@ -352,7 +365,9 @@ class _SyncMixin:
             self._sync_failed(sync.SyncError("fail"))
             return
         state.doc, state.version = keep, result.version
+        joined = state.fresh
         state.fresh = state.joining = False
+        self._sync_stale_ok = False
         if result.uploaded:
             state.bound = True          # written with the credential: bound there
         state.seen |= sync.seen_after(cats, applied)
@@ -369,6 +384,12 @@ class _SyncMixin:
         log.info("sync: done - version %d, %d bytes%s%s", result.version, result.size,
                  ", sent" if result.uploaded else "",
                  ", changed here" if applied.any() else "")
+        if joined and result.saved:
+            # How old what it joined is, said once it is in place.
+            from .qt_i18n import format_when
+            self._sync_joined_saved = result.saved
+            hub_of(self).note(tr("sync_joined_saved",
+                                 when=format_when(result.saved, "d MMM yyyy HH:mm")))
         self._sync_set_status("older" if result.older else "ok")
         if result.older:
             # The site (or someone in its place) handed back an earlier copy:
@@ -383,6 +404,35 @@ class _SyncMixin:
                 log.warning("sync: window not refreshed", exc_info=True)
         # A playlist's connection settings the round did not put in place.
         self._sync_tell_held(state, new=bool(applied.held))
+
+    def _sync_ask_stale(self, gen: int, saved: int) -> None:
+        """A computer joining was handed a copy last saved more than a
+        month ago: another computer may have a newer one, and the site
+        could hand back an earlier copy this one cannot tell. Asked in
+        plain words, No the default: yes takes it, no leaves sync off. No
+        round runs while it is asked."""
+        from .widgets import confirm
+        days = sync.age_days(saved)
+        try:
+            asked = gen == self._sync_gen and self._sync_on()
+            yes = asked and confirm(self, tr("sync_title"), tr("sync_stale_ask", n=days),
+                                    default_yes=False)
+        finally:
+            self._sync_busy = False
+        if not asked or gen != self._sync_gen or not self._sync_on():
+            # Stopped, or another code, meanwhile: its own round follows.
+            if self._sync_on():
+                self._sync_set_status("idle")
+                self._sync_soon(1)
+            return
+        if yes:
+            log.info("sync: a copy %d days old taken, as asked", days)
+            self._sync_stale_ok = True
+            self.sync_now(manual=True)
+            return
+        log.info("sync: not joined - the copy there was %d days old", days)
+        self._sync_forget()
+        self._sync_set_status("stale")
 
     def _sync_failed(self, err: sync.SyncError) -> None:
         kind = err.kind
@@ -565,6 +615,7 @@ class _SyncMixin:
             # The first computer: what it has is the start, not a newcomer's.
             state.seen = set(sync.chosen(self.settings))
         self._sync_tell_held(None)          # another code's card goes with it
+        self._sync_stale_ok = False
         self._sync_fails = 0
         self._sync_sent = None
         self._sync_set_status("idle")
@@ -677,7 +728,7 @@ class _SyncMixin:
             problem = tr("sync_err_big", size=format_size(size),
                          limit=format_size(sync.MAX_BLOB))
         elif kind in ("net", "busy", "refused", "read", "newer", "none", "full", "fail",
-                      "older"):
+                      "older", "stale"):
             problem = tr(f"sync_err_{kind}")
         return line, problem
 
