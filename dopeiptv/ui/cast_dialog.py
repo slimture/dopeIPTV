@@ -98,6 +98,10 @@ def last_first(names: list[str], last: str) -> list[str]:
     return list(names)
 
 
+#: The device list's least width: the window's 400 less its margins.
+MIN_LIST_W = 364
+
+
 def cast_button_text(name: str | None) -> str:
     """The cast window's button for the device picked: "Cast to Living room
     TV" (a long name cut), or plain "Cast"."""
@@ -171,7 +175,9 @@ class CastDialog(QDialog):
         # for the person, and said (_note_stranger).
         self._strangers: set[str] = set()
         self.setWindowTitle(tr("cast_title"))
-        self.setMinimumWidth(400)
+        # The width it starts from on the list, never on the window: a
+        # window given a minimum of its own leaves its layout's out, and
+        # "Cast to AirPlay (Apple TV)" was cut to its middle on the button.
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 18, 18, 18)
         lay.setSpacing(10)
@@ -181,6 +187,7 @@ class CastDialog(QDialog):
         lay.addWidget(self.status)
 
         self.list = QListWidget()
+        self.list.setMinimumWidth(MIN_LIST_W)
         self.list.itemDoubleClicked.connect(lambda _i: self._cast())
         lay.addWidget(self.list, 1)
         # A Kodi that mDNS does not find (another subnet, announcing off), or
