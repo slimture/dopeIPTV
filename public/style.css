@@ -421,11 +421,12 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
    muted one. Under a hairline one quiet line: the company with the
    copyright, and that no content comes with the app. One logo, dopeIPTV's:
    a second (Solecraft's) under it made two marks fight for the eye. On a
-   phone the brand goes over the groups, each group across the whole width
-   with its links in one row that wraps where the line ends - two even
-   columns left a link alone on its row whenever a group had an odd number,
-   and made the footer almost a screen tall -, each link a finger's room and
-   a long word (German's) broken rather than run into its neighbour. */
+   phone the brand goes over the groups, as the big sites lay out theirs:
+   a hairline over each group, its name, then its links one under another,
+   each a row a finger can hit - always open, nothing to unfold. Links in a
+   row that wrapped read as a jumble; two columns left one alone whenever a
+   group had an odd number. A long word (German's) breaks rather than runs
+   off the line. */
 footer { background: var(--surface); padding: 44px 0 32px; margin-top: 24px; }
 footer .foot-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: 32px 48px; align-items: start; }
@@ -453,12 +454,12 @@ footer .foot-company a:hover { color: var(--accent); }
   footer { padding: 28px 0 26px; }
   footer .foot-top { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   footer .foot-brand { max-width: none; }
-  footer .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 14px; width: 100%; }
-  footer .foot-h { margin-bottom: 0; }
-  footer .foot-col ul { display: flex; flex-wrap: wrap; gap: 0 20px; }
-  footer .foot-col a { display: inline-block; max-width: 100%; padding: 7px 0; font-size: 15px;
-    overflow-wrap: anywhere; hyphens: auto; }
-  footer .foot-base { margin-top: 22px; }
+  footer .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 0; width: 100%; }
+  footer .foot-col { padding: 16px 0 8px; border-top: 1px solid var(--line); }
+  footer .foot-h { margin: 0 0 2px; font-size: 13px; }
+  footer .foot-col ul { gap: 0; font-size: 15px; }
+  footer .foot-col a { display: block; padding: 9px 0; overflow-wrap: anywhere; hyphens: auto; }
+  footer .foot-base { margin-top: 8px; }
 }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
