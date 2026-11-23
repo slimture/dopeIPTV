@@ -314,17 +314,28 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            mpv libmpv-dev ffmpeg ruby ruby-dev build-essential \
-            libgl1 libegl1 libxcb-cursor0 libpulse0 desktop-file-utils \
-            libfuse2 appstream
+          tools="mpv libmpv-dev ffmpeg ruby ruby-dev build-essential
+            libgl1 libegl1 libxcb-cursor0 libpulse0 desktop-file-utils
+            libfuse2 appstream"
           # Everything Qt's X11 platform plugin links, so PyInstaller finds
           # and bundles it. A library missing here is silently left out, and
           # the AppImage then dies at start on any X11 box that lacks it too
           # (AppImageHub's test runner was the first to say so).
+          x11="libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-xkb1
+            libxcb-image0 libxcb-render-util0 libxcb-shape0 libxcb-util1"
+          # The packages fetched several at once first, each only with the
+          # SHA-256 apt's signed lists name (tools/apt_fetch.py): Ubuntu's
+          # mirror gave them one by one at 100 kB/s at times - nine minutes.
+          # apt installs from there and fetches anything missing itself.
+          debs="$RUNNER_TEMP/apt-debs"
+          # shellcheck disable=SC2086
+          python3 -I tools/apt_fetch.py "$debs" $tools $x11
+          # shellcheck disable=SC2086
           sudo apt-get install -y --no-install-recommends \
-            libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-xkb1 \
-            libxcb-image0 libxcb-render-util0 libxcb-shape0 libxcb-util1
+            -o Dir::Cache::Archives="$debs" $tools
+          # shellcheck disable=SC2086
+          sudo apt-get install -y --no-install-recommends \
+            -o Dir::Cache::Archives="$debs" $x11
           sudo gem install --no-document fpm
           # appimagetool and the runtime, AppImage's own files: each only as
           # the bytes packaging/build-inputs.json names (tools/build_inputs.py

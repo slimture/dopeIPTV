@@ -73,8 +73,8 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
 ## The workflows
 
 - **`ci.yml`** - every push and pull request: ruff and mypy (job "Lint +
-  types"), pytest on Linux in four parts at once ("Tests 1/4" to "4/4",
-  each on a runner of its own: `DOPEIPTV_SHARD=k/4`, `tests/shard.py`),
+  types"), pytest on Linux in six parts at once ("Tests 1/6" to "6/6",
+  each on a runner of its own: `DOPEIPTV_SHARD=k/6`, `tests/shard.py`),
   "Lint + tests" green only when all of those are - the one check to look
   at -, and - a job of its own - the audit of the Python packages the
   builds ship ("What the build downloads" below). (The packaging checks -
@@ -83,13 +83,19 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   `tests/shard_times.json`. When one part takes much longer than the
   others, refresh it: run the suite with `--junitxml=run.xml` and
   `python3 tools/shard_times.py run.xml`. A part runs locally the same way:
-  `DOPEIPTV_SHARD=2/4 QT_QPA_PLATFORM=offscreen pytest -q`. The system
+  `DOPEIPTV_SHARD=2/6 QT_QPA_PLATFORM=offscreen pytest -q`. The system
   libraries the tests need (about 77 MB from Ubuntu's mirror, one to eight
   minutes) are kept between runs by `actions/cache`, one copy per runner
   image and version of `ci.yml`: apt still reads its signed lists, a kept
   package is used only with the SHA-256 they name, and the rest comes from
   the mirror (`tests/test_ci_apt_cache.py`). Only the test jobs keep any;
-  the release builds always download theirs.
+  the release builds always download theirs. What is downloaded - in CI
+  and in the Linux release build - is fetched several files at once by
+  `tools/apt_fetch.py` from the mirrors apt is set up with, each kept only
+  with the size and SHA-256 apt's signed lists name; apt installs from
+  there and downloads anything missing itself (`tests/test_apt_fetch.py`).
+  Ubuntu's mirror for the runners has served packages one by one at
+  100 kB/s - nine minutes of a release build.
 - **`nightly.yml`** - every push to `testing`: builds every package the way
   a release does (it calls `release.yml` with `nightly_version`) and
   publishes them as a **pre-release** `nightly-<version>.<run>`. Users on

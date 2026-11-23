@@ -107,3 +107,20 @@ def test_only_a_package_the_lists_name_with_its_sha256_is_kept(tmp_path):
                          text=True, timeout=30, check=True)
     assert out.stdout.split() == ["1", "3"], out
     assert sorted(p.name for p in debs.iterdir()) == ["good_1_amd64.deb"]
+
+
+def test_both_workflows_fetch_what_they_install_into_the_folder_apt_installs_from():
+    # CI: the kept packages judged, the rest fetched at once, then apt.
+    script = _install_script()
+    fetch = script.index('python3 -I tools/apt_fetch.py "$debs" $packages')
+    assert script.index('echo "Packages kept') < fetch < script.index("sudo apt-get install")
+    # The Linux release build: every package it installs fetched first, into
+    # the folder each install then reads (tools/apt_fetch.py).
+    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+    step = release.split("      - name: System deps (libmpv, ffmpeg, Qt runtime, fpm, appimagetool)\n", 1)[1]
+    step = step.split("      - name: ", 1)[0]
+    fetch = step.index('python3 -I tools/apt_fetch.py "$debs" $tools $x11')
+    installs = [m.start() for m in re.finditer(r"sudo apt-get install", step)]
+    assert len(installs) == 2 and all(fetch < i for i in installs)
+    assert step.count('-o Dir::Cache::Archives="$debs"') == 2
+    assert step.index("sudo apt-get update") < fetch
