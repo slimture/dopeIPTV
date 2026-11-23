@@ -94,6 +94,32 @@ def test_watched_store_local_snapshots():
     assert kinds == ["series"]
 
 
+def test_watched_store_marks_and_lifts_many_episodes_at_once():
+    # A series' whole mark turned into the episodes' own (mw_trakt's
+    # _series_whole_to_episodes) and those lifted with the series - each
+    # one write, and kept for the next start.
+    store = {}
+    s = MagicMock()
+    s.value = lambda k, d="": store.get(k, d)
+    writes = []
+    s.setValue = lambda k, v: (writes.append(k), store.__setitem__(k, v))
+    w = WatchedStore(s)
+    w.mark_episodes_local(700, [(1, 1), (1, 2), (2, 1)], [5001, 5002])
+    assert len(writes) == 1
+    assert w.is_episode_watched(700, 1, 2) and w.is_episode_watched(700, 2, 1)
+    assert w.is_episode_watched_by_stream(5001) and w.is_episode_watched_by_stream(5002)
+    w.mark_episodes_local(None, [(3, 3)], [])          # no show known: no pair kept
+    assert not w.episodes_for(700) & {(3, 3)} and len(writes) == 1
+    again = WatchedStore(s)
+    assert again.is_episode_watched(700, 1, 1) and again.is_episode_watched_by_stream(5002)
+    writes.clear()
+    w.unmark_episodes_by_stream([5001, 9999])
+    assert len(writes) == 1 and not w.is_episode_watched_by_stream(5001)
+    assert w.is_episode_watched_by_stream(5002)
+    w.unmark_episodes_by_stream([9999])                # nothing of it marked: no write
+    assert len(writes) == 1
+
+
 def test_watched_store_snapshots_persist():
     store = {}
     s = MagicMock()

@@ -1141,6 +1141,20 @@ class WatchedStore:
         eps.add((int(season), int(episode)))
         self._save()
 
+    def mark_episodes_local(self, show_tmdb_id: int | None,
+                            pairs: list[tuple[int, int]],
+                            stream_ids: list[int]) -> None:
+        """Several episodes marked at once, saved once: a series' whole mark
+        turned into marks of their own (TMDB's season and number where the
+        show is known, else the episodes' own ids)."""
+        known = bool(pairs) and isinstance(show_tmdb_id, int)
+        if known and isinstance(show_tmdb_id, int):
+            eps = self.local_episodes.setdefault(show_tmdb_id, set())
+            eps.update((int(s), int(e)) for s, e in pairs)
+        self.local_episode_streams.update(int(i) for i in stream_ids)
+        if known or stream_ids:
+            self._save()
+
     # -- local -> Trakt push (cross-device sync of local-only marks) ----------
 
     def pending_trakt_pushes(self) -> tuple[list[int],
@@ -1265,6 +1279,14 @@ class WatchedStore:
     def unmark_episode_by_stream(self, episode_id: int) -> None:
         self.local_episode_streams.discard(int(episode_id))
         self._save()
+
+    def unmark_episodes_by_stream(self, episode_ids: list[int]) -> None:
+        """Several episodes' own marks lifted at once, saved once (a whole
+        series unmarked)."""
+        ids = {int(i) for i in episode_ids} & self.local_episode_streams
+        if ids:
+            self.local_episode_streams -= ids
+            self._save()
 
     def is_episode_watched_by_stream(self, episode_id: int | None) -> bool:
         return (isinstance(episode_id, int)

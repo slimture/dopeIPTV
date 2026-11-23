@@ -524,11 +524,33 @@ class _TraktMixin:
             pass
         return 0
 
+    def _series_seen_whole(self, series: dict | None = None) -> bool:
+        """Whether the series an episode belongs to (*series*, else the one
+        in context) is marked watched as a whole - its own Mark as watched,
+        by its id or as TMDB's whole show, or a media server's played
+        series: then every episode of it counts as watched."""
+        series = self.series_ctx if series is None else series
+        if not isinstance(series, dict) or not series:
+            return False
+        if series.get("_played"):
+            return True
+        sid = series.get("series_id") or series.get("stream_id")
+        try:
+            if self.watched.is_series_watched_by_stream(int(sid)):
+                return True
+        except (TypeError, ValueError):
+            pass
+        tid = self._tmdb_id_for_item(series, "series")
+        return isinstance(tid, int) and (tid in self.watched.local_shows
+                                         or tid in self.watched.synced_shows)
+
     def is_episode_watched(self, item: dict) -> bool:
         if item and item.get("_played"):
             return True          # a media server says so (mw_media)
         if not item or not self.series_ctx:
             return False
+        if self._series_seen_whole():
+            return True
         if self.tmdb:
             show_title = (self.series_ctx.get("name")
                           or self.series_ctx.get("title") or "")
@@ -581,6 +603,9 @@ class _TraktMixin:
             if (isinstance(tid, int) and pair is not None
                     and pair in (self.watched.trakt_episodes.get(tid) or set())):
                 return "trakt"
+            if isinstance(tid, int) and tid in self.watched.synced_shows \
+                    and self._series_seen_whole():
+                return "trakt"                  # the whole show, on Trakt too
             return "local"
         return None
 
@@ -786,6 +811,8 @@ class _TraktMixin:
 
     def _unmark_episode_watched(self, item: dict,
                                 push_to_trakt: bool) -> None:
+        if self._series_seen_whole():
+            self._series_whole_to_episodes(item)
         self._ms_mark(item, False, "episode")
         sid = self._show_tmdb_id_for_episode()
         try:
@@ -814,6 +841,68 @@ class _TraktMixin:
         if push_to_trakt and sid is not None and season is not None:
             self._accounts_push("remove_episode_history", sid, season, episode)
         self.list_model.refresh_all()
+
+    def _known_episodes(self, series: dict) -> list[dict]:
+        """The episodes of *series* the window holds now, nothing asked of
+        the provider: its page's, else its page's answer kept for a few
+        minutes, else the list's when it shows that series' episodes."""
+        sid = str(series.get("series_id") or series.get("stream_id") or "")
+        if not sid:
+            return []
+        page_ctx = getattr(self, "_sp_ctx", None) or {}
+        if str(page_ctx.get("series_id") or "") == sid and getattr(self, "_sp_seasons", None):
+            return [e for s in self._sp_seasons for e in s.episodes]
+        hit = (getattr(self, "_sp_cache", None) or {}).get((id(self.client), sid))
+        if hit is not None:
+            try:
+                return list(self._episode_rows(hit[1], series))
+            except Exception:
+                log.debug("watched: episodes from the page's answer", exc_info=True)
+        ctx = self.series_ctx or {}
+        if str(ctx.get("series_id") or ctx.get("stream_id") or "") == sid:
+            return [it for it in (getattr(self, "all_items", None) or [])
+                    if isinstance(it, dict) and it.get("episode_num") is not None]
+        return []
+
+    def _series_whole_to_episodes(self, but: dict) -> None:
+        """One episode unmarked of a series marked watched as a whole: the
+        whole mark lifted and every other episode the window knows of
+        marked on its own, so only that one goes back to unwatched."""
+        series = self.series_ctx or {}
+        key = str(but.get("id") or "")
+        pair = (but.get("season"), but.get("episode_num"))
+        others = [ep for ep in self._known_episodes(series)
+                  if not (str(ep.get("id") or "") == key and key)
+                  and not (key == "" and (ep.get("season"), ep.get("episode_num")) == pair)]
+        tid = self._show_tmdb_id_for_episode()
+        if not isinstance(tid, int):
+            tid = self._tmdb_id_for_item(series, "series")
+        pairs: list[tuple[int, int]] = []
+        streams: list[int] = []
+        for ep in others:
+            try:
+                p = (int(ep.get("season")), int(ep.get("episode_num")))
+            except (TypeError, ValueError):
+                p = None
+            if isinstance(tid, int) and p is not None:
+                pairs.append(p)
+            else:
+                try:
+                    streams.append(int(ep.get("id")))
+                except (TypeError, ValueError):
+                    continue
+        try:
+            self.watched.unmark_series_by_stream(int(series.get("series_id")
+                                                     or series.get("stream_id")))
+        except (TypeError, ValueError):
+            pass
+        if isinstance(tid, int) and (tid in self.watched.local_shows
+                                     or tid in self.watched.synced_shows):
+            self.watched.unmark_show(tid)
+        series.pop("_played", None)
+        self.watched.mark_episodes_local(tid, pairs, streams)
+        log.info("watched: one episode unmarked of a series seen whole - %d others "
+                 "kept watched on their own", len(pairs) + len(streams))
 
     def _mark_series_watched(self, item: dict,
                              push_to_trakt: bool) -> None:
@@ -878,6 +967,15 @@ class _TraktMixin:
             self.watched.unmark_series_by_stream(int(sid))
         except (TypeError, ValueError):
             pass
+        # The whole series unwatched: its episodes' own marks too, those the
+        # window knows of (TMDB-keyed ones go with the show below).
+        ids = []
+        for ep in self._known_episodes(item):
+            try:
+                ids.append(int(ep.get("id")))
+            except (TypeError, ValueError):
+                continue
+        self.watched.unmark_episodes_by_stream(ids)
         # Also clear any TMDB-keyed per-episode marks + whole-show mark
         # for this show so the badge disappears immediately.
         tid = self._tmdb_id_for_item(item, "series")

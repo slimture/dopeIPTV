@@ -19,6 +19,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   plugin - sent a report that said only "Fatal Python error: Aborted": the
   reason Qt gave went to a terminal nobody had open. The report now has
   Qt's last words, and the warning lines just before them, masked.
+- A series marked watched as a whole (its own Mark as watched) left its
+  episodes unmarked on its page, in the list, in TV mode and on the phone
+  remote. Every episode of it now shows as watched; unmarking one episode
+  leaves the others watched, and unmarking the series unmarks them all.
 
 ## [1.6.12]
 

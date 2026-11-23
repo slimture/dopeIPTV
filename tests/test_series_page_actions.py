@@ -1,7 +1,8 @@
 """A series' page's own actions in the real window (ui/mw_series_page.py):
 the header's Favorite, Follow and Watch later pressed and pressed again -
 each kept in the store the lists and Mine read, the button saying so -,
-the ⋯ menu's Mark as watched (the whole series) and back, an episode's menu (its address
+the ⋯ menu's Mark as watched - the whole series, every episode
+with it - and back, one episode unmarked of a series seen whole (only that one), an episode's menu (its address
 copied, Remove from Continue watching, Mark as watched), and a series the
 provider will not give: said on the page, and Try again fetches it."""
 from __future__ import annotations
@@ -130,11 +131,13 @@ pick.append(tr("ctx_mark_watched"))
 w._sp_more_menu(QPoint(0, 0))
 settle(lambda: w.show_watched_count(w._sp_ctx) > 0)
 assert w.watched.is_series_watched_by_stream(130)
+settle(lambda: all(s.watched for s in page.states.values()))   # every episode with it
 pick.append(tr("ctx_unmark_watched"))
 w._sp_more_menu(QPoint(0, 0))
 assert tr("ctx_mark_watched") not in menus[-1], "it offered what was already so"
 settle(lambda: w.show_watched_count(w._sp_ctx) == 0)
 assert not w.watched.is_series_watched_by_stream(130)
+settle(lambda: not any(s.watched for s in page.states.values()))
 w._sp_more_menu(QPoint(0, 0))
 assert tr("ctx_mark_watched") in menus[-1] and tr("ctx_unmark_watched") not in menus[-1]
 
@@ -163,6 +166,19 @@ settle(lambda: page.states["2002"].watched)
 assert not page.states["2001"].watched, "only that episode"
 w._sp_episode_menu(eps["2002"], QPoint(0, 0))
 assert tr("ctx_unmark_watched") in menus[-1] and tr("ctx_mark_watched") not in menus[-1]
+
+# -- the whole series watched, then one episode unmarked: only that one ----------------
+pick.append(tr("ctx_mark_watched"))
+w._sp_more_menu(QPoint(0, 0))
+settle(lambda: all(s.watched for s in page.states.values()))
+pick.append(tr("ctx_unmark_watched"))
+w._sp_episode_menu(eps["2001"], QPoint(0, 0))
+settle(lambda: not page.states["2001"].watched)
+assert all(s.watched for k, s in page.states.items() if k != "2001"), \
+    {k: s.watched for k, s in page.states.items()}
+assert not w.watched.is_series_watched_by_stream(130), "the whole mark lifted"
+w._open_series_page(series)                                  # read again: kept so
+settle(lambda: not page.states["2001"].watched and page.states["1001"].watched)
 assert pick == []
 print("SERIES_ACTIONS_OK", flush=True)
 os._exit(0)
