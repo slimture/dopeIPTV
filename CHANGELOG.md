@@ -5,6 +5,17 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+### Fixed
+
+- An error from the provider (a 502 Bad Gateway while it was having
+  trouble) showed in Messages with the whole address it failed on - the
+  user name and password in it - and its row was cut off at the top and the
+  foot. Every notice now shows an address as its server alone, never a
+  login, token or path, and keeps nothing more in what was said; and a long
+  run with no space in a message breaks, so the row is as tall as its lines.
+
 ## [1.6.12]
 
 ### Security

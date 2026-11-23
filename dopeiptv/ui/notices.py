@@ -48,7 +48,7 @@ from typing import Any, Callable
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
-from ..core.log import log
+from ..core.log import for_people, log
 
 LEVELS = ("info", "warning", "error")
 #: The kinds of work an icon is drawn for; anything else is "work".
@@ -182,7 +182,7 @@ class NoticeHub(QObject):
                 self._end(old, emit=False, linger=False)
         self._seq += 1
         token = self._seq
-        self._jobs[token] = Job(token, str(text or ""), key,
+        self._jobs[token] = Job(token, for_people(str(text or "")), key,
                                 kind if kind in KINDS else "work", time.monotonic(),
                                 mine, done, total, cancel, group, group_text, shown_at,
                                 act, str(cancel_text or ""))
@@ -206,7 +206,7 @@ class NoticeHub(QObject):
         if job is None:
             return False
         self._job_timers[token].start()
-        new = (job.text if text is None else str(text),
+        new = (job.text if text is None else for_people(str(text)),
                job.done if done is None else done,
                job.total if total is None else total)
         if new != (job.text, job.done, job.total):
@@ -397,9 +397,11 @@ class NoticeHub(QObject):
         first line is its title. The same *key* or the same words again
         refresh the one there; the same words count up. Returns its id (0
         for a note)."""
-        text = str(text or "").strip()
+        # Words from outside - an exception's - show no login, token or
+        # path, and are kept so in what was said (core/log.for_people).
+        text = for_people(str(text or "")).strip()
         if title is not None:
-            head, body = str(title).strip(), text
+            head, body = for_people(str(title)).strip(), text
         else:
             head, _nl, body = text.partition("\n")
             head, body = head.strip(), body.strip()
@@ -437,7 +439,7 @@ class NoticeHub(QObject):
     def note(self, text: str, *, ms: int | None = None, key: str | None = None) -> None:
         """Passing words: the line says them for *ms*, then they are gone. A
         note while the video fills the screen is no news later: dropped."""
-        text = str(text or "").strip()
+        text = for_people(str(text or "")).strip()
         if not text:
             return
         self._say(text)

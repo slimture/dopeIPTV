@@ -347,6 +347,42 @@ def redact_text(text: str) -> str:
         return WITHHELD
 
 
+#: An address in words from outside, brackets and all (an IPv6 host's):
+#: what for_people cuts to its scheme and host.
+_ADDRESS = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.-]{1,15}://[^\s'\"<>()]+")
+
+
+def _site_of(address: str) -> str:
+    """*address* as its scheme and host alone: no login, path or query."""
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(address)
+        host, port = parts.hostname or "", parts.port
+    except ValueError:
+        return "…"
+    if not host:
+        return f"{parts.scheme}://…"
+    if ":" in host:
+        host = f"[{host}]"
+    return f"{parts.scheme}://{host}" + (f":{port}" if port else "")
+
+
+def for_people(text: str) -> str:
+    """Words from outside - an exception's message - as the app shows them
+    to the person (its notices, the status line): every address cut to its
+    scheme and host, so no login, token or path in it is shown or kept with
+    what the notices said ("502 Server Error: Bad Gateway for url:
+    http://host:2095"), then what redact_text masks. Never raises; WITHHELD
+    when it could not be done."""
+    try:
+        text = str(text)
+        if "://" in text:
+            text = _ADDRESS.sub(lambda m: _site_of(m.group(0)), text)
+        return redact_text(text)
+    except Exception:
+        return WITHHELD
+
+
 def _escaped(text: str) -> str:
     """*text* with its control characters shown as \\x1b, not acted on."""
     return _CONTROL.sub(lambda m: f"\\x{ord(m.group(0)):02x}", text)

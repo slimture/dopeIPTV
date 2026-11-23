@@ -37,6 +37,7 @@ from dopeiptv.ui.notice_widgets import (  # noqa: E402
     ActivityPanel,
     DecisionCard,
     _font,
+    breakable,
     colours,
     one_line,
     two_lines,
@@ -444,6 +445,45 @@ def test_a_long_message_fits_the_panel_whole(app):
     tops = [r.geometry().top() for r in rows]
     assert len(rows) == 2 and tops[1] >= rows[0].geometry().bottom(), tops   # never over each other
     assert all(r.findChildren(QLabel)[0].height() >= 14 for r in rows)
+
+
+def test_an_address_in_what_is_said_shows_its_host_alone_and_no_login(app):
+    """An error from the provider quoted the address it failed on - the
+    login in its query and all - in the panel, and kept it in what was said."""
+    hub = _hub()
+    url = ("http://tv.example:2095/player_api.php?username=kalle77&password=secret123"
+           "&action=get_series")
+    hub.post("Error: 502 Server Error: Bad Gateway for url: " + url, level="error")
+    hub.note("Could not reach " + url)
+    token = hub.start("Loading " + url)
+    hub.update(token, "Still loading " + url)
+    words = " | ".join([*hub.texts(), *hub.said(), hub.note_text(),
+                        *[e.text for e in hub.entries()]])
+    assert "http://tv.example:2095" in words
+    for leak in ("kalle77", "secret123", "player_api", "get_series"):
+        assert leak not in words, (leak, words)
+
+
+def test_a_long_run_breaks_and_its_row_fits_the_panel(app):
+    """A run Qt could not break - an address, a path - was as wide as
+    itself: the row got the height of fewer lines and was cut off."""
+    host = _host(app)
+    hub = _hub()
+    line = ActivityLine(hub, host)
+    line.setGeometry(16, 540, 240, ActivityLine.H)
+    panel = ActivityPanel(hub, host)
+    hub.post("Could not save to /home/someone/Videos/dopeIPTV/Recordings/"
+             "SVT1_HD_2026-11-22_19-30_Rapport_with_a_very_long_name_indeed.ts", level="error")
+    panel.open_at(line)
+    app.processEvents()
+    from PyQt6.QtWidgets import QLabel
+    [row] = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]
+    label = row.findChildren(QLabel)[0]
+    assert "\u200b" in label.text()
+    assert label.minimumSizeHint().width() <= label.width()
+    assert label.height() >= label.heightForWidth(label.width())
+    assert row.mapTo(panel, row.rect().bottomLeft()).y() <= panel.height()
+    assert breakable("short words stay as they are") == "short words stay as they are"
     panel.close_panel()
     host.close()
 

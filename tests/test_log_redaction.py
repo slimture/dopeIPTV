@@ -528,3 +528,17 @@ def test_the_exception_itself_leaves_the_record_once_masked():
     assert "tracebackpw1" not in rec.exc_text and "ValueError" in rec.exc_text
     text = logging.Formatter().format(rec)
     assert "ValueError" in text and "tracebackpw1" not in text
+
+
+def test_words_for_people_show_an_address_as_its_host_alone():
+    """What the app shows a person of an error (its notices): every address
+    its scheme and host - no login, token or path - and the log's masking."""
+    from dopeiptv.core import log as L
+    said = L.for_people("Error: 502 Server Error: Bad Gateway for url: "
+                        "http://tv.example:2095/player_api.php?username=kalle77&password=secret123")
+    assert said == "Error: 502 Server Error: Bad Gateway for url: http://tv.example:2095"
+    assert L.for_people("at http://user:pw@[2001:db8::1]:8080/live/u/p/1.ts now") == \
+        "at http://[2001:db8::1]:8080 now"
+    assert L.for_people("see (https://a.example/x?token=abc) here") == "see (https://a.example) here"
+    assert "secret" not in L.for_people("max retries with url: /get.php?username=a&password=secret")
+    assert L.for_people("plain words") == "plain words"
