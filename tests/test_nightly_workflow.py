@@ -142,3 +142,22 @@ def test_the_apple_secrets_reach_the_macos_job_alone_in_its_own_environment():
     for name, block in jobs.items():
         named = [s for s in apple if f"secrets.{s}" in block]
         assert not named or name == "macos-dmg", (name, named)
+
+
+def _named_step(name: str) -> str:
+    return RELEASE.split(f"      - name: {name}\n", 1)[1].split("      - name: ", 1)[0]
+
+
+def test_the_windows_vulkan_loader_builds_on_every_core():
+    step = _named_step("Vulkan loader (vulkan-1.dll)")
+    assert re.search(r"cmake --build vulkan-loader/build --config Release --parallel\n", step)
+
+
+def test_only_the_intel_mac_build_leaves_zeroconfs_speed_ups_out():
+    # zeroconf has an Apple Silicon wheel alone; on Intel pip builds it, and
+    # its Cython speed-ups cost minutes for nothing a person would notice.
+    mac = RELEASE.split("\n  macos-dmg:\n", 1)[1]
+    step = mac.split("      - name: Python build deps\n", 1)[1].split("      - name: ", 1)[0]
+    intel = step.split('if [ "${{ matrix.deps }}" = conda ]; then', 1)[1].split("\n          fi\n", 1)[0]
+    assert "export SKIP_CYTHON=1" in intel
+    assert RELEASE.count("SKIP_CYTHON") == 1

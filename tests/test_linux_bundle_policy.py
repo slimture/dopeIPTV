@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -209,3 +210,52 @@ def test_release_audits_the_bundle_and_launches_native_wayland():
     assert re.search(r"find\s+dist/dopeiptv", job)
     step = _step(job, "Self-containment test across clean distros")
     assert re.search(r"python3?\s+/work/tools/linux_wayland_smoke\.py", step)
+
+
+def _distro_run(tmp_path: Path, distros: str) -> tuple[subprocess.CompletedProcess, float]:
+    """The clean-distro step as the runner runs it, with a docker that only
+    says which distro it was given, takes two seconds and fails "bad:2"."""
+    step = _step(_linux_release(), "Self-containment test across clean distros")
+    body = step.split("        run: |\n", 1)[1]
+    script = "\n".join(line[10:] for line in body.splitlines())
+    script = script.replace("${{ matrix.test_distros }}", distros)
+    stub = tmp_path / "bin"
+    stub.mkdir(exist_ok=True)
+    docker = stub / "docker"
+    # docker run --rm -v X IMAGE bash -c SCRIPT: the image is the fifth word.
+    docker.write_text('#!/bin/sh\necho "checked in $5"\nsleep 2\n'
+                      '[ "$5" != bad:2 ]\n', encoding="utf-8")
+    docker.chmod(0o755)
+    env = dict(os.environ, PATH=f"{stub}{os.pathsep}{os.environ['PATH']}")
+    start = time.monotonic()
+    done = subprocess.run(["bash", "-c", script], env=env, cwd=tmp_path,
+                          capture_output=True, text=True, timeout=60)
+    return done, time.monotonic() - start
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_the_clean_distros_are_checked_at_once_and_any_one_failing_fails(tmp_path):
+    done, took = _distro_run(tmp_path, "ok:1 bad:2 late:3")
+    assert done.returncode == 1, done
+    out = done.stdout
+    # Side by side: three runs of two seconds each take about two, not six.
+    assert took < 5, took
+    for image, result in (("ok:1", "passed"), ("bad:2", "FAILED"), ("late:3", "passed")):
+        group = out.split(f"::group::self-containment on {image}: {result}\n", 1)[1]
+        assert group.split("::endgroup::", 1)[0].strip() == f"checked in {image}"
+    assert "::error::self-containment failed on bad:2" in out
+    assert out.count("::error::") == 1
+    # Each distro's output in the order the matrix names them.
+    assert out.index("on ok:1") < out.index("on bad:2") < out.index("on late:3")
+    passed, _ = _distro_run(tmp_path, "ok:1 late:3")
+    assert passed.returncode == 0 and "::error::" not in passed.stdout, passed
+
+
+def test_a_distro_beside_the_others_is_given_time_to_say_it_plays_video():
+    step = _step(_linux_release(), "Self-containment test across clean distros")
+    launch = step.split("--- launch under Xvfb", 1)[1].split("echo \"alive after 15 s", 1)[0]
+    # Still the same bar: alive after 15 s, then up to 30 s more for the line
+    # while it keeps running - never less.
+    assert "sleep 15" in launch
+    assert launch.index("sleep 15") < launch.index("kill -0") < launch.index("seq 30")
+    assert 'kill -0 "$pid" 2>/dev/null || break' in launch

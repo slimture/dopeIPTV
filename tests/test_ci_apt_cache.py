@@ -42,10 +42,19 @@ def test_every_action_in_ci_is_pinned_and_the_cache_is_the_test_jobs_alone():
     key = re.search(r"key: (apt-.*)", CI).group(1)
     assert "steps.image.outputs.name" in key and "hashFiles('.github/workflows/ci.yml')" in key
     assert "ImageOS" in CI and "ImageVersion" in CI
-    # The builds take their packages from the mirror, never from a cache.
+    # The builds take their packages from the mirror, never from a cache:
+    # no cache action, no setup-python cache, the Flatpak builder's own off.
     for other in WORKFLOWS.glob("*.yml"):
-        if other.name != "ci.yml":
-            assert "actions/cache" not in other.read_text(encoding="utf-8"), other.name
+        if other.name == "ci.yml":
+            continue
+        text = other.read_text(encoding="utf-8")
+        assert "actions/cache" not in text, other.name
+        assert re.findall(r"^\s+cache:\s*(\S+)", text, re.M) in ([], ["false"]), other.name
+        assert "restore-cache:" not in text and "cache-key:" not in text, other.name
+    release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+    flatpak = release.split("uses: flatpak/flatpak-github-actions/flatpak-builder@", 1)[1]
+    assert re.search(r"\A\S+\s+#[^\n]*\n\s+with:\n(\s{10}.*\n)*?\s{10}cache: false\n",
+                     flatpak), flatpak[:400]
 
 
 def test_the_lists_are_read_before_a_kept_package_is_judged_and_apt_installs():

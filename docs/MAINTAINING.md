@@ -107,7 +107,14 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   screen), and a release whose Flatpak fails is red (#36 shipped a Flatpak
   that crashed at every start while the leg was allowed to fail). A flaky
   download (GitHub, conda-forge, micromamba) is the usual reason a leg goes
-  red - re-run the failed jobs before looking for a bug.
+  red - re-run the failed jobs before looking for a bug. What a run takes
+  is set by its slowest job (about 6-8 minutes) and, at times, by GitHub's
+  queue for a Mac: the Linux job checks its clean distros at once, each in
+  a container of its own; Windows builds the Vulkan loader on every core;
+  the Intel Mac takes zeroconf without its Cython speed-ups (it has a
+  wheel for Apple Silicon alone, and building them took 1.5 minutes). No
+  build keeps a cache - not even the Flatpak builder's - so nothing
+  another job wrote can reach a release (`tests/test_ci_apt_cache.py`).
 
 Every workflow is read-only unless a job says otherwise (`permissions:`),
 names each action by its commit (the version in a comment beside it), and
