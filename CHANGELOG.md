@@ -15,6 +15,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   foot. Every notice now shows an address as its server alone, never a
   login, token or path, and keeps nothing more in what was said; and a long
   run with no space in a message breaks, so the row is as tall as its lines.
+- A crash at start - Qt finding no display to connect to, or no platform
+  plugin - sent a report that said only "Fatal Python error: Aborted": the
+  reason Qt gave went to a terminal nobody had open. The report now has
+  Qt's last words, and the warning lines just before them, masked.
 
 ## [1.6.12]
 

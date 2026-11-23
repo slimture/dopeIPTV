@@ -48,6 +48,13 @@ _SUPPRESSED_QT_WARNINGS = (
     b"libpng warning:",
 )
 _original_msg_handler = None
+#: Where the native crash handler writes this run (_install_crash_hooks):
+#: the crash file the next start offers to send, or the terminal.
+_crash_target = None
+#: Qt's last few warnings: the reason a fatal error gives is often in the
+#: line before it ("qt.qpa.xcb: could not connect to display").
+_QT_LAST_WORDS: list[str] = []
+_QT_LAST_KEPT = 6
 
 # Every Qt module the app imports (tests/test_flatpak_manifest.py keeps the
 # list whole), QtDBus on Linux alone. The self-check loads each: a package
@@ -77,6 +84,7 @@ def _qt_message_filter(msg_type, context, message):
     for pattern in _SUPPRESSED_QT_WARNINGS:
         if pattern in msg_bytes:
             return
+    _keep_qt_words(msg_type, context, message)
     if _original_msg_handler is not None:
         _original_msg_handler(msg_type, context, message)
         return
@@ -132,6 +140,35 @@ def _close_on_interrupt(window) -> bool:
     tick.start(500)
     window._interrupt_tick = tick
     return True
+
+
+def _keep_qt_words(msg_type, context, message) -> None:
+    """Qt's last words before it aborts, in the crash file: a fatal error at
+    start - no display to connect to, no platform plugin - wrote only
+    "Fatal Python error: Aborted" there, its reason went to a terminal
+    nobody had open. The last few warnings are kept so the line that says
+    why goes with it; the words are masked as the log masks them."""
+    try:
+        from PyQt6.QtCore import QtMsgType
+        text = (message if isinstance(message, str)
+                else bytes(message).decode("utf-8", "replace")).strip()
+        category = getattr(context, "category", None) or ""
+        if category and category != "default":
+            text = f"{category}: {text}"
+        if msg_type != QtMsgType.QtFatalMsg:
+            if msg_type in (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg):
+                _QT_LAST_WORDS.append(text[:500])
+                del _QT_LAST_WORDS[:-_QT_LAST_KEPT]
+            return
+        target = _crash_target
+        if target is None or target is sys.stderr:
+            return                      # a terminal shows Qt's own words
+        from .core.log import redact_text
+        lines = [*_QT_LAST_WORDS, text[:2000]]
+        target.write("".join(f"Qt: {redact_text(ln)}\n" for ln in lines))
+        target.flush()
+    except Exception:
+        pass
 
 
 def _install_crash_hooks() -> None:
@@ -235,6 +272,8 @@ def _install_crash_hooks() -> None:
             faulthandler.enable(file=target, all_threads=True)
         except Exception:
             pass
+        global _crash_target
+        _crash_target = target
 
 
 def _watch_link_events(app, window) -> None:

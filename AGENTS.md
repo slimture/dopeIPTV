@@ -146,7 +146,7 @@ map and the one-way import rule.
 
 | Module | What it owns |
 |--------|--------------|
-| `app.py` | Entry point, QApplication, login loop |
+| `app.py` | Entry point, QApplication, login loop; Qt's last words before a fatal error - and the warnings just before it - in the crash file the next start offers to send, masked (`_keep_qt_words`) |
 | `launcher.py` | The installed `dopeiptv` command: the window, or with `--server` server mode without one (no widget imported); `dopeiptv.py` does the same for a checkout and the frozen builds |
 | `headless.py` | `dopeiptv --server`: server mode without a window (`--port`, `--no-discovery`) - QtCore for the settings and plain threads, the household's sources and settings (never a profile's own), the usual log, SIGINT/SIGTERM stop it; `HeadlessHost`, the server's questions answered from the settings file; its port in use logged with whose it is (the window's server, another `--server`, another program) and the port free next (`taken_note`), nothing changed; a settings file that could not be made private stops it until `--settings-not-private` says so once; the tuner open to every device logged at every start (`open_note`) |
 | `i18n.py` | English source strings, `set_language`, `tr()` (other 26 languages in `locale/*.json`) |
