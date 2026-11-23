@@ -72,10 +72,18 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
 
 ## The workflows
 
-- **`ci.yml`** - every push and pull request: ruff, mypy and pytest on
-  Linux, and - a job of its own - the audit of the Python packages the
+- **`ci.yml`** - every push and pull request: ruff and mypy (job "Lint +
+  types"), pytest on Linux in four parts at once ("Tests 1/4" to "4/4",
+  each on a runner of its own: `DOPEIPTV_SHARD=k/4`, `tests/shard.py`),
+  "Lint + tests" green only when all of those are - the one check to look
+  at -, and - a job of its own - the audit of the Python packages the
   builds ship ("What the build downloads" below). (The packaging checks -
-  versions, icons, paths workflows name - are tests in the suite.)
+  versions, icons, paths workflows name - are tests in the suite.) A test
+  file stays whole in one part; the parts are made even by
+  `tests/shard_times.json`. When one part takes much longer than the
+  others, refresh it: run the suite with `--junitxml=run.xml` and
+  `python3 tools/shard_times.py run.xml`. A part runs locally the same way:
+  `DOPEIPTV_SHARD=2/4 QT_QPA_PLATFORM=offscreen pytest -q`.
 - **`nightly.yml`** - every push to `testing`: builds every package the way
   a release does (it calls `release.yml` with `nightly_version`) and
   publishes them as a **pre-release** `nightly-<version>.<run>`. Users on

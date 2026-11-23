@@ -685,8 +685,9 @@ methods in `ui/channel_list.py`.
 
 ## Quality gate
 
-CI (`.github/workflows/ci.yml`) runs on every push/PR - reproduce it
-locally before committing:
+CI (`.github/workflows/ci.yml`) runs on every push/PR - the suite in four
+parts at once (`tests/shard.py`, "Lint + tests" the check that sums them
+up) - reproduce it locally before committing:
 
 ```bash
 ruff check dopeiptv tests     # lint (pyflakes + bugbear + comprehensions)

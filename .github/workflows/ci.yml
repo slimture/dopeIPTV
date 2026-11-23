@@ -1,6 +1,7 @@
 name: CI
 
-# Fast quality gate on every push and PR: lint (ruff) + the full pytest suite.
+# Fast quality gate on every push and PR: lint (ruff, mypy) + the full pytest
+# suite, in four parts at once.
 # This is the green check to look at BEFORE tagging a release - it catches the
 # class of breakage (undefined names, broken imports, failing tests) that used
 # to only surface once a build ran. Kept separate from release.yml, which only
@@ -20,12 +21,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-test:
-    name: Lint + tests
+  lint:
+    name: Lint + types
     # Pinned, not ubuntu-latest: that label moves to Ubuntu 26.04 from
     # 2026-10-19. Take a new image on purpose, with a green run, never by
     # surprise in the middle of a release.
     runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1   # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Pin ruff so a future release adding rules can't turn the gate red
+          # without an intentional bump here.
+          pip install "ruff==0.15.8" "mypy==1.18.2"
+          # PyQt6 6.12's QtDBus.pyi has an invalid signature ("/" after "*").
+          # Keep the type gate on a verified binding until that stub is fixed.
+          pip install -r requirements.txt "PyQt6==6.10.2"
+      - name: Ruff (lint)
+        run: ruff check dopeiptv tests
+      - name: Mypy (types, scoped to the logic modules)
+        run: mypy
+
+  tests:
+    # The suite in four parts at once, each on a runner of its own
+    # (tests/shard.py): a test file stays whole in one part, the parts made
+    # even by what each file took on a whole run (tests/shard_times.json,
+    # tools/shard_times.py). One runner took about 17 minutes for all of it.
+    name: Tests ${{ matrix.shard }}/4
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09   # v5.1.0
         with:
@@ -49,20 +83,29 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Pin ruff so a future release adding rules can't turn the gate red
-          # without an intentional bump here.
-          pip install "ruff==0.15.8" "mypy==1.18.2" pytest
-          # PyQt6 6.12's QtDBus.pyi has an invalid signature ("/" after "*").
-          # Keep the type gate on a verified binding until that stub is fixed.
+          pip install pytest
           pip install -r requirements.txt "PyQt6==6.10.2"
-      - name: Ruff (lint)
-        run: ruff check dopeiptv tests
-      - name: Mypy (types, scoped to the logic modules)
-        run: mypy
       - name: Pytest
         env:
           QT_QPA_PLATFORM: offscreen   # no display on the runner
-        run: pytest -q
+          DOPEIPTV_SHARD: ${{ matrix.shard }}/4
+        run: pytest -q --durations=15
+
+  lint-test:
+    # The one check to look at, under the name it always had: green only
+    # when the lint and every part of the suite are.
+    name: Lint + tests
+    if: always()
+    needs: [lint, tests]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Lint and every part of the suite passed
+        env:
+          LINT: ${{ needs.lint.result }}
+          TESTS: ${{ needs.tests.result }}
+        run: |
+          echo "lint: $LINT, tests: $TESTS"
+          test "$LINT" = success && test "$TESTS" = success
 
   audit:
     # Known vulnerabilities in the Python packages the builds ship: the exact

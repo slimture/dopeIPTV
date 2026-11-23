@@ -2,6 +2,7 @@
 tests - what the app does with dopeiptv/core/gcguard.py. Left automatic, a
 collection triggered on a pool or cast thread tore Qt objects down off the
 main thread, and the suite segfaulted under load in a QTimer's lambda."""
+import collections
 import gc
 import os
 import tempfile
@@ -10,6 +11,7 @@ import time
 import pytest
 
 from dopeiptv.core.gcguard import collect_due
+from tests import shard
 
 _state = {"last_full": time.monotonic()}
 
@@ -28,6 +30,26 @@ os.environ["PYTHONUNBUFFERED"] = "1"
 # And a child that dies in Qt or mpv says where, instead of exiting with
 # nothing but a Qt warning on stderr (as on a Windows run).
 os.environ["PYTHONFAULTHANDLER"] = "1"
+
+
+def pytest_collection_modifyitems(config, items):
+    """CI runs the suite in parts at once (tests/shard.py): with
+    DOPEIPTV_SHARD=k/N only part k's test files run here."""
+    try:
+        spec = shard.parse(os.environ.get("DOPEIPTV_SHARD", ""))
+    except ValueError as e:
+        raise pytest.UsageError(str(e)) from None
+    if spec is None:
+        return
+    k, n = spec
+    counts = collections.Counter(shard.file_of(item.nodeid) for item in items)
+    owner = shard.assign(dict(counts), shard.load_times(), n)
+    keep, drop = [], []
+    for item in items:
+        (keep if owner[shard.file_of(item.nodeid)] == k - 1 else drop).append(item)
+    if drop:
+        config.hook.pytest_deselected(items=drop)
+    items[:] = keep
 
 
 @pytest.fixture(autouse=True, scope="session")
