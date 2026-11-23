@@ -61,12 +61,16 @@ def _build_from_source():
 def _no_short_login_left():
     """A login of three characters or fewer is masked as a word of its own
     (core/log.py): a test's client made with "u" and "p" must not mask
-    every "/p/" in the next test's addresses."""
+    every "/p/" in the next test's addresses. A longer one neither: a
+    test's "root" masked the next test's /tmp/pytest-of-root/ path in what
+    the notices said (they take every word through the log's mask)."""
     from dopeiptv.core import log as app_log
-    kept = set(app_log._short)
+    kept, kept_long = set(app_log._short), set(app_log._secrets)
     yield
     app_log._short.clear()
     app_log._short.update(kept)
+    app_log._secrets.clear()
+    app_log._secrets.update(kept_long)
 
 
 @pytest.fixture(autouse=True)
