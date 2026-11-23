@@ -1739,3 +1739,29 @@ window.iptvCopyButtons(document);
   }, {passive: true});
   look();
 })();
+
+/* The footer's groups (render.jq, site_footer): open in the page, for a
+   browser without this file; on a computer they stay open, their names
+   only names (not a Tab stop, a click nothing); on a phone folded, a tap on
+   a name opening its group. Back to open on a wider window. */
+(function () {
+  "use strict";
+  var groups = document.querySelectorAll("footer details.foot-col");
+  if (!groups.length || !window.matchMedia) { return; }
+  var phone = window.matchMedia("(max-width: 720px)");
+  function fit() {
+    for (var i = 0; i < groups.length; i++) {
+      groups[i].open = !phone.matches;
+      var name = groups[i].querySelector("summary");
+      if (name) { name.tabIndex = phone.matches ? 0 : -1; }
+    }
+  }
+  for (var i = 0; i < groups.length; i++) {
+    var name = groups[i].querySelector("summary");
+    if (name) {
+      name.addEventListener("click", function (e) { if (!phone.matches) { e.preventDefault(); } });
+    }
+  }
+  fit();
+  if (phone.addEventListener) { phone.addEventListener("change", fit); } else { phone.addListener(fit); }
+})();

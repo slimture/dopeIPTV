@@ -420,13 +420,15 @@ h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.03em; line-height:
    the width; each group's name in the text's own ink over its links in the
    muted one. Under a hairline one quiet line: the company with the
    copyright, and that no content comes with the app. One logo, dopeIPTV's:
-   a second (Solecraft's) under it made two marks fight for the eye. On a
-   phone the brand goes over the groups, as the big sites lay out theirs:
-   a hairline over each group, its name, then its links one under another,
-   each a row a finger can hit - always open, nothing to unfold. Links in a
-   row that wrapped read as a jumble; two columns left one alone whenever a
-   group had an odd number. A long word (German's) breaks rather than runs
-   off the line. */
+   a second (Solecraft's) under it made two marks fight for the eye. A
+   group's name is its <details>' summary, only a name on a computer (nav.js
+   keeps it open there). On a phone the brand goes over the groups, as the
+   big sites lay out theirs: each group a row under a hairline with its name
+   and the help page's +, folded (nav.js), its links one under another when
+   opened, each a row a finger can hit - open, the twelve links made the
+   footer a screen tall; in a row that wrapped they read as a jumble. A long
+   word (German's) breaks rather than runs off the line. A link's hover
+   colour only where there is a pointer: a tap on a phone left it lit. */
 footer { background: var(--surface); padding: 44px 0 32px; margin-top: 24px; }
 footer .foot-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: 32px 48px; align-items: start; }
@@ -439,27 +441,37 @@ footer .foot-mark b { font-family: var(--display); font-weight: 600; font-size: 
 footer .foot-tag { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 footer .foot-ver { margin: 6px 0 0; color: var(--faint); font-size: 12.5px; }
 footer .foot-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 32px; }
+footer .foot-col > summary { display: block; list-style: none; cursor: default; }
+footer .foot-col > summary::-webkit-details-marker { display: none; }
+footer .foot-col > summary::marker { content: ""; }
 footer .foot-h { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; color: var(--text); }
 footer .foot-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px;
   font-size: 13.5px; line-height: 1.45; }
 footer .foot-col a { color: var(--muted); }
-footer .foot-col a:hover { color: var(--accent); }
+@media (hover: hover) { footer .foot-col a:hover { color: var(--accent); } }
 footer .foot-base { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--line);
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 24px; }
 footer .foot-company, footer .foot-note { margin: 0; color: var(--faint); font-size: 12.5px; line-height: 1.6; }
 footer .foot-company a { color: inherit; }
 footer .foot-company bdi { white-space: nowrap; }
-footer .foot-company a:hover { color: var(--accent); }
+@media (hover: hover) { footer .foot-company a:hover { color: var(--accent); } }
 @media (max-width: 720px) {
   footer { padding: 28px 0 26px; }
   footer .foot-top { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   footer .foot-brand { max-width: none; }
   footer .foot-cols { grid-template-columns: minmax(0, 1fr); gap: 0; width: 100%; }
-  footer .foot-col { padding: 16px 0 8px; border-top: 1px solid var(--line); }
-  footer .foot-h { margin: 0 0 2px; font-size: 13px; }
-  footer .foot-col ul { gap: 0; font-size: 15px; }
+  footer .foot-col { border-top: 1px solid var(--line); }
+  footer .foot-col > summary { cursor: pointer; display: flex; align-items: center;
+    justify-content: space-between; gap: 18px; min-height: 52px; padding: 4px 0; }
+  footer .foot-col > summary::after {
+    content: "+"; flex: none; width: 28px; height: 28px; display: grid; place-items: center;
+    color: var(--muted); font-size: 22px; font-weight: 300; line-height: 1; transition: transform .2s ease; }
+  footer .foot-col[open] > summary::after { transform: rotate(45deg); }
+  footer .foot-col > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  footer .foot-h { margin: 0; font-size: 15px; }
+  footer .foot-col ul { gap: 0; padding-bottom: 10px; font-size: 15px; }
   footer .foot-col a { display: block; padding: 9px 0; overflow-wrap: anywhere; hyphens: auto; }
-  footer .foot-base { margin-top: 8px; }
+  footer .foot-base { margin-top: 0; }
 }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -841,7 +853,7 @@ body.searching .help-sec-more { display: none; }
 }
 .help-item[open] > summary::after { transform: rotate(45deg); }
 .help-item > summary:hover, .help-item > summary:hover::after { color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .help-item > summary::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .help-item > summary::after, footer .foot-col > summary::after { transition: none; } }
 .help-a { color: var(--muted); line-height: 1.7; max-width: 74ch; padding: 0 0 22px; }
 .help-a p { margin: 0 0 11px; }
 .help-a p:last-child { margin-bottom: 0; }

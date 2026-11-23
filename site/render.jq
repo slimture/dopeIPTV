@@ -277,14 +277,17 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # Every page's footer, one for all: dopeIPTV and what it is, the links in
   # three small groups, and under a hairline who makes it, where to reach
   # them and that it holds no channels - in plain sight on every page
-  # (Stripe's review, the Swedish E-Commerce Act's section 8).
+  # (Stripe's review, the Swedish E-Commerce Act's section 8). A group is a
+  # <details> open in the page: a computer, and a browser without nav.js,
+  # show every link; on a phone nav.js folds them, a tap on a name opening
+  # its group.
   def foot_group($head; $links):
-    "      <div class=\"foot-col\">\n"
-    + "        <h2 class=\"foot-h\">\($head | h)</h2>\n"
+    "      <details class=\"foot-col\" open>\n"
+    + "        <summary><h2 class=\"foot-h\">\($head | h)</h2></summary>\n"
     + "        <ul>\n"
     + ([$links[] | "          <li><a href=\"\(.[0] | h)\"\(.[2] // "")>\(.[1] | h)</a></li>\n"] | add)
     + "        </ul>\n"
-    + "      </div>\n";
+    + "      </details>\n";
   def site_footer:
     "<footer>\n"
     + "  <div class=\"wrap\">\n"
