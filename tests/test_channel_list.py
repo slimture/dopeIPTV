@@ -230,8 +230,11 @@ class FavHost(Host):
 def _drag(view, ev_type, pos, fav: bool = True):
     mime = QMimeData()
     mime.setData(FAV_DRAG_MIME if fav else "text/plain", b"1")
-    cls = QDropEvent if ev_type == QEvent.Type.Drop else QDragMoveEvent
-    e = cls(pos, Qt.DropAction.MoveAction, mime, Qt.MouseButton.LeftButton,
+    # Qt takes a QPoint for a drag move and a QPointF for a drop; an older
+    # PyQt6 (CI's) does not turn one into the other.
+    drop = ev_type == QEvent.Type.Drop
+    cls = QDropEvent if drop else QDragMoveEvent
+    e = cls(pos if drop else pos.toPoint(), Qt.DropAction.MoveAction, mime, Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier, ev_type)
     (view.dropEvent if ev_type == QEvent.Type.Drop else view.dragMoveEvent)(e)
     return e
