@@ -83,7 +83,13 @@ pytest). Logs: `DOPEIPTV_LOG=debug DOPEIPTV_LOG_FILE=/tmp/dope.log`.
   `tests/shard_times.json`. When one part takes much longer than the
   others, refresh it: run the suite with `--junitxml=run.xml` and
   `python3 tools/shard_times.py run.xml`. A part runs locally the same way:
-  `DOPEIPTV_SHARD=2/4 QT_QPA_PLATFORM=offscreen pytest -q`.
+  `DOPEIPTV_SHARD=2/4 QT_QPA_PLATFORM=offscreen pytest -q`. The system
+  libraries the tests need (about 77 MB from Ubuntu's mirror, one to eight
+  minutes) are kept between runs by `actions/cache`, one copy per runner
+  image and version of `ci.yml`: apt still reads its signed lists, a kept
+  package is used only with the SHA-256 they name, and the rest comes from
+  the mirror (`tests/test_ci_apt_cache.py`). Only the test jobs keep any;
+  the release builds always download theirs.
 - **`nightly.yml`** - every push to `testing`: builds every package the way
   a release does (it calls `release.yml` with `nightly_version`) and
   publishes them as a **pre-release** `nightly-<version>.<run>`. Users on

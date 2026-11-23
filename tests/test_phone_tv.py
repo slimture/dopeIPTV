@@ -174,7 +174,7 @@ def test_the_now_card_is_the_way_back_to_the_picture_only_in_tv_mode_while_somet
     assert "picture" in tv_input.ALL and tv_input.remote_action("picture") == "picture"
 
 
-def test_picture_from_the_phone_shows_what_plays_and_nothing_else():
+def test_picture_from_the_phone_shows_what_plays_and_nothing_else(monkeypatch):
     pytest.importorskip("PyQt6.QtWidgets")
     from PyQt6.QtCore import QObject
     from PyQt6.QtWidgets import QApplication
@@ -182,6 +182,11 @@ def test_picture_from_the_phone_shows_what_plays_and_nothing_else():
     from dopeiptv.ui.mw_phone import _PhoneMixin
     from dopeiptv.ui.mw_tv import _TvMixin
     QApplication.instance() or QApplication([])
+    # No dialog, menu or other window open: a key goes to TV mode itself
+    # (_tv_input hands it to whatever else is active - a window an earlier
+    # test in this process left would take it).
+    for name in ("activeModalWidget", "activePopupWidget", "activeWindow"):
+        monkeypatch.setattr(QApplication, name, staticmethod(lambda: None))
 
     class Player:
         current_url = "http://x/1.ts"

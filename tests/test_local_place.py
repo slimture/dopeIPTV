@@ -33,6 +33,17 @@ def app():
     return a
 
 
+def _let_go(place):
+    """Closed, then gone: a page left open stays the active window for the
+    tests after it in this process (deleteLater alone waits for an event
+    loop that never comes)."""
+    from PyQt6.QtCore import QEvent
+    from PyQt6.QtWidgets import QApplication
+    place.close()
+    place.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
 def test_a_picture_fits_its_box_or_covers_it():
     from dopeiptv.ui.local_place import fits_inside
     assert not fits_inside(200, 300, 2, 3)          # a poster in a poster's box
@@ -76,7 +87,7 @@ def test_twenty_thousand_cards_are_dressed_only_as_they_paint(app):
     for _ in range(3):
         app.processEvents()
     assert 0 < len(set(dressed)) < 200
-    place.deleteLater()
+    _let_go(place)
 
 
 def test_a_narrow_pane_gives_the_controls_rows_of_their_own(app):
@@ -105,7 +116,7 @@ def test_a_narrow_pane_gives_the_controls_rows_of_their_own(app):
     app.processEvents()
     assert not place.is_narrow() and place.layout_switch.isVisible()
     assert not place._tools.isVisible()
-    place.deleteLater()
+    _let_go(place)
 
 
 _CHILD = r"""
