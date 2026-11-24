@@ -386,6 +386,9 @@ class _BuildDetailMixin:
         dc.addLayout(dcol, 1)
         self.d_continue.hide()
         il.addWidget(self.d_continue)
+        # A film's or an episode's download: "Downloaded · 1.4 GB" and
+        # Delete download, how far it got, or Download (mw_downloads).
+        self._build_dl_detail(il)
 
         self.cast_scroll = QScrollArea()
         self.cast_scroll.setWidgetResizable(True)

@@ -58,6 +58,12 @@ has two profiles or more.
 - Folder: `recordings_dir`, `rec_save_mp4`, `rec_mp4_keep_subs` (only while saving as MP4); link → Nerd › Remote and
   automation (file names, what runs after)
 - Limits: `rec_max_value` + `rec_max_unit`, `rec_total_value` + `rec_total_unit`
+- Downloads: `downloads_dir` (the folder; by default one in the videos
+  folder), `downloads_cap_gb` (the space they may take, 50 GB by default, 0
+  none - never below 1 GB free on the disk), what they take now and how they
+  behave; the queue `downloads_queue`, the Downloaded place's
+  `downloads_view` and `downloads_sort` (no row). This computer's: never
+  synced, never in a backup
 - Padding: `rec_pad_before_min`, `rec_pad_after_min`
 - Series recordings: the rules (`series_rules_<source id>`), add a word, delete;
   on an Enigma2 box with AutoTimer also the box's own rules (kept on the box,
@@ -218,8 +224,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
   `place_row_local_continue`, `place_row_radio_favs`, `place_row_rec_now` -
   also hidden from a row's heading, "Hide this row"); link → Posters & info
   (Popular right now, one setting, one place); the sidebar's entries as
-  chips (`places_hidden`: Guide, Search, Local files, Radio, Recordings);
-  `places_folded` (also the chevron under the places)
+  chips (`places_hidden`: Guide, Search, Local files, Radio, Recordings,
+  Downloaded); `places_folded` (also the chevron under the places)
 
 **Keyboard shortcuts** (`shortcuts`)
 - Keyboard shortcuts: `keyboard_shortcuts` (every rebindable action's key)

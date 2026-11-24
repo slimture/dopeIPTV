@@ -574,7 +574,9 @@ class _SeriesPageMixin:
                 if dur <= 0:
                     dur = sv.minutes_of(ep) * 60.0
                 states[key] = EpisodeState(watched, sv.Progress(pos, dur, at),
-                                           bool(ep.get("_new")))
+                                           bool(ep.get("_new")),
+                                           downloaded=not local and bool(self._dl_pills(
+                                               "episode", ep)))
         finally:
             self.series_ctx = saved
         order = sv.flow(self._sp_seasons)
@@ -906,9 +908,11 @@ class _SeriesPageMixin:
             self._ep_index_override = next((i for i, e in enumerate(queue) if e is ep), -1)
             if at is not None:
                 self._sp_start_once = (key, at)
-            self._start_playback(url, ep.get("name") or ep.get("title") or "dopeIPTV",
-                                 ep.get("stream_icon") or ep.get("cover"), key,
-                                 "episode", record=True, item=ep)
+            # A downloaded episode plays its file, as this episode.
+            start = getattr(self, "_dl_start", self._start_playback)
+            start(url, ep.get("name") or ep.get("title") or "dopeIPTV",
+                  ep.get("stream_icon") or ep.get("cover"), key,
+                  "episode", record=True, item=ep)
         finally:
             self.series_ctx = saved
             self._sp_start_once = None
@@ -1033,6 +1037,8 @@ class _SeriesPageMixin:
                 if trakt_ok:
                     m.addAction(self._account_action("ctx_mark_watched"), partial(
                         self._sp_with_series, self._mark_episode_watched, ep, True))
+        # Download, or what its download is (mw_downloads).
+        self._dl_episode_menu(m, ep)
         m.addSeparator()
         m.addAction(tr("ctx_copy_stream_url"), partial(self._sp_copy_url, ep))
         m.exec(pos)
@@ -1069,6 +1075,8 @@ class _SeriesPageMixin:
         self._add_fav_folder_menu(m, "series", [ctx], self.series_favs)
         if self.tmdb:
             m.addAction(tr("ctx_match_tmdb"), partial(self._sp_match_tmdb, ctx))
+        # Download this season, Download all episodes (mw_downloads).
+        self._dl_series_menu(m)
         m.exec(pos)
         self._sp_refresh()
 

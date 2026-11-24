@@ -205,10 +205,12 @@ class ImageSource:
 @dataclass
 class EpisodeState:
     """What a card says beside the episode itself: watched ("local",
-    "trakt" or None), how far it got, a new one of a followed series."""
+    "trakt" or None), how far it got, a new one of a followed series, its
+    file downloaded (core/downloads.py)."""
     watched: str | None = None
     progress: sv.Progress = field(default_factory=sv.Progress)
     new: bool = False
+    downloaded: bool = False
 
 
 # -- the episodes --------------------------------------------------------------------
@@ -450,6 +452,11 @@ class EpisodeDelegate(QStyledItemDelegate):
             used = self._pill(p, tr("sp_up_next"), pill_r, rtl, False)
         elif state.new:
             used = self._pill(p, tr("sp_new"), pill_r, rtl, True)
+        if state.downloaded:
+            # Downloaded beside the rest, before it on the line.
+            rest = QRect(pill_r.left() + (used if rtl else 0), pill_r.top(),
+                         max(10, pill_r.width() - used), pill_r.height())
+            used += self._pill(p, tr("pill_downloaded"), rest, rtl, False)
         room = max(10, title_r.width() - used)
         title_text = str(ep.get("_sp_label") or ep.get("name") or "")
         p.setFont(title_f)

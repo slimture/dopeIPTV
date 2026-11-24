@@ -663,6 +663,18 @@ class _MittMixin:
         except (TypeError, ValueError):
             return ""
 
+    def _mitt_dl_pills(self, e: mitt.Entry) -> tuple:
+        """Downloaded, for a film or an episode whose file is (of its own
+        source: mw_downloads)."""
+        kind = {mitt.FILM: "movie", mitt.EPISODE: "episode"}.get(e.kind)
+        find = getattr(self, "_dl_find", None)
+        if kind is None or not callable(find):
+            return ()
+        try:
+            return ("dl",) if find(kind, e.row, e.ident, source=e.source) else ()
+        except Exception:
+            return ()
+
     def _mitt_card_cont(self, e: mitt.Entry, many: bool) -> Card:
         row = e.row
         if e.kind == mitt.EPISODE:
@@ -678,7 +690,7 @@ class _MittMixin:
             line = self._mitt_join(self._mitt_left(e), self._mitt_from(e, many))
             image = self._mitt_art(row, "vod")
         return Card(key=e.key, title=title, line=line, image=image or "",
-                    progress=e.progress, data=e)
+                    progress=e.progress, pills=self._mitt_dl_pills(e), data=e)
 
     def _mitt_tile(self, e: mitt.Entry, many: bool) -> ChannelRow:
         name = e.title
@@ -734,6 +746,7 @@ class _MittMixin:
                 pills = ("seen",)
         except Exception:
             pass
+        pills += self._mitt_dl_pills(e)
         return Card(key=e.key, title=e.title, line=tr(_KIND_WORD[e.kind]),
                     image=self._mitt_art(row, kind), pills=pills, data=e)
 
@@ -994,9 +1007,10 @@ class _MittMixin:
                                  error=True)
                 return
             self._current_key = key
-            self._start_playback(url, row.get("name") or row.get("title") or "dopeIPTV",
-                                 row.get("stream_icon") or row.get("cover"), key, "movie",
-                                 item=row)
+            # A downloaded film plays its file, as this film (mw_downloads).
+            start = getattr(self, "_dl_start", self._start_playback)
+            start(url, row.get("name") or row.get("title") or "dopeIPTV",
+                  row.get("stream_icon") or row.get("cover"), key, "movie", item=row)
         finally:
             self._sp_start_once = None
 

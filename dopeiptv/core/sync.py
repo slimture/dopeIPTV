@@ -409,7 +409,8 @@ SETTINGS_DENY = frozenset({
 })
 # Simkl's sign-in like Trakt's; a Kodi's login, and Discord's status, are
 # this computer's.
-SETTINGS_DENY_PREFIX = ("sync_", "trakt_", "simkl_", "kodi_", "discord_",
+# Downloads (core/downloads.py): this computer's files, queue and folder.
+SETTINGS_DENY_PREFIX = ("sync_", "trakt_", "simkl_", "kodi_", "discord_", "downloads_",
                         "nerd_", "selfupdate_", "update_",
                         "donate_", "feedback_", "parental_", "resume_positions",
                         "favorites", "movie_favorites", "series_favorites",

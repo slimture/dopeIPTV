@@ -1,6 +1,6 @@
 """The window's places (core/places.py): the sidebar is the app's structure -
 Mine, TV, Movies, Series, Guide, Search, then Local files, Radio,
-Recordings - and there is no Home.
+Recordings, Downloaded - and there is no Home.
 
 ``_show_place(name)`` is the one way to a place: a nav entry, a back
 button, Esc from the Guide or Search, a profile switch and the start all
@@ -28,7 +28,8 @@ from ..i18n import tr
 #: The words of each place, as its entry and header say them.
 PLACE_WORDS = {"mitt": "nav_mine", "tv": "nav_tv", "films": "nav_movies",
                "series": "nav_series", "guide": "nav_guide", "search": "nav_search",
-               "local": "nav_local", "radio": "nav_radio", "rec": "nav_recordings"}
+               "local": "nav_local", "radio": "nav_radio", "rec": "nav_recordings",
+               "dl": "nav_downloads"}
 #: Mine's tabs while it shows today's lists.
 MITT_TAB_WORDS = {"fav": "nav_favorites", "watchlist": "nav_watchlist",
                   "history": "nav_history"}
@@ -169,7 +170,7 @@ class _PlacesMixin:
         self._close_search_page()
         # A place's own pages close through their own way out, so what they
         # forget on leaving (Mine's search while viewing privately) is forgotten.
-        for close in ("_close_mitt_page",):
+        for close in ("_close_mitt_page", "_close_dl_page"):
             fn = getattr(self, close, None)
             if callable(fn):
                 fn()

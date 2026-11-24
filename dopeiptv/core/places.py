@@ -1,11 +1,12 @@
 """The app's places - what the sidebar is: Mine, TV, Movies, Series, Guide,
-Search, then Local files, Radio, Recordings - with no Qt: their names, the
+Search, then Local files, Radio, Recordings, Downloaded - with no Qt: their names, the
 sidebar entry and list mode of each, where the app opens (where the person
 was last, or always Mine), and Home's settings retired into these.
 
 A place is one of two kinds: a list place (Mine, TV, Movies, Series, Local
 files, Radio, Recordings: the middle pane's list, or a page a place builds
-over it) or a page place (the Guide, Search: a page over the list place
+over it - Downloaded's is a page of its own over whatever list was there,
+ui/mw_downloads.py) or a page place (the Guide, Search: a page over the list place
 the person came from, which Back and Esc return to).
 
 ``last_place`` is the profile's own (where each person left off);
@@ -28,7 +29,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 #: Every place, in the sidebar's order: the upper group, then the lower.
-PLACES = ("mitt", "tv", "films", "series", "guide", "search", "local", "radio", "rec")
+PLACES = ("mitt", "tv", "films", "series", "guide", "search", "local", "radio", "rec", "dl")
 UPPER = PLACES[:6]
 LOWER = PLACES[6:]
 #: Pages over the list place under them.
@@ -39,7 +40,7 @@ LIST_PLACES = tuple(p for p in PLACES if p not in PAGE_PLACES)
 #: list modes' names, as the entries always had.
 NAV_OF = {"mitt": "mitt", "tv": "live", "films": "vod", "series": "series",
           "guide": "guide", "search": "search", "local": "local", "radio": "radio",
-          "rec": "rec"}
+          "rec": "rec", "dl": "dl"}
 PLACE_OF_NAV = {nav: place for place, nav in NAV_OF.items()}
 #: The list mode a list place shows; Mine's are its tabs (MITT_MODES).
 MODE_OF = {"tv": "live", "films": "vod", "series": "series", "local": "local",
@@ -54,13 +55,13 @@ MITT_TABS = ("fav", "watchlist", "history")
 SHOW_HOOKS = {"mitt": "_mitt_show", "tv": "_place_tv_show",
               "films": "_place_films_show", "series": "_place_series_show",
               "local": "_place_local_show", "radio": "_place_radio_show",
-              "rec": "_place_rec_show"}
+              "rec": "_place_rec_show", "dl": "_place_dl_show"}
 #: ...and the ones asked to show their place's content again (a profile,
 #: a source, followed series or sync changed what they show).
 REFRESH_HOOKS = {"mitt": "_mitt_refresh", "tv": "_place_tv_refresh",
                  "films": "_place_films_refresh", "series": "_place_series_refresh",
                  "local": "_place_local_refresh", "radio": "_place_radio_refresh",
-                 "rec": "_place_rec_refresh"}
+                 "rec": "_place_rec_refresh", "dl": "_place_dl_refresh"}
 
 START_KEY = "start_place"
 LAST_KEY = "last_place"
@@ -76,7 +77,7 @@ RETIRED_KEY = "home_retired"
 
 #: The sidebar's entries a person may take out of it, in the sidebar's
 #: order; Mine, TV, Movies and Series always stay.
-HIDEABLE = ("guide", "search", "local", "radio", "rec")
+HIDEABLE = ("guide", "search", "local", "radio", "rec", "dl")
 #: The places hidden from the sidebar ("guide,radio"), the entries folded
 #: into a compact row, and "Just the list" - each profile's own.
 HIDDEN_KEY = "places_hidden"
@@ -233,8 +234,8 @@ def shown(settings: Any) -> tuple[str, ...]:
 
 
 def lower_shown(settings: Any) -> bool:
-    """Whether the sidebar's lower group (Local files, Radio, Recordings)
-    has an entry left - the hairline over it goes when it has none."""
+    """Whether the sidebar's lower group (Local files, Radio, Recordings,
+    Downloaded) has an entry left - the hairline over it goes when it has none."""
     gone = hidden(settings)
     return any(p not in gone for p in LOWER)
 

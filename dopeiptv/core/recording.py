@@ -356,8 +356,10 @@ class RecordingManager(QObject):
         for dirpath, _dirs, names in walker:
             for n in names:
                 p = os.path.join(dirpath, n)
+                # A download in a folder under the recordings' is no
+                # recording (core/downloads.py's sidecar says it).
                 if (os.path.splitext(n)[1].lower() in self.VIDEO_EXTS
-                        and os.path.isfile(p)):
+                        and os.path.isfile(p) and not os.path.exists(p + ".dl.json")):
                     try:
                         st = os.stat(p)
                     except OSError:

@@ -275,7 +275,12 @@ class _RecordingMixin(_TimeshiftMixin):
         if not self._guard_rec_switch(url, title):
             return False
         tuner_ok = getattr(self, "_tuner_ok", None)
-        return tuner_ok is None or tuner_ok(url)
+        if not (tuner_ok is None or tuner_ok(url)):
+            return False
+        # A download on the account gives way before the player's connection
+        # opens (mw_downloads) - it never stops the playback.
+        dl = getattr(self, "_dl_before_play", None)
+        return dl is None or dl(url)
 
     def _guard_rec_switch(self, url: str, title: str) -> bool:
         # A stream from the network (a SAT>IP server's RTSP too), not a file.
@@ -681,13 +686,23 @@ class _RecordingMixin(_TimeshiftMixin):
         if self._rec_plays(j) and self._rec_ride(j):
             return RecordingManager.RIDE
         if j.get("_go_ahead"):
+            self._rec_dl_room(j)
             return RecordingManager.OPEN
         why = self._rec_held_why(j)
         if why is None:
+            self._rec_dl_room(j)
             return RecordingManager.OPEN
         if not j.get("_held"):
             self._rec_note_held(j)
         return RecordingManager.HOLD
+
+    def _rec_dl_room(self, j: dict) -> None:
+        """A recording about to open its own connection: a download on its
+        account gives way first (mw_downloads) - a recording never waits for
+        one."""
+        room = getattr(self, "_dl_make_room", None)
+        if callable(room):
+            room(str(j.get("source") or ""))
 
     def _rec_plays(self, j: dict) -> bool:
         """Whether recording *j*'s channel is what the docked player plays

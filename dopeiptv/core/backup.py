@@ -146,9 +146,11 @@ _LEFT_OUT = frozenset({
 })
 # update_*: the update channel and what its check last found; ts_*: what a
 # source's timeshift probe learned; "_": the files' own markers;
-# nerd_mirror_*: the backup address that answered last on this computer.
+# nerd_mirror_*: the backup address that answered last on this computer;
+# downloads_*: the downloads' queue, folder and limit - this computer's files
+# (core/downloads.py), never in a backup.
 _LEFT_OUT_PREFIXES = ("update_", "home_pcache_", "ts_broken/", "ts_depth/", "_",
-                      "nerd_mirror_")
+                      "nerd_mirror_", "downloads_")
 _TMDB_CACHE = re.compile(r"tmdb_.*(cache|matcher)")
 
 #: Settings naming a folder ("dir"), a JSON list of folders ("dirs") or files

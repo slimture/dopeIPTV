@@ -28,7 +28,10 @@ disagree, the code is what runs and the sentence is a bug: report it.
   own, so a short password is masked without every "abc" in the log; a line
   that could not be masked is withheld, never written as it was), error
   reports (`core/report.py`, the same forms) and any address that is
-  logged.
+  logged. A download is kept by its source's id, its stream id and its
+  kind - never by its address, which for Xtream holds the login - and
+  nothing it writes beside its file names one
+  ([below](#downloaded-films-and-episodes-are-files-on-the-disk)).
 - **What a person watches.** History, resume points, watched marks and
   the viewing statistics stay on the computer (`core/viewing_stats.py`
   is never synced), and dopeiptv.org never learns them: sync carries watch
@@ -95,6 +98,9 @@ change a playlist file on its web server.
 | A guide with a DTD or entities, an endless download, a gzip bomb | `providers/epg.py`: `refuse_entities`, `read_capped`, `gunzip_gently` (`GUIDE_DOWNLOAD_MAX`, `GUIDE_UNPACKED_MAX`: 2 GiB); the index is built in a process of its own (`providers/epg_index.py`) |
 | A name shown as markup | `Qt.TextFormat.PlainText` and `ui/widgets.plain_text`, the text over the picture too |
 | A title spliced into the command after a recording, or into its file name | `core/rec_extras.py`: no shell, placeholders filled per argument, a batch file on Windows given text only (`through_cmd`); a name without control characters or device names, a folder never outside the recordings folder (`core/recording.py`) |
+| A film's or an episode's title made into a download's file name (`../../.bashrc`, `CON`, a NUL), a link left on the way, a page or an error message instead of the video, an answer longer than it said, a download that fills the disk | `core/downloads.py`: the name through recording's `safe_filename`, every folder on the way checked as `_stays_inside` does (no link that leads out of the downloads folder), the `.part` and the sidecar opened without following a link (`O_NOFOLLOW`); the first bytes refused as the rewind buffer refuses a page (`dvr_ingest.not_a_stream`, a `text/html` answer too); Content-Length matched; the downloads' space limit and recording's `DISK_FLOOR` of free space looked at before and while it writes; renamed from `.part` only once whole |
+| A download's address or an HLS film's segments sending the app to this computer, a link-local host or the home network | The bytes through `core/dvr_ingest.open_for` (the app's guarded request path, `core/dest_guard.py`); an HLS film through `core/restream.ffmpeg_opener` - ffmpeg reads an alias through the bridge, whose `Policy` judges every segment, key and redirect; no address, login or token in ffmpeg's arguments |
+| A sidecar in the downloads folder that names a poster elsewhere, or is not one | `core/downloads.read_sidecar`: at most 64 KB, JSON of a kind and source this app writes, only the fields a sidecar keeps (`clean_meta`), a poster by its own name beside it - never a path, a hidden file or one going up; the folder read without following a link, bounded in depth and number |
 
 **What is left.**
 
@@ -780,6 +786,32 @@ see their sockets, only what they ask a proxy for - so the proxy is the
 app's, and every stream from the internet goes through it, at the cost of
 a copy of each through the app's process.
 
+### Downloaded films and episodes are files on the disk
+
+A film or an episode downloaded to watch without the network
+(`core/downloads.py`) is a file in the downloads folder - by default one
+of the app's own in the person's videos folder - with a sidecar beside it
+(`<file>.dl.json`) and its poster as a picture file. The sidecar holds
+what offline mode needs and nothing else: the kind, the source's id and
+the name the person gave the source, the stream id and the playback key,
+the title, year, plot, length and category, the poster's file name, and
+for an episode its series (id, title, plot, category, poster's file name),
+season, number and title. It never holds an address, a login, a token or
+an account; a text that came with an address in it is kept without the
+address (`clean_meta`). The queue of what is still to download is in the
+settings file (0600) - the poster's address too, never the stream's: that
+is asked of the source's client when a download starts.
+
+The files take the folder modes the system gives, as recordings do: where
+the folder lets another account in, it can see what was downloaded, by
+its file names alone. Nothing downloads while viewing privately (a running
+download waits), the downloads are never synced and never in a backup, and
+Delete download removes the file, its sidecar and its poster.
+
+*Why:* a download is a file the person keeps, like a recording, and the
+person chooses its folder. An HLS film cannot be carried on where it was
+cut: a pause or a cut starts it again.
+
 ### Logins are in the settings files, not a keyring
 
 Every login and token is in Qt's settings, as plain text, in files only
@@ -1281,7 +1313,8 @@ person outside the project is recorded there yet.
   `test_exclusive_bind.py`,
   `test_phone_remote.py`, `test_server_mode.py`, `test_dvr_server.py`,
   `test_settings_files.py`, `test_pins.py`, `test_rec_extras.py`,
-  `test_recording_safety.py`, `test_privacy.py`,
+  `test_recording_safety.py`, `test_downloads.py`, `test_downloads_hls.py`,
+  `test_downloads_window.py`, `test_privacy.py`,
   `test_privacy_playback.py`, `test_privacy_logs.py`, `test_log_redaction.py`,
   `test_report.py`, `test_feedback_fit.py`, `test_remote.py`,
   `test_update_channel.py`, `test_welcome_sync.py`,
