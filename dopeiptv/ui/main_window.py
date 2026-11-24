@@ -1209,8 +1209,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._demo_stores()
         self._base_title = tr("demo_title")
         self.setWindowTitle(self._base_title)
-        # Another source's category ids and lists say nothing about this one.
-        self._last_cat = {}
+        # Another source's category ids and lists say nothing about this one;
+        # TV opens on All - every channel at a first look, the guide with
+        # all of them.
+        self._last_cat = {"live": None}
         self._recent_cache = {}
         self._full_catalog = None
         self._search_index_cache = {}
@@ -1920,7 +1922,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                "icon_url": it.get("stream_icon"),
                                "key": self._item_key(it),
                                "kind": "live", "item": it}
-        privacy.playback_started("live", self._item_key(it), keep=self._kept("live"))
+        privacy.playback_started("live", self._item_key(it))
         note_titles(self._last_playback)
         self._sync_player_buttons()
         self.listw.viewport().update()
@@ -2628,7 +2630,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                "series_ctx": (self.series_ctx
                                               if kind == "episode" else None),
                                "own_buffer": own_buffer}
-        privacy.playback_started(kind, key, keep=self._kept(kind))
+        privacy.playback_started(kind, key)
         note_titles(self._last_playback)
         # Snapshot the ordered episode queue + current index so a natural
         # end-of-episode can autoplay the next one, even if the user browses

@@ -129,6 +129,8 @@ def test_switching_playlist_loads_that_playlists_rules(settings):
     w._resume_settings = settings
     w.overrides = CategoryOverrides(settings, "category_overrides_a")
     w.playlist_store.get.return_value = {"id": "b", "name": "B"}
+    # The login's answer is used as the welcome's connect step uses one.
+    w._use_source = lambda *a, **k: MainWindow._use_source(w, *a, **k)
 
     def sync(_pool, fn, done, _fail):
         done(fn())

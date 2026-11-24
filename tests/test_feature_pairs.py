@@ -711,7 +711,9 @@ assert not cc.stops and (w.player is None or not w.player.isVisible())
 w.play_live_channel(b)
 assert not spin(lambda: len(cc.casts) > 2, 0.5) and len(sent) == 3
 
-# The list: a double-click / Enter (play), and channel up/down (zap).
+# The list: a double-click / Enter (play), and channel up/down (zap) - on
+# All, every channel of the demo.
+w._last_cat["live"] = None
 w.switch_mode("live")
 assert spin(lambda: w.list_model.rowCount() >= 5), w.list_model.rowCount()
 order = [w.list_model.item_at(i) for i in range(w.list_model.rowCount())]

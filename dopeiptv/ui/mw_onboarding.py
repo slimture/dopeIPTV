@@ -45,6 +45,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ..core import privacy
 from ..core.log import log
 from ..core.stores import PassingSettings
 from ..core.workers import on_gui_thread, run_async
@@ -262,11 +263,6 @@ class _OnboardingMixin:
         memory - else None (the settings, as ever)."""
         return self._demo_kept
 
-    def _kept(self, kind: str) -> bool:
-        """Whether what starts now (of *kind*) may be kept anywhere: never
-        the demo's own (core/privacy.py's playbacks kept nowhere)."""
-        return self._demo_kept is None or kind in _OWN_KINDS
-
     def _demo_stores(self) -> None:
         """(start_demo) The demo's stores, in memory."""
         from ..core.series_rules import SeriesRuleStore
@@ -274,6 +270,7 @@ class _OnboardingMixin:
             CategoryOverrides, ChannelOverrides, WatchedStore, WatchlistStore,
         )
         self._demo_kept = kept = PassingSettings()
+        privacy.keep_nothing(True, _OWN_KINDS)
         self._build_source_stores(None)
         self._watch_favorites()
         self.series_rules = SeriesRuleStore(kept, None)
@@ -298,6 +295,7 @@ class _OnboardingMixin:
             self._last_playback = None
         self._prev_live_item = None
         self._demo_kept = None
+        privacy.keep_nothing(False)
         from ..core.stores import WatchedStore, WatchlistStore
         cache = self._own(self._cache_settings)
         self.watched = WatchedStore(cache)

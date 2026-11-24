@@ -926,7 +926,7 @@ class _CastMixin(_CastMomentMixin):
         key, kind = ctx.get("key"), ctx.get("kind")
         if key is None or not kind:
             return
-        privacy.playback_started(kind, key, keep=self._kept(kind))
+        privacy.playback_started(kind, key)
         note_titles(ctx)
         self._cast_hooked = True
         title, item = ctx.get("title") or "", ctx.get("item")

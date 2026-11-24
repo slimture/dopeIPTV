@@ -17,6 +17,11 @@ from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
 
+class PlaylistTooLarge(LocalizedError, ValueError):
+    """A playlist past what is read of one (core/_lazy_requests.LIST_MAX):
+    said in the user's language, a ValueError as it always was."""
+
+
 class NoList(LocalizedError):
     """A list action answered with something that is no list - a refused
     login's {"user_info": {"auth": 0}}, an error object. Treated as a failed
@@ -921,7 +926,7 @@ class M3UClient(OfflineClient):
             # (a path that is no file - a device - never ends).
             raw = fh.read(LIST_MAX + 1)
         if len(raw) > LIST_MAX:
-            raise LocalizedError("err_m3u_too_large", mb=LIST_MAX >> 20)
+            raise PlaylistTooLarge("err_m3u_too_large", mb=LIST_MAX >> 20)
         # A playlist file of the person's own may name logos beside it:
         # its folder is one the image loader reads pictures from
         # (core/picture_files.py).
@@ -949,7 +954,7 @@ class M3UClient(OfflineClient):
         except zlib.error:
             raise LocalizedError("err_m3u_no_channels") from None
         if len(out) > LIST_MAX or unpack.unconsumed_tail:
-            raise LocalizedError("err_m3u_too_large", mb=LIST_MAX >> 20)
+            raise PlaylistTooLarge("err_m3u_too_large", mb=LIST_MAX >> 20)
         return out
 
     def _parse(self, text: str) -> None:
@@ -1693,7 +1698,10 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
         parts = parts[1:]
     if (len(parts) >= 3 and parts[0] and parts[1]
             and re.fullmatch(r"\d+(\.[A-Za-z0-9]{1,5})?", parts[-1])):
-        return server, parts[0], parts[1]
+        # As the panel wrote them into its address: a login with a space or
+        # an "@" in it comes percent-encoded (pa%20ss is "pa ss").
+        from urllib.parse import unquote
+        return server, unquote(parts[0]), unquote(parts[1])
     return None
 
 

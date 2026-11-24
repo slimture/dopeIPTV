@@ -361,7 +361,7 @@ def test_every_control_has_words_for_a_screen_reader(app):
     for idx in _pages(ov):
         ov._stack.setCurrentIndex(idx)
         app.processEvents()
-        missing = [w for w in a11y.unnamed(ov._stack.currentWidget())]
+        missing = list(a11y.unnamed(ov._stack.currentWidget()))
         assert not missing, (idx, [type(w).__name__ for w in missing])
     got["_win"].close()
 

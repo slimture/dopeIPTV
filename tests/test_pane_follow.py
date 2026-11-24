@@ -96,7 +96,7 @@ settle(lambda: w.mode == "series" and w.list_model.rowCount() > 0, what="series 
 ch = c.live_streams()[2]
 w.play_live_channel(ch)
 settle(lambda: w.mode == "live" and selected_key() == "3", what="channel followed from Series")
-assert cat_data() == DemoClient.CATEGORY_ID, cat_data()
+assert cat_data() == ch["category_id"], cat_data()
 
 # 2. An episode started from outside (the phone's path) while the list shows
 #    channels: its series' page, the episode marked, its season shown.

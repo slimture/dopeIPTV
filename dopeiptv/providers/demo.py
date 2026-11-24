@@ -115,13 +115,9 @@ class DemoClient(OfflineClient):
     interface of every client (OfflineClient's empty answers for the rest)."""
 
     LOG_NAME = "demo"
-    #: The first category, the live test streams'.
-    CATEGORY_ID = LIVE_CATEGORIES[0][0]
     #: No "Recently added" among its categories (ui/mw_lists.py): nothing
     #: of it was added by anyone.
     lists_recent = False
-    #: Kept nowhere (core/privacy.py): what it plays, and what is done with it.
-    keeps_nothing = True
 
     def __init__(self) -> None:
         super().__init__()

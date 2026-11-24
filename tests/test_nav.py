@@ -192,10 +192,18 @@ assert all(not b.icon().isNull() for b in w.nav_btns.values())
 w.switch_mode("live")
 pump()
 assert w._place == "tv" and w.nav_btns["live"].isChecked()
-# The window's own channels come in on the pool: on a loaded machine they
-# arrive late and would put their rows over the one set here.
-assert until(lambda: len(w.all_items) == len(Client.STREAMS)
-             and w.pool.activeThreadCount() == 0)
+# The window's own channels and the demo's guide come in on the pool: on a
+# loaded machine they arrive late and would put their rows over the one set
+# here.
+# The window's own start - its first lists, a moment after it is made
+# (main_window's singleShot) - is over before the rows are set here too.
+import time
+started = time.monotonic() + 0.6
+while time.monotonic() < started:
+    pump(1)
+first = Client().live_categories()[0]["category_id"]      # where TV lands
+assert until(lambda: len(w.all_items) == len(Client().live_streams(first))
+             and w.xmltv.is_loaded() and w.pool.activeThreadCount() == 0)
 pump()
 w.all_items = [{"name": "Kanal", "stream_id": 1}]
 guide = w.nav_btns["guide"]

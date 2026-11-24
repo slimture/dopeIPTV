@@ -38,9 +38,9 @@ from typing import Callable
 from PyQt6.QtCore import QLocale, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
-    QComboBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout,
-    QWidget,
+    QApplication, QComboBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel,
+    QLineEdit, QMenu, QMenuBar, QProgressBar, QPushButton, QScrollArea, QSizePolicy,
+    QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME
@@ -414,6 +414,19 @@ class WelcomeOverlay(QWidget):
         self._flash = QTimer(self)
         self._flash.timeout.connect(self._next_greeting)
         self._flash.start(1300)
+
+        # Enter presses the button that has the keys, as Space does (a
+        # button outside a dialog takes Space alone): the guide is used with
+        # the keyboard only from its first page to its last.
+        for button in self.findChildren(QPushButton):
+            button.setAutoDefault(True)
+
+        # While the guide is up the keys stay in it: what is under it cannot
+        # be seen, and the window's start (its first list, a place opened)
+        # gives its list the focus a moment after the guide shows.
+        app = QApplication.instance()
+        if app is not None:
+            app.focusChanged.connect(self._focus_moved)
 
     # -- pages ---------------------------------------------------------------
 
@@ -1385,6 +1398,56 @@ class WelcomeOverlay(QWidget):
         super().resizeEvent(event)
         self._fit_card(self._stack.currentIndex(), cover=False)
 
+    # -- the keys -------------------------------------------------------------
+
+    def _stops(self) -> list[QWidget]:
+        """The page's Tab stops, in the window's focus order."""
+        out: list[QWidget] = []
+        start = self
+        w = start.nextInFocusChain()
+        while w is not None and w is not start and len(out) < 400:
+            if (self.isAncestorOf(w) and w.isVisible() and w.isEnabled()
+                    and w.focusPolicy() & Qt.FocusPolicy.TabFocus
+                    and w.focusProxy() is None):
+                out.append(w)
+            w = w.nextInFocusChain()
+        return out
+
+    def focusNextPrevChild(self, next: bool) -> bool:  # noqa: N802 - Qt's name
+        """Tab and Shift+Tab go round the page's own controls - never to
+        the window's under it, which cannot be seen."""
+        stops = self._stops()
+        if not stops:
+            return super().focusNextPrevChild(next)
+        held = QApplication.focusWidget()
+        try:
+            i = stops.index(held)
+        except ValueError:
+            i = -1 if next else 0
+        target = stops[(i + (1 if next else -1)) % len(stops)]
+        target.setFocus(Qt.FocusReason.TabFocusReason if next
+                        else Qt.FocusReason.BacktabFocusReason)
+        return True
+
+    def _focus_moved(self, _old, new) -> None:
+        """The window gave the keys to something under the guide: back to
+        the page (a menu, a dialog or another window keeps them)."""
+        if new is None or not self.isVisible():
+            return
+        if new is self or self.isAncestorOf(new) or new.window() is not self.window():
+            return
+        if isinstance(new, (QMenu, QMenuBar)):
+            return
+        QTimer.singleShot(0, self._take_keys)
+
+    def _take_keys(self) -> None:
+        held = QApplication.focusWidget()
+        if not self.isVisible() or held is None or held is self or self.isAncestorOf(held):
+            return
+        if held.window() is not self.window() or isinstance(held, (QMenu, QMenuBar)):
+            return
+        self._page_shown_focus(self._stack.currentIndex())
+
     def reset(self, page: int = PAGE_WELCOME) -> None:
         """Back to *page* (the first, or the choice of what to watch) with
         the greeting flashing again - when the guide is opened again."""
@@ -1410,7 +1473,6 @@ class WelcomeOverlay(QWidget):
         self._fit_card(self._stack.currentIndex(), cover=False)
         # The keys to the page's first control - unless they are in the
         # guide already (a resize of the window covers it again).
-        from PyQt6.QtWidgets import QApplication
         held = QApplication.focusWidget()
         if held is None or not (held is self or self.isAncestorOf(held)):
             self.setFocus()

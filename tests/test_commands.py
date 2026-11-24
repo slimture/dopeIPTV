@@ -420,7 +420,7 @@ from pathlib import Path
 # The file's address as the system makes one: file:///C:/... on Windows.
 for cmd in ({"play": "http://h/live/ch.ts?x=1"}, {"play": film},
             {"play": Path(film).as_uri()},
-            {"channel": "sintel"}, {"channel": "No such channel"}, {"open": True}):
+            {"channel": "sintel 24/7"}, {"channel": "No such channel"}, {"open": True}):
     w.handle_command(cmd)
     for _ in range(200):
         app.processEvents()
@@ -443,7 +443,7 @@ def test_the_window_carries_out_each_command():
     # it: it need not be a stream); a file as one opened from Local files.
     assert streams == [["stream", "http://h/live/ch.ts?x=1", "ch.ts", "live", False, False]]
     assert len(files) == 2 and files[0][1] == files[1][1] and files[0][1].endswith("Film.mkv")
-    assert ["channel", "Sintel"] in calls
+    assert ["channel", "Sintel 24/7"] in calls
     assert any(c[0] == "toast" and "No such channel" in c[1] for c in calls)
     assert calls.count(["forward"]) == 6
 
