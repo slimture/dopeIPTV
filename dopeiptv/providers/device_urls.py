@@ -38,6 +38,11 @@ def on_host(url: Any, host: str | None, schemes: tuple[str, ...] = SCHEMES) -> s
     query on *host*, with no login."""
     text = str(url or "").strip()
     target = _bare(host)
+    if any(c <= " " or c == "\x7f" for c in text):
+        # No address holds a space or a control character; urlsplit drops a
+        # tab or a CR without a word, and the text with it in was handed on
+        # ("h\rttp://...", tests/test_fuzz_readers.py).
+        return ""
     try:
         u = urlsplit(text)
         port = u.port

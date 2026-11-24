@@ -16,7 +16,7 @@ from urllib.parse import quote
 
 from ..core.log import log
 from ..i18n import tr
-from .boxes import BoxClient, clean_text
+from .boxes import BoxClient, clean_text, items, rows_of
 
 GRID = {"limit": "999999", "start": "0"}
 
@@ -40,12 +40,11 @@ class TvheadendClient(BoxClient):
         version = str(info.get("sw_version") or "")
         return {"kind": "tvheadend", "name": f"{info.get('name') or 'Tvheadend'} {version}".strip(),
                 "version": version, "api": info.get("api_version"),
-                "capabilities": list(info.get("capabilities") or [])}
+                "capabilities": [str(c) for c in items(info.get("capabilities"))]}
 
     def _entries(self, path: str, extra: dict | None = None) -> list[dict]:
         js = self.get_json(path, dict(GRID, **(extra or {})), timeout=(6.0, 90.0))
-        rows = js.get("entries") if isinstance(js, dict) else None
-        return [r for r in rows or [] if isinstance(r, dict)]
+        return rows_of(js.get("entries") if isinstance(js, dict) else None)
 
     def _stream_url(self, uuid: str) -> str:
         url = self.url(f"/stream/channel/{quote(uuid, safe='')}")
@@ -84,8 +83,11 @@ class TvheadendClient(BoxClient):
             base = {"key": uuid, "name": ch.get("name") or uuid, "url": self._stream_url(uuid),
                     "icon": self._icon(ch), "epg_id": uuid, "num": _num(ch.get("number"))}
             rows.append(dict(base, category=everything))
-            for t in sorted((u for u in ch.get("tags") or [] if u in tags), key=rank.__getitem__):
-                rows.append(dict(base, category=tags[t][1] or everything))
+            # A tag is its uuid, a string: anything else in the list (a
+            # list, unhashable) names none.
+            for tag in sorted((u for u in items(ch.get("tags")) if isinstance(u, str) and u in tags),
+                              key=rank.__getitem__):
+                rows.append(dict(base, category=tags[tag][1] or everything))
         return rows, self._recordings() if self.opt_flag("recordings", True) else []
 
     def _recordings(self) -> list[dict]:

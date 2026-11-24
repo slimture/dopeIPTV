@@ -153,12 +153,25 @@ def parse(value: Any) -> list[Rule]:
         if not isinstance(row, dict):
             continue
         find = row.get("find")
-        if not isinstance(find, str) or not find:
+        if not isinstance(find, str) or not find or not _text(find):
             continue
         replace = row.get("replace")
-        out.append(Rule(find, replace if isinstance(replace, str) else "",
-                        bool(row.get("regex"))))
+        replace = replace if isinstance(replace, str) else ""
+        if not _text(replace):
+            continue
+        out.append(Rule(find, replace, bool(row.get("regex"))))
     return out
+
+
+def _text(value: str) -> bool:
+    """Whether *value* is text an address can hold: JSON's "\\ud800" is a
+    lone surrogate no address encodes, and an address with one made from a
+    rule raised wherever it was written out (tests/test_fuzz_readers.py)."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def dump(rules: list[Rule]) -> str:

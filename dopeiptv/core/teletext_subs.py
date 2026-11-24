@@ -83,7 +83,7 @@ def track_langs(track: dict) -> list[str]:
 def _pid(track: dict) -> int | None:
     try:
         pid = int(track.get("src-id") or 0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):     # an infinite one too
         return None
     return pid if 0 < pid < 0x1FFF else None
 
@@ -199,7 +199,7 @@ class PageStore:
         raw = self.settings.value(self.key, "")
         try:
             data = json.loads(raw) if isinstance(raw, str) and raw else {}
-        except ValueError:
+        except (ValueError, RecursionError):        # a backup's, nested past Python's limit
             return {}
         return data if isinstance(data, dict) else {}
 

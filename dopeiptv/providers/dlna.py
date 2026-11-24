@@ -35,6 +35,7 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import islice
 from typing import Any
 from urllib.parse import quote, urljoin, urlparse
 from xml.sax.saxutils import escape
@@ -194,6 +195,10 @@ def _read_body(r: Any, limit: int = MAX_XML) -> bytes:
 _NAMED_MAX = 8
 #: Descriptions one search takes at most: a home has a handful of TVs.
 MAX_ANSWERS = 64
+#: Devices of one description looked at (a TV has a handful, nested two or
+#: three deep): each is searched for its services through all it holds,
+#: so thousands nested took time with their square (tests/test_fuzz_found.py).
+MAX_DEVICES = 64
 
 
 def _elsewhere_at_home(address: str) -> bool:
@@ -418,7 +423,7 @@ def describe(location: str, session: Any = None) -> Renderer | None:
         log.info("dlna: no description from %s (%s)", location, e)
         return None
     base = (root.findtext("URLBase") or "").strip() or location
-    for dev in root.iter("device"):
+    for dev in islice(root.iter("device"), MAX_DEVICES):
         av = rc = None
         for svc in dev.iter("service"):
             stype = (svc.findtext("serviceType") or "").strip()

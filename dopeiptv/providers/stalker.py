@@ -578,8 +578,16 @@ class StalkerClient(Mirrored, ListCache):
         try:
             data = r.json(object_pairs_hook=json_object)
         except ValueError:
-            # Ministra answers an expired token with a bare text line.
-            if _AUTH_FAILED.search(r.text[:300]):
+            # Ministra answers an expired token with a bare text line - its
+            # start read, never the whole answer as text: r.text guessed the
+            # charset of all of it (up to 32 MB) first, seconds a call for a
+            # portal that sends no charset (tests/test_fuzz_stalker.py).
+            head = r.content[:1200]
+            try:
+                said = head.decode(r.encoding or "utf-8", "replace")
+            except LookupError:
+                said = head.decode("utf-8", "replace")
+            if _AUTH_FAILED.search(said[:300]):
                 return None, True
             log.warning("stalker %s @ %s: non-JSON reply (content-type=%s, "
                         "%d bytes)", what, self.server,

@@ -340,11 +340,18 @@ def unseal(key: bytes, blob: bytes) -> dict[str, Any]:
         if inflate.unconsumed_tail:
             raise ValueError("too big")
         doc = json.loads(text.decode("utf-8"))
-    except (ValueError, zlib.error, UnicodeDecodeError) as e:
+    except (ValueError, RecursionError, zlib.error, UnicodeDecodeError) as e:
         raise SyncError("read") from e
     if not isinstance(doc, dict) or not isinstance(doc.get("c"), dict):
         raise SyncError("read")
-    if int(doc.get("v") or 0) > FORMAT:
+    # The layout's number as another computer wrote it: one that is no
+    # number ("x", 1e400, a list) is no copy this app wrote - int() of it
+    # raised (tests/test_fuzz_readers.py).
+    try:
+        version = int(doc.get("v") or 0)
+    except (TypeError, ValueError, OverflowError):
+        raise SyncError("read") from None
+    if version > FORMAT:
         raise SyncError("newer")
     clean = empty_doc()
     for cat, entries in doc["c"].items():

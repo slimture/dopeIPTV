@@ -145,7 +145,8 @@ class Client:
         self.keepalive, self.timeout, self.will = keepalive, timeout, will
         self._context = context or tls_context
         self._sock: socket.socket | None = None
-        self._buf = b""
+        self._buf = bytearray()
+        self._at = 0                       # where the next packet starts in _buf
         self._next_id = 1
         self.last_io = 0.0                 # time.monotonic() of the last packet sent
         self.inbox: list[tuple[str, bytes, bool]] = []
@@ -163,7 +164,7 @@ class Client:
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             if self.tls:
                 sock = self._context().wrap_socket(sock, server_hostname=self.host)
-            self._sock, self._buf = sock, b""
+            self._sock, self._buf, self._at = sock, bytearray(), 0
             self._send(connect_packet(self.client_id, self.keepalive, self.username,
                                       self.password, self.will))
             ptype, _flags, body = self._read(time.monotonic() + self.timeout, want=CONNACK)
@@ -221,7 +222,7 @@ class Client:
         """Bytes already read that no packet was made of yet - kept here or
         in TLS's own buffer, where select does not see them."""
         sock = self._sock
-        return bool(self._buf) or (isinstance(sock, ssl.SSLSocket) and sock.pending() > 0)
+        return len(self._buf) > self._at or (isinstance(sock, ssl.SSLSocket) and sock.pending() > 0)
 
     #: Packets one take() reads at most: a broker that never stops sending
     #: would otherwise keep it reading - and its thread with it - for good.
@@ -288,7 +289,8 @@ class Client:
         self.last_io = time.monotonic()
 
     def _fill(self, n: int, end: float) -> None:
-        while len(self._buf) < n:
+        """At least *n* bytes from the next packet's start in the buffer."""
+        while len(self._buf) - self._at < n:
             left = end - time.monotonic()
             if left <= 0 or self._sock is None:
                 raise TimeoutError("no answer from the broker")
@@ -303,6 +305,15 @@ class Client:
             if not chunk:
                 self._drop()
                 raise ConnectionError("the broker closed the connection")
+            # The packets read are let go once a read, not once a packet, and
+            # what comes is added in place: cutting each packet off copied
+            # the rest every time - a broker's flood of small packets in one
+            # read took time with its square - and adding to bytes copied a
+            # large packet sent a byte at a time once a byte
+            # (tests/test_fuzz_readers.py).
+            if self._at:
+                del self._buf[:self._at]
+                self._at = 0
             self._buf += chunk
 
     def _read_one(self, end: float) -> tuple[int, int, bytes]:
@@ -310,7 +321,7 @@ class Client:
         length, mult, i = 0, 1, 1
         while True:
             self._fill(i + 1, end)
-            byte = self._buf[i]
+            byte = self._buf[self._at + i]
             length += (byte & 0x7F) * mult
             i += 1
             if not byte & 0x80:
@@ -323,9 +334,10 @@ class Client:
             self._drop()
             raise MqttError("answer too large")
         self._fill(i + length, end)
-        first = self._buf[0]
-        body = self._buf[i:i + length]
-        self._buf = self._buf[i + length:]
+        at = self._at
+        first = self._buf[at]
+        body = bytes(self._buf[at + i:at + i + length])
+        self._at = at + i + length
         return first >> 4, first & 0x0F, body
 
     def _read(self, end: float, want: int) -> tuple[int, int, bytes]:

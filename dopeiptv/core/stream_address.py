@@ -178,6 +178,11 @@ def _inet_aton(text: str) -> ipaddress.IPv4Address | None:
             digits, base = low, 10
             if not digits or not all(c in "0123456789" for c in digits):
                 return None
+        # A part longer than any address's is none - and int() refuses
+        # thousands of digits (tests/test_fuzz_readers.py); leading zeros
+        # are the C library's to take, as many as there are.
+        if len(digits.lstrip("0")) > 11:
+            return None
         values.append(int(digits, base) if digits else 0)
     last = values.pop()
     if any(v > 0xFF for v in values) or last >= 1 << (8 * (4 - len(values))):
