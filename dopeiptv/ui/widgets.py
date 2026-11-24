@@ -152,7 +152,12 @@ def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
     box.setDefaultButton(
         QMessageBox.StandardButton.Yes if default_yes
         else QMessageBox.StandardButton.No)
-    return box.exec() == QMessageBox.StandardButton.Yes
+    try:
+        return box.exec() == QMessageBox.StandardButton.Yes
+    finally:
+        # Asked and answered: gone, not a child of *parent* for the rest of
+        # the session (docs/PERFORMANCE.md).
+        box.deleteLater()
 
 
 def heart_path(size: float) -> QPainterPath:

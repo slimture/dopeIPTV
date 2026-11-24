@@ -266,6 +266,7 @@ class _RecordingMixin(_TimeshiftMixin):
         d.exec()
         if dont is not None and dont.isChecked() and chosen["idx"] is not None:
             self.settings.setValue(dont_ask_setting, "true")
+        d.deleteLater()     # answered: not kept for the session (docs/PERFORMANCE.md)
         return chosen["idx"]
 
     def _guard_stream_switch(self, url: str, title: str) -> bool:
