@@ -138,6 +138,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   for Mine's favourites of every source, as it does for History. Read on
   Mine's own worker, so thousands of favourites keep the window quick.
 
+### Changed
+
+- Every message and question - Reset all, a delete, a wrong PIN, a name or a
+  number asked for - is in the app's own look on every theme: the title as a
+  heading, a small mark drawn in the theme's colours, the button Enter
+  presses in the accent and a destructive one in red, mirrored right to left.
+  Qt's stock boxes, with the desktop's icons and a plain grey layout, are
+  gone (`ui/message_box.py`).
+
 ### Fixed
 
 - The first-run guide could lose the keyboard to the channel list behind it
