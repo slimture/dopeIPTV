@@ -404,6 +404,10 @@ def _profile_files() -> list:
 
 def main() -> int:
     """Launch the application."""
+    # importlib whole on this thread before any other starts: a first import
+    # of it on a worker thread, beside another's, could leave the import
+    # machinery half made on Python 3.12.3 (NameError: name 'sys').
+    import importlib.util  # noqa: F401
     # PyInstaller's windowed (no-console) build - our Windows release - leaves
     # sys.stdout (and sometimes sys.stderr) as None. Any print()/flush() then
     # crashes with "'NoneType' object has no attribute 'write'/'flush'" - which

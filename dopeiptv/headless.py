@@ -204,6 +204,10 @@ def _arg(argv: list[str], name: str) -> str | None:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    # importlib whole on this thread before any other starts: a first import
+    # of it on a worker thread, beside another's, could leave the import
+    # machinery half made on Python 3.12.3 (NameError: name 'sys').
+    import importlib.util  # noqa: F401
     if sys.stdout is None:
         sys.stdout = open(os.devnull, "w")
     if sys.stderr is None:

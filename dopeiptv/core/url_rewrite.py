@@ -48,7 +48,6 @@ export keeps only plain values).
 
 from __future__ import annotations
 
-import importlib
 import json
 import re
 import time
@@ -111,15 +110,23 @@ _REFUSED_PARTS = {
 
 def _load_parser() -> Any:
     """The standard library's parser of regular expressions: re._parser
-    (3.11 on), sre_parse before it. None: no regular expression is taken."""
-    for name in ("re._parser", "sre_parse"):
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", DeprecationWarning)
-                return importlib.import_module(name)
-        except ImportError:
-            continue
-    return None
+    (3.11 on), sre_parse before it. None: no regular expression is taken.
+    By the import statement, never importlib.import_module: this module is
+    first imported on a worker thread (a source's client), and on Python
+    3.12.3 that call could meet another thread's first import of importlib
+    half done - NameError: name 'sys' is not defined, and no recording."""
+    try:
+        from re import _parser  # type: ignore[attr-defined]
+        return _parser
+    except ImportError:
+        pass
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            import sre_parse
+        return sre_parse
+    except ImportError:
+        return None
 
 
 _SRE: Any = _load_parser()

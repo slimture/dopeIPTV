@@ -755,9 +755,13 @@ _RUN = r"""
 import json, os, signal, sys, threading, time
 sys.path.insert(0, sys.argv[1])
 claims_dir, job_id = sys.argv[2], sys.argv[3]
+# Imported here, before the watcher's thread starts: a first import of
+# importlib on two threads at once can leave a half-made copy of the import
+# machinery on Python 3.12.3 (NameError: name 'sys' in every later import).
+import importlib.util  # noqa: F401
+from dopeiptv.core import rec_claims as rc
 
 def watch():
-    from dopeiptv.core import rec_claims as rc
     c = rc.Claims(claims_dir, rc.WINDOW)
     end = time.monotonic() + 40
     state = None
