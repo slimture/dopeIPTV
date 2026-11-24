@@ -2,13 +2,14 @@
 (core/ytdlp.py).
 
 Such an address opens from Open address… (the app menu), --play, a
-dopeiptv://play link or the remote API. It plays in the embedded player:
-mpv's ytdl hook runs yt-dlp where the libmpv has one, else the window asks
-yt-dlp for the stream and plays that. With no yt-dlp found the app offers
-to download the official release binary for this computer (checksum
-checked) into the user's data folder - never bundled - and keeps that copy
-up to date, at most once a day while it is used. Settings > Playback turns
-the managed copy off, and then only the system's is used.
+dopeiptv://play link or the remote API - never while offline mode is on
+(``_play_web`` asks first, as the player's door says it). It plays in the
+embedded player: mpv's ytdl hook runs yt-dlp where the libmpv has one, else
+the window asks yt-dlp for the stream and plays that. With no yt-dlp found
+the app offers to download the official release binary for this computer
+(checksum checked) into the user's data folder - never bundled - and keeps
+that copy up to date, at most once a day while it is used. Settings >
+Playback turns the managed copy off, and then only the system's is used.
 
 Saved addresses are favourites of their own kind (``web_favorites``, by
 address, no source's), with a LIVE badge when the stream is live; they show
@@ -28,7 +29,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QVBoxLayout,
 )
 
-from ..core import ytdlp
+from ..core import offline, ytdlp
 from ..core.commands import stream_url_ok
 from ..core.log import log, redact_url
 from ..core.stores import FAV_DEFAULT_GROUP
@@ -41,7 +42,8 @@ from .theme import P
 _ERR_TEXT = {"platform": "ytdlp_err_platform", "pin": "ytdlp_err_pin", "release": "ytdlp_err_download",
              "download": "ytdlp_err_download", "checksum": "ytdlp_err_checksum",
              "runs": "ytdlp_err_runs", "busy": "ytdlp_err_busy",
-             "missing": "ytdlp_err_runs", "failed": "web_play_failed"}
+             "missing": "ytdlp_err_runs", "failed": "web_play_failed",
+             "offline": "offline_needs_network"}
 
 
 def _error_text(err) -> str:
@@ -150,7 +152,12 @@ class _WebStreamsMixin:
 
     def _play_web(self, url: str, title: str | None = None, item: dict | None = None,
                   player=None, external: bool = False) -> None:
-        """A web page (YouTube, Twitch, ...) played through yt-dlp."""
+        """A web page (YouTube, Twitch, ...) played through yt-dlp. Offline
+        mode: refused before anything - yt-dlp, mpv's hook and an external
+        player each go to the page themselves."""
+        if offline.refusal(url):
+            self._offline_refused("a web page")
+            return
         from ..media.players import launch_player
         item = item or self._web_item(url, title)
         name = item.get("name") or title or ytdlp.display_name(url)
@@ -197,6 +204,9 @@ class _WebStreamsMixin:
         if gen != self._web_gen:
             return
         self._hide_busy()
+        if str(msg or "").partition(":")[0].strip() == "offline":
+            self._offline_refused("a web page")      # offline mode came on meanwhile
+            return
         log.info("web stream: yt-dlp could not open it: %s", msg)
         detail = str(msg or "").partition(": ")[2]
         text = tr("web_play_failed")

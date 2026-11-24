@@ -462,6 +462,73 @@ def test_the_guard_stands_where_every_request_and_stream_passes():
     assert asks("ui/mw_offline.py", "_offline_may_play", "offline.stream_refusal")
     assert asks("core/recording.py", "_spawn", "offline.stream_refusal")
     assert asks("core/restream.py", "watch", "offline.stream_refusal")
+    # A web page: refused before yt-dlp is looked for or run, mpv's hook
+    # handed it, or an external player started; yt-dlp itself asks again.
+    assert asks("ui/mw_webstreams.py", "_play_web", "offline.refusal")
+    assert asks("core/ytdlp.py", "resolve", "offline.refusal")
+    # An external mpv or VLC, whichever way it is started.
+    assert asks("media/players.py", "launch_player", "offline.stream_refusal")
+
+
+#: What starts a program (or opens a link in one).
+PROGRAM_STARTS = {"subprocess.Popen", "subprocess.run", "subprocess.call",
+                  "subprocess.check_call", "subprocess.check_output", "os.system",
+                  "os.startfile", "os.execv", "os.execve", "os.execvp", "os.posix_spawn",
+                  "QProcess", "QDesktopServices.openUrl"}
+#: Every module that starts a program: the guard it asks itself, or None and
+#: why the program reaches nothing offline mode must refuse.
+OWN_PROGRAMS = {
+    "__init__.py": (None, "git describe in a checkout"),
+    "core/_alloc.py": (None, "the app itself again, with another allocator"),
+    "core/desktop_entry.py": (None, "the desktop's own tools for the app's menu entry"),
+    "core/macupdate.py": (None, "hdiutil and codesign on the update already downloaded"),
+    "core/nerd.py": (None, "the system's own network tools, read for the VPN guard"),
+    "core/platform_macos.py": (None, "caffeinate"),
+    "core/platform_windows.py": (None, "PowerShell for the Start menu's shortcut"),
+    "core/rec_extras.py": (None, "the command the person wrote, run after a recording"),
+    "core/rec_mp4.py": (None, "ffmpeg on a recording's file"),
+    "core/rec_view.py": (None, "ffmpeg and ffprobe on a recording's file"),
+    "core/recording.py": ("stream_refusal", "the recorder on a stream"),
+    "core/restream.py": ("stream_refusal", "ffmpeg on a channel server mode restreams"),
+    "core/selfupdate.py": (None, "the update already downloaded, checked"),
+    "core/winupdate.py": (None, "the installer already downloaded, checked"),
+    "core/xdg.py": (None, "a link the person clicked, in their own browser or file manager"),
+    "core/ytdlp.py": ("refusal", "yt-dlp on a web page; its version and the hasher ask "
+                                 "nothing of the network"),
+    "media/players.py": ("stream_refusal", "an external mpv or VLC"),
+    "providers/airplay_bridge.py": (None, "ffmpeg reads an alias through the bridge, which "
+                                          "asks offline mode of every connection"),
+    "providers/cast_bridge.py": (None, "ffmpeg reads an alias through the bridge, which asks "
+                                       "offline mode of every connection"),
+    "providers/cast_feed.py": (None, "its reader reads an alias through the bridge, which "
+                                     "asks offline mode of every connection"),
+    "providers/epg.py": (None, "the guide's parser on the file already downloaded"),
+    "ui/mw_local_library.py": (None, "ffmpeg on a local file for its frame"),
+}
+
+
+def _program_starts(tree: ast.AST) -> set[str]:
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Attribute, ast.Name)):
+            name = _dotted(node)
+            if name in PROGRAM_STARTS or name.rsplit(".", 1)[-1] == "QProcess":
+                found.add(name)
+    return found
+
+
+def test_every_program_the_app_starts_asks_offline_mode_or_reaches_nothing_outside():
+    """Rule 1, offline mode: a program the app starts on an address (mpv,
+    VLC, yt-dlp, ffmpeg) goes to the internet as the app's own requests
+    would - each is listed here, asking the guard or why it need not."""
+    starts = {rel for rel, tree in _modules() if _program_starts(tree)}
+    unlisted = sorted(starts - set(OWN_PROGRAMS))
+    assert not unlisted, f"a program offline mode does not know: {unlisted}"
+    assert not sorted(set(OWN_PROGRAMS) - starts), "listed, and starts nothing any more"
+    trees = dict(_modules())
+    for rel, (guard, _why) in OWN_PROGRAMS.items():
+        if guard is not None:
+            assert guard in _offline_calls(trees[rel]), f"{rel} does not ask offline.{guard}"
     # A route's adapter is the capped one's: the same send.
     text = (PKG / "core/net_adapter.py").read_text(encoding="utf-8")
     assert "capped_adapter()" in text and "def send" not in text

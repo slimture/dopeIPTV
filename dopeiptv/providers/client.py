@@ -29,6 +29,20 @@ class NoList(LocalizedError):
     one, else the load fails with the reason."""
 
 
+def wrong_login(e: BaseException | None) -> bool:
+    """Whether a source's login *e* was the account's login refused - by
+    its key (every client raises LocalizedError("err_wrong_login")), else a
+    server's own words in a RuntimeError, "username" or "user name". What
+    the start (app.py) and the login as offline mode ends (ui/mw_offline.py)
+    tell apart from a network that failed."""
+    if not isinstance(e, RuntimeError):
+        return False
+    if getattr(e, "key", "") == "err_wrong_login":
+        return True
+    words = str(e).lower()
+    return "user name or password" in words or "username or password" in words
+
+
 def list_rows(data: Any) -> list | None:
     """A list action's answer as rows: a list as it is, with anything in it
     that is no object left out; an object of rows keyed by id (some panels

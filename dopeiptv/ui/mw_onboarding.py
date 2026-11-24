@@ -232,9 +232,10 @@ class _OnboardingMixin:
         if self._wtry is not None:
             return
         from ..core import offline
-        if offline.stream_refusal(server):
+        if offline.on() and offline.needs_network(server):
             # Offline mode (no network, or turned on): nothing tried - said
-            # plainly at once, never a wait (mw_offline).
+            # plainly at once, never a wait (mw_offline). A playlist file is
+            # read, not played: it is tried.
             log.info("welcome: no try - offline mode is on")
             ov = self._wizard_view()
             if ov is not None:

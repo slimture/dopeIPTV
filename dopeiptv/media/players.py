@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 
+from ..core import offline
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.xdg import system_env
@@ -370,7 +371,8 @@ def allowed_page(player: str, url: str) -> bool:
 
 def launch_player(player: str, url: str, title: str | None = None,
                   parent: object = None) -> None:
-    """Spawn an external mpv or VLC process."""
+    """Spawn an external mpv or VLC process - never on an address offline
+    mode refuses."""
     log.info("launching EXTERNAL %s for %s", player,
              for_log(title or redact_url(url)))
     title = title or "dopeIPTV"
@@ -383,6 +385,16 @@ def launch_player(player: str, url: str, title: str | None = None,
         log.warning("external %s not started: not a stream's address (%s:)",
                     name, address_scheme(url)[:20] or "-")
         QMessageBox.warning(parent, name, tr("open_address_bad"))
+        return
+    if offline.stream_refusal(url):
+        # Offline mode: the player (an external mpv's own yt-dlp too) would
+        # go to the internet itself - said as the window's door says it.
+        log.info("external %s not started: offline mode - it needs the network", name)
+        say = getattr(parent, "_offline_refused", None)
+        if callable(say):
+            say("an external player")
+        else:
+            QMessageBox.information(parent, name, tr("offline_needs_network"))
         return
     exe = find_player_executable(player)
     if not exe:

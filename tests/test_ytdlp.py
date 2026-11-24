@@ -479,3 +479,47 @@ def test_a_frozen_build_hands_mpv_the_wrapper(tmp_path):
     assert os.access(path, os.X_OK)
     assert "exec /usr/bin/yt-dlp" in open(path).read()
     assert ytdlp.hook_path(found, tmp_path, frozen=True) == path     # written once
+
+
+# -- offline mode: the page is never asked for --------------------------------------------
+
+@pytest.fixture
+def offline_on():
+    from dopeiptv.core import offline
+    offline.reset()
+    offline.set_mode(offline.HAND, offline.WHY_HAND)
+    yield offline
+    offline.reset()
+
+
+def test_resolve_runs_nothing_while_offline(offline_on):
+    """yt-dlp goes to the site itself: offline, it is not run at all."""
+    ran: list = []
+    with pytest.raises(YtdlpError) as e:
+        ytdlp.resolve("/usr/bin/yt-dlp", "https://www.youtube.com/watch?v=x",
+                      run=lambda *a, **k: ran.append(a))
+    assert e.value.reason == "offline" and ran == []
+
+
+def test_a_web_page_offline_asks_nothing_and_says_it_needs_the_network(offline_on):
+    """Open address… or a saved page while offline: refused before
+    anything - no yt-dlp looked for or run, no player, no hook - with the
+    words the player's door says (ui/mw_webstreams._play_web)."""
+    pytest.importorskip("PyQt6.QtWidgets")
+    from types import SimpleNamespace
+
+    from dopeiptv.ui import mw_webstreams
+
+    said: list = []
+
+    def never(*a, **k):
+        raise AssertionError("asked while offline")
+
+    host = SimpleNamespace(_offline_refused=lambda kind="": said.append(kind),
+                           _ytdlp_found=never, _web_item=lambda url, title=None: {"name": "x"},
+                           _start_playback=never, _show_busy=never,
+                           player=SimpleNamespace(has_ytdl_hook=never), _web_gen=0)
+    for player, external in ((None, False), ("vlc", False), ("mpv", True)):
+        mw_webstreams._WebStreamsMixin._play_web(
+            host, "https://www.youtube.com/watch?v=x", player=player, external=external)
+    assert len(said) == 3
