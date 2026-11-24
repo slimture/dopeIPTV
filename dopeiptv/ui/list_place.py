@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from . import a11y
 from .media_cards import Card, CardDelegate, CardView, PageHeader, PlacePage, Segmented, is_heading
 from .series_page import drawn_icon
 from .theme import P, corner_radius
@@ -315,7 +316,8 @@ class ListPlace(PlacePage):
         self.note.setTextFormat(Qt.TextFormat.PlainText)
         self.note.setWordWrap(True)
         nb.addWidget(self.note, 1)
-        self.note_btn = QPushButton(self.NOTE_ACTION)
+        # Shown only with words (set_note): a place without an action has none.
+        self.note_btn = a11y.words_later(QPushButton(self.NOTE_ACTION))
         self.note_btn.setObjectName(f"{self.NAME}NoteAction")
         self.note_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.note_btn.clicked.connect(self.note_action)

@@ -457,6 +457,10 @@ class _DetailMixin:
         if self.tmdb and name:
             chip.setCursor(Qt.CursorShape.PointingHandCursor)
             chip.setToolTip(plain_text(tr("detail_cast_find", name=name)))
+            # Tab and Enter reach it too; its name is the one under the photo.
+            chip.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+            chip.setAccessibleName(name)
+            chip.setAccessibleDescription(tr("detail_cast_find", name=name))
             chip.clicked.connect(
                 lambda: self._on_cast_clicked(name, person_id))
         v = QVBoxLayout(chip)
@@ -653,6 +657,7 @@ class _DetailMixin:
             return
         d = self._ensure_cast_dialog()
         d.setWindowTitle(tr("actor_other_titles", name=name))
+        self._cast_result_list.setAccessibleName(d.windowTitle())
         status = self._cast_status
         result_list = self._cast_result_list
         result_list.clear()
@@ -1087,6 +1092,10 @@ class _DetailMixin:
         card.customContextMenuRequested.connect(
             lambda pos, c=card, po=post:
             self._epg_programme_menu(po, c.mapToGlobal(pos)))
+        # Its menu from the keyboard as well (Tab to it, the menu key or
+        # Shift+F10), read as the time and the title it shows.
+        card.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        card.setAccessibleName(f"{stamp} {ti.text()}")
         self.epg_lay.insertWidget(self.epg_lay.count() - 1, card)
 
     # -- record / remind straight from a guide entry -------------------------

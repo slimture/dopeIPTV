@@ -41,6 +41,7 @@ class _SearchMixin:
         else:
             key = "list_filter_placeholder"
         self.search.setPlaceholderText(tr(key))
+        self.search.setAccessibleName(tr(key))      # a placeholder is no name (ui/a11y.py)
 
     def _sync_cat_search_hint(self) -> None:
         """The sidebar's box and its 🔍 toggle say what it finds: categories
@@ -49,7 +50,9 @@ class _SearchMixin:
         text = tr(self._CAT_FIND.get(getattr(self, "mode", ""),
                                      "list_filter_placeholder"))
         self.cat_search.setPlaceholderText(text)
+        self.cat_search.setAccessibleName(text)
         self.cat_search_btn.setToolTip(text)
+        self.cat_search_btn.setAccessibleName(text)
 
     def _toggle_cat_search(self, on: bool) -> None:
         self.cat_search.setVisible(on)

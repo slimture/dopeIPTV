@@ -1294,6 +1294,8 @@ class _TraktMixin:
         lay.addWidget(tw)
         wl_list = QListWidget()
         hist_list = QListWidget()
+        wl_list.setAccessibleName(tr("trakt_tab_watchlist"))
+        hist_list.setAccessibleName(tr("nav_history"))
         tw.addTab(wl_list, tr("trakt_tab_watchlist"))
         tw.addTab(hist_list, tr("nav_history"))
         status = QLabel(tr("common_loading"))

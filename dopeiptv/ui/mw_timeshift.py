@@ -549,6 +549,7 @@ class _TimeshiftMixin:
         info.setWordWrap(True)
         lay.addWidget(info)
         lst = QListWidget()
+        lst.setAccessibleName(d.windowTitle())     # the channel's past programmes
         lay.addWidget(lst, 1)
         btns = QHBoxLayout()
         watch_btn = QPushButton(tr("common_watch"), objectName="Primary")

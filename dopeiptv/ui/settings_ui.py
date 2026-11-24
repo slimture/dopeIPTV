@@ -43,6 +43,7 @@ from ..core.log import log
 from ..core.palette_match import fold as _fold
 from ..core.palette_match import words as _words
 from ..i18n import english_of
+from . import a11y
 from .theme import (
     P, THEMES, _luminance, _mix, corner_radius,
     resolve_accent, rounded,
@@ -185,6 +186,7 @@ class SettingsCard(QFrame):
             h.setContentsMargins(0, 0, 0, 0)
             outer.addLayout(h)
             outer.addWidget(below)
+            a11y.name_fields(below, label)      # a field under the label (a list of addresses)
         w.below = below
         h.setSpacing(16)
         text = QVBoxLayout()
@@ -208,6 +210,9 @@ class SettingsCard(QFrame):
             holder.setLayout(control)
             control = holder
         if control is not None:
+            # A field is read by its row's label (a switch or a button has
+            # its own words): ui/a11y.py.
+            a11y.name_fields(control, label)
             # One column of controls down the card: the same width for all,
             # unless a control has a size of its own (a switch, a number, a
             # button - stretched to the column a button was a wide slab).
@@ -235,6 +240,9 @@ class SettingsCard(QFrame):
         v = QVBoxLayout(holder)
         v.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         v.addWidget(w)
+        title = self.property("_title")
+        if isinstance(title, QLabel):
+            a11y.name_fields(w, title.text())      # a list: the section's name
         return self._add(holder, findable(search))
 
     def layout_row(self, lay: QLayout, search: str = "") -> QWidget:
@@ -338,6 +346,9 @@ class SettingsPage(QScrollArea):
         self.path: QLabel | None = None
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
+        # Tab goes to its controls (and scrolls to the one it reaches).
+        a11y.unfocused(self)
+        self.setAccessibleName(title)
         body = QWidget()
         body.setObjectName("SettingsPageBody")
         outer = QHBoxLayout(body)
@@ -395,6 +406,7 @@ class SettingsPage(QScrollArea):
         the colour of the group the page belongs to."""
         rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
         btn = QPushButton(f"{text}  {'‹' if rtl else '›'}")
+        btn.setAccessibleName(text)
         btn.setObjectName("SettingsCrumb")
         btn.setFlat(True)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -478,10 +490,12 @@ class _NavDelegate(QStyledItemDelegate):
         colour = index.data(GROUP_ROLE)
         if colour and index.data(Qt.ItemDataRole.UserRole) is None:
             self._heading(painter, option, index, str(colour))
-        elif colour and option.state & QStyle.StateFlag.State_Selected:
+            return
+        if colour and option.state & QStyle.StateFlag.State_Selected:
             self._tinted(painter, option, index, str(colour))
         else:
             super().paint(painter, option, index)
+        a11y.keyboard_ring(painter, option)
 
     def _heading(self, painter, option, index, colour: str) -> None:
         """The group's heading in its colour: the style sheet gives every
@@ -568,6 +582,7 @@ class SettingsShell(QWidget):
         self.search = QLineEdit()
         self.search.setObjectName("SettingsSearch")
         self.search.setPlaceholderText(search_placeholder)
+        self.search.setAccessibleName(search_placeholder)
         self.search.setClearButtonEnabled(True)
         sv.addWidget(self.search)
         self.nav = SettingsNav()
@@ -585,6 +600,7 @@ class SettingsShell(QWidget):
         # each page's rows under its title, instead of one page at a time.
         self.results = QScrollArea()
         self.results.setObjectName("SettingsResults")
+        a11y.unfocused(self.results)
         self.results.setWidgetResizable(True)
         self.results.setFrameShape(QFrame.Shape.NoFrame)
         rbody = QWidget()
@@ -1269,6 +1285,10 @@ QLabel#SettingsGroupHead {{ color: {p['muted']}; font-size: 12px; }}
     width: 16px; height: 16px; margin: -6px 0; border-radius: 8px;
     background: #FFFFFF; border: 1px solid {line};
 }}
+/* Its focus comes from Tab alone (ValueSlider): the keyboard's ring. */
+#SettingsPageBody QSlider#SettingsSlider::handle:horizontal:focus {{
+    border: 2px solid {p['accent']};
+}}
 QLabel#SliderValue {{ color: {p['text2']}; font-size: 12px; }}
 #SettingsResultsBody {{ background: {p['bg']}; }}
 #SettingsRow, QFrame#SettingsCard > QWidget {{ background: transparent; }}
@@ -1333,6 +1353,10 @@ class PlaylistDelegate(QStyledItemDelegate):
         return QSize(option.rect.width(), self.H)
 
     def paint(self, pr: QPainter, option, index) -> None:
+        self._paint(pr, option, index)
+        a11y.keyboard_ring(pr, option)
+
+    def _paint(self, pr: QPainter, option, index) -> None:
         info = index.data(self.ROLE) or {}
         pr.save()
         pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -2452,6 +2476,10 @@ class ValueSlider(QWidget):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(10)
         self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setObjectName("SettingsSlider")
+        # Tab reaches it, a click does not keep the focus: its handle lit
+        # (settings_style) is the keyboard's alone.
+        self.slider.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.slider.setRange(round(lo * scale), round(hi * scale))
         self.slider.setValue(round(value * scale))
         self.slider.setCursor(Qt.CursorShape.PointingHandCursor)

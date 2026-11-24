@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from ..core import catchup, channel_numbers, mirrors, nerd
 from ..i18n import tr
+from . import a11y
 from .box_finder import MEDIA_KINDS
 from .dialogs import SourceFields
 from .nav_widgets import source_initials
@@ -242,6 +243,9 @@ class SourcePage(SourceFields, QScrollArea):
         outer.addWidget(col, 100)
         outer.addStretch(1)
         self.setWidget(body)
+        # Tab goes to its controls, never to the page around them (ui/a11y.py).
+        a11y.unfocused(self)
+        self.setAccessibleName(str(playlist.get("name") or ""))
         self._header(crumb)
         self._build_tabs()
         self._col.addStretch(1)
@@ -273,6 +277,8 @@ class SourcePage(SourceFields, QScrollArea):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
         self.crumb = QPushButton(f"{crumb}  {_arrow()}" if crumb else _arrow())
+        # Read as the page it goes back to, without its arrow.
+        self.crumb.setAccessibleName(crumb or tr("btn_back"))
         self.crumb.setObjectName("SettingsCrumb")
         self.crumb.setFlat(True)
         self.crumb.setCursor(Qt.CursorShape.PointingHandCursor)

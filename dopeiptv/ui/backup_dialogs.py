@@ -416,6 +416,7 @@ class RestoreBackupDialog(QDialog):
         # A backup with many playlists of their own proxy can name dozens:
         # they scroll, the choice below stays on the screen.
         notes_box = QScrollArea()
+        notes_box.setAccessibleName(tr("restore_title"))   # what the backup brings, read by scrolling
         notes_box.setWidget(self._picks_box)
         notes_box.setWidgetResizable(True)
         notes_box.setFrameShape(QScrollArea.Shape.NoFrame)

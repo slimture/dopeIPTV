@@ -349,9 +349,9 @@ class ResultsDelegate(QStyledItemDelegate):
 
 class ResultsView(QListView):
     """The results: Up and Down go through the rows of every group (the
-    headings are passed over), Enter or a double click acts on one, Tab
-    goes back to the field, the menu key or a right click asks for a
-    row's menu."""
+    headings are passed over), Enter or a double click acts on one,
+    Shift+Tab goes back to the field and Tab on out of the page, the menu
+    key or a right click asks for a row's menu."""
 
     chosen = pyqtSignal(object)
     menu_wanted = pyqtSignal(object, QPoint)
@@ -394,10 +394,14 @@ class ResultsView(QListView):
                 return i
         return -1
 
-    def focusNextPrevChild(self, _next: bool) -> bool:
-        """Tab (either way): back to the field."""
-        self.to_field.emit()
-        return True
+    def focusNextPrevChild(self, next_: bool) -> bool:  # noqa: N802 - Qt hook
+        """Shift+Tab: back to the field. Tab: on out of the page, as it goes
+        anywhere else - Tab both ways to the field kept the keyboard on the
+        page, the sidebar out of its reach."""
+        if not next_:
+            self.to_field.emit()
+            return True
+        return super().focusNextPrevChild(True)
 
     def keyPressEvent(self, e) -> None:
         key = e.key()
@@ -477,6 +481,7 @@ class SearchPage(QWidget):
         lay.addWidget(self.partial)
         self.model = ResultsModel(self)
         self.view = ResultsView()
+        self.view.setAccessibleName(tr("sa_results_a11y"))
         self.view.setModel(self.model)
         self.delegate = ResultsDelegate(self.images, self.view)
         self.view.setItemDelegate(self.delegate)
@@ -506,6 +511,7 @@ class SearchPage(QWidget):
     def retranslate(self) -> None:
         self.field.setPlaceholderText(tr("sa_placeholder_all"))
         self.field.setAccessibleName(tr("sa_title"))
+        self.view.setAccessibleName(tr("sa_results_a11y"))
         self.chips["all"].setText(tr("sa_filter_all"))
         for group in sa.GROUPS:
             self.chips[group].setText(group_title(group))

@@ -2991,6 +2991,8 @@
   "card_scroll_back": "이전 보기",
   "card_view_switch_a11y": "보기",
   "card_sort_a11y": "정렬: {order}",
+  "sa_results_a11y": "결과",
+  "about_notes_a11y": "릴리스 노트",
   "card_continue": "이어 보기",
   "card_popular": "지금 인기",
   "card_grid": "그리드",

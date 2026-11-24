@@ -302,6 +302,8 @@ class _SimklListsDialog(QDialog):
         lay.addWidget(tabs)
         self.wl_list = QListWidget()
         self.hist_list = QListWidget()
+        self.wl_list.setAccessibleName(tr("trakt_tab_watchlist"))
+        self.hist_list.setAccessibleName(tr("nav_history"))
         tabs.addTab(self.wl_list, tr("trakt_tab_watchlist"))
         tabs.addTab(self.hist_list, tr("nav_history"))
         self.status = QLabel(tr("common_loading"))

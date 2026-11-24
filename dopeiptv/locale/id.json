@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Tampilkan sebelumnya",
   "card_view_switch_a11y": "Tampilan",
   "card_sort_a11y": "Urutan: {order}",
+  "sa_results_a11y": "Hasil",
+  "about_notes_a11y": "Catatan rilis",
   "card_continue": "Lanjutkan",
   "card_popular": "Populer saat ini",
   "card_grid": "Kisi",

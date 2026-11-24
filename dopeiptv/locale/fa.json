@@ -2991,6 +2991,8 @@
   "card_scroll_back": "نمایش قبلی‌ها",
   "card_view_switch_a11y": "نما",
   "card_sort_a11y": "مرتب‌سازی: {order}",
+  "sa_results_a11y": "نتایج",
+  "about_notes_a11y": "یادداشت‌های انتشار",
   "card_continue": "ادامه",
   "card_popular": "محبوب‌ترین‌های اکنون",
   "card_grid": "شبکه",

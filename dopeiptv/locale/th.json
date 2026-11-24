@@ -2991,6 +2991,8 @@
   "card_scroll_back": "แสดงก่อนหน้า",
   "card_view_switch_a11y": "มุมมอง",
   "card_sort_a11y": "เรียงตาม: {order}",
+  "sa_results_a11y": "ผลลัพธ์",
+  "about_notes_a11y": "บันทึกประจำรุ่น",
   "card_continue": "ดูต่อ",
   "card_popular": "กำลังนิยมตอนนี้",
   "card_grid": "ตาราง",

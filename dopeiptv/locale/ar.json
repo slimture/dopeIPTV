@@ -2991,6 +2991,8 @@
   "card_scroll_back": "عرض السابق",
   "card_view_switch_a11y": "العرض",
   "card_sort_a11y": "الفرز: {order}",
+  "sa_results_a11y": "النتائج",
+  "about_notes_a11y": "ملاحظات الإصدار",
   "card_continue": "متابعة",
   "card_popular": "الأكثر رواجًا الآن",
   "card_grid": "شبكة",

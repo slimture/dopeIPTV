@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Mostrar anteriores",
   "card_view_switch_a11y": "Vista",
   "card_sort_a11y": "Orden: {order}",
+  "sa_results_a11y": "Resultados",
+  "about_notes_a11y": "Notas de la versión",
   "card_continue": "Continuar",
   "card_popular": "Popular ahora",
   "card_grid": "Cuadrícula",

@@ -3354,6 +3354,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "card_scroll_back": {"en": "Show earlier"},
     "card_view_switch_a11y": {"en": "View"},
     "card_sort_a11y": {"en": "Sort: {order}"},
+    "sa_results_a11y": {"en": "Results"},
+    "about_notes_a11y": {"en": "Release notes"},
     "card_continue": {"en": "Continue"},
     "card_popular": {"en": "Popular right now"},
     "card_grid": {"en": "Grid"},

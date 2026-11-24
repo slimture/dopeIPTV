@@ -2991,6 +2991,8 @@
   "card_scroll_back": "הצג קודמים",
   "card_view_switch_a11y": "תצוגה",
   "card_sort_a11y": "מיון: {order}",
+  "sa_results_a11y": "תוצאות",
+  "about_notes_a11y": "הערות גרסה",
   "card_continue": "המשך",
   "card_popular": "פופולרי עכשיו",
   "card_grid": "רשת",

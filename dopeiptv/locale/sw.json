@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Onyesha zilizotangulia",
   "card_view_switch_a11y": "Mwonekano",
   "card_sort_a11y": "Mpangilio: {order}",
+  "sa_results_a11y": "Matokeo",
+  "about_notes_a11y": "Maelezo ya toleo",
   "card_continue": "Endelea",
   "card_popular": "Maarufu sasa hivi",
   "card_grid": "Gridi",

@@ -286,6 +286,10 @@ class _PlacesMixin:
             return
         place = self._list_place if self._list_place in places.LIST_PLACES else "tv"
         header.set_title(place_title(place))
+        # The list under it is read by the place's name ("TV", "Movies").
+        listw = getattr(self, "listw", None)
+        if listw is not None:
+            listw.setAccessibleName(place_title(place))
         header.set_count(self._place_count_text)
         if place == "mitt":
             mode = getattr(self, "mode", "fav")

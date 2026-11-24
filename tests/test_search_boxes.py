@@ -14,13 +14,16 @@ from dopeiptv.ui.mw_radio import SEARCH
 
 class _Box:
     def __init__(self):
-        self.placeholder = self.tip = ""
+        self.placeholder = self.tip = self.name = ""
 
     def setPlaceholderText(self, text):
         self.placeholder = text
 
     def setToolTip(self, text):
         self.tip = text
+
+    def setAccessibleName(self, text):   # a placeholder is no name (ui/a11y.py)
+        self.name = text
 
 
 def _win(mode, **kw):
@@ -43,6 +46,7 @@ def test_the_box_over_the_list_says_it_filters_the_list():
         w = _win(mode, _current_cat="12")
         w._sync_search_hint()
         assert w.search.placeholder == "Filter this list…", mode
+        assert w.search.name == w.search.placeholder, mode     # what a screen reader says
 
 
 def test_in_a_local_folder_it_says_it_searches_the_subfolders():
@@ -81,6 +85,7 @@ def test_the_sidebar_box_says_what_it_finds_and_its_toggle_too():
         w._sync_cat_search_hint()
         assert w.cat_search.placeholder == text, mode
         assert w.cat_search_btn.tip == text, mode
+        assert w.cat_search.name == w.cat_search_btn.name == text, mode
 
 
 def test_in_local_files_the_sidebar_box_filters_the_list():

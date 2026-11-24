@@ -2991,6 +2991,8 @@
   "card_scroll_back": "显示前面的",
   "card_view_switch_a11y": "视图",
   "card_sort_a11y": "排序：{order}",
+  "sa_results_a11y": "结果",
+  "about_notes_a11y": "发行说明",
   "card_continue": "继续",
   "card_popular": "当前热门",
   "card_grid": "网格",

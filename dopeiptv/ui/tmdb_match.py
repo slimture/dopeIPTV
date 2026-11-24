@@ -49,10 +49,12 @@ class TmdbMatchDialog(QDialog):
         row = QHBoxLayout()
         self.search_edit = QLineEdit(clean or title)
         self.search_edit.setPlaceholderText(tr("tmdb_search_placeholder"))
+        self.search_edit.setAccessibleName(tr("tmdb_search_placeholder"))
         self.search_edit.returnPressed.connect(self._do_search)
         row.addWidget(self.search_edit, 1)
         self.year_edit = QLineEdit(str(year) if year else "")
         self.year_edit.setPlaceholderText(tr("tmdb_year_placeholder"))
+        self.year_edit.setAccessibleName(tr("tmdb_year_placeholder"))
         self.year_edit.setFixedWidth(70)
         self.year_edit.returnPressed.connect(self._do_search)
         row.addWidget(self.year_edit)
@@ -68,6 +70,7 @@ class TmdbMatchDialog(QDialog):
 
         # Result list with poster thumbnails.
         self.result_list = QListWidget()
+        self.result_list.setAccessibleName(self.windowTitle())
         self.result_list.setIconSize(QSize(64, 96))
         self.result_list.setSpacing(2)
         self.result_list.itemDoubleClicked.connect(lambda _i: self._apply())

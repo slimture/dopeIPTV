@@ -394,7 +394,9 @@ class HeartButton(_ChipPainting, QPushButton):
 
 
 class _ClickableWidget(QWidget):
-    """Plain QWidget that emits clicked() on a left-button press."""
+    """Plain QWidget that emits clicked() on a left-button press - and, once
+    it takes the keyboard's focus (``setFocusPolicy``), on Enter or Space,
+    with a ring in the accent while it has it."""
 
     clicked = pyqtSignal()
 
@@ -402,6 +404,32 @@ class _ClickableWidget(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event) -> None:      # noqa: N802 - Qt hook
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space) \
+                and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier:
+            self.clicked.emit()
+            return
+        super().keyPressEvent(event)
+
+    def focusInEvent(self, event) -> None:       # noqa: N802 - Qt hook
+        super().focusInEvent(event)
+        self.update()
+
+    def focusOutEvent(self, event) -> None:      # noqa: N802 - Qt hook
+        super().focusOutEvent(event)
+        self.update()
+
+    def paintEvent(self, event) -> None:         # noqa: N802 - Qt hook
+        super().paintEvent(event)
+        if not self.hasFocus():
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(QPen(QColor(_theme.ACCENT), 2))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 8, 8)
+        p.end()
 
 
 class MenuBarDot(QWidget):
