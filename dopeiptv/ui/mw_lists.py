@@ -83,6 +83,9 @@ class _ListsMixin:
             self._history_filter = "watched" if mode == "watched" else "all"
         self._sync_history_chips()
         self._refresh_nav_status()
+        hint = getattr(self, "_update_provider_hint", None)
+        if callable(hint):
+            hint()          # no source of one's own: said on its places
         if hasattr(self, "local_view_btn"):
             self.local_view_btn.setVisible(mode == "local")
             self.local_rescan_btn.setVisible(mode == "local")
@@ -397,8 +400,10 @@ class _ListsMixin:
                 cw.setData(Qt.ItemDataRole.UserRole, "__continue__")
                 self.cat_list.addItem(cw)
             # "Recently added" for TV, Movies and Series - the latest the
-            # provider has published, newest first.
-            if self.mode in ("vod", "series", "live"):
+            # provider has published, newest first (not the demo's: nothing
+            # of it was added by anyone).
+            if self.mode in ("vod", "series", "live") \
+                    and getattr(self.client, "lists_recent", True):
                 rc = QListWidgetItem("🆕  " + tr("cat_recent"))
                 rc.setData(Qt.ItemDataRole.UserRole, "__recent__")
                 self.cat_list.addItem(rc)

@@ -71,6 +71,11 @@ def build_general(ctx: SettingsContext) -> None:
     c = general.card(tr("set_card_start"))
     c.row(tr("set_start_place"), start_box, tr("set_start_place_hint"),
           search="start startup open launch home mine")
+    # The last channel played again as the app opens, like a TV switched on
+    # (ui/mw_start_channel.py): each profile's own, off by default.
+    from ..core import start_channel as _start_channel
+    last_channel_box = c.toggle(tr("set_start_channel"), _start_channel.on(win.settings),
+                                tr("set_start_channel_hint"), badge=ctx.own())
     c = general.card(tr("set_card_updates"))
     from ..core import build_check as _build
     if not _build.allowed():
@@ -187,6 +192,9 @@ def build_general(ctx: SettingsContext) -> None:
         # Written once chosen ("last" is the default).
         if start_box.currentData() != _places.start_choice(win.settings):
             put(_places.START_KEY, start_box.currentData())
+        # Written once switched (off is the default).
+        if last_channel_box.isChecked() != _start_channel.on(win.settings):
+            put(_start_channel.KEY, flag(last_channel_box))
         # Written once switched (on is the default).
         if ask_box.isChecked() != donate_rhythm.asking(win.settings):
             put(donate_rhythm.K_ASK, flag(ask_box))

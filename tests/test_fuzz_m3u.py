@@ -59,7 +59,7 @@ def playlist(tmp_path):
         try:
             c.authenticate()
         except LocalizedError as e:
-            assert e.key == "err_m3u_no_channels"
+            assert e.key in M3UClient.EMPTY_KEYS
             return c
         return c
     return read

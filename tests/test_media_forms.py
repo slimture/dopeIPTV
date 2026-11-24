@@ -281,11 +281,11 @@ def test_welcome_offers_media_servers_and_connects_with_the_token(app, fake):
     parent = QWidget()
     w = WelcomeOverlay(parent, settings=None,
                        on_connect=lambda *a: connected.append(a), on_explore=lambda: None,
-                       on_connect_trakt=lambda: None, on_language_change=lambda c: None,
-                       on_demo=lambda: None)
+                       on_language_change=lambda c: None, on_demo=lambda: None)
+    w._cards["media"].click()                     # "Media server"
     combo = w._conn_kind
     assert combo.findData("jellyfin") >= 0 and combo.findData("plex") >= 0
-    assert combo.findData("enigma2") < 0          # boxes stay Nerd's
+    assert combo.findData("enigma2") < 0 and combo.findData("xtream") < 0   # its card's own
     combo.setCurrentIndex(combo.findData("emby"))
     w._server.setText(s.base + "/emby")
     s.routes[("POST", "/emby/Users/AuthenticateByName")] = _auth_route
@@ -293,7 +293,7 @@ def test_welcome_offers_media_servers_and_connects_with_the_token(app, fake):
     w._pw.setText("secret pw")
     w._do_connect()
     assert _wait(lambda: bool(connected))
-    server, user, pw, kind, name, mac, signed = connected[0]
+    server, user, pw, kind, name, mac, signed, _extra = connected[0]
     assert (server, user, pw, kind) == (s.base, "Anna", "", "emby")
     assert signed == {"token": TOKEN, "options": {"user_id": UID, "server_id": "srv1"}}
 

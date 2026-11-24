@@ -60,6 +60,8 @@ def test_a_download_is_parsed_in_a_process_of_its_own(tmp_path, monkeypatch):
         raise AssertionError("parsed or packed in the app's own process")
     monkeypatch.setattr(XmltvGuide, "_parse", not_here)
     monkeypatch.setattr(XmltvGuide, "_write_cache", not_here)
+    # A guide of any size (a small one parses here: test_a_small_guide_...).
+    monkeypatch.setattr(XmltvGuide, "PARSE_HERE_MAX", 0)
     cache = tmp_path / "epg_x.xml"
     data = _guide()
     g = XmltvGuide(client=None, cache_path=str(cache))
@@ -186,6 +188,21 @@ def test_a_loaded_guide_answers_while_a_refresh_holds_the_lock(tmp_path):
         t.join(timeout=5)
         assert not t.is_alive(), "waited for the refresh"
     assert answers and answers[0]
+
+
+def test_a_small_guide_is_parsed_here(tmp_path, monkeypatch):
+    """A guide of a few channels (the demo's, a box's) parses in less time
+    than a process takes to start: here, its index kept as ever."""
+    def not_elsewhere(self, data, cache=None):
+        raise AssertionError("a process started for a small guide")
+    monkeypatch.setattr(XmltvGuide, "_parse_elsewhere", not_elsewhere)
+    cache = tmp_path / "epg_s.xml"
+    g = XmltvGuide(client=None, cache_path=str(cache))
+    data = _guide()
+    assert len(data) <= XmltvGuide.PARSE_HERE_MAX
+    g._download = lambda: data
+    assert g.ensure_loaded() is True and sorted(g._by_id) == ["c0", "c1", "c2"]
+    assert cache.exists() and g._index_path().exists()
 
 
 def test_the_frozen_app_starts_itself_as_the_parser(tmp_path, monkeypatch):

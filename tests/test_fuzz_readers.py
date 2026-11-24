@@ -259,6 +259,34 @@ def test_fuzz_recording_names():
         fz.decoded(text_from(rng, ("SVT1", "", "x" * 300)))))
 
 
+CARRIED = {"id": "j1", "start": 1.7e9, "stop": 1.7e9 + 3600, "status": "recording",
+           "carry": {"at": 1.7e9 + 60, "part": "News 2026-11-24 21.00.ts"},
+           "history": [{"_kind": "live", "stream_id": 2, "_key": 2, "name": "Two"},
+                       {"_kind": "movie", "_key": 9}]}
+
+
+def test_fuzz_carried_recordings_and_the_last_channel():
+    """What the jobs' list says of a recording carried on from a window
+    (another process wrote it), and what History names last as the app
+    starts (core/start_channel.py)."""
+    from dopeiptv.core import start_channel
+    from dopeiptv.core.recording import RecordingManager
+
+    def target(v: object) -> tuple:
+        j = v if isinstance(v, dict) else {"carry": v}
+        at = RecordingManager.carried_from(j)
+        assert at is None or (isinstance(at, float) and math.isfinite(at))
+        rows = j.get("history")
+        rows = rows if isinstance(rows, list) else None
+        e = start_channel.last_live(rows)
+        sid = start_channel.stream_of(e)
+        assert isinstance(sid, str) and len(sid) <= 200
+        found = start_channel.find(rows, e)
+        assert found is None or isinstance(found, dict)
+        return at, sid
+    fz.fuzz("carried", target, lambda rng: fz.json_value(rng, CARRIED), seeds=(CARRIED, [], None))
+
+
 # -- what is opened: a backup, a synced copy, a room's message ---------------------------
 
 def test_fuzz_backup_files(tmp_path):
@@ -562,6 +590,36 @@ def test_fuzz_phone_queries():
     fz.fuzz("phone-browse", browse, lambda rng: (
         fz.json_value(rng, [{"name": "SVT1", "pos": 10, "dur": 100}, {"name": "Dune"}]),
         fz.decoded(rng.choice(fz.ODD_TEXT)), rng.choice(fz.ODD_TEXT + (5, -1, 10 ** 30, None))))
+
+
+def test_fuzz_drawn_pictures():
+    """A picture the app draws (core/drawn_art.py) is asked by its address -
+    the demo's, but a provider's logo field could name one too: what it asks
+    is words alone, bounded, and drawn at a fixed size whatever it says."""
+    pytest.importorskip("PyQt6.QtGui")
+    from PyQt6.QtGui import QGuiApplication
+
+    from dopeiptv.core import drawn_art
+    app = QGuiApplication.instance() or QGuiApplication([])
+    drawn_art.use_palette({"blue": "#3b82f6", "green": "#22c55e"}, lambda _c: "#ffffff")
+    seeds = (drawn_art.address("logo", "SV", "blue"),
+             drawn_art.address("poster", "Big Buck Bunny", "green", "2008 · Blender Foundation"))
+
+    def target(value):
+        got = drawn_art.parse(value)
+        if got is not None:
+            assert got.kind in drawn_art.KINDS and got.text and all(c.isprintable() for c in got.text)
+            assert len(got.text) <= drawn_art.TEXT_MAX and len(got.line) <= drawn_art.LINE_MAX
+        img = drawn_art.render(value, 64)
+        assert (img is None) == (got is None), value
+        if img is not None:
+            assert max(img.width(), img.height()) <= 512
+        return got
+
+    fz.fuzz("drawn-picture", target, lambda rng: fz.decoded(text_from(rng, seeds, tokens=(
+        "drawn:", "logo", "poster", "?", "&", "t=", "c=", "l=", "%0A", "%00", "‮", "%",
+        "blue", "x" * 600))), seeds=seeds)
+    assert app is not None
 
 
 @pytest.mark.parametrize("module", ["backup", "sync"])

@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QThreadPool
 
-from ..core import offline, picture_files
+from ..core import drawn_art, offline, picture_files
 from ..core.log import log
 from ..core.workers import choose_cover_url, is_tmdb_image_url
 from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
@@ -159,6 +159,8 @@ class CoverArtService:
         # A web address - or a file where the app's own pictures are (a
         # frame, a cover, a picon: core/picture_files.py). A provider writes
         # this field too, and any other path is not a picture to read.
+        if drawn_art.is_drawn(raw):
+            return raw              # drawn by the app (the demo's): nothing fetched
         if not raw.lower().startswith(("http://", "https://")):
             local = picture_files.local_path(raw)
             if local is None or not picture_files.trusted(local):
@@ -208,7 +210,10 @@ class CoverArtService:
         # A Trakt-only row already carries a real TMDB poster URL as its
         # stream_icon, so skip the title search (it would be a wasted
         # round-trip that could even mismatch) and use that directly.
-        title_tmdb = None if it.get("_trakt_only") else self.poster_for(it, eff)
+        # A poster the app draws (the demo's films) is the row's own: no
+        # title search for it either.
+        drawn = drawn_art.is_drawn(it.get("stream_icon") or it.get("cover"))
+        title_tmdb = None if it.get("_trakt_only") or drawn else self.poster_for(it, eff)
         if not self.prefer_tmdb:
             title_tmdb = None
         return choose_cover_url(
@@ -230,7 +235,7 @@ class CoverArtService:
         # stays iconless.
         if kind == "rec":
             return True
-        if is_tmdb_image_url(url):
+        if is_tmdb_image_url(url) or drawn_art.is_drawn(url):
             return True
         # When the user prefers the provider's own artwork, there's no
         # pending title-search poster that could replace this URL, so

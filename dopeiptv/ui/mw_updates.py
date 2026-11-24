@@ -438,6 +438,9 @@ class _UpdatesMixin:
                         dlg.failed(start_refused(e))
                         dlg.show()
                         return
+                    # The new copy is on its way: closed without a question
+                    # (a server that runs carries the recordings on).
+                    self._close_forced = True
                     self.close()
                 elif hasattr(updater, "on_exit"):
                     # "Is installed" holds anyway: the Mac's new app goes in

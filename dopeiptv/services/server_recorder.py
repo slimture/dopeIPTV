@@ -336,7 +336,9 @@ class ServerRecorder(QObject):
                                        str(j.get("channel") or ""))
             span = s.span()
             lead = float(getattr(s, "KEY_LEAD", 0.0))
-            since = (max(float(j.get("start") or 0.0), float(span[0]) + lead)
+            # From its start - or, carried on from a window that closed, from
+            # where that one left off (RecordingManager.resumes_at).
+            since = (max(self.rec.resumes_at(j) or 0.0, float(span[0]) + lead)
                      if span else None)
             recorder = s.record(path, since)
         except Exception as e:
@@ -434,8 +436,7 @@ class ServerRecorder(QObject):
         who = HOLD_PREFIX + str(j["id"])
         key = "srv:" + channel_key(pid, sid) if sid else who
         session = pool.acquire(url, key, who, self.server._ingest_of(pl), source=pid)
-        rec = SharedRecording(pool, session, who, path,
-                              since=float(j.get("start") or 0.0) or None).start()
+        rec = SharedRecording(pool, session, who, path, since=self.rec.resumes_at(j)).start()
         log.info("record: %s - read into the server's buffer, its one connection shared "
                  "with every device that tunes to it", for_log(j.get("title")))
         return path, rec

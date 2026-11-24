@@ -317,7 +317,7 @@ assert any(n.startswith("Vuxen") and tr("cat_locked_suffix") in n for n in names
 barn = next(c for c in page.folder_tiles.items() if c.title == "Barn")
 w._mitt_folder_picked(barn)
 cards = page.folder_items.items()
-assert [c.title for c in cards] == ["Art of Motion"]
+assert [c.title for c in cards] == [chans[3]["name"]], [c.title for c in cards]
 act("folder", cards[0])
 assert w._last_playback["kind"] == "live" and str(w._last_playback["key"]) == "4"
 # Dropped on Favorites: out of the folder.

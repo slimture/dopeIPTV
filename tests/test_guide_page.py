@@ -54,6 +54,7 @@ s.setValue("language", "sv")
 theme.apply_theme(s)
 app.setStyleSheet(theme.build_style())
 w = mw.MainWindow(Client(), s, PlaylistStore(s))
+w._last_cat["live"] = None               # TV on All: every channel of the demo
 now = time.time()
 w.xmltv.is_loaded = lambda: True
 w.xmltv.programmes_in = lambda ch, a, b: [

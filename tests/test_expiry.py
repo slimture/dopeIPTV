@@ -134,7 +134,9 @@ def test_both_logins_say_it():
     app = (root / "dopeiptv" / "app.py").read_text(encoding="utf-8")
     assert "w._expiry_check(pl, auth_ok[0])" in app
     main = (root / "dopeiptv" / "ui" / "main_window.py").read_text(encoding="utf-8")
-    assert "self._expiry_check(pl, _auth)" in main
+    # switch_playlist's login and the welcome's connect step both end in
+    # _use_source, which says it.
+    assert "self._expiry_check(pl, auth)" in main and "self._use_source(pid, candidate, _auth" in main
 
 
 def test_its_words_are_in_every_language():

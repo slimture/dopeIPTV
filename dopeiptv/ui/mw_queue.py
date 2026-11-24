@@ -22,7 +22,8 @@ from PyQt6.QtCore import Qt, QTimer
 from ..core.log import log
 from ..core.privacy import for_log
 from ..i18n import tr
-from ..providers.client import DemoClient, OfflineClient, dropped_playlist
+from ..providers.client import OfflineClient, dropped_playlist
+from ..providers.demo import DemoClient
 from .dialogs import PlaylistDialog
 from .notices import hub_of
 from .widgets import confirm

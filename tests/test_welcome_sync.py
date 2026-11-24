@@ -120,7 +120,6 @@ def _window(tmp_path):
             self.playlist_store = PlaylistStore(self.settings)
             self._sync_state_file = tmp_path / "here-sync.json"
             self._welcome = None
-            self._add_provider_btn = None
             self._player_fs = False
             self.client = OfflineClient()
             self.trakt = SimpleNamespace(is_connected=lambda: False)

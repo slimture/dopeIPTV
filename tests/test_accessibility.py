@@ -347,12 +347,11 @@ pump(3)
 def tab_round(place, limit=200):
     w._show_place(place)
     pump(15)
-    start = w.listw if w.listw.isVisible() else None
-    if start is None:
-        w.focusNextChild()
-        start = QApplication.focusWidget()
-    else:
-        start.setFocus(Qt.FocusReason.TabFocusReason)
+    # The list, else the place's own entry in the sidebar: a stop that stays
+    # while the round goes (the info column's programme rows are made again
+    # as the guide comes in and the detail follows the place's pick).
+    start = w.listw if w.listw.isVisible() else w.nav_btns[places.NAV_OF[place]]
+    start.setFocus(Qt.FocusReason.TabFocusReason)
     pump(2)
     start = QApplication.focusWidget()
     assert start is not None, place

@@ -773,8 +773,10 @@ class _RecordingMixin(_TimeshiftMixin):
             try:
                 span = session.span()
                 lead = float(getattr(session, "KEY_LEAD", 0.0))
-                since = (max(float(j.get("start") or 0.0), float(span[0]) + lead)
-                         if span else None)
+                # Carried on from a window that closed: where that one left off.
+                carried = RecordingManager.carried_from(j)
+                begin = carried if carried is not None else float(j.get("start") or 0.0)
+                since = (max(begin, float(span[0]) + lead) if span else None)
                 recorder = session.record(path, since)
             except Exception as e:
                 log.info("record: not from the rewind buffer (%s)", e)

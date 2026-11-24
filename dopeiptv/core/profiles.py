@@ -96,8 +96,9 @@ OWN_KEYS = frozenset({
     "series_seasons",
     # Mine's queue: Watch later in the person's own order (core/mitt.py).
     "watch_later_order",
-    # Where each person left off: the app opens there (core/places.py).
-    "last_place", "last_list_place",
+    # Where each person left off: the app opens there (core/places.py) - and
+    # on their last channel, when they want it so (core/start_channel.py).
+    "last_place", "last_list_place", "start_last_channel",
     # The recordings each person watched to their end (core/rec_view.py).
     "rec_watched",
     # What the places show (core/places.py): the sidebar's entries hidden or
