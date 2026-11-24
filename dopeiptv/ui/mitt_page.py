@@ -24,8 +24,9 @@ Overview: the sections, each hidden while it has nothing to show -
 
 Favorite folders: the person's folders as tiles (the favorites outside any
 folder first, "New folder" last); one picked shows its titles under them,
-in their order - dragged to another place in it, or onto another folder's
-tile to move there.
+in their order, each kind together - dragged to another place among its
+kind's titles, whatever source they are of, or onto another folder's tile
+to move there.
 
 Every list is one painted view of uniform rows or cells (no widget per
 item), as tall as its content inside the page's one scroll area; pictures
@@ -156,6 +157,22 @@ def drop_index(y: int, row_h: int, count: int) -> int:
     if count <= 0:
         return 0
     return max(0, min(count, (y + row_h // 2) // max(1, row_h)))
+
+
+def drop_span(groups: Sequence[Any], rows: Iterable[int], count: int) -> tuple[int, int] | None:
+    """The places (``drop_index``'s, first and last) rows *rows* of a list
+    may be dropped at when it keeps each group together (*groups*: each
+    row's - a folder's kinds): from before the first row of their group to
+    after its last; anywhere with no groups said; None for rows of more than
+    one group, or none."""
+    if not groups:
+        return (0, max(0, count))
+    picked = {groups[r] for r in rows if 0 <= r < len(groups)}
+    if len(picked) != 1:
+        return None
+    g = next(iter(picked))
+    held = [i for i, x in enumerate(groups) if x == g]
+    return (held[0], held[-1] + 1)
 
 
 # -- painting helpers -----------------------------------------------------------------
@@ -1017,7 +1034,10 @@ class FolderItemDelegate(_RowDelegate):
 class FolderItemsView(_RowList):
     """A folder's titles in their order: dragged to another place in it
     (``reordered(cards, index)``) or onto a folder's tile (the page's
-    ``drag_cards`` say which). A card's *rank* ``LOGO`` fits its picture
+    ``drag_cards`` say which). The folder lists each kind together
+    (*groups*: each row's), so a drag is offered a place among its own
+    kind's titles alone - whatever source they are of -, none for titles of
+    several kinds (``drop_span``). A card's *rank* ``LOGO`` fits its picture
     (a channel's logo) rather than covering the box with it."""
 
     ROW_H = FOLDER_ITEM_H
@@ -1029,6 +1049,9 @@ class FolderItemsView(_RowList):
     def __init__(self, loader=None, parent=None) -> None:
         self.drop_at: int | None = None
         self.can_reorder = True
+        self.groups: list[Any] = []
+        self._dragging: list[Card] = []
+        self._span: tuple[int, int] | None = None
         self._press: tuple[int, QPoint] | None = None
         super().__init__(loader, parent)
         self.setItemDelegate(FolderItemDelegate(self))
@@ -1075,6 +1098,9 @@ class FolderItemsView(_RowList):
             return
         if card not in cards:
             cards = [card]
+        self._dragging = list(cards)
+        self._span = drop_span(self.groups, [self.row_of(c.key) for c in cards],
+                               self.model_.rowCount())
         self.drag_started.emit(cards)
         drag = QDrag(self)
         data = QMimeData()
@@ -1089,9 +1115,21 @@ class FolderItemsView(_RowList):
         p.end()
         drag.setPixmap(pm)
         drag.setHotSpot(QPoint(16, 18))
-        drag.exec(Qt.DropAction.MoveAction)
-        self.drop_at = None
-        self.viewport().update()
+        try:
+            drag.exec(Qt.DropAction.MoveAction)
+        finally:
+            self._dragging, self._span = [], None
+            self.drop_at = None
+            self.viewport().update()
+
+    def drop_place(self, y: int) -> int | None:
+        """Where the titles dragged would go dropped at *y*: a place among
+        their own kind's titles, else None (nothing offered)."""
+        at = drop_index(y, self.ROW_H, self.model_.rowCount())
+        span = self._span
+        if span is None or not span[0] <= at <= span[1]:
+            return None
+        return at
 
     def dragEnterEvent(self, e) -> None:
         if e.mimeData().hasFormat(MIME) and e.source() is self and self.can_reorder:
@@ -1103,11 +1141,14 @@ class FolderItemsView(_RowList):
         if not (e.mimeData().hasFormat(MIME) and e.source() is self and self.can_reorder):
             e.ignore()
             return
-        at = drop_index(e.position().toPoint().y(), self.ROW_H, self.model_.rowCount())
+        at = self.drop_place(e.position().toPoint().y())
         if at != self.drop_at:
             self.drop_at = at
             self.viewport().update()
-        e.acceptProposedAction()
+        if at is None:
+            e.ignore()
+        else:
+            e.acceptProposedAction()
 
     def dragLeaveEvent(self, e) -> None:
         self.drop_at = None
@@ -1120,7 +1161,7 @@ class FolderItemsView(_RowList):
             e.ignore()
             return
         e.acceptProposedAction()
-        self.reordered.emit(self.selected_cards(), at)
+        self.reordered.emit(list(self._dragging) or self.selected_cards(), at)
 
 
 # -- the search field and the chips -----------------------------------------------------
@@ -1656,12 +1697,15 @@ class MittPage(QWidget):
         self.folder_tiles.set_current(current)
 
     def set_folder_items(self, title: str, note: str, cards: Sequence[Card],
-                         empty: str, reorder: bool) -> None:
+                         empty: str, reorder: bool, groups: Sequence[Any] = ()) -> None:
+        """A folder's titles (*groups*: each card's kind - a drag is offered
+        a place among its own kind's alone)."""
         self.folder_head.title.setText(title)
         self.folder_items.setAccessibleName(title or tr("mitt_tab_folders"))
         self.folder_head.set_note(note)
         self.folder_head.setVisible(bool(title))
         self.folder_items.set_items(cards)
+        self.folder_items.groups = list(groups) if len(groups) == len(cards) else []
         self.folder_items.can_reorder = reorder
         self.folder_items.setVisible(bool(cards))
         self.folder_empty.setText(empty)

@@ -411,8 +411,9 @@ SETTINGS_DENY = frozenset({
     # recordings still to save as MP4 are this computer's files.
     "viewing_stats", "rec_mp4_pending",
     # Mine's queue order: Watch later itself does not sync (the cache file),
-    # so neither does the order of it.
-    "watch_later_order",
+    # so neither does the order of it - nor the favourites' folders' order,
+    # as the favourites do not.
+    "watch_later_order", "mitt_folder_order",
 })
 # Simkl's sign-in like Trakt's; a Kodi's login, and Discord's status, are
 # this computer's.

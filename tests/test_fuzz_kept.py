@@ -2,8 +2,9 @@
 (tests/fuzz_util.py): a download's sidecar (core/downloads.read_sidecar - a
 downloads folder on a NAS or a shared disk, another computer's copy of the
 app, a hand that edited one), a series' episodes kept for offline
-(known_episodes) and a recording's claim (core/rec_claims.parse - written by
-the other recorder, or planted). Each says "not one" or gives values of
+(known_episodes), a recording's claim (core/rec_claims.parse - written by
+the other recorder, or planted) and Mine's folders' order (core/mitt -
+a backup restored brings it back). Each says "not one" or gives values of
 their type and in range - never an exception, a hang or a RecursionError."""
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ import os
 import random
 
 from dopeiptv.core import downloads as dl
+from dopeiptv.core import mitt
 from dopeiptv.core import rec_claims as rc
 from dopeiptv.core.names import holds_login
 from tests import fuzz_util as fz
@@ -127,3 +129,36 @@ def test_fuzz_recording_claims():
                 assert isinstance(v, str) and len(v) <= 2048 and all(ch >= " " or ch == "\t" for ch in v)
         return c
     fz.fuzz("recording-claim", target, _make(CLAIM), seeds=[json.dumps(CLAIM).encode(), b""])
+
+
+ORDERS = {"Sport": ["pb|live:82", "pa|live:3", "pb|live:77", "pa|vod:40"], "all": ["|radio:u1"]}
+
+
+def test_fuzz_mines_folder_orders():
+    """A folder's order between its sources' titles, as a profile keeps it
+    (core/mitt.FOLDER_ORDER_KEY - a backup restored brings it back): read as
+    names to lists of words, bounded, and a folder built with it holds each
+    of its titles once, each store's in that store's order."""
+    stores = [mitt.FavStore("pa", "chan", {"Sport": [{"stream_id": 3}, {"stream_id": 4}]}),
+              mitt.FavStore("pb", "chan", {"Sport": [{"stream_id": 77}, {"stream_id": 81},
+                                                     {"stream_id": 82}]}),
+              mitt.FavStore("pa", "movie", {"Sport": [{"stream_id": 40}]}),
+              mitt.FavStore("pb", "movie", {"Sport": [{"stream_id": 900}]})]
+    _l, plain = mitt.fav_folders(stores)
+    want = [e.key for e in plain["Sport"].entries]
+
+    def target(data: bytes) -> object:
+        orders = mitt.parse_folder_orders(data)
+        assert isinstance(orders, dict) and len(orders) <= mitt.FOLDER_ORDERS_MAX
+        for name, keys in orders.items():
+            assert isinstance(name, str) and isinstance(keys, list) and 0 < len(keys) <= mitt.ORDER_MAX
+            assert all(isinstance(k, str) for k in keys) and len(set(keys)) == len(keys)
+        _l, named = mitt.fav_folders(stores, orders=orders)
+        got = [e.key for e in named["Sport"].entries]
+        assert sorted(got) == sorted(want), got
+        for src in ("pa", "pb"):
+            mine = [k for k in got if k.startswith(f"{src}|live:")]
+            assert mine == [k for k in want if k.startswith(f"{src}|live:")], (src, got)
+        assert [k.split("|")[1][:4] for k in got] == [k.split("|")[1][:4] for k in want]
+        return orders
+    fz.fuzz("mine-folder-orders", target, _make(ORDERS), seeds=[json.dumps(ORDERS).encode(), b""])

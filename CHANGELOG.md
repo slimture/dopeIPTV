@@ -312,6 +312,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - The activity panel's History could keep a note about a title that began
   playing in private viewing and played on after it was turned off (its
   reconnect, its recording). Nothing is kept until that playback ends.
+- In a folder on Mine's Favorite folders that holds titles of several
+  sources, a title dragged before or after one of another source went back
+  among its own source's. It now stays where it was dropped among its
+  kind's titles: its source keeps its own order, and the folder keeps how
+  the sources' titles go between each other (for each profile). A place
+  among another kind's titles is not offered.
 
 ## [1.6.12]
 

@@ -11,7 +11,11 @@ locked folder asks for the PIN whichever source locked it; the parental
 lock on categories holds for every source's titles; a kids profile sees
 the source in use alone and never a locked folder; thousands of
 favourites over several sources keep the window's thread quick (read on
-Mine's worker)."""
+Mine's worker). A title dragged lands where it was dropped, whatever source
+the titles around it are of - its own store takes the order, the folder's
+order between the sources kept for this profile and read back, renamed with
+the folder, a title out of it out of it too -; a place among another kind's
+is not offered."""
 from __future__ import annotations
 
 import os
@@ -40,6 +44,7 @@ from dopeiptv.i18n import tr
 from dopeiptv.providers import epg as epgmod
 from dopeiptv.providers.client import DemoClient
 from dopeiptv.ui import main_window as mw_mod
+from dopeiptv.ui import mitt_page
 from dopeiptv.ui.main_window import MainWindow
 from dopeiptv.ui.mw_mitt import LOOSE
 
@@ -230,12 +235,40 @@ assert ids(w.favs.groups["Nordic only"]) == [4] and 4 not in ids(w.favs.groups["
 assert json.dumps(w.movie_favs.groups) == pa_movies and "Nordic only" not in pb("movie_favorites")
 settle(lambda: tile("Nordic only").line == tr("mitt_n_channels", n=3), what="the counts")
 
-# -- a reorder: each store keeps its own order, the others untouched ---------------------
+# -- a reorder: where it was dropped, whatever source the titles around it are of ---------
 pa_sport = json.dumps(w.favs.groups["Sport"])
-w._mitt_folder_reorder([card("Nordic Tennis")], 0)
+w._mitt_folder_reorder([card("Nordic Tennis")], 0)          # before Pirat's channel
+assert titles() == ["Nordic Tennis", C3, "Nordic Sport", "Matchen", "Nordic Film"], titles()
 assert ids(pb()["Sport"]) == [82, 81, 77], pb()["Sport"]       # the hidden one keeps its place
-assert json.dumps(w.favs.groups["Sport"]) == pa_sport
-assert titles()[:3] == [C3, "Nordic Tennis", "Nordic Sport"], titles()
+assert json.dumps(w.favs.groups["Sport"]) == pa_sport          # Pirat's own order untouched
+kept = mitt.parse_folder_orders(own.value(mitt.FOLDER_ORDER_KEY))
+assert kept["Sport"][:3] == ["pb|live:82", "pa|live:3", "pb|live:77"], kept
+# ... and stays there once the folders are read again from the stores.
+w._mitt_folders_changed()
+settle(lambda: not w._mitt_folders_pending(), what="the folders read again")
+w._mitt_folders_fill()
+assert titles() == ["Nordic Tennis", C3, "Nordic Sport", "Matchen", "Nordic Film"], titles()
+# Pirat's film dropped after Nordic's: the films' two sources the same way.
+w._mitt_folder_reorder([card("Matchen")], 5)
+assert titles()[3:] == ["Nordic Film", "Matchen"], titles()
+# A channel among the films: no place offered for it, and nothing changes.
+view = page.folder_items
+assert view.groups == ["chan", "chan", "chan", "movie", "movie"], view.groups
+view._span = mitt_page.drop_span(view.groups, [view.row_of(card(C3).key)], len(cards()))
+assert view.drop_place(0) == 0 and view.drop_place(3 * view.ROW_H) == 3
+assert view.drop_place(4 * view.ROW_H) is None
+view._span = None
+before = (titles(), ids(pb()["Sport"]), json.dumps(w.favs.groups["Sport"]))
+w._mitt_folder_reorder([card(C3)], 4)
+assert (titles(), ids(pb()["Sport"]), json.dumps(w.favs.groups["Sport"])) == before
+# Within its own source's titles, as before.
+w._mitt_folder_reorder([card("Nordic Sport")], 0)
+assert titles()[:3] == ["Nordic Sport", "Nordic Tennis", C3], titles()
+assert ids(pb()["Sport"]) == [77, 81, 82], pb()["Sport"]
+w._mitt_folder_reorder([card("Nordic Tennis")], 0)
+assert titles()[:3] == ["Nordic Tennis", "Nordic Sport", C3], titles()
+w._mitt_folder_reorder([card("Nordic Sport")], 3)
+assert titles()[:3] == ["Nordic Tennis", C3, "Nordic Sport"], titles()
 
 # -- renamed in every source that holds it ------------------------------------------------
 message_box.get_text = lambda *a, **k: ("Sporten", True)
@@ -248,6 +281,25 @@ assert "Sporten" in pb("movie_favorites") and "Sport" not in pb("movie_favorites
 assert w.favs.group_color("Sporten").get("bgcolor") == "#2FBF71"   # its colour with it
 settle(lambda: "Sporten" in tiles() and "Sport" not in tiles(), what="the tile renamed")
 assert w._mitt_folder == "Sporten" and "Nordic Tennis" in titles()
+kept = mitt.parse_folder_orders(own.value(mitt.FOLDER_ORDER_KEY))
+assert "Sport" not in kept and kept["Sporten"][0] == "pb|live:82", kept   # its order with it
+assert titles()[:3] == ["Nordic Tennis", C3, "Nordic Sport"], titles()
+# A title out of the folder: out of its order too (back in, it comes at the end).
+w._mitt_folder_out([card("Nordic Tennis")])
+assert "Nordic Tennis" not in titles() and 82 not in ids(pb()["Sporten"])
+kept = mitt.parse_folder_orders(own.value(mitt.FOLDER_ORDER_KEY))
+assert "pb|live:82" not in kept["Sporten"] and kept["Sporten"][0] == "pa|live:3", kept
+w._mitt_folder_drop([card("Nordic Sport")], tile(LOOSE))
+kept = mitt.parse_folder_orders(own.value(mitt.FOLDER_ORDER_KEY))
+assert "pb|live:77" not in kept.get("Sporten", []), kept
+pbs = pb()
+pbs["Sporten"] = pbs["Sporten"] + [{"stream_id": 82, "name": "Nordic Tennis", "category_id": "n"},
+                                   {"stream_id": 77, "name": "Nordic Sport", "category_id": "n"}]
+own.setValue("favorites_pb", json.dumps(pbs))
+w._mitt_folders_changed()
+settle(lambda: not w._mitt_folders_pending(), what="read with the two back")
+w._mitt_folders_fill()
+assert titles()[:3] == [C3, "Nordic Tennis", "Nordic Sport"], titles()
 
 # -- one store fails: none of them changed, and said ---------------------------------------
 _rename = FavoriteStore.rename_group

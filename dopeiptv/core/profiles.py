@@ -94,8 +94,10 @@ OWN_KEYS = frozenset({
     "track_prefs",
     # The season last picked on each series' page (ui/mw_series_page.py).
     "series_seasons",
-    # Mine's queue: Watch later in the person's own order (core/mitt.py).
-    "watch_later_order",
+    # Mine's queue: Watch later in the person's own order (core/mitt.py), and
+    # the favourites' folders in it: how several sources' titles go between
+    # each other where the person dragged them.
+    "watch_later_order", "mitt_folder_order",
     # Where each person left off: the app opens there (core/places.py) - and
     # on their last channel, when they want it so (core/start_channel.py).
     "last_place", "last_list_place", "start_last_channel",

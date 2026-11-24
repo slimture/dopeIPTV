@@ -310,16 +310,89 @@ def test_a_title_left_out_is_neither_listed_nor_counted_and_a_broken_test_shows_
     assert mitt.fav_folders([]) == (mitt.Folder("all"), {})
 
 
-def test_a_reorder_keeps_each_stores_titles_in_their_own_places():
+def _idents(entries):
+    return [e.ident for e in entries]
+
+
+def test_a_title_dragged_lands_where_it_was_dropped_whatever_source_is_around_it():
     _loose, named = mitt.fav_folders(_stores())
     sport = named["Sport"].entries
     keys = [e.key for e in sport]
-    # Golf dragged to the top, the film of Nordic before Pirat's.
-    order = mitt.moved_to(keys, [sport[1].key], 0)
-    order = mitt.moved_to(order, [sport[4].key], order.index(sport[3].key))
-    got = mitt.reordered_within(sport, order)
-    assert [e.ident for e in got] == ["4", "3", "77", "40", "900", "radio:u1"]
-    assert mitt.reordered_within(sport, []) == sport
+    # Nordic's channel before Pirat's first, then Nordic's film before Pirat's.
+    got = mitt.dropped(sport, keys, [keys[2]], 0)
+    assert _idents(got) == ["77", "3", "4", "40", "900", "radio:u1"]
+    got = mitt.dropped(got, [e.key for e in got], [keys[4]], 3)
+    assert _idents(got) == ["77", "3", "4", "900", "40", "radio:u1"]
+    # Golf dragged up among its own source's, as before.
+    assert _idents(mitt.dropped(sport, keys, [keys[1]], 0))[:3] == ["4", "3", "77"]
+    # Among another kind's: nothing changes - the folder lists each kind together.
+    assert mitt.dropped(sport, keys, [keys[0]], 4) == sport
+    assert mitt.dropped(sport, keys, [keys[5]], 0) == sport
+    assert mitt.dropped(sport, keys, [], 0) == sport
+    # A chip or a search shows some: those not shown keep their places.
+    got = mitt.dropped(sport, [keys[3], keys[4]], [keys[4]], 0)
+    assert _idents(got) == ["3", "4", "77", "900", "40", "radio:u1"]
+    # What is kept: the kinds two sources hold, in their new order; none
+    # for a folder whose every kind is one source's.
+    assert mitt.folder_order(got) == [keys[0], keys[1], keys[2], keys[4], keys[3]]
+    assert mitt.folder_order([e for e in sport if e.source != "pb"]) == []
+
+
+def test_the_order_kept_holds_through_a_rebuild_and_each_store_keeps_its_own():
+    stores = _stores()
+    _l, named = mitt.fav_folders(stores)
+    keys = [e.key for e in named["Sport"].entries]
+    # Nordic's channel dragged between Pirat's two: kept, and read back.
+    got = mitt.dropped(named["Sport"].entries, keys, [keys[2]], 1)
+    kept = mitt.parse_folder_orders(mitt.dump_folder_orders({"Sport": mitt.folder_order(got)}))
+    loose, again = mitt.fav_folders(stores, orders=kept)
+    assert _idents(again["Sport"].entries) == ["3", "77", "4", "40", "900", "radio:u1"]
+    assert _idents(loose.entries) == ["1", "1"] and _idents(again["Vuxen"].entries) == ["79"]
+    # A title added since in Nordic: at the end of its kind; one the order
+    # does not name in the middle of its store (a lock opened): after the
+    # one before it there; one in front of the first it names: before it.
+    pb = {"Sport": [{"stream_id": 76, "name": "front"}, {"stream_id": 77, "name": "Nordic Sport"},
+                    {"stream_id": 81, "name": "shown again"}, {"stream_id": 78, "name": "Nordic Golf"}]}
+    kept = {"Sport": [keys[0], keys[2], "pb|live:78", keys[1]]}
+    _l, again = mitt.fav_folders(stores[:3] + [mitt.FavStore("pb", "chan", pb)] + stores[4:],
+                                 orders=kept)
+    assert _idents(again["Sport"].entries)[:6] == ["3", "76", "77", "81", "78", "4"]
+    pb["Sport"].append({"stream_id": 99, "name": "added since"})
+    _l, again = mitt.fav_folders(stores[:3] + [mitt.FavStore("pb", "chan", pb)] + stores[4:],
+                                 orders=kept)
+    assert _idents(again["Sport"].entries)[:7] == ["3", "76", "77", "81", "78", "4", "99"]
+    # A store reordered elsewhere (the sidebar) is followed as it is.
+    pa = {"Sport": [{"stream_id": 4, "name": "Golf"}, {"stream_id": 3, "name": "Sportkanalen"}]}
+    _l, again = mitt.fav_folders([mitt.FavStore("pa", "chan", pa)] + stores[1:],
+                                 orders={"Sport": mitt.folder_order(got)})
+    chans = [e for e in again["Sport"].entries if e.kind == mitt.CHANNEL]
+    assert [e.ident for e in chans if e.source == "pa"] == ["4", "3"]
+    assert sorted(_idents(chans)) == ["3", "4", "77"]
+
+
+def test_the_folders_orders_are_read_back_bounded_and_kept_tidy():
+    for junk in ("", "[1, 2]", "{", "null", '{"a": "b"}', '{"a": [1, {"x": 2}]}', b"\xff\xfe",
+                 7, None, '{"a": ' + "[" * 5000 + "]" * 5000 + "}",
+                 '{"a": ["' + "x" * mitt.FOLDER_ORDER_TEXT_MAX + '"]}'):
+        assert mitt.parse_folder_orders(junk) == {}, junk[:40] if isinstance(junk, str) else junk
+    assert mitt.parse_folder_orders('{"a": ["k", 3, "k", "j"], "b": []}') == {"a": ["k", "j"]}
+    many = {f"f{i}": [f"k{i}"] for i in range(100)}
+    got = mitt.parse_folder_orders(mitt.dump_folder_orders(many))
+    assert list(got) == [f"f{i}" for i in range(100 - mitt.FOLDER_ORDERS_MAX, 100)]
+    long = mitt.parse_folder_orders(mitt.dump_folder_orders({"a": [f"k{i}" for i in range(2000)]}))
+    assert len(long["a"]) == mitt.ORDER_MAX
+    # The last arranged last (so the last to go); none kept for an empty one.
+    orders = {"a": ["1"], "b": ["2"]}
+    assert list(mitt.order_kept(orders, "a", ["3"])) == ["b", "a"]
+    assert mitt.order_kept(orders, "a", []) == {"b": ["2"]}
+    # A title out of one folder, or out of every one.
+    orders = {"a": ["1", "2"], "b": ["1", "3"], "c": ["1"]}
+    assert mitt.order_without(orders, ["1"], "a") == {"a": ["2"], "b": ["1", "3"], "c": ["1"]}
+    assert mitt.order_without(orders, ["1"]) == {"a": ["2"], "b": ["3"]}
+    # Renamed: its order with it; onto a folder with an order of its own, that one.
+    assert mitt.order_renamed(orders, "a", "z") == {"b": ["1", "3"], "c": ["1"], "z": ["1", "2"]}
+    assert mitt.order_renamed(orders, "a", "b") == {"b": ["1", "3"], "c": ["1"]}
+    assert mitt.order_renamed(orders, "q", "z") == orders
 
 
 # -- the page ---------------------------------------------------------------------------------
@@ -538,6 +611,12 @@ def test_the_parts_are_mirrored_right_to_left(app):
     assert tl["when"].left() < tl["action"].left() and tr_["when"].left() > tr_["action"].left()
     assert mp.drop_index(0, 64, 5) == 0 and mp.drop_index(40, 64, 5) == 1
     assert mp.drop_index(10_000, 64, 5) == 5
+    # A folder's kinds together: a drag offered its own kind's places alone.
+    kinds = ["chan", "chan", "chan", "movie", "movie", "radio"]
+    assert mp.drop_span(kinds, [2], 6) == (0, 3)
+    assert mp.drop_span(kinds, [3], 6) == (3, 5) and mp.drop_span(kinds, [5], 6) == (5, 6)
+    assert mp.drop_span(kinds, [0, 3], 6) is None and mp.drop_span(kinds, [], 6) is None
+    assert mp.drop_span([], [0], 4) == (0, 4)
 
 
 def test_the_page_right_to_left(app):
@@ -572,3 +651,17 @@ def test_the_queue_order_is_a_profiles_own_backed_up_and_not_synced(tmp_path):
     doc = backup.collect({"main": s}, "1.6.2")
     kept = doc["stores"]["main"][f"profiles/me/{mitt.ORDER_KEY}"]
     assert mitt.parse_order(kept) == ["vod:1", "series:2"]
+
+
+def test_a_folders_order_is_a_profiles_own_backed_up_and_not_synced(tmp_path):
+    from PyQt6.QtCore import QSettings
+    from dopeiptv.core import backup, profiles, sync
+    assert profiles.is_own(mitt.FOLDER_ORDER_KEY)
+    assert not sync.syncable(mitt.FOLDER_ORDER_KEY)
+    assert not sync.syncable(f"profiles/kim/{mitt.FOLDER_ORDER_KEY}")
+    s = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+    s.setValue(f"profiles/me/{mitt.FOLDER_ORDER_KEY}",
+               mitt.dump_folder_orders({"Sport": ["pb|live:77", "pa|live:3"]}))
+    doc = backup.collect({"main": s}, "1.6.2")
+    kept = doc["stores"]["main"][f"profiles/me/{mitt.FOLDER_ORDER_KEY}"]
+    assert mitt.parse_folder_orders(kept) == {"Sport": ["pb|live:77", "pa|live:3"]}

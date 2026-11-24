@@ -11,8 +11,9 @@ the page's own; the viewing log (core/viewing_stats.py) for the habits. A
 kids profile sees the source in use alone, as the lists do, with nothing
 for adults; a favorites folder locked stays out while the lock is shut, and
 so does a favourite of a category locked (every source's, as History's).
-Nothing is written but the queue's order (core/mitt.ORDER_KEY, a profile's
-own) and what the person does: a heart, a move, a removal.
+Nothing is written but the queue's order (core/mitt.ORDER_KEY), a folder's
+order between its sources' titles (core/mitt.FOLDER_ORDER_KEY) - each a
+profile's own - and what the person does: a heart, a move, a removal.
 
 The Favorite folders tab is every source's too: one folder of a name
 whatever source and kind hold it (core/mitt.fav_folders, built on the
@@ -21,8 +22,11 @@ source and playing from it as the Overview plays it. What is done to a
 title acts on its own source's store; a folder renamed, removed, locked,
 opened or coloured is so in every source that holds it - all of them or
 none (_mitt_change puts back what it touched when one store fails, and
-says so). A folder locked in any source is locked; its PIN is asked as the
-lists ask it.
+says so). A title dragged lands where it was dropped among its kind's,
+whatever source the titles around it are of: its own source's store takes
+its titles' new order, the folder's kept order how they go between the
+other sources' (_mitt_folder_reorder). A folder locked in any source is
+locked; its PIN is asked as the lists ask it.
 
 What it plays. Everything through the window's own paths, as the lists,
 Home's shelves and the series page play it: a channel through
@@ -192,6 +196,9 @@ class _FavSnap:
     #: Offline mode: what is downloaded (as _Snap.offline) - the folders
     #: then hold only what plays; None online.
     offline: tuple | None = None
+    #: The folders' orders between their sources' titles, as kept
+    #: (core/mitt.FOLDER_ORDER_KEY) - parsed on the worker.
+    orders: str = ""
 
 
 @dataclass
@@ -268,7 +275,8 @@ def _build_folders(snap: _FavSnap, lock: _LockTest | None = None
                 and (snap.offline is None or mitt.offline_keeps(e, *snap.offline))
                 and lock(e.source, mitt.SECTION_MODE.get(str(e.row.get("_section"))), e.row))
 
-    loose, named = mitt.fav_folders(stores, keep, FAV_DEFAULT_GROUP)
+    loose, named = mitt.fav_folders(stores, keep, FAV_DEFAULT_GROUP,
+                                    mitt.parse_folder_orders(snap.orders))
     parsed = {(s.source, s.section): s.groups for s in stores}
     return (_Folders(snap.made_for, snap.gen, snap.stamp, loose, named,
                      {m: set(v) for m, v in lock.wanted.items()}), parsed)
@@ -783,7 +791,8 @@ class _MittMixin:
         stamp = self._mitt_fav_stamp()
         self._mitt_fstamp_asked = stamp
         return _FavSnap(made_for, self._mitt_fgen, stamp, copies, active, kids, shut, found,
-                        self._mitt_offline())
+                        self._mitt_offline(),
+                        str(own.value(mitt.FOLDER_ORDER_KEY, "") or ""))
 
     def _mitt_offline(self) -> tuple | None:
         """Offline mode: what is downloaded, for the worker to keep only what
@@ -1838,8 +1847,10 @@ class _MittMixin:
     # Every source's favourites, one folder of a name whatever source and kind
     # hold it (core/mitt.fav_folders), read on the page's worker. What a move,
     # a reorder or a title out of its folder does acts on each title's own
-    # source's store; a folder renamed, removed, locked or coloured is so in
-    # every source that holds it - all of them or none (_mitt_change).
+    # source's store - a reorder also on the folder's order between its
+    # sources' titles (_mitt_orders_edit); a folder renamed, removed, locked
+    # or coloured is so in every source that holds it - all of them or none
+    # (_mitt_change).
 
     def _mitt_fav_stores(self):
         """(section, store, id key, kind) of the window's own favourites:
@@ -1946,7 +1957,8 @@ class _MittMixin:
         title = tr("nav_favorites") if loose else self._mitt_folder
         empty = "" if cards else (tr("mitt_nothing") if (terms or chip != mitt.ALL)
                                   else tr("mitt_folder_empty"))
-        page.set_folder_items(title, self._mitt_counts(folder), cards, empty, True)
+        page.set_folder_items(title, self._mitt_counts(folder), cards, empty, True,
+                              [mitt.section_of(c.data) for c in cards])
         self._mitt_mark()
 
     def _mitt_counts(self, folder: mitt.Folder | None) -> str:
@@ -2098,6 +2110,7 @@ class _MittMixin:
                   if name in st.locked_groups()]
         if not self._mitt_change(steps):
             return
+        self._mitt_orders_edit(lambda o: mitt.order_renamed(o, name, new))
         if self._mitt_folder == name:
             self._mitt_folder = new
         self._mitt_after_folders()
@@ -2114,6 +2127,7 @@ class _MittMixin:
                   if name not in st.groups and name in st.locked_groups()]
         if not self._mitt_change(steps):
             return
+        self._mitt_orders_edit(lambda o: mitt.order_kept(o, name, []))
         if self._mitt_folder == name:
             self._mitt_folder = LOOSE
         self._mitt_after_folders()
@@ -2211,8 +2225,13 @@ class _MittMixin:
                 steps.append((st, partial(_colour_on, target, colour)))
         if not self._mitt_change(steps):
             return
+        keys = [e.key for e in entries]
+        # Out of the order kept here - and of the one kept there, where it
+        # comes at the end of its kind as any title added does.
+        self._mitt_orders_edit(lambda o: mitt.order_without(mitt.order_without(o, keys, here),
+                                                            keys, target))
         self._mitt_after_folders()
-        self._mitt_drop_shown({e.key for e in entries})
+        self._mitt_drop_shown(set(keys))
 
     @staticmethod
     def _mitt_plain(row: dict) -> dict:
@@ -2220,40 +2239,68 @@ class _MittMixin:
                 and not (k in ("_kind", "_key") and row.get("_section") in ("radio", "web"))}
 
     def _mitt_folder_reorder(self, cards: list, index: int) -> None:
-        """Titles dragged to another place in the folder shown - each kept
-        in its own store's order there (a title of another source or kind
-        keeps the place of its own among them)."""
+        """Titles dragged to another place in the folder shown: there, as
+        the list shows it, whatever source the titles around it are of
+        (core/mitt.dropped). Each source's store takes its own titles' new
+        order (one it keeps that is not shown keeps its place); how they go
+        between the other sources' is the folder's order, kept
+        (core/mitt.FOLDER_ORDER_KEY). A drop among another kind's - the
+        page offers none - changes nothing."""
         page = self._mitt_page
-        if page is None:
+        folders = self._mitt_folders()
+        if page is None or folders is None:
             return
-        shown = list(page.folder_items.items())
-        keys = [c.key for c in shown]
-        moving = [c.key for c in cards if c.key in keys]
+        folder = folders.loose if self._mitt_folder == LOOSE \
+            else folders.named.get(self._mitt_folder)
+        if folder is None:
+            return
+        shown = [c.key for c in page.folder_items.items()]
+        moving = [c.key for c in cards if c.key in shown]
         if not moving:
             return
-        order = mitt.moved_to(keys, moving, index)
-        by = {c.key: c.data for c in shown if isinstance(c.data, mitt.Entry)}
+        entries = mitt.dropped(folder.entries, shown, moving, index)
+        if [e.key for e in entries] == [e.key for e in folder.entries]:
+            self._mitt_folders_fill()
+            return
+        by = {e.key: e for e in entries}
         group = self._mitt_folder_here()
-        touched = {(by[k].source, str(by[k].row.get("_section"))) for k in moving if k in by}
+        touched = {(by[k].source, mitt.section_of(by[k])) for k in moving if k in by}
         stores = _Stores(self)
         steps: list = []
         for src, sec in touched:
             id_key = _ID_KEY.get(sec, "stream_id")
-            ids = [by[k].row.get(id_key) for k in order if k in by
-                   and by[k].source == src and str(by[k].row.get("_section")) == sec]
+            ids = [e.row.get(id_key) for e in entries
+                   if e.source == src and mitt.section_of(e) == sec]
             st = stores.get(src, sec)
             if st is not None and ids:
                 steps.append((st, partial(_reordered, group, ids)))
         if not self._mitt_change(steps):
             return
-        folders = self._mitt_folders()
-        folder = None if folders is None else (
-            folders.loose if self._mitt_folder == LOOSE else folders.named.get(self._mitt_folder))
-        if folder is not None:
-            folder.entries = mitt.reordered_within(folder.entries, order)
+        folder.entries = entries
+        kept = mitt.folder_order(entries)
+        names = set(folders.named) | {FAV_DEFAULT_GROUP}
+        self._mitt_orders_edit(lambda o: mitt.order_kept(
+            {n: v for n, v in o.items() if n in names}, group, kept))
         self._mitt_after_folders()
         self._mitt_folders_fill()
         page.folder_items.focus_key(moving[0], take_focus=False)
+
+    def _mitt_orders_edit(self, change: Callable[[dict], dict]) -> None:
+        """The folders' kept orders (core/mitt.FOLDER_ORDER_KEY, this
+        profile's) as *change* makes them - never raising: an order not kept
+        leaves the folder in its sources' own orders."""
+        try:
+            own = self._own(self.settings)
+            before = mitt.parse_folder_orders(own.value(mitt.FOLDER_ORDER_KEY, ""))
+            after = change(before)
+            if after == before:
+                return
+            if after:
+                own.setValue(mitt.FOLDER_ORDER_KEY, mitt.dump_folder_orders(after))
+            else:
+                own.remove(mitt.FOLDER_ORDER_KEY)
+        except Exception:
+            log.warning("mine: a folder's order was not kept", exc_info=True)
 
     def _mitt_folder_item_menu(self, card: Any, pos: QPoint) -> None:
         e = self._mitt_entry(card)
@@ -2320,8 +2367,10 @@ class _MittMixin:
                                           group)))
         if not self._mitt_change(steps):
             return
+        keys = [e.key for e in entries]
+        self._mitt_orders_edit(lambda o: mitt.order_without(o, keys, group))
         self._mitt_after_folders()
-        self._mitt_drop_shown({e.key for e in entries})
+        self._mitt_drop_shown(set(keys))
 
     def _mitt_folder_unfav(self, cards: list) -> None:
         """Out of the favorites of its own source, every folder there."""
@@ -2336,8 +2385,10 @@ class _MittMixin:
                                           None)))
         if not self._mitt_change(steps):
             return
+        keys = [e.key for e in entries]
+        self._mitt_orders_edit(lambda o: mitt.order_without(o, keys))
         self._mitt_after_folders()
-        self._mitt_drop_shown({e.key for e in entries})
+        self._mitt_drop_shown(set(keys))
 
 
 class _Stores:

@@ -5,7 +5,8 @@ series they follow and History as a timeline - as plain data, no Qt.
 The window (ui/mw_mitt.py) reads the stores (core/stores.py,
 services/resume.py) and hands their rows here, on a worker; what comes back
 is drawn by ui/mitt_page.py. Nothing here stores anything but the queue's
-order (``ORDER_KEY``, a profile's own: core/profiles.py).
+order (``ORDER_KEY``) and the order a folder of several sources' titles was
+dragged into (``FOLDER_ORDER_KEY``), each a profile's own (core/profiles.py).
 
 * ``Entry``: one title of a section - its kind, its key at its source, the
   store's own row (what the window plays), its source, when it was played,
@@ -25,11 +26,14 @@ order (``ORDER_KEY``, a profile's own: core/profiles.py).
   locale's first day of the week), last week, then by month (``timeline``).
 * The favourites' folders across every source (``fav_folders``): one folder
   of a name whatever source and kind hold it, each title with its own
-  source and store (``FavStore``, ``Folder``).
+  source and store (``FavStore``, ``Folder``); a title dragged to its place
+  among them (``dropped``), each store keeping its own titles' order and the
+  folder how they go between the sources' (``folder_order``, ``interleaved``).
 """
 
 from __future__ import annotations
 
+import heapq
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -41,13 +45,14 @@ from .num import digits, number
 from .palette_match import fold, words
 
 __all__ = [
-    "ALL", "CHANNEL", "EPISODE", "FAV_SECTIONS", "FILM", "FILTERS", "LOCAL", "RADIO", "SERIES",
-    "WEB", "Entry", "FavStore", "Folder", "QueueSummary", "action_of", "by_habit",
-    "continue_entries", "day_group", "entry_key", "fav_folders", "fav_rows", "folder_entry",
-    "habit_score", "habitual", "history_entries", "item_key", "length_of", "matches", "merged",
-    "moved", "moved_to", "new_entries", "parse_order", "dump_order", "playing_keys",
-    "queue_ident", "queue_order", "queue_summary", "reordered_within", "terms_of", "timeline",
-    "when_of",
+    "ALL", "CHANNEL", "EPISODE", "FAV_SECTIONS", "FILM", "FILTERS", "FOLDER_ORDER_KEY", "LOCAL",
+    "RADIO", "SERIES", "WEB", "Entry", "FavStore", "Folder", "QueueSummary", "action_of",
+    "by_habit", "continue_entries", "day_group", "dropped", "dump_folder_orders", "entry_key",
+    "fav_folders", "fav_rows", "folder_entry", "folder_order", "habit_score", "habitual",
+    "history_entries", "interleaved", "item_key", "length_of", "matches", "merged", "moved",
+    "moved_to", "new_entries", "order_kept", "order_renamed", "order_without",
+    "parse_folder_orders", "parse_order", "dump_order", "playing_keys", "queue_ident",
+    "queue_order", "queue_summary", "section_of", "terms_of", "timeline", "when_of",
 ]
 
 CHANNEL, FILM, SERIES, EPISODE = "channel", "film", "series", "episode"
@@ -71,6 +76,16 @@ SOURCELESS = (RADIO, LOCAL, WEB)
 #: Where the queue's order is kept: a JSON list of ``queue_ident``s.
 ORDER_KEY = "watch_later_order"
 ORDER_MAX = 500
+#: Where the order a folder's titles were dragged into is kept, for a folder
+#: whose titles of one kind come from more than one source: a JSON object, a
+#: folder's name -> its titles' keys (``folder_order``; a profile's own:
+#: core/profiles.py). Each source's store keeps its own titles' order; this
+#: only how they go between another source's.
+FOLDER_ORDER_KEY = "mitt_folder_order"
+#: The folders whose order is kept, at most - the last arranged kept.
+FOLDER_ORDERS_MAX = 64
+#: Longer than this, the value kept is no order the app wrote.
+FOLDER_ORDER_TEXT_MAX = 2 * 1024 * 1024
 #: History's rows shown at a time; "Show more" adds as many again.
 HISTORY_PAGE = 150
 #: The favourite channels shown until "Show all".
@@ -357,17 +372,20 @@ def _colour(colours: Mapping[str, Any], name: str) -> dict[str, str]:
 
 
 def fav_folders(stores: Sequence[FavStore], keep: Callable[[Entry], bool] | None = None,
-                default: str = "all") -> tuple[Folder, dict[str, Folder]]:
+                default: str = "all", orders: Mapping[str, Sequence[str]] | None = None
+                ) -> tuple[Folder, dict[str, Folder]]:
     """Every store's favourites as Mine's folders: those in no folder
     (*default*) and every folder by name - one of a name across every
     source and kind ("Sport" of two sources is one folder). A folder lists
     the channels first, then the films, the series, the stations and the
     web streams; each kind's from the stores in the order given (the source
-    in use's first), each store's in its own order, a title once per store.
-    *keep* says whether a title may be shown (a kids profile's test, the
-    parental lock on categories): one it leaves out is neither listed nor
-    counted. (The favourites in no folder, the folders by name in the
-    order of their names.)"""
+    in use's first), each store's in its own order, a title once per store -
+    or, for a folder with an order kept (*orders*: its name -> keys, the
+    person's drag), each kind's sources' titles among each other as it says
+    (``interleaved``). *keep* says whether a title may be shown (a kids
+    profile's test, the parental lock on categories): one it leaves out is
+    neither listed nor counted. (The favourites in no folder, the folders
+    by name in the order of their names.)"""
     names: set[str] = set()
     for st in stores:
         names.update(str(g) for g in (st.groups or {}) if g != default)
@@ -405,25 +423,164 @@ def fav_folders(stores: Sequence[FavStore], keep: Callable[[Entry], bool] | None
         for name, folder in named.items():
             if not folder.colour:
                 folder.colour = _colour(st.colours, name)
+    for folder in (loose, *named.values()):
+        kept = (orders or {}).get(folder.name)
+        if kept:
+            folder.entries = interleaved(folder.entries, kept)
     return loose, named
 
 
-def reordered_within(entries: Sequence[Entry], keys: Sequence[str]) -> list[Entry]:
-    """A folder's *entries* after titles were dragged into the order
-    *keys* (the keys shown, in their new order), as their stores keep it:
-    each store's titles among *keys* take the places they held, in the new
-    order - one of another source or kind keeps its own place, as
-    FavoriteStore.reorder keeps a row the view did not show."""
-    rank = {k: i for i, k in enumerate(keys)}
-    out = list(entries)
-    slots: dict[tuple[str, str], list[int]] = {}
-    for i, e in enumerate(entries):
-        if e.key in rank:
-            slots.setdefault((e.source, str(e.row.get("_section") or e.kind)), []).append(i)
-    for held in slots.values():
-        moved = sorted((entries[i] for i in held), key=lambda e: rank[e.key])
-        for i, e in zip(held, moved, strict=True):
-            out[i] = e
+def section_of(e: Entry) -> str:
+    """The favourites' section a folder's title is of (``FAV_SECTIONS``)."""
+    return str(e.row.get("_section") or e.kind)
+
+
+def dropped(entries: Sequence[Entry], shown: Sequence[str], moving: Sequence[str],
+            index: int) -> list[Entry]:
+    """A folder's *entries* with the titles *moving* dragged before what was
+    at *index* of those *shown* (the keys the page lists, in their order - a
+    chip or a search may leave some out): the shown titles take the places
+    they held, in their new order, one not shown keeps its own. A folder
+    lists each kind together, so a drop that would put a title among
+    another kind's changes nothing (the entries as they were)."""
+    by = {e.key: e for e in entries}
+    order = [k for k in moved_to(shown, moving, index) if k in by]
+    if not order:
+        return list(entries)
+    placed = set(order)
+    queue = iter([by[k] for k in order])
+    out = [next(queue, e) if e.key in placed else e for e in entries]
+    if [section_of(e) for e in out] != [section_of(e) for e in entries]:
+        return list(entries)
+    return out
+
+
+def folder_order(entries: Sequence[Entry]) -> list[str]:
+    """What is kept of a folder's order (``FOLDER_ORDER_KEY``): the keys of
+    its titles of a kind that more than one source holds, in their order -
+    each source's store keeps its own titles' order; this says how they go
+    between the other sources'. [] when every kind is one source's."""
+    sources: dict[str, set[str]] = {}
+    for e in entries:
+        sources.setdefault(section_of(e), set()).add(e.source)
+    mixed = {s for s, held in sources.items() if len(held) > 1}
+    return list(dict.fromkeys(e.key for e in entries if section_of(e) in mixed))[:ORDER_MAX]
+
+
+def interleaved(entries: Sequence[Entry], keys: Sequence[str]) -> list[Entry]:
+    """A folder's *entries* (each kind together, each store's titles in its
+    own order) with each kind's sources' titles put among each other as the
+    kept order *keys* has them. Each store's own order always holds - a
+    store reordered elsewhere (the sidebar) is followed as it is. A title
+    the keys do not name goes by its store: after the title before it there
+    (one shown again as a lock opens), and one after its store's last named
+    title - added since - at the end of its kind, the stores in their
+    order."""
+    rank = {k: i for i, k in enumerate(dict.fromkeys(keys))}
+    if not rank or not entries:
+        return list(entries)
+    runs: dict[str, dict[tuple[str, str], list[Entry]]] = {}
+    for e in entries:
+        runs.setdefault(section_of(e), {}).setdefault((e.source, section_of(e)), []).append(e)
+    out: list[Entry] = []
+    last = float(len(rank) + 1)
+    for stores in runs.values():
+        seqs = list(stores.values())
+        if len(seqs) == 1:
+            out += seqs[0]
+            continue
+        keyed: list[list[tuple[float, float, int]]] = []
+        for n, seq in enumerate(seqs):
+            named = [i for i, e in enumerate(seq) if e.key in rank]
+            final = named[-1] if named else -1
+            first = float(rank[seq[named[0]].key]) if named else last
+            before: float | None = None
+            ks: list[tuple[float, float, int]] = []
+            for i, e in enumerate(seq):
+                if e.key in rank:
+                    before = float(rank[e.key])
+                    ks.append((before, 0.0, i))
+                elif i > final:
+                    ks.append((last, float(n), i))
+                elif before is None:
+                    ks.append((first, -1.0, i))
+                else:
+                    ks.append((before, 0.5, i))
+            keyed.append(ks)
+        heads = [(ks[0], n) for n, ks in enumerate(keyed)]
+        heapq.heapify(heads)
+        while heads:
+            (_k, _t, i), n = heapq.heappop(heads)
+            out.append(seqs[n][i])
+            if i + 1 < len(seqs[n]):
+                heapq.heappush(heads, (keyed[n][i + 1], n))
+    return out
+
+
+def parse_folder_orders(raw: Any) -> dict[str, list[str]]:
+    """The folders' kept orders (``FOLDER_ORDER_KEY``) read back: a folder's
+    name -> its keys, at most ``FOLDER_ORDERS_MAX`` folders of ``ORDER_MAX``
+    keys; anything else - too long, nested past any real one, not a set of
+    lists of words - reads as none."""
+    if isinstance(raw, (bytes, bytearray)):
+        raw = raw.decode("utf-8", "replace")
+    if isinstance(raw, str):
+        if len(raw) > FOLDER_ORDER_TEXT_MAX:
+            return {}
+        try:
+            raw = json.loads(raw) if raw else {}
+        except (ValueError, RecursionError):
+            return {}
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, list[str]] = {}
+    for name, keys in list(raw.items())[-FOLDER_ORDERS_MAX:]:
+        if isinstance(name, str) and isinstance(keys, list):
+            got = list(dict.fromkeys(k for k in keys if isinstance(k, str)))[:ORDER_MAX]
+            if got:
+                out[name] = got
+    return out
+
+
+def dump_folder_orders(orders: Mapping[str, Sequence[str]]) -> str:
+    """*orders* as kept: the last ``FOLDER_ORDERS_MAX`` folders (the last
+    arranged last), each its first ``ORDER_MAX`` keys."""
+    kept = {str(n): list(dict.fromkeys(str(k) for k in keys))[:ORDER_MAX]
+            for n, keys in orders.items() if keys}
+    return json.dumps(dict(list(kept.items())[-FOLDER_ORDERS_MAX:]), separators=(",", ":"))
+
+
+def order_kept(orders: Mapping[str, Sequence[str]], folder: str,
+               keys: Sequence[str]) -> dict[str, list[str]]:
+    """*orders* with *folder*'s now *keys* (the last arranged, so the last
+    to go past ``FOLDER_ORDERS_MAX``) - none kept for it when *keys* is
+    empty."""
+    out = {n: list(v) for n, v in orders.items() if n != folder}
+    if keys:
+        out[folder] = list(keys)
+    return out
+
+
+def order_without(orders: Mapping[str, Sequence[str]], keys: Iterable[str],
+                  folder: str | None = None) -> dict[str, list[str]]:
+    """*orders* with the titles *keys* taken out of *folder*'s (of every
+    folder's for None) - a title out of a folder, or of the favourites."""
+    gone = set(keys)
+    out: dict[str, list[str]] = {}
+    for n, v in orders.items():
+        left = [k for k in v if k not in gone] if folder is None or n == folder else list(v)
+        if left:
+            out[n] = left
+    return out
+
+
+def order_renamed(orders: Mapping[str, Sequence[str]], old: str,
+                  new: str) -> dict[str, list[str]]:
+    """*orders* after folder *old* was renamed *new*: its order with it -
+    onto a folder that has one of its own, that one stays."""
+    out = {n: list(v) for n, v in orders.items() if n != old}
+    if old in orders and new not in out:
+        out[new] = list(orders[old])
     return out
 
 
