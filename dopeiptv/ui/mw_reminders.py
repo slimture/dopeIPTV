@@ -84,7 +84,9 @@ class _RemindersMixin:
 
     def _open_reminders(self) -> None:
         from .reminders import RemindersDialog
-        RemindersDialog(self).exec()
+        d = RemindersDialog(self)
+        d.exec()
+        d.deleteLater()     # closed: not kept for the session (docs/PERFORMANCE.md)
 
     def _check_reminders(self) -> None:
         now = int(time.time())

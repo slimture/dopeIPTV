@@ -90,3 +90,35 @@ def test_a_pin_asked_leaves_no_window_and_no_pin(monkeypatch):
     _flush_deletes()
     assert parent.findChildren(QDialog) == []
     parent.deleteLater()
+
+
+def test_the_reminders_window_counts_down_only_while_open(monkeypatch):
+    """Its 1 s countdown started with the window and was never stopped:
+    opened once, it ticked in a closed window for the rest of the session,
+    and one more each time it was opened."""
+    from types import SimpleNamespace
+
+    from PyQt6.QtWidgets import QDialog, QWidget
+
+    from dopeiptv.ui.mw_reminders import _RemindersMixin
+    from dopeiptv.ui.reminders import RemindersDialog
+    seen = []
+
+    def run(self):
+        self.show()
+        seen.append(self._timer.isActive())     # open: it counts down
+        self.hide()
+        seen.append(self._timer.isActive())     # closed: it does not
+        return 0
+    monkeypatch.setattr(QDialog, "exec", run)
+    host = QWidget()
+    host.reminders = SimpleNamespace(all=lambda: [], remove=lambda *a: None)
+    for _ in range(3):
+        _RemindersMixin._open_reminders(host)
+    assert seen == [True, False] * 3
+    kept = RemindersDialog(host)                # one made and never shown
+    assert not kept._timer.isActive()
+    kept.deleteLater()
+    _flush_deletes()
+    assert host.findChildren(RemindersDialog) == []
+    host.deleteLater()
