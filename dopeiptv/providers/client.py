@@ -484,11 +484,13 @@ class XtreamClient(Mirrored, ListCache):
 
     def authenticate(self) -> dict:
         data = self._api()
-        if not isinstance(data, dict) or "user_info" not in data:
+        # A user_info that is no object ("", [], a number) is none: asked
+        # .get() it raised (tests/test_fuzz_xtream.py).
+        ui = data.get("user_info") if isinstance(data, dict) else None
+        if not isinstance(ui, dict):
             log.warning("xtream auth @ %s: unexpected response (no user_info)",
                         self.server)
             raise LocalizedError("err_unexpected_response")
-        ui = data["user_info"]
         if str(ui.get("auth", 0)) != "1":
             log.warning("xtream auth @ %s: rejected (auth != 1, status=%s)",
                         self.server, ui.get("status"))
@@ -497,7 +499,7 @@ class XtreamClient(Mirrored, ListCache):
         # recording that would need a second one is not offered with one.
         try:
             self.max_connections = int(ui.get("max_connections") or 0) or None
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):     # 1e400 is infinity
             self.max_connections = None
         self._saw_account(ui)
         log.info(
@@ -592,10 +594,17 @@ class XtreamClient(Mirrored, ListCache):
         return rows, list_rows(self.held(("get_series_categories",))) or []
 
     def series_info(self, series_id: int | str) -> dict:
-        return self._api(action="get_series_info", series_id=series_id) or {}
+        return self._info(self._api(action="get_series_info", series_id=series_id))
 
     def vod_info(self, vod_id: int | str) -> dict:
-        return self._api(action="get_vod_info", vod_id=vod_id) or {}
+        return self._info(self._api(action="get_vod_info", vod_id=vod_id))
+
+    @staticmethod
+    def _info(data: Any) -> dict:
+        """An info answer as the object it is meant to be: a panel's [] (or
+        a list of anything, a number) for an unknown title is none - every
+        reader asks it .get() (tests/test_fuzz_xtream.py)."""
+        return data if isinstance(data, dict) else {}
 
     def short_epg(self, stream_id: int | str, limit: int = 8) -> list[dict]:
         data = self._api(action="get_short_epg", stream_id=stream_id, limit=limit)
@@ -605,8 +614,9 @@ class XtreamClient(Mirrored, ListCache):
     def _listings(data) -> list[dict]:
         # Some panels answer an unknown stream with a bare [] instead of an
         # object; .get on it raised and lost the whole info panel.
+        # And a row that is no object is none: each is asked .get().
         rows = data.get("epg_listings") if isinstance(data, dict) else None
-        return rows if isinstance(rows, list) else []
+        return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
 
     def epg_table(self, stream_id: int | str) -> list[dict]:
         """Full EPG table - fallback when get_short_epg returns nothing."""
@@ -1003,10 +1013,10 @@ class M3UClient(OfflineClient):
 
     def live_categories(self) -> list[dict]:
         self._ensure()
-        seen: list[str] = []
-        for c in self._channels:
-            if c["category_id"] not in seen:
-                seen.append(c["category_id"])
+        # Each group once, in list order - kept by a dict: looked for in a
+        # list, a playlist with a group per channel took time with the
+        # square of its length (tests/test_fuzz_m3u.py).
+        seen = dict.fromkeys(c["category_id"] for c in self._channels)
         return [{"category_id": g, "category_name": g} for g in seen]
 
     def live_streams(self, category_id: str | None = None) -> list[dict]:
