@@ -33,7 +33,7 @@ from .. import VERSION
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
-from .boxes import USER_AGENT, build_xmltv, normalize_server
+from .boxes import USER_AGENT, build_xmltv, items, normalize_server, rows_of
 from .mediaserver import PRODUCT, MediaServerClient, device_id, to_int
 
 PLEX_TV = "https://plex.tv"
@@ -136,8 +136,8 @@ def _connection_order(res: dict) -> list[str]:
     http:// too, for a network that blocks plex.direct names), then from
     outside, Plex's relay last; IPv6 after IPv4 in each."""
     groups: list[list[tuple[bool, str]]] = [[], [], []]
-    for c in res.get("connections") or []:
-        if not isinstance(c, dict) or not c.get("uri"):
+    for c in rows_of(res.get("connections")):
+        if not c.get("uri"):
             continue
         uri = str(c["uri"]).rstrip("/")
         v6 = bool(c.get("IPv6"))
@@ -204,12 +204,12 @@ def pick_connection(connections: list[str], server_id: str = "", timeout: float 
 
 
 def _tags(m: dict, name: str, limit: int = 12) -> str:
-    return ", ".join(str(t.get("tag")) for t in (m.get(name) or [])[:limit]
+    return ", ".join(str(t.get("tag")) for t in items(m.get(name))[:limit]
                      if isinstance(t, dict) and t.get("tag"))
 
 
 def _tmdb(m: dict) -> int | None:
-    for g in m.get("Guid") or []:
+    for g in items(m.get("Guid")):
         gid = str(g.get("id") or "") if isinstance(g, dict) else ""
         if gid.startswith("tmdb://"):
             return to_int(gid[7:])
@@ -271,7 +271,7 @@ class PlexClient(MediaServerClient):
             mc = self.mc(path, dict(params, **{"X-Plex-Container-Start": str(start),
                                                "X-Plex-Container-Size": str(PAGE)}),
                          timeout=self.LIST_TIMEOUT)
-            rows = [m for m in mc.get("Metadata") or [] if isinstance(m, dict)]
+            rows = rows_of(mc.get("Metadata"))
             out += rows
             total = to_int(mc.get("totalSize"))
             if len(rows) < PAGE or (total and len(out) >= total):
@@ -339,8 +339,8 @@ class PlexClient(MediaServerClient):
         """(address, container) of a film or an episode. Not "play_url":
         the window asks a box that transcodes by that name (ui/mw_box.py),
         and a Plex channel then never played."""
-        media = next((x for x in m.get("Media") or [] if isinstance(x, dict)), {})
-        part = next((x for x in media.get("Part") or [] if isinstance(x, dict)), {})
+        media = next(iter(rows_of(m.get("Media"))), {})
+        part = next(iter(rows_of(media.get("Part"))), {})
         ext = str(part.get("container") or media.get("container") or "mkv")
         kbps = self._kbps()
         key = str(part.get("key") or "")
@@ -403,7 +403,7 @@ class PlexClient(MediaServerClient):
                 "series_key": str(m.get("grandparentRatingKey") or ""), **self._watch(m)}
 
     def _catalogue(self) -> dict:
-        sections = [d for d in self.mc("/library/sections").get("Directory") or [] if isinstance(d, dict)]
+        sections = rows_of(self.mc("/library/sections").get("Directory"))
         movie_libs = [(str(d["key"]), str(d.get("title") or "")) for d in sections
                       if d.get("type") == "movie" and d.get("key")]
         show_libs = [(str(d["key"]), str(d.get("title") or "")) for d in sections
@@ -421,7 +421,7 @@ class PlexClient(MediaServerClient):
 
     def _resume_list(self) -> list[dict]:
         try:
-            rows = self.mc("/library/onDeck").get("Metadata") or []
+            rows = rows_of(self.mc("/library/onDeck").get("Metadata"))
         except LocalizedError:
             raise
         except Exception as e:
@@ -445,7 +445,7 @@ class PlexClient(MediaServerClient):
 
     def _live(self) -> tuple[list[dict], str]:
         try:
-            dvrs = [d for d in self.mc("/livetv/dvrs").get("Dvr") or [] if isinstance(d, dict)]
+            dvrs = rows_of(self.mc("/livetv/dvrs").get("Dvr"))
         except LocalizedError:
             raise
         except Exception as e:
@@ -461,17 +461,15 @@ class PlexClient(MediaServerClient):
             lineup = str(d.get("lineup") or "")
             if lineup:
                 try:
-                    rows = [c for c in self.mc("/livetv/epg/channels", {"lineup": lineup}).get("Channel") or []
-                            if isinstance(c, dict)]
+                    rows = rows_of(self.mc("/livetv/epg/channels", {"lineup": lineup}).get("Channel"))
                 except LocalizedError:
                     raise
                 except Exception as e:
                     log.info("plex: no channel list for a DVR (%s)", type(e).__name__)
             if not rows:
-                for dev in d.get("Device") or []:
-                    for cm in (dev.get("ChannelMapping") or []) if isinstance(dev, dict) else []:
-                        if isinstance(cm, dict) and str(cm.get("enabled", "1")) in ("1", "true") \
-                                and cm.get("channelKey"):
+                for dev in rows_of(d.get("Device")):
+                    for cm in rows_of(dev.get("ChannelMapping")):
+                        if str(cm.get("enabled", "1")) in ("1", "true") and cm.get("channelKey"):
                             rows.append({"identifier": cm["channelKey"], "title": cm.get("channelKey")})
             for ch in rows:
                 ident = str(ch.get("identifier") or ch.get("key") or "")
@@ -501,7 +499,7 @@ class PlexClient(MediaServerClient):
         channels = self.guide_channels()
         if not channels:
             return b""
-        providers = self.mc("/media/providers").get("MediaProvider") or []
+        providers = items(self.mc("/media/providers").get("MediaProvider"))
         epg = next((str(p.get("identifier")) for p in providers if isinstance(p, dict)
                     and str(p.get("identifier") or "").startswith("tv.plex.providers.epg")), "")
         if not epg:
@@ -513,13 +511,11 @@ class PlexClient(MediaServerClient):
         while start < 100_000:
             mc = self.mc(f"/{epg}/grid?{query}", {"X-Plex-Container-Start": str(start),
                                                  "X-Plex-Container-Size": "2000"}, timeout=(6.0, 120.0))
-            rows = [m for m in mc.get("Metadata") or [] if isinstance(m, dict)]
+            rows = rows_of(mc.get("Metadata"))
             for p in rows:
                 show = str(p.get("grandparentTitle") or "")
                 title = str(p.get("title") or "")
-                for media in p.get("Media") or []:
-                    if not isinstance(media, dict):
-                        continue
+                for media in rows_of(p.get("Media")):
                     events.append({"channel": str(media.get("channelIdentifier") or ""),
                                    "start": to_int(media.get("beginsAt")) or 0,
                                    "stop": to_int(media.get("endsAt")) or 0,

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from collections.abc import Iterator
 from typing import Any, Callable
 from urllib.parse import urlsplit
 from xml.etree import ElementTree as ET
@@ -165,26 +166,34 @@ class DVBViewerClient(BoxClient):
         out: list[dict] = []
         seen: set[tuple[str, str]] = set()
 
-        def walk(el: ET.Element, cat: str) -> None:
-            for child in el:
-                tag = child.tag.lower()
-                if tag in ("section", "group", "folder"):
-                    walk(child, clean_text(child.get("caption") or child.get("name")
-                                           or child.get("Header")) or cat)
-                    continue
-                if tag not in ("entry", "channel", "favourite", "favorite"):
-                    continue
-                text = clean_text(child.text)
-                cid = str(child.get("ID") or child.get("id") or child.get("channelid") or "")
-                name = clean_text(child.get("name"))
-                if not cid and "|" in text:
-                    cid, name = (x.strip() for x in text.split("|", 1))
-                row = by_id.get(cid) or by_name.get((name or text).lower())
-                if row is None or (row["key"], cat) in seen:
-                    continue
-                seen.add((row["key"], cat))
-                out.append(dict(row, category=cat))
-        walk(root, default)
+        # Every section within sections, in the order the server lists them:
+        # walked with a list of its own, not by a call for each level - a
+        # server's sections nested a thousand deep raised RecursionError
+        # (tests/test_fuzz_boxes.py).
+        stack: list[tuple[Iterator[ET.Element], str]] = [(iter(root), default)]
+        while stack:
+            children, cat = stack[-1]
+            child = next(children, None)
+            if child is None:
+                stack.pop()
+                continue
+            tag = child.tag.lower()
+            if tag in ("section", "group", "folder"):
+                stack.append((iter(child), clean_text(child.get("caption") or child.get("name")
+                                                      or child.get("Header")) or cat))
+                continue
+            if tag not in ("entry", "channel", "favourite", "favorite"):
+                continue
+            text = clean_text(child.text)
+            cid = str(child.get("ID") or child.get("id") or child.get("channelid") or "")
+            name = clean_text(child.get("name"))
+            if not cid and "|" in text:
+                cid, name = (x.strip() for x in text.split("|", 1))
+            row = by_id.get(cid) or by_name.get((name or text).lower())
+            if row is None or (row["key"], cat) in seen:
+                continue
+            seen.add((row["key"], cat))
+            out.append(dict(row, category=cat))
         return out
 
     def _recordings(self, stream: str) -> list[dict]:

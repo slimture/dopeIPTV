@@ -171,7 +171,10 @@ def file_url_path(url: str, windows: bool | None = None) -> str:
     of a network path (file://nas/films/a.mkv is \\\\nas\\films\\a.mkv)."""
     if windows is None:
         windows = sys.platform == "win32"
-    u = urlsplit(url)
+    try:
+        u = urlsplit(url)
+    except ValueError:
+        return ""               # file://[ - no path at all (tests/test_fuzz_readers.py)
     if not windows:
         return unquote(u.path)
     host, path = u.netloc, u.path
@@ -212,7 +215,8 @@ def checked(cmd: Any) -> dict | None:
             ok = link_address_ok(play)
         else:
             ok = (len(play) <= MAX_OWN and "\x00" not in play
-                  and (_ok_url(play) or _is_path(play)))
+                  and (_ok_url(play) or _is_path(play))
+                  and (not play.lower().startswith("file:") or bool(file_url_path(play))))
         if not ok:
             return None
         out["play"] = play

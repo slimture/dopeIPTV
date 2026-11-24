@@ -37,7 +37,9 @@ REMEMBER_MAX = 400
 
 _DIGITS = re.compile(r"\d+")
 _SXXEYY = re.compile(r"\bS\d{1,3}\s*[ .x_-]?\s*E\d{1,4}\b", re.IGNORECASE)
-_SEP = re.compile(r"^[\s\-–—:|·*]+|[\s\-–—:|·*]+$")
+#: What is left over around an episode's own title once the series' name
+#: and "S01E02" are gone (and whitespace).
+_SEP = "-–—:|·*"
 
 
 def _info(ep: dict) -> dict:
@@ -106,7 +108,9 @@ def seasons(episodes: Any) -> list[Season]:
     groups: dict[int | None, list[dict]] = {}
     if isinstance(episodes, dict):
         for key, eps in episodes.items():
-            for ep in eps or []:
+            # A season's episodes are a list; anything else (a number, an
+            # object) holds none - iterated, a number raised.
+            for ep in eps if isinstance(eps, (list, tuple)) else ():
                 if isinstance(ep, dict):
                     s = season_of(ep.get("season", key))
                     groups.setdefault(s, []).append(ep)
@@ -218,7 +222,7 @@ def find_number(all_seasons: list[Season], number: int | None) -> int | None:
 def _load(raw: Any) -> dict:
     try:
         data = json.loads(str(raw or "") or "{}")
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, RecursionError):
         return {}
     return data if isinstance(data, dict) else {}
 
@@ -277,10 +281,22 @@ def episode_title(ep: dict, series_name: str = "") -> str:
     if name and title.lower().startswith(name.lower()):
         title = title[len(name):]
     title = _SXXEYY.sub(" ", title)
-    title = _SEP.sub("", " ".join(title.split()))
+    title = _trim(" ".join(title.split()))
     if episode_number(ep) is not None and digits(title) == episode_number(ep):
         return ""
     return title
+
+
+def _trim(text: str) -> str:
+    """*text* without the separators and spaces it begins and ends with. A
+    pattern for both ends took time with the square of a run of them in
+    the middle (tests/test_fuzz_xtream.py)."""
+    i, j = 0, len(text)
+    while i < j and (text[i].isspace() or text[i] in _SEP):
+        i += 1
+    while j > i and (text[j - 1].isspace() or text[j - 1] in _SEP):
+        j -= 1
+    return text[i:j]
 
 
 def plot_of(ep: dict) -> str:

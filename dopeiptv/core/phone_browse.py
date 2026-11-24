@@ -20,6 +20,7 @@ as ui/mw_phone_browse.py fills them on the server's thread.
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 import threading
 import time
@@ -100,11 +101,13 @@ def percent(pos: Any, dur: Any) -> int:
     """How far a title got, 0-100 (0: not started or not known)."""
     try:
         p, d = float(pos or 0), float(dur or 0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
-    if d <= 0 or p <= 0:
+    # NaN and infinity are no position: a server's resume point said one,
+    # and round() of it raised (tests/test_fuzz_readers.py).
+    if not (math.isfinite(p) and math.isfinite(d)) or d <= 0 or p <= 0:
         return 0
-    return max(1, min(100, int(round(100 * p / d))))
+    return max(1, min(100, int(round(min(100.0, 100 * p / d)))))     # 1 / 5e-324 is infinity
 
 
 class Lists:

@@ -42,7 +42,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from ..core._lazy_requests import requests
 from ..core.log import log
 from ..i18n import LocalizedError, tr
-from .boxes import BoxClient, build_xmltv, clean_text
+from .boxes import BoxClient, build_xmltv, clean_text, items, rows_of
 
 STREAMDEV_PORT = 3000
 # How far ahead the guide is asked, and from how long ago (the running
@@ -129,7 +129,7 @@ class VdrClient(BoxClient):
             self._streamdev = self.streamdev_base()
             vdr: dict = info["vdr"] if isinstance(info.get("vdr"), dict) else {}
             version = str(vdr.get("version") or "")
-            plugins = [str(p.get("name") or "") for p in vdr.get("plugins") or [] if isinstance(p, dict)]
+            plugins = [str(p.get("name") or "") for p in rows_of(vdr.get("plugins"))]
             if plugins and not any(p.startswith("streamdev") for p in plugins):
                 self.live_note = tr("vdr_no_streamdev")
             return {"kind": "vdr", "name": f"VDR {version}".strip(), "version": version,
@@ -201,8 +201,7 @@ class VdrClient(BoxClient):
         start = 0
         for _ in range(200):
             js = self.get_json(path, dict(params or {}, start=str(start), limit=str(PAGE)), timeout=timeout)
-            got = js.get(key) if isinstance(js, dict) else None
-            rows = [r for r in got or [] if isinstance(r, dict)]
+            rows = rows_of(js.get(key) if isinstance(js, dict) else None)
             out += rows
             total = _int(js.get("total")) if isinstance(js, dict) else 0
             if not rows or len(out) >= total:
@@ -270,7 +269,7 @@ class VdrClient(BoxClient):
             seg = urlsplit(e["url"]).path.rstrip("/").rsplit("/", 1)[-1]
             name, num = clean_text(e["name"]), 0
             m = _NUMBERED.match(name)
-            if m and m.group(1) == seg:
+            if m and m.group(1) == seg and len(seg) <= 9:
                 num, name = int(m.group(1)), m.group(2).strip()
             elif seg.isdecimal() and len(seg) <= 9:
                 num = int(seg)
@@ -314,11 +313,9 @@ class VdrClient(BoxClient):
                 if failed >= 5 and not events:
                     break
                 continue
-            for ev in (js.get("events") if isinstance(js, dict) else None) or []:
-                if not isinstance(ev, dict):
-                    continue
+            for ev in rows_of(js.get("events") if isinstance(js, dict) else None):
                 start = _int(ev.get("start_time"))
-                contents = [str(c) for c in ev.get("contents") or [] if c]
+                contents = [str(c) for c in items(ev.get("contents")) if c]
                 events.append({"channel": cid, "start": start, "stop": start + _int(ev.get("duration")),
                                "title": clean_text(ev.get("title")),
                                "subtitle": clean_text(ev.get("short_text")),

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import re
 import time
+from bisect import bisect_left
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlsplit
 
@@ -129,7 +130,46 @@ def shift_template(live_url: str) -> str:
     return _append(live_url, "?utc={utc}&lutc={lutc}")
 
 
-_FLUSSONIC = re.compile(r"^(?P<pre>.+/)(?P<name>[^/?#]+?)(?P<ext>\.m3u8|\.ts)?(?P<qs>\?[^#]*)?$")
+_EXTS = (".m3u8", ".ts")
+
+
+def _flussonic_parts(s: str) -> tuple[str, str, str | None, str] | None:
+    """(pre, name, ext, query) of a Flussonic address - what the pattern
+    ^(?P<pre>.+/)(?P<name>[^/?#]+?)(?P<ext>\\.m3u8|\\.ts)?(?P<qs>\\?[^#]*)?$
+    matched, the same in every case, in time that grows with the address:
+    the pattern took time with its square on a provider's address of many
+    "/" and a "#" (tests/test_fuzz_readers.py). Each "/" from the last
+    one before a newline is tried as the end of pre, as the pattern's
+    backtracking did."""
+    nl = s.find("\n")
+    limit = len(s) if nl < 0 else nl            # pre (".+/") holds no newline
+    slashes = [i for i, c in enumerate(s) if c == "/"]
+    marks = [i for i, c in enumerate(s) if c == "?"]
+    hashes = [i for i, c in enumerate(s) if c == "#"]
+    last_hash = hashes[-1] if hashes else -1
+
+    def first(found: list[int], at: int) -> int:
+        k = bisect_left(found, at)
+        return found[k] if k < len(found) else len(s)
+
+    k = bisect_left(slashes, limit) - 1
+    while k >= 0 and slashes[k] >= 1:
+        j = slashes[k] + 1
+        q = first(marks, j)
+        if first(slashes, j) >= q and first(hashes, j) >= q:
+            name = s[j:q]
+            if q < len(s):                      # a query to the end, with no "#"
+                if last_hash < q and name:
+                    ext = next((e for e in _EXTS if name.endswith(e) and len(name) > len(e)), None)
+                    return s[:j], name[:-len(ext)] if ext else name, ext, s[q:]
+            elif name:
+                body = name[:-1] if name.endswith("\n") else name
+                ext = next((e for e in _EXTS if body.endswith(e) and len(body) > len(e)), None)
+                if ext:
+                    return s[:j], body[:-len(ext)], ext, ""
+                return s[:j], body or name, None, ""
+        k -= 1
+    return None
 
 
 def flussonic_template(live_url: str) -> str | None:
@@ -137,10 +177,10 @@ def flussonic_template(live_url: str) -> str | None:
     .../NAME-{utc}-{duration}.m3u8, .../mpegts (or a .ts) ->
     .../archive-{utc}-{duration}.ts; the query (a token) stays. None for an
     address of another shape."""
-    m = _FLUSSONIC.match(live_url or "")
-    if not m or "://" not in m.group("pre") or "/" not in m.group("pre").split("://", 1)[1]:
+    got = _flussonic_parts(live_url or "")
+    if not got or "://" not in got[0] or "/" not in got[0].split("://", 1)[1]:
         return None
-    pre, name, ext, qs = m.group("pre"), m.group("name"), m.group("ext"), m.group("qs") or ""
+    pre, name, ext, qs = got
     if ext == ".m3u8":
         return f"{pre}{name}-{{utc}}-{{duration}}.m3u8{qs}"
     if ext == ".ts" or (ext is None and name == "mpegts"):

@@ -28,6 +28,13 @@ download to disk, a guide read with its own ceiling) is never counted. And
 JSON (a ``ValueError``, as for any other), instead of a RecursionError no
 caller expects.
 
+**What it is written in.** An answer that names no charset is read as
+JSON's own (UTF-8, or the UTF-16/-32 its first bytes say) by ``json()``,
+and its ``text`` guessed from its first ``GUESS_BYTES`` - requests guessed
+from all of it, and the guess takes time with the square of some bytes
+(minutes for a megabyte). A charset whose decoder does too (punycode:
+``safe_xml.slow_codec``) is read as UTF-8.
+
 **What goes to dopeiptv.org** (core/site_out.py): every request through
 the adapter is asked ``site_out.check`` first, and one for dopeiptv.org
 that holds a login of a source is not sent (``LoginHeld``, a
@@ -50,6 +57,11 @@ RESPONSE_MAX = 32 * 1024 * 1024
 #: And a source's own lists and playlists (providers/client.py make_client):
 #: the largest real ones are a hundred MB or two.
 LIST_MAX = 512 * 1024 * 1024
+#: How much of an answer that declares no charset its charset is guessed
+#: from (``text``): requests' guess read all of it, and chardet takes time
+#: with the square of a run of letters after one byte past ASCII - seconds
+#: for 8 KB, an hour for a megabyte. 1 KB: 0.06 s at worst.
+GUESS_BYTES = 1024
 
 _lock = threading.Lock()
 _made: dict[str, Any] = {}
@@ -134,8 +146,35 @@ def _classes() -> dict[str, Any]:
             def __getattr__(self, name: str) -> Any:
                 return getattr(self._raw, name)
 
+        from . import safe_xml
+
         class Response(real.Response):
+            @property
+            def apparent_encoding(self) -> Any:
+                # From the answer's first GUESS_BYTES alone: of all of it,
+                # minutes for an answer of a server that names no charset
+                # (tests/test_fuzz_stalker.py).
+                guess = getattr(real.compat, "chardet", None)
+                if guess is None:
+                    return "utf-8"
+                return guess.detect(self.content[:GUESS_BYTES])["encoding"]
+
+            @property
+            def text(self) -> str:
+                # A charset whose decoder takes time with the square of
+                # the text (safe_xml.slow_codec) is no answer's: UTF-8.
+                if safe_xml.slow_codec(getattr(self, "encoding", None)):
+                    return str(self.content or b"", "utf-8", errors="replace")
+                return str(super().text)
+
             def json(self, **kwargs: Any) -> Any:
+                if not getattr(self, "encoding", None) and self.content:
+                    # JSON is UTF-8 (or -16, -32, which its first bytes
+                    # say: RFC 8259): one that declares no charset is read
+                    # so, what is no UTF-8 replaced - requests guessed a
+                    # charset from the bytes first, through ``text``, for
+                    # every answer that was not UTF-8 (tests/test_fuzz_stalker.py).
+                    self.encoding = real.utils.guess_json_utf(self.content) or "utf-8"
                 try:
                     return super().json(**kwargs)
                 except RecursionError:

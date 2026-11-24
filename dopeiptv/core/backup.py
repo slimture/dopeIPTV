@@ -794,7 +794,7 @@ def _sources(raw: Any) -> list[dict]:
         raise BackupError("invalid", "playlists")
     try:
         rows = json.loads(raw)
-    except ValueError as e:
+    except (ValueError, RecursionError) as e:       # "[[[[..." past Python's limit
         raise BackupError("invalid", "playlists") from e
     if not isinstance(rows, list):
         raise BackupError("invalid", "playlists")
