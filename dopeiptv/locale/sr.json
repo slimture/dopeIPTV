@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Napomene",
   "notice_hist_empty": "Još ništa – ono što vam aplikacija kaže i poslovi koje pokrenete prikazuju se ovde dok se ne zatvori.",
   "notice_hist_none": "Ništa ove vrste.",
-  "menu_activity": "Aktivnost i poruke…"
+  "menu_activity": "Aktivnost i poruke…",
+  "set_start_channel": "Pokreni na poslednjem kanalu",
+  "set_start_channel_hint": "Kada se dopeIPTV otvori, ponovo se pušta kanal uživo koji si poslednji gledao na izvoru koji se koristi – kao televizor koji se upali. Ne kada se dopeIPTV otvori da pusti nešto drugo.",
+  "rec_close_title": "Za snimanje dopeIPTV mora biti otvoren",
+  "rec_close_running": "dopeIPTV upravo snima. Snima samo dok je otvoren, pa izlazak zaustavlja ono što se snima.",
+  "rec_close_due": "U narednih 12 sati zakazano je snimanje. dopeIPTV snima samo dok je otvoren, pa ako izađeš, neće biti snimljeno.",
+  "rec_close_server": "Da bi snimao sa zatvorenim prozorom, ostavi dopeIPTV da radi kao server: dopeiptv --server",
+  "rec_close_keep": "Ostavi dopeIPTV otvoren",
+  "rec_close_quit": "Ipak izađi",
+  "rec_carried_note": "Prozor aplikacije je zatvoren u {time}: server dopeIPTV-a (dopeiptv --server) snima ostatak kao zaseban snimak. Između njih može nedostajati nekoliko sekundi.",
+  "rec_carry_note": "Nastavlja se od {time}, gde je prozor aplikacije prestao da snima; deo pre toga je snimak „{part}“. Između njih može nedostajati nekoliko sekundi."
 }

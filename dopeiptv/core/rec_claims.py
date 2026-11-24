@@ -24,7 +24,10 @@ finishes it, or, when another holds it, asks that one to stop
 (``ask_stop``: a ``.stop`` file beside it, seen at its next look).
 
 Beside the claims: ``window.alive``, locked while a window runs (``hold
-presence``) - the server takes no new job while one does (``present``);
+presence``) - the server takes no new job while one does (``present``) -
+and ``server.alive``, locked while a server records: a window that closes
+carries on what it records to it (core/rec_close.py), holding those
+claims a moment longer than the rest (``let_go_all``'s *keep*);
 ``jobs.lock``, held for the moment a recorder reads and writes the list of
 scheduled jobs (``jobs_lock``); ``jobs.stamp``, changed after each write, so
 the other reads the list again only then (``touch_jobs``, ``jobs_stamp``).
@@ -576,10 +579,16 @@ class Claims:
             with contextlib.suppress(OSError):
                 os.utime(self._path(name), (now, now))
 
-    def let_go_all(self) -> None:
-        """Every lock this process holds let go (its claims as they are)."""
+    def let_go_all(self, keep: Any = ()) -> None:
+        """Every lock this process holds let go (its claims as they are) -
+        but the claims of the jobs in *keep*, still held (a window closing
+        holds what a server carries on until nothing of its own reads the
+        stream: core/recording.py's let_go_carried). The presence goes
+        either way."""
+        kept = {key_of(j) for j in (keep or ())}
         with self._lock:
-            held, self._held = self._held, {}
+            held = {k: h for k, h in self._held.items() if k not in kept}
+            self._held = {k: h for k, h in self._held.items() if k in kept}
             for h in held.values():
                 _unlock(h.fd)
                 with contextlib.suppress(OSError):

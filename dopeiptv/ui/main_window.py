@@ -50,6 +50,7 @@ from .widgets import (
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
+from .mw_rec_close import _RecCloseMixin
 from .mw_busy import _BusyMixin
 from .notices import hub_of
 from .mw_airplay import _AirPlayMixin
@@ -113,6 +114,7 @@ from .mw_shortcuts import _ShortcutsMixin
 from .mw_palette import _PaletteMixin
 from .mw_sidebar import _SidebarMixin
 from .mw_sort import _SortMixin
+from .mw_start_channel import _StartChannelMixin
 from .mw_subtitles import _SubtitlesMixin
 from .mw_updates import _UpdatesMixin
 from .mw_radio import _RadioMixin
@@ -145,7 +147,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PortalArchiveMixin, _SeriesMixin, _SyncMixin,
                  _ConnectionsMixin, _MirrorsMixin, _TogetherMixin, _StatsMixin,
                  _SimklMixin, _DiscordMixin, _MediaServerMixin, _TvMixin,
-                 _TeletextMixin, _ProfilesMixin, _BuildMixin, QMainWindow):
+                 _TeletextMixin, _ProfilesMixin, _StartChannelMixin, _RecCloseMixin, _BuildMixin,
+                 QMainWindow):
     """Primary application window with sidebar, channel list, and detail panel."""
 
     # A guide download's progress: (the load's token, percent). Token 0 is a
@@ -433,6 +436,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # "Who's watching?" over it all when there are several profiles
         # (mw_profiles) - TV mode shows it as a screen of its own.
         self._maybe_pick_profile_at_start()
+        # "Start on the last channel" (mw_start_channel): once who is watching
+        # is said, and only when nothing else was asked for.
+        self._start_channel_arm()
 
     # -- UI construction -------------------------------------------------------
 
@@ -3692,6 +3698,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
     # -- first-run onboarding ------------------------------------------------
 
     def closeEvent(self, event) -> None:
+        # Recordings that closing would stop or miss, with no server to take
+        # them: asked first, before anything is let go - "Keep dopeIPTV
+        # open" leaves the window as it was (mw_rec_close).
+        if not self._rec_close_go_on():
+            event.ignore()
+            return
         # Close the non-modal cast panel first: as a separate top-level
         # window it would otherwise keep the app alive (quitOnLastWindowClosed
         # never fires) and leave the process hanging after the main window
@@ -3735,7 +3747,14 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                     active["payload"], progress),
                 daemon=True).start()
         self._simkl_stop_current()
-        self.rec.shutdown()
+        # A `dopeiptv --server` that runs carries on what records here: each
+        # one's connection ends now, its claim is let go last of all below
+        # (mw_rec_close) - else every recording ends, as before.
+        carry = self._rec_close_carry()
+        if carry:
+            self.rec.shutdown(carry=carry)
+        else:
+            self.rec.shutdown()
         if self.player:
             self.player.shutdown()
         # Now that the player has let go of an in-player recording's file.
@@ -3785,6 +3804,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # should sit through that just to close the window.
         if casting:
             cast_stop.join(2.0)
+        # Nothing of the window's reads a stream any more: the recordings a
+        # server carries on are its now (it opens its own connection).
+        self._rec_close_let_go()
         self._events_join(1.0)
         # Settings -> Reset all: the app's folders emptied now that the
         # player and the workers have let go of them (core/reset.py).

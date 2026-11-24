@@ -391,6 +391,7 @@ class _SettingsMixin:
                         from ..core import xdg
                         xdg.open_folder(os.path.dirname(path))
                     log.warning("settings: the app closes - its settings file is not private")
+                    self._close_forced = True       # nothing asked on the way (mw_rec_close)
                     self.close()
                     return
                 self.settings.setValue(settings_files.ACCEPTED_KEY, settings_files.with_accepted(
@@ -411,6 +412,7 @@ class _SettingsMixin:
             if pending is not None:
                 log.warning("settings: the app closes - a question about a settings file "
                             "others may read could not be asked")
+                self._close_forced = True
                 self.close()
 
     def _ask_settings_open(self, path: str) -> str:

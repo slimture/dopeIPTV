@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Taarifa",
   "notice_hist_empty": "Bado hakuna - kile programu inakuambia na kazi unazoanzisha huonekana hapa hadi itakapofungwa.",
   "notice_hist_none": "Hakuna cha aina hii.",
-  "menu_activity": "Shughuli na ujumbe…"
+  "menu_activity": "Shughuli na ujumbe…",
+  "set_start_channel": "Anza kwenye chaneli ya mwisho",
+  "set_start_channel_hint": "dopeIPTV inapofunguka, chaneli mubashara uliyotazama mwisho kwenye chanzo kinachotumika inacheza tena – kama TV inayowashwa. Si wakati dopeIPTV inafunguliwa ili kucheza kitu kingine.",
+  "rec_close_title": "Kurekodi kunahitaji dopeIPTV iwe wazi",
+  "rec_close_running": "dopeIPTV inarekodi sasa hivi. Inarekodi tu ikiwa wazi, kwa hiyo kuondoka kunasimamisha kinachorekodiwa.",
+  "rec_close_due": "Kuna kitu kilichopangwa kurekodiwa ndani ya saa 12 zijazo. dopeIPTV inarekodi tu ikiwa wazi, kwa hiyo hakitarekodiwa ukiondoka.",
+  "rec_close_server": "Ili kurekodi dirisha likiwa limefungwa, acha dopeIPTV iendelee kufanya kazi kama seva: dopeiptv --server",
+  "rec_close_keep": "Acha dopeIPTV wazi",
+  "rec_close_quit": "Ondoka hata hivyo",
+  "rec_carried_note": "Dirisha la programu lilifungwa saa {time}: seva ya dopeIPTV (dopeiptv --server) inarekodi sehemu iliyobaki kama rekodi yake yenyewe. Huenda sekunde chache kati ya hizo mbili zikakosekana.",
+  "rec_carry_note": "Inaendelea kuanzia {time}, pale dirisha la programu liliposimamisha kurekodi; sehemu ya kabla yake ni rekodi \"{part}\". Huenda sekunde chache kati ya hizo mbili zikakosekana."
 }

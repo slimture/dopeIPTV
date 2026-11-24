@@ -71,6 +71,11 @@ class _CommandsMixin:
             self._come_forward()
         if cmd.get("tv") is True and hasattr(self, "enter_tv_mode"):
             self.enter_tv_mode()
+        if cmd.get("play") or cmd.get("channel") or cmd.get("number") is not None:
+            # What it asks for wins over "Start on the last channel".
+            skip = getattr(self, "_start_channel_skip", None)
+            if callable(skip):
+                skip("a command came")
         if (cmd.get("play") or cmd.get("channel") or cmd.get("number") is not None) \
                 and getattr(self, "_profile_locked", lambda: False)():
             # "Who's watching?" waits for the PIN at start (it is in front

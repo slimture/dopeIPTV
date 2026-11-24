@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "提示",
   "notice_hist_empty": "暂无内容——应用告诉你的信息和你开始的任务会显示在这里，直到应用关闭。",
   "notice_hist_none": "没有此类内容。",
-  "menu_activity": "活动与消息…"
+  "menu_activity": "活动与消息…",
+  "set_start_channel": "从上次的频道开始",
+  "set_start_channel_hint": "打开 dopeIPTV 时，会再次播放你在当前来源上最后观看的直播频道，就像打开电视一样。若 dopeIPTV 是为了播放其他内容而打开，则不会。",
+  "rec_close_title": "录制需要 dopeIPTV 保持打开",
+  "rec_close_running": "dopeIPTV 正在录制。它只在打开时录制，因此退出会停止正在录制的内容。",
+  "rec_close_due": "未来 12 小时内有计划录制的内容。dopeIPTV 只在打开时录制，因此如果退出，将不会录制。",
+  "rec_close_server": "若要在关闭窗口时录制，请让 dopeIPTV 以服务器方式运行：dopeiptv --server",
+  "rec_close_keep": "保持 dopeIPTV 打开",
+  "rec_close_quit": "仍然退出",
+  "rec_carried_note": "应用窗口已于 {time} 关闭：dopeIPTV 的服务器（dopeiptv --server）将剩余部分录制为单独的录像。两段之间可能缺少几秒钟。",
+  "rec_carry_note": "从 {time} 继续，即应用窗口停止录制之处；之前的部分是录像“{part}”。两段之间可能缺少几秒钟。"
 }

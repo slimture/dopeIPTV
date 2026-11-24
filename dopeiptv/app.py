@@ -120,8 +120,9 @@ from .ui.app_icon import (  # noqa: F401
 def _close_on_interrupt(window) -> bool:
     """Ctrl+C in the terminal the app was started from closes the window
     as its close button does - the player, recordings and settings let go
-    in order - instead of a KeyboardInterrupt raised inside whatever Qt
-    callback ran then, which read as a crash. A second Ctrl+C ends the
+    in order, without the window's question about recordings due (it was
+    asked from the terminal) - instead of a KeyboardInterrupt raised inside
+    whatever Qt callback ran then, which read as a crash. A second Ctrl+C ends the
     process at once. Python only sees a signal while it runs, so a light
     tick keeps it looking."""
     import signal
@@ -129,6 +130,9 @@ def _close_on_interrupt(window) -> bool:
     def ask(_sig, _frame) -> None:
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         log.info("Ctrl+C: closing the window")
+        # Asked from the terminal: no question in the window on the way
+        # (ui/mw_rec_close.py) - a server that runs carries recordings on.
+        window._close_forced = True
         QTimer.singleShot(0, window.close)
 
     try:
@@ -743,6 +747,10 @@ def main() -> int:
         settings.setValue("password", pl.get("password", ""))
 
     w = MainWindow(client, settings, store)
+    from .core import start_channel
+    if start_channel.skips(command):
+        # The command wins over "Start on the last channel" (mw_start_channel).
+        w._start_channel_skip("the app was started with a command")
     w.show()
     _close_on_interrupt(w)
     if restored is not None:

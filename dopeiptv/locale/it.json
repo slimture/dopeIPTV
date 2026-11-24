@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Note",
   "notice_hist_empty": "Ancora niente: ciò che l'app ti dice e le attività che avvii compaiono qui finché non viene chiusa.",
   "notice_hist_none": "Niente di questo tipo.",
-  "menu_activity": "Attività e messaggi…"
+  "menu_activity": "Attività e messaggi…",
+  "set_start_channel": "Avvia sull'ultimo canale",
+  "set_start_channel_hint": "All'apertura di dopeIPTV riparte il canale in diretta che hai guardato per ultimo sulla sorgente in uso, come una TV che si accende. Non quando dopeIPTV viene aperto per riprodurre altro.",
+  "rec_close_title": "Le registrazioni richiedono dopeIPTV aperto",
+  "rec_close_running": "dopeIPTV sta registrando in questo momento. Registra solo finché è aperto, quindi uscendo si interrompe ciò che sta registrando.",
+  "rec_close_due": "C'è qualcosa in programma da registrare nelle prossime 12 ore. dopeIPTV registra solo finché è aperto, quindi se esci non verrà registrato.",
+  "rec_close_server": "Per registrare a finestra chiusa, lascia dopeIPTV in esecuzione come server: dopeiptv --server",
+  "rec_close_keep": "Tieni dopeIPTV aperto",
+  "rec_close_quit": "Esci comunque",
+  "rec_carried_note": "La finestra dell'app è stata chiusa alle {time}: il server di dopeIPTV (dopeiptv --server) registra il resto, come registrazione a sé. Tra le due potrebbero mancare alcuni secondi.",
+  "rec_carry_note": "Prosegue dalle {time}, dove la finestra dell'app ha smesso di registrare; la parte precedente è la registrazione «{part}». Tra le due potrebbero mancare alcuni secondi."
 }

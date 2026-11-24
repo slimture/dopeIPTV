@@ -186,7 +186,10 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 **General** (`general`)
 - Language: `language`
 - Start: `start_place` (where you left off - each profile's own
-  `last_place` / `last_list_place`, no row - or always on Mine)
+  `last_place` / `last_list_place`, no row - or always on Mine);
+  `start_last_channel` (Start on the last channel: the profile's last live
+  channel of the source in use plays as the app opens; off by default; this
+  profile's, not synced - ui/mw_start_channel.py)
 - Updates: `check_updates`, `update_channel`
 - This computer: `desktop_entry` (Linux), the Start-menu shortcut (Windows,
   an action; it was under Advanced › Maintenance), `mpris` (the system's

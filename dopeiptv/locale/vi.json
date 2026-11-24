@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Ghi chú",
   "notice_hist_empty": "Chưa có gì - những gì ứng dụng thông báo và việc bạn bắt đầu sẽ hiện ở đây cho đến khi đóng ứng dụng.",
   "notice_hist_none": "Không có mục nào thuộc loại này.",
-  "menu_activity": "Hoạt động và tin nhắn…"
+  "menu_activity": "Hoạt động và tin nhắn…",
+  "set_start_channel": "Bắt đầu ở kênh cuối cùng",
+  "set_start_channel_hint": "Khi dopeIPTV mở, kênh trực tiếp bạn xem lần cuối trên nguồn đang dùng sẽ phát lại – như một chiếc TV vừa bật. Không áp dụng khi dopeIPTV được mở để phát nội dung khác.",
+  "rec_close_title": "Ghi hình cần dopeIPTV luôn mở",
+  "rec_close_running": "dopeIPTV đang ghi hình. Ứng dụng chỉ ghi khi đang mở, nên thoát sẽ dừng nội dung đang được ghi.",
+  "rec_close_due": "Có nội dung được hẹn ghi trong 12 giờ tới. dopeIPTV chỉ ghi khi đang mở, nên nội dung đó sẽ không được ghi nếu bạn thoát.",
+  "rec_close_server": "Để ghi khi cửa sổ đã đóng, hãy để dopeIPTV chạy ở chế độ máy chủ: dopeiptv --server",
+  "rec_close_keep": "Giữ dopeIPTV mở",
+  "rec_close_quit": "Vẫn thoát",
+  "rec_carried_note": "Cửa sổ ứng dụng đã đóng lúc {time}: máy chủ dopeIPTV (dopeiptv --server) ghi phần còn lại thành một bản ghi riêng. Có thể thiếu vài giây giữa hai phần.",
+  "rec_carry_note": "Tiếp tục từ {time}, nơi cửa sổ ứng dụng dừng ghi; phần trước đó là bản ghi \"{part}\". Có thể thiếu vài giây giữa hai phần."
 }

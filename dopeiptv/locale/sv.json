@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Notiser",
   "notice_hist_empty": "Inget ännu – det appen berättar och det du sätter igång syns här tills den stängs.",
   "notice_hist_none": "Inget av det slaget.",
-  "menu_activity": "Aktivitet och meddelanden…"
+  "menu_activity": "Aktivitet och meddelanden…",
+  "set_start_channel": "Starta på senaste kanalen",
+  "set_start_channel_hint": "När dopeIPTV öppnas spelas den livekanal du såg senast i källan som används igen – som en tv som slås på. Inte när dopeIPTV öppnas för att spela något annat.",
+  "rec_close_title": "Inspelningar kräver att dopeIPTV är öppen",
+  "rec_close_running": "dopeIPTV spelar in just nu. Den spelar bara in medan den är öppen, så om du avslutar stoppas det som spelas in.",
+  "rec_close_due": "Något ska spelas in inom de närmaste 12 timmarna. dopeIPTV spelar bara in medan den är öppen, så det spelas inte in om du avslutar.",
+  "rec_close_server": "Låt dopeIPTV köra som server för att spela in med fönstret stängt: dopeiptv --server",
+  "rec_close_keep": "Låt dopeIPTV vara öppen",
+  "rec_close_quit": "Avsluta ändå",
+  "rec_carried_note": "Appens fönster stängdes kl. {time}: dopeIPTV:s server (dopeiptv --server) spelar in resten, som en egen inspelning. Några sekunder mellan de två kan saknas.",
+  "rec_carry_note": "Fortsätter från {time}, där appens fönster slutade spela in; delen före är inspelningen ”{part}”. Några sekunder mellan de två kan saknas."
 }

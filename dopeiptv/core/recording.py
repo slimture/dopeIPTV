@@ -255,7 +255,8 @@ SCRAMBLED = "the box cannot decrypt this channel"
 #: What a job keeps only while this process runs - never in the settings.
 _TRANSIENT = ("proc", "recorder", "_asking", "_held", "_go_ahead", "_feed", "_classic",
               "_alias", "_listed", "_elsewhere", "_claim_state", "_claim_info", "_opening",
-              "_since", "_own", "_from_claim", "_after_ran", "_was_elsewhere")
+              "_since", "_own", "_from_claim", "_after_ran", "_was_elsewhere", "_carry_noted",
+              "_carrying")
 #: What a later edit of a scheduled job changes (``edited`` says when).
 _EDITABLE = ("start", "stop", "title", "folder", "prog_start", "prog_stop", "url",
              "edited")
@@ -266,6 +267,14 @@ def _stamp_of(j: dict) -> float:
         return float(j.get("edited") or 0.0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _clock(ts: float) -> str:
+    """*ts* as this computer's time of day ("21:13")."""
+    try:
+        return datetime.fromtimestamp(ts).strftime("%H:%M")
+    except (OverflowError, OSError, ValueError):
+        return "?"
 
 
 class RecordingManager(QObject):
@@ -282,6 +291,14 @@ class RecordingManager(QObject):
     (``_merge``), a job is recorded by whoever claims it as it comes due
     (``_claim``), a job the other records shows here as recording - by it
     (``_elsewhere``) - and a stop asked here reaches it (``cancel``).
+
+    A scheduled recording the window records as it closes goes on in a
+    `dopeiptv --server` that runs (``shutdown``'s *carry*, chosen by
+    core/rec_close.py): its connection here ends, the job goes back on the
+    list with what it was (``CARRY``: where it left off, its first part's
+    file), and once nothing of the window's reads the stream any more its
+    claim is let go (``let_go_carried``) - the server records the rest into
+    a recording of its own, both parts saying so in their info.
     """
 
     jobs_changed = pyqtSignal()
@@ -319,6 +336,10 @@ class RecordingManager(QObject):
 
     #: How often the claims' folder is tidied (rec_claims.Claims.sweep).
     SWEEP_S = 3600.0
+    #: A recording carried on by the server (shutdown's *carry*) keeps this
+    #: on the list: {"at": when the window let go, "part": its first part's
+    #: file name} - read as from outside (carried_from).
+    CARRY = "carry"
 
     def __init__(self, settings: QSettings, parent: QObject | None = None,
                  claims: Any = None) -> None:
@@ -372,6 +393,10 @@ class RecordingManager(QObject):
         # next start).
         self._remuxing: set[str] = set()
         self._closing = False
+        #: Shut down (shutdown()): nothing starts any more.
+        self._shut = False
+        #: The carried jobs whose claims wait for let_go_carried().
+        self._carried: list[str] = []
         self._remuxed.connect(self._remux_done, Qt.ConnectionType.QueuedConnection)
         if claims is not None:
             self._share_start()
@@ -610,6 +635,7 @@ class RecordingManager(QObject):
             elif j.get("_elsewhere"):
                 # The other's to say - but a later edit here of one it holds.
                 newer = j.get("status") == "scheduled" and _stamp_of(j) > _stamp_of(s)
+                self._carried_in(j, s)
                 out.append(self._saved(j if newer else s))
             elif j.get("status") == "scheduled":
                 if _stamp_of(s) > _stamp_of(j):
@@ -618,6 +644,7 @@ class RecordingManager(QObject):
                             j[k] = s[k]
                     j.pop("_held", None)
                     changed = True
+                changed = self._carried_in(j, s) or changed
                 out.append(self._saved(j))
             # Started, finished or cancelled here: out of the list.
         for j in list(self.jobs):
@@ -640,6 +667,21 @@ class RecordingManager(QObject):
         else:
             self._stored = t_ids
         return changed
+
+    def _carried_in(self, j: dict, s: dict) -> bool:
+        """A recording the other recorder carries on to this one (its window
+        closed while it recorded it): what it was, from the list - where it
+        left off, its first part, and the address a job known only from its
+        claim lacks. Whether *j* changed."""
+        carry = s.get(self.CARRY)
+        if not isinstance(carry, dict) or j.get(self.CARRY) == carry:
+            return False
+        j[self.CARRY] = carry
+        if not j.get("url") and s.get("url"):
+            j["url"] = s["url"]
+        if self.LATER not in j and isinstance(s.get(self.LATER), dict):
+            j[self.LATER] = s[self.LATER]
+        return True
 
     def _gone_elsewhere(self, j: dict) -> None:
         """Scheduled job *j* left the list the other wrote: it started
@@ -756,8 +798,10 @@ class RecordingManager(QObject):
     def _share_start(self) -> None:
         try:
             self.claims.ensure()
-            if self.who == "window":
-                self.claims.hold_presence()
+            # Each says it runs: the server leaves what comes due to a window
+            # that does, and a window closing carries its recordings on to a
+            # server that does (core/rec_close.py).
+            self.claims.hold_presence()
             self.claims.sweep()
             self._swept = time.monotonic()
             self._stamp = self.claims.jobs_stamp()
@@ -1460,9 +1504,9 @@ class RecordingManager(QObject):
 
     def _address_came(self, job_id: str, url: str, why: str) -> None:
         j = next((j for j in self.jobs if j["id"] == job_id), None)
-        if (j is None or j["status"] != "scheduled"
+        if (self._shut or j is None or j["status"] != "scheduled"
                 or j.pop("_asking", None) is None):
-            return                      # cancelled or given up meanwhile
+            return                      # cancelled, given up or closed meanwhile
         if not url:
             self._no_address(j, why or "the source gave none")
         elif j.get("stop") is not None and j["stop"] <= time.time():
@@ -1883,6 +1927,8 @@ class RecordingManager(QObject):
             return False
 
     def tick(self) -> None:
+        if self._shut:
+            return                      # closed: nothing starts any more
         now = time.time()
         cap = self._max_bytes()
         changed = self._share_tick()
@@ -2001,13 +2047,24 @@ class RecordingManager(QObject):
                         else "recorder stopped unexpectedly")
                     changed = True
         self._claims_settle()
+        self._note_carried()
         if changed:
             self.jobs_changed.emit()
 
-    def shutdown(self) -> None:
+    def shutdown(self, carry: Any = ()) -> None:
         """The app closes: every recording ends. The command after a
         recording runs for them in after_shutdown(), once the player has
-        let go of its file - their usual check, 1.5 s later, never comes."""
+        let go of its file - their usual check, 1.5 s later, never comes.
+
+        *carry*: the ids of scheduled recordings recording here that a
+        `dopeiptv --server` running now carries on (core/rec_close.py chose
+        them): each one's connection here ends now, what it recorded stays
+        a recording of its own, and the job goes back on the list with where
+        it left off (CARRY) - its claim held until let_go_carried(), once
+        nothing of the window's reads the stream. One that cannot be carried
+        ends as before."""
+        self._shut = True
+        self._timer.stop()
         self._ended_on_quit = [j for j in self.jobs if j["status"] == "recording"]
         # MP4s being written are ended: each keeps its .ts and is done at
         # the next start (rec_mp4's journal), as is any due from now on.
@@ -2015,6 +2072,7 @@ class RecordingManager(QObject):
         stopped = rec_mp4.stop_all()
         if stopped:
             log.info("recording: %d MP4(s) left for the next start", stopped)
+        self._carry_on({str(c) for c in (carry or ())})
         self.finish_all_inplayer("app closed")
         for j in self.jobs:
             if j.get("_elsewhere"):
@@ -2032,20 +2090,153 @@ class RecordingManager(QObject):
     def _share_end(self) -> None:
         """Closing: a job still waiting here let go for the other recorder
         (a `dopeiptv --server` records it as it comes due), every lock let
-        go - this recorder no longer runs."""
+        go - this recorder no longer runs - but a carried one's, held until
+        let_go_carried()."""
         if self.claims is None:
             return
         for j in self.jobs:
-            if j.get("status") == "scheduled" and "_claim_state" in j:
+            if j.get("status") == "scheduled" and "_claim_state" in j \
+                    and not j.get("_carrying"):
                 try:
                     self.claims.free(j["id"])
                 except Exception as e:
                     log.debug("record: a claim not let go: %s", e)
                 j.pop("_claim_state", None)
         try:
+            self.claims.let_go_all(keep=self._carried)
+        except Exception as e:
+            log.debug("record: the claims not let go: %s", e)
+
+    # -- carried on by the server (core/rec_close.py) -----------------------------------
+
+    def _carry_on(self, ids: set[str]) -> None:
+        """(shutdown) Each recording of *ids* ended here for the server to
+        carry on: its connection - its recorder, the player's stream it
+        rides, its own ffmpeg or mpv - ends now; what it recorded is a
+        recording of its own, done, its info saying where the rest is; the
+        job scheduled again with CARRY, its claim held. One that cannot be
+        ended so is left to end as before."""
+        if not ids or self.claims is None or self._no_claims:
+            return
+        for j in list(self.jobs):
+            if (str(j.get("id")) not in ids or j.get("status") != "recording"
+                    or j.get("_elsewhere") or "_claim_state" not in j):
+                continue
+            try:
+                part = self._hand_over(j)
+            except Exception as e:      # ended as before, then
+                log.warning("record: %s not carried on by the server (%s) - it stops "
+                            "as the window closes", for_log(j.get("title")), e)
+                continue
+            self._ended_on_quit = [part if k is j else k for k in self._ended_on_quit]
+            self._carried.append(str(j["id"]))
+
+    def _hand_over(self, j: dict) -> dict:
+        """Job *j*'s connection here ended, its part kept: the part, done,
+        for after_shutdown(); *j* scheduled again with CARRY."""
+        rec = j.get("recorder")
+        if rec is not None:
+            rec.stop()                  # from the rewind buffer
+        elif j.get("inplayer"):
+            if self.stop_inplayer_cb is not None:
+                self.stop_inplayer_cb()     # the player's own stream, recorded
+        else:
+            self._stop_proc(j)          # its own connection, closed now
+        at = time.time()
+        path = str(j.get("path") or "")
+        part = {**j, "status": "done"}
+        if path:
+            self._note(path, self._words("rec_carried_note", time=_clock(at)))
+        for key in ("proc", "recorder", "inplayer", "background", "_feed", "_own", "_since",
+                    "_alias", "_listed", "_classic", "_go_ahead", "_held", "_after_ran"):
+            j.pop(key, None)
+        j.update(status="scheduled", path="", error="", proc=None, _carrying=True, edited=at)
+        j[self.CARRY] = {"at": at, "part": os.path.basename(path)[:255]}
+        log.info("record: %s - carried on by the server (dopeiptv --server) as the window "
+                 "closes: its connection here ended, the rest goes into a recording of its "
+                 "own", for_log(j.get("title")))
+        return part
+
+    def let_go_carried(self) -> None:
+        """(the window's closing, last) What the server carries on let go:
+        each carried recording's claim given up - the server takes it at its
+        next look and opens its own connection, the window's ended by now -
+        and every lock left held for them. Never raises."""
+        ids, self._carried = self._carried, []
+        if self.claims is None:
+            return
+        for jid in ids:
+            try:
+                self.claims.free(jid)
+            except Exception as e:
+                log.warning("record: a carried recording's claim not let go (%s) - the "
+                            "server takes it once this process has ended", e)
+        try:
             self.claims.let_go_all()
         except Exception as e:
             log.debug("record: the claims not let go: %s", e)
+
+    @classmethod
+    def carried_from(cls, j: dict) -> float | None:
+        """When the recorder before stopped, for a job carried on to this
+        one (CARRY) - within the job's own times - else None."""
+        carry = j.get(cls.CARRY)
+        if not isinstance(carry, dict):
+            return None
+        from .num import number
+        at = number(carry.get("at"))
+        start, stop = number(j.get("start")), number(j.get("stop"))
+        if at is None or start is None or at < start or (stop is not None and at > stop):
+            return None
+        return float(at)
+
+    def resumes_at(self, j: dict) -> float | None:
+        """Where a recording of *j*, due now, begins in a rewind buffer that
+        holds the past: where the window left off for one carried on, else
+        its start (None: none known)."""
+        at = self.carried_from(j)
+        if at is not None:
+            return at
+        from .num import number
+        start = number(j.get("start"))
+        return float(start) if start else None
+
+    def _note_carried(self) -> None:
+        """(each tick) A carried job recording here now: its info says it
+        goes on from where the window left off - once."""
+        for j in self.jobs:
+            if (j.get("status") != "recording" or j.get("_elsewhere")
+                    or j.get("_carry_noted") or not j.get("path")):
+                continue
+            at = self.carried_from(j)
+            if at is None:
+                continue
+            j["_carry_noted"] = True
+            part = str((j.get(self.CARRY) or {}).get("part") or "")
+            part = "".join(c for c in os.path.basename(part.replace("\\", "/"))
+                           if c >= " ")[:255]
+            self._note(str(j["path"]), self._words("rec_carry_note", time=_clock(at),
+                                                   part=part or "?"))
+
+    def _note(self, path: str, text: str) -> None:
+        """*text* added to recording *path*'s description (its sidecar)."""
+        try:
+            info = self.read_info(path)
+            desc = str(info.get("description") or "").strip()
+            self.write_info(path, str(info.get("title") or ""),
+                            f"{desc}\n\n{text}" if desc else text)
+        except Exception as e:          # never in a recording's way
+            log.debug("record: a recording's info not written: %s", e)
+
+    @staticmethod
+    def _words(key: str, **kw: Any) -> str:
+        """The app's words for *key* (the window's language; a server's its
+        settings' - headless.py sets it)."""
+        try:
+            from ..i18n import tr
+            return tr(key, **kw)
+        except Exception:
+            return key
 
     #: How long the app's closing waits, in all, for the rewind buffer's
     #: recordings to write their last bytes before their command runs.

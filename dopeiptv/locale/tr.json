@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Notlar",
   "notice_hist_empty": "Henüz bir şey yok – uygulamanın size söyledikleri ve başlattığınız işler, uygulama kapanana kadar burada görünür.",
   "notice_hist_none": "Bu türden bir şey yok.",
-  "menu_activity": "Etkinlik ve mesajlar…"
+  "menu_activity": "Etkinlik ve mesajlar…",
+  "set_start_channel": "Son kanalla başlat",
+  "set_start_channel_hint": "dopeIPTV açıldığında, kullanılan kaynakta en son izlediğin canlı kanal yeniden oynar – açılan bir televizyon gibi. dopeIPTV başka bir şey oynatmak için açıldığında değil.",
+  "rec_close_title": "Kayıtlar için dopeIPTV açık olmalı",
+  "rec_close_running": "dopeIPTV şu anda kayıt yapıyor. Yalnızca açıkken kayıt yapar; çıkarsan kaydedilmekte olan şey durur.",
+  "rec_close_due": "Önümüzdeki 12 saat içinde kaydedilmek üzere planlanmış bir şey var. dopeIPTV yalnızca açıkken kayıt yapar; çıkarsan kaydedilmez.",
+  "rec_close_server": "Pencere kapalıyken kayıt yapmak için dopeIPTV'yi sunucu olarak çalışır bırak: dopeiptv --server",
+  "rec_close_keep": "dopeIPTV'yi açık tut",
+  "rec_close_quit": "Yine de çık",
+  "rec_carried_note": "Uygulamanın penceresi kapandı (saat {time}): dopeIPTV'nin sunucusu (dopeiptv --server) geri kalanını ayrı bir kayıt olarak kaydediyor. İkisi arasında birkaç saniye eksik olabilir.",
+  "rec_carry_note": "Saat {time} itibarıyla, uygulamanın penceresinin kaydı bıraktığı yerden devam eder; öncesindeki bölüm \"{part}\" kaydıdır. İkisi arasında birkaç saniye eksik olabilir."
 }

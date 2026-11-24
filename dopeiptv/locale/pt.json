@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "Notas",
   "notice_hist_empty": "Nada ainda – o que o app avisa e as tarefas que você inicia aparecem aqui até ele ser fechado.",
   "notice_hist_none": "Nada deste tipo.",
-  "menu_activity": "Atividade e mensagens…"
+  "menu_activity": "Atividade e mensagens…",
+  "set_start_channel": "Iniciar no último canal",
+  "set_start_channel_hint": "Ao abrir o dopeIPTV, o canal ao vivo que você assistiu por último na fonte em uso volta a tocar, como uma TV que se liga. Não quando o dopeIPTV é aberto para reproduzir outra coisa.",
+  "rec_close_title": "As gravações precisam do dopeIPTV aberto",
+  "rec_close_running": "O dopeIPTV está gravando agora. Ele só grava enquanto está aberto, então sair interrompe o que está sendo gravado.",
+  "rec_close_due": "Há algo agendado para gravar nas próximas 12 horas. O dopeIPTV só grava enquanto está aberto, então isso não será gravado se você sair.",
+  "rec_close_server": "Para gravar com a janela fechada, mantenha o dopeIPTV rodando como servidor: dopeiptv --server",
+  "rec_close_keep": "Manter o dopeIPTV aberto",
+  "rec_close_quit": "Sair mesmo assim",
+  "rec_carried_note": "A janela do app foi fechada às {time}: o servidor do dopeIPTV (dopeiptv --server) grava o resto, como uma gravação à parte. Alguns segundos entre as duas podem faltar.",
+  "rec_carry_note": "Continua a partir das {time}, onde a janela do app parou de gravar; a parte anterior é a gravação \"{part}\". Alguns segundos entre as duas podem faltar."
 }

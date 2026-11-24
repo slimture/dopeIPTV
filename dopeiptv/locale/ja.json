@@ -3228,5 +3228,15 @@
   "notice_hist_notes": "お知らせ",
   "notice_hist_empty": "まだありません。アプリからのお知らせや開始した作業は、アプリを閉じるまでここに表示されます。",
   "notice_hist_none": "この種類の項目はありません。",
-  "menu_activity": "アクティビティとメッセージ…"
+  "menu_activity": "アクティビティとメッセージ…",
+  "set_start_channel": "最後のチャンネルで起動",
+  "set_start_channel_hint": "dopeIPTV を開くと、使用中のソースで最後に見ていたライブチャンネルがもう一度再生されます。テレビの電源を入れたときのように。dopeIPTV がほかのものを再生するために開かれたときは除きます。",
+  "rec_close_title": "録画には dopeIPTV を開いておく必要があります",
+  "rec_close_running": "dopeIPTV は現在録画中です。開いている間だけ録画するため、終了すると録画中の内容は止まります。",
+  "rec_close_due": "12 時間以内に録画の予定があります。dopeIPTV は開いている間だけ録画するため、終了すると録画されません。",
+  "rec_close_server": "ウィンドウを閉じたまま録画するには、dopeIPTV をサーバーとして動かしたままにしてください: dopeiptv --server",
+  "rec_close_keep": "dopeIPTV を開いたままにする",
+  "rec_close_quit": "それでも終了",
+  "rec_carried_note": "アプリのウィンドウは {time} に閉じられました。残りは dopeIPTV のサーバー (dopeiptv --server) が別の録画として録画します。2 つの間の数秒が欠けている場合があります。",
+  "rec_carry_note": "{time} から、アプリのウィンドウが録画を止めたところの続きです。その前の部分は録画「{part}」です。2 つの間の数秒が欠けている場合があります。"
 }

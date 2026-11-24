@@ -9,6 +9,30 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
+- Start on the last channel (Settings → General → Start; off by default,
+  each profile its own): as the app opens, the live channel you watched
+  last on the source in use plays again, like a TV switched on. Only once
+  who is watching is said ("Who's watching?", a profile's PIN, TV mode's
+  picker), never over a command the app was opened with (`--play`,
+  `--channel`, a `dopeiptv://` link) or one handed over meanwhile, never for
+  a channel the lists would not show now (hidden, of a hidden or locked
+  category, one a kids profile may not see) - then nothing plays, and no
+  older channel instead. It plays as a click on the channel does: the
+  account's connections, server mode's sharing and every question as ever.
+- A recording carried on when the window closes: while a `dopeiptv --server`
+  runs, closing the window as it records a scheduled recording hands the
+  rest to the server - the window ends its own connection first, then lets
+  the recording go, and the server opens its own and records the rest as a
+  recording of its own beside the first part. A few seconds between the two
+  may be missing, and both parts' info (their description) says so. The
+  server is never started for it, and a recording started by hand ("until
+  stopped") or one about to end stops as before.
+- Closing the window with recordings due and no server to take them asks
+  first: a recording running, or one due within the next 12 hours, records
+  only while dopeIPTV is open - "Keep dopeIPTV open" (the default, and what
+  Escape does) or "Quit anyway". Not asked when the app closes itself (Reset
+  all, a restore, an update's restart, Ctrl+C in the terminal).
+
 - The notices at the sidebar's foot fold away to a small bell beside
   Settings when nothing is happening, the unread messages counted on it;
   the line comes back only while something runs or is said. The bell
