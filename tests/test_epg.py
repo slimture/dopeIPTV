@@ -360,3 +360,62 @@ def test_a_damaged_index_falls_back_to_the_xml(tmp_path):
     g2 = XmltvGuide(client=None, cache_path=str(cache))
     assert g2._load_index() is True
     assert not list(tmp_path.glob("*.part"))
+
+
+# -- a guide's times read without strptime (docs/PERFORMANCE.md) ----------------------
+
+def _moment(s):
+    dt = parse_xmltv_time(s)
+    return None if dt is None else dt.timestamp()
+
+
+def test_a_guide_time_is_read_the_same_without_strptime():
+    import random
+
+    from dopeiptv.providers.epg import xmltv_moment
+    rnd = random.Random(7)
+    samples = ["", None, "   ", "2026", "20260927200000", "20260927200000 +0200",
+               "20260927200000+0200", " 20260927200000  -0530 ", "20260927200000 +02:00",
+               "20260927180000Z", "20260927180000 gmt", "20260927180000 utc", "20260927180000 Utc",
+               "20260927200000 junk", "20260927200000 +2400", "20260927200000 +2359",
+               "20260927200000 -2359", "20260927200000 +0060", "20260927200000 -0000",
+               "20260927200000 +020", "20260927200000 +02000", "20260230120000 +0000",
+               "20240229120000 +0000", "20230229120000 +0000", "20261301120000 +0000",
+               "20260001120000 +0000", "20260100120000 +0000", "20260101240000 +0000",
+               "20260101236000 +0000", "20260101235960 +0000", "20260101235959 +0000",
+               "19700101000000 +0000", "19691231235959 +0000", "19710101000000 +0100",
+               "28991231235959 -0100", "29000101000000 +0000", "00010101000000 +0100",
+               "99991231235959 -0100", "２0260927200000 +0200", "20260927200000 +０200",
+               "2026092720000 +0200", "202609272000000 +0200", "\t20260927200000\t+0100\n",
+               "20260927200000 + 0200", "20260927200000 +0200 ", "abcd0927200000 +0200"]
+    for _ in range(3000):
+        y = rnd.choice([1969, 1970, 1971, 2000, 2024, 2025, 2026, 2100, 2899, 2900])
+        mo, d = rnd.randint(0, 13), rnd.randint(0, 32)
+        h, mi, se = rnd.randint(0, 25), rnd.randint(0, 61), rnd.randint(0, 61)
+        sign = rnd.choice("+-")
+        off = f"{sign}{rnd.randint(0, 25):02d}{rnd.randint(0, 61):02d}"
+        sep = rnd.choice(["", " ", "  "])
+        samples.append(f"{y:04d}{mo:02d}{d:02d}{h:02d}{mi:02d}{se:02d}{sep}{off}")
+    for s in samples:
+        assert xmltv_moment(s) == _moment(s), s
+
+
+def test_a_guide_in_its_own_form_is_parsed_without_strptime(monkeypatch):
+    # strptime took three quarters of a big guide's parse: the form nearly
+    # every guide writes is read without it, and gives what it gave.
+    from dopeiptv.providers import epg
+    there = timezone(timedelta(hours=1))
+    now = datetime.now(there).replace(minute=0, second=0, microsecond=0)
+    times = [((now + timedelta(hours=i)).strftime(f), (now + timedelta(hours=i + 1)).strftime(f))
+             for i in range(50) for f in ("%Y%m%d%H%M%S +0100", "%Y%m%d%H%M%S+0100")[i % 2:][:1]]
+    progs = "".join(f'<programme start="{a}" stop="{b}" channel="a"><title>T{i}</title></programme>'
+                    for i, (a, b) in enumerate(times))
+    data = f'<tv><channel id="a"><display-name>A</display-name></channel>{progs}</tv>'.encode()
+    asked = []
+    real = epg.parse_xmltv_time
+    monkeypatch.setattr(epg, "parse_xmltv_time", lambda s: asked.append(s) or real(s))
+    starts, stops, titles, _descs = epg.parse_xmltv(data, 7)[0]["a"]
+    assert asked == []
+    assert list(starts) == [int(real(a).timestamp()) for a, _b in times]
+    assert list(stops) == [int(real(b).timestamp()) for _a, b in times]
+    assert titles == tuple(f"T{i}" for i in range(50))
