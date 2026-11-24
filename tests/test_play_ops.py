@@ -64,7 +64,9 @@ class FakeMpv(dict):
         object.__setattr__(self, "_pause", False)
 
     def __setitem__(self, k, v):
-        ops.append(["set", k, norm(v)])
+        # The certificate bundle is wherever this machine keeps it (the
+        # system's, or certifi's): that one is set is what counts.
+        ops.append(["set", k, "@CA@" if k == "tls-ca-file" and v else norm(v)])
         super().__setitem__(k, v)
 
     def __getattr__(self, n):

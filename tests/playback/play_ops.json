@@ -1068,7 +1068,7 @@
    [
     "set",
     "tls-ca-file",
-    "/etc/ssl/certs/ca-certificates.crt"
+    "@CA@"
    ],
    [
     "command",
