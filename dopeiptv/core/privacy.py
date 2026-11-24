@@ -79,9 +79,11 @@ def keep_nothing(on: bool, spared: Any = ()) -> None:
     """The demo is the source (*on*, ui/mw_onboarding.py): every playback
     started from now on is kept nowhere, as playback_private says, but of
     the kinds *spared*; off, what starts next is kept as ever."""
-    global _passing_on, _passing_spared
+    global _passing_on, _passing_spared, _passing_playback
     _passing_on = bool(on)
     _passing_spared = frozenset(str(k) for k in spared) if on else frozenset()
+    if not on:
+        _passing_playback = None
 
 
 def keeping_nothing() -> bool:
@@ -171,15 +173,15 @@ def for_log(text: Any) -> Any:
     """What a log line may say of what is played: its title or name, or
     "<private>" while private viewing is on or a playback that began
     private still goes on after it - the log is kept on disk and goes with
-    a report."""
-    return "<private>" if playing_private() else text
+    a report. The demo's playbacks are named so too (keep_nothing)."""
+    return "<private>" if playing_private() or _passing_playback is not None else text
 
 
 def url_for_log(url: Any) -> str:
     """A stream's address as a log line may carry it: its account taken out
     (core/log.redact_url) - and, for what plays privately, nothing at all:
     not the server's name either, which says whose service it is."""
-    if not playing_private():
+    if not playing_private() and _passing_playback is None:
         return redact_url(url)
     return "<private>"
 

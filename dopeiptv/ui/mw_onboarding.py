@@ -17,7 +17,16 @@ The guide (ui/welcome.py) asks; the window does the work here:
   Radio. Remembered, so the guide does not come back at every start.
 * No source of one's own (explore, the demo): a calm strip under the list
   says so with "Add your own source" - in the pane's layout, never over the
-  list - and the guide opens on the choice of what to watch.
+  list - and the guide opens on the choice of what to watch; in the demo it
+  also offers to leave it (back to no source). It can be put away for the
+  session (its ✕), and on a narrow pane its buttons go under its words.
+* Who is watching first: while "Who's watching?" is up, or a PIN is still
+  to be given, the guide waits hidden - its keys, its Esc and its actions
+  come after the profile is picked (_welcome_hold, _welcome_after_pick).
+* A kids profile adds no source, brings no settings and turns no Nerd on
+  without a grown-up's PIN (mw_profiles._kids_settings_unlock): the strip's
+  button, Connect, the Bring step and the Nerd link ask it (the guide's
+  *guard*); the Nerd link is not offered to it at all.
 
 The welcome's Bring step (settings from another computer) is done here
 with what Settings does: the sync code joined as Settings > Sync joins it
@@ -43,7 +52,9 @@ from typing import Any
 
 from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QBoxLayout, QFrame, QHBoxLayout, QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget,
+)
 
 from ..core import privacy
 from ..core.log import log
@@ -122,10 +133,62 @@ class _OnboardingMixin:
     #: The demo in use: what its stores write to (in memory).
     _demo_kept: PassingSettings | None = None
     _source_strip: QWidget | None = None
+    #: The guide waiting for "Who's watching?": the page it is to open on
+    #: (show_welcome asked meanwhile), or True when it was up and hidden
+    #: (_welcome_hold) - None when nothing waits.
+    _welcome_waits: Any = None
+    #: The strip put away for the session, and for which state ("demo",
+    #: "none"): it comes back for the other.
+    _strip_away: str = ""
+
+    def _welcome_blocked(self) -> bool:
+        """Who is watching is still to be said: the picker is up, or a PIN
+        waits (mw_profiles) - the guide comes after."""
+        return (getattr(self, "_profile_picker", None) is not None
+                or bool(getattr(self, "_profile_must_pick", False)))
+
+    def _welcome_hold(self) -> None:
+        """(mw_profiles) "Who's watching?" is shown: the guide up now is
+        hidden as it is, to come back once a profile is picked."""
+        ov = self._wizard_view()
+        if ov is not None and ov.isVisible():
+            ov.hide()
+            self._welcome_waits = True
+
+    def _welcome_after_pick(self) -> None:
+        """(mw_profiles) The picker gone: the guide that waited for it -
+        as it was, or opened on the page asked for meanwhile."""
+        if sip.isdeleted(self) or self._welcome_blocked():
+            return
+        waits, self._welcome_waits = self._welcome_waits, None
+        if waits is None:
+            return
+        ov = self._wizard_view()
+        if waits is True and ov is not None:
+            ov.cover()
+            self._update_provider_hint()
+            return
+        self.show_welcome(PAGE_WELCOME if waits is True else int(waits))
+
+    def _welcome_may_change(self) -> bool:
+        """The guide's guard: before a source is tried, settings are brought
+        or Nerd is switched - a kids profile's grown-up PIN
+        (mw_profiles._kids_settings_unlock); anyone else goes on."""
+        unlock = getattr(self, "_kids_settings_unlock", None)
+        return bool(unlock()) if callable(unlock) else True
+
+    def _welcome_kids(self) -> bool:
+        kids = getattr(self, "_profile_kids", None)
+        return bool(kids()) if callable(kids) else False
 
     def show_welcome(self, page: int = PAGE_WELCOME) -> None:
         """Show the guide - from its first page, or *page* (the choice of
-        what to watch, from "Add your own source")."""
+        what to watch, from "Add your own source"). Not while who is
+        watching is still to be said: it waits for the profile."""
+        if self._welcome_blocked():
+            if self._welcome_waits is not True:
+                self._welcome_waits = page
+            return
         if self._welcome is None:
             self._welcome = WelcomeOverlay(
                 self, settings=self.settings,
@@ -133,7 +196,9 @@ class _OnboardingMixin:
                 on_explore=self._wizard_explore,
                 on_language_change=self._wizard_language,
                 on_demo=self.start_demo,
-                on_files=self._wizard_files)
+                on_files=self._wizard_files,
+                guard=self._welcome_may_change,
+                kids=self._welcome_kids)
             self._welcome.sync_asked.connect(self._wizard_sync)
             self._welcome.sync_cancelled.connect(self._wizard_sync_cancel)
             self._welcome.restore_asked.connect(self._wizard_restore)
@@ -166,10 +231,10 @@ class _OnboardingMixin:
         worked. One try at a time."""
         if self._wtry is not None:
             return
-        # Use the name the user typed; fall back to the server host so an
-        # unnamed playlist still gets a sensible label.
-        name = name.strip() or server.split("//")[-1].split("/")[0] \
-            or tr("playlist_default_name")
+        # The name typed; else the server's host, or a playlist file's
+        # name - never a login the address carries (core/names.py).
+        from ..core.names import source_name
+        name = name.strip() or source_name(server) or tr("playlist_default_name")
         store = self.playlist_store
         taken = {str(p.get("id")) for p in (store.playlists() if store is not None else [])}
         pid = uuid.uuid4().hex[:8]
@@ -250,14 +315,18 @@ class _OnboardingMixin:
             log.info("welcome: the try was stopped")
 
     def _wizard_explore(self) -> None:
+        # The strip under the list says there is no source yet, and how to
+        # add one: nothing more is said here.
         self._wizard_connect_cancel()
-        self._set_status(tr("welcome_add_hint"))
         self._update_provider_hint()
 
     def _wizard_files(self) -> None:
-        """Just my files and radio: no source - Local files, where its Add
-        folder is; the guide is not shown again at start for it."""
+        """Just my files and radio: no source - the demo left if it was in
+        use - Local files, where its Add folder is; the guide is not shown
+        again at start for it."""
         self._wizard_connect_cancel()
+        if self._demo_kept is not None:
+            self._demo_to_nothing()
         self.settings.setValue(FILES_ONLY_KEY, "true")
         self._show_place("local")
         self._update_provider_hint()
@@ -308,6 +377,44 @@ class _OnboardingMixin:
         self.watchlist = WatchlistStore(cache)
         self._build_source_stores(None)
         log.info("demo: left - nothing of it kept")
+
+    def _demo_to_nothing(self) -> None:
+        """Leave the demo for no source at all (the strip's Leave the demo,
+        Just my files and radio): as at a first start - the empty client,
+        no guide of its own, the window's lists read again."""
+        if self._demo_kept is None:
+            return
+        store = getattr(self, "playlist_store", None)
+        pid = getattr(store, "active_id", None) if store is not None else None
+        if pid and store.get(pid):
+            # A source of one's own is there (added while the demo ran, its
+            # switch not through): that one, not none.
+            self.switch_playlist(pid)
+            return
+        self._leave_demo()
+        from ..providers.epg import XmltvGuide
+        self.client = OfflineClient()
+        self._base_title = self._no_source_title()
+        self.setWindowTitle(self._base_title)
+        self._last_cat = {}
+        self._recent_cache = {}
+        self._full_catalog = None
+        self._search_index_cache = {}
+        self.xmltv = XmltvGuide(self.client, None, cache_path=None)
+        for name in ("_guide_source_changed", "_sp_source_changed", "_pf_source_changed",
+                     "_place_series_source_changed", "_popular_changed", "_update_playlist_btn"):
+            fn = getattr(self, name, None)
+            if callable(fn):
+                fn()
+        self._refresh_places("source")
+        self._refresh_mode_availability()
+        if getattr(self, "mode", "live") not in _OWN_PLACES:
+            self.switch_mode("live")
+        self._update_provider_hint()
+
+    def _no_source_title(self) -> str:
+        from .. import APP_NAME
+        return APP_NAME
 
     # -- the Bring step: settings from another computer ----------------------
 
@@ -410,6 +517,9 @@ class _OnboardingMixin:
                 from .qt_i18n import format_when
                 ov.sync_no_sources(tr("sync_joined_saved", when=format_when(saved, "d MMM yyyy HH:mm"))
                                    if saved else "")
+            # The profiles that came: "Who's watching?" as at start - the
+            # guide waits behind it, on the choice of what to watch.
+            self._maybe_pick_profile_at_start()
             return
         self._wizard_load(came)
         # "Who's watching?" as at start, with two profiles or more.
@@ -482,37 +592,43 @@ class _OnboardingMixin:
         """Explore (no source at all) or the demo."""
         return type(self.client) is OfflineClient or self._demo_kept is not None
 
+    def _own_source_id(self) -> str | None:
+        """The source in use's id - None while there is no source of one's
+        own (explore, the demo): what is kept per source (stream health,
+        own channel numbers, the avatar) is never the demo's under a stored
+        source's id."""
+        if self._demo_kept is not None:
+            return None
+        store = getattr(self, "playlist_store", None)
+        return getattr(store, "active_id", None) if store is not None else None
+
     def _build_source_strip(self, lay) -> None:
         """(mw_build) The strip under the middle pane's pages that says
         there is no source of one's own - the demo's word, or none at all -
-        with "Add your own source": in the pane's layout, so it never covers
-        a row."""
-        holder = QWidget()
-        hl = QVBoxLayout(holder)
-        hl.setContentsMargins(0, 0, 0, 10)
-        strip = QFrame(objectName="SourceStrip")
-        strip.setStyleSheet(
-            f"#SourceStrip {{ background: {P['input']}; border: 1px solid {P['border']};"
-            " border-radius: 10px; }"
-            f"#SourceStripText {{ color: {P['text2']}; font-size: 12px; }}")
-        row = QHBoxLayout(strip)
-        row.setContentsMargins(12, 8, 10, 8)
-        row.setSpacing(10)
-        words = QVBoxLayout()
-        words.setSpacing(0)
-        self._source_strip_text = QLabel("", objectName="SourceStripText")
-        self._source_strip_text.setWordWrap(True)
-        self._source_strip_text.setTextFormat(Qt.TextFormat.PlainText)
-        words.addWidget(self._source_strip_text)
-        row.addLayout(words, 1)
-        self._source_strip_btn = QPushButton(tr("onb_add_own_source"), objectName="Primary")
-        self._source_strip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._source_strip_btn.clicked.connect(lambda: self.show_welcome(PAGE_CHOOSE))
-        row.addWidget(self._source_strip_btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        hl.addWidget(strip)
-        holder.hide()
-        lay.addWidget(holder)
-        self._source_strip = holder
+        with "Add your own source" (and in the demo, Leave the demo): in the
+        pane's layout, so it never covers a row."""
+        strip = _SourceStrip()
+        self._source_strip_text = strip.text
+        self._source_strip_btn = strip.add
+        self._source_strip_leave = strip.leave
+        strip.add.clicked.connect(self._strip_add_source)
+        strip.leave.clicked.connect(self._demo_to_nothing)
+        strip.away.clicked.connect(self._strip_put_away)
+        strip.hide()
+        lay.addWidget(strip)
+        self._source_strip = strip
+
+    def _strip_add_source(self) -> None:
+        """Add your own source: the guide on the choice of what to watch - a
+        kids profile only with a grown-up's PIN."""
+        if not self._welcome_may_change():
+            return
+        self.show_welcome(PAGE_CHOOSE)
+
+    def _strip_put_away(self) -> None:
+        """Its ✕: away for the session, while this state lasts."""
+        self._strip_away = "demo" if self._demo_kept is not None else "none"
+        self._update_provider_hint()
 
     def _update_provider_hint(self) -> None:
         """The strip under the list while there is no source of one's own
@@ -522,10 +638,81 @@ class _OnboardingMixin:
         if strip is None or sip.isdeleted(strip):
             return
         overlay_up = self._welcome is not None and self._welcome.isVisible()
+        state = "demo" if self._demo_kept is not None else "none"
         on = (self._no_own_source() and not overlay_up and not getattr(self, "_player_fs", False)
-              and getattr(self, "mode", "live") not in _OWN_PLACES)
+              and getattr(self, "mode", "live") not in _OWN_PLACES
+              and self._strip_away != state)
         if on:
-            self._source_strip_text.setText(
-                tr("onb_strip_demo") if self._demo_kept is not None else tr("onb_strip_none"))
-            self._source_strip_btn.setText(tr("onb_add_own_source"))
+            strip.say(state == "demo")
         strip.setVisible(on)
+
+
+class _SourceStrip(QWidget):
+    """The calm strip that says there is no source of one's own: its words,
+    Add your own source, in the demo Leave the demo, and a ✕ that puts it
+    away for the session. Its buttons go under its words on a narrow pane
+    (NARROW), so the words take two lines, not five."""
+
+    NARROW = 560
+
+    def __init__(self) -> None:
+        super().__init__()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 10)
+        frame = QFrame(objectName="SourceStrip")
+        frame.setStyleSheet(
+            f"#SourceStrip {{ background: {P['input']}; border: 1px solid {P['border']};"
+            " border-radius: 10px; }"
+            f"#SourceStripText {{ color: {P['text2']}; font-size: 12px; }}"
+            f"QPushButton#SourceStripLeave {{ background: transparent; border: none;"
+            f" color: {P['muted']}; font-size: 12px; padding: 4px 6px; }}"
+            f"QPushButton#SourceStripLeave:hover, QPushButton#SourceStripLeave:focus"
+            f" {{ color: {P['text']}; text-decoration: underline; }}"
+            f"QToolButton#SourceStripAway {{ background: transparent; border: none;"
+            f" color: {P['muted']}; padding: 2px; }}"
+            f"QToolButton#SourceStripAway:hover, QToolButton#SourceStripAway:focus"
+            f" {{ color: {P['text']}; }}")
+        self._box = QBoxLayout(QBoxLayout.Direction.LeftToRight, frame)
+        self._box.setContentsMargins(12, 8, 6, 8)
+        self._box.setSpacing(10)
+        self.text = QLabel("", objectName="SourceStripText")
+        self.text.setWordWrap(True)
+        self.text.setTextFormat(Qt.TextFormat.PlainText)
+        self._box.addWidget(self.text, 1)
+        buttons = QHBoxLayout()
+        buttons.setSpacing(6)
+        self.leave = QPushButton(objectName="SourceStripLeave")
+        self.leave.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add = QPushButton(objectName="Primary")
+        self.add.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.away = QToolButton(objectName="SourceStripAway")
+        self.away.setText("✕")
+        self.away.setAutoRaise(True)
+        self.away.setCursor(Qt.CursorShape.PointingHandCursor)
+        buttons.addStretch(1)
+        buttons.addWidget(self.leave, 0, Qt.AlignmentFlag.AlignVCenter)
+        buttons.addWidget(self.add, 0, Qt.AlignmentFlag.AlignVCenter)
+        buttons.addWidget(self.away, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._box.addLayout(buttons)
+        outer.addWidget(frame)
+        self.say(False)
+
+    def say(self, demo: bool) -> None:
+        self.text.setText(tr("onb_strip_demo") if demo else tr("onb_strip_none"))
+        self.add.setText(tr("onb_add_own_source"))
+        self.leave.setText(tr("onb_leave_demo"))
+        self.leave.setVisible(demo)
+        self.away.setToolTip(tr("common_close"))
+        self.away.setAccessibleName(tr("common_close"))
+        self._fit()
+
+    def _fit(self) -> None:
+        narrow = 0 < self.width() < self.NARROW
+        want = (QBoxLayout.Direction.TopToBottom if narrow
+                else QBoxLayout.Direction.LeftToRight)
+        if self._box.direction() != want:
+            self._box.setDirection(want)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt's name
+        super().resizeEvent(event)
+        self._fit()

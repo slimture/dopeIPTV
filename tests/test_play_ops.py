@@ -6,7 +6,8 @@ command and load in its order plays: a live channel with mpv's own
 rewind, one from the app's rewind buffer, a film from where it got to, a
 film with its tracks and a subtitle kept, a channel with subtitles off, a
 web page (its own file options), a channel after it, an RTSP address of
-no SAT>IP source (played as it is), a channel while muted, an address that is no stream, a
+no SAT>IP source (played as it is), a channel while muted, the demo's film
+on a loop and a channel after it, an address that is no stream, a
 stream whose certificate this core will not check, and no core at all.
 
 tests/playback/play_ops.json holds what mpv was told. When a change to it
@@ -166,6 +167,13 @@ p.video.mpv = None
 p.video.ensure_started = None
 run("no_core", "http://192.0.2.1/live/u/p/1.ts", "One", local_buffer=True, buffer_key="live:1")
 p.video.mpv = saved
+# The demo's film on a loop (main_window._loop_arm): mpv loops that file,
+# no rewind buffer even with one to be had - and the next stream as ever.
+dvr["url"] = "http://127.0.0.1:41000/live.ts?t=loop"
+run("loop", "https://example.com/films/bbb.mp4", "Loop", local_buffer=True,
+    buffer_key="live:loop", before=p.loop_next)
+run("after_loop", "http://192.0.2.1/live/u/p/2.ts", "Two", local_buffer=True,
+    buffer_key="live:2")
 print("RESULT" + json.dumps(out), flush=True)
 os._exit(0)
 """
@@ -227,6 +235,17 @@ def test_what_the_record_says_holds():
     assert ["set", "mute", True] in k["muted"]["ops"]
     for way in ("no_stream", "no_core"):
         assert not k[way]["ok"] and k[way]["ops"] == [], way
+    # A film on a loop: loop-file for that file alone, never through the
+    # rewind buffer; the stream after it plays as ever (buffer and all).
+    loop = k["loop"]
+    loads = [o for o in loop["ops"] if o[0] == "command" and o[1] == "loadfile"]
+    assert len(loads) == 1 and any("loop-file=inf" in str(x) for x in loads[0]), loop["ops"]
+    assert not loop["buffer"] and not any("127.0.0.1:41000" in str(o) for o in loop["ops"])
+    for way, rec in k.items():
+        if way != "loop":
+            assert not any("loop-file" in str(o) for o in rec["ops"]), way
+    assert k["after_loop"]["buffer"]
+    assert ["play", "http://127.0.0.1:41000/live.ts?t=loop"] in k["after_loop"]["ops"]
     u = k["unchecked"]
     assert not u["ok"] and u["refusal"] and ["command", "stop"] in u["ops"]
     assert not any(o[0] == "play" for o in u["ops"])

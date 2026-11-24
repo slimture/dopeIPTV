@@ -504,7 +504,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._search_sources_changed()
         self._xs_sources_changed()
         store = self.playlist_store
-        pl = store.get(store.active_id) if (store and store.active_id) else None
+        # The demo is no source of one's own: no stored source's name on it.
+        pid = self._own_source_id()
+        pl = store.get(pid) if (store and pid) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
         prof = self._profile() if self._profile_many() else None
         if prof is not None:
@@ -985,7 +987,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         """Single Escape handler so the key is never ambiguous: dismiss the
         onboarding wizard if it's up, else leave the Guide page if it shows,
         otherwise leave fullscreen. The notices' panel open closes first,
-        and alone."""
+        and alone; the command palette open over the guide is the guide's
+        (it is not opened over it)."""
         panel = getattr(self, "_notice_panel", None)
         if panel is not None and not panel.isHidden():
             panel.close_panel()
@@ -1986,6 +1989,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_audio_visuals(url)
         self._arm_loading(it.get("stream_icon"))
         self.player.refusal = ""
+        self._loop_arm("live", it)
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(wake_reason(title))
@@ -2839,6 +2843,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # and where it is decides its way out (core/net_bridge.py).
         outside = kind == "radio" or (not own_buffer and self._from_outside(url))
         self.player.refusal = ""
+        if not catchup:
+            self._loop_arm(kind, item)
         if self.player.play(url, title, start=resume_at,
                             local_buffer=kind == "live" and not catchup,
                             buffer_key=f"{kind}:{key}" if key else None,
@@ -2872,6 +2878,21 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                         "external mpv window", url_for_log(url))
             self.player.hide()
             launch_player("mpv", url, title, self)
+
+    def _loop_arm(self, kind: str, item) -> None:
+        """A channel the source plays as a film on a loop (the demo's,
+        DemoClient.loops): the player told to loop that file - never any
+        other stream's way."""
+        loops = getattr(self.client, "loops", None)
+        if kind != "live" or not callable(loops) or not isinstance(item, dict):
+            return
+        try:
+            on = bool(loops(item.get("stream_id")))
+        except Exception:
+            on = False
+        arm = getattr(self.player, "loop_next", None) if on else None
+        if callable(arm):
+            arm()
 
     def _arm_loading(self, icon_url, reconnect: bool = False) -> None:
         """What the player's loading indicator shows while the next stream

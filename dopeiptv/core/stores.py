@@ -18,7 +18,7 @@ from PyQt6.QtCore import QSettings
 
 from . import pins, privacy, site_out
 from .log import register_secrets
-from .names import collapse_repeats
+from .names import collapse_repeats, source_name
 
 
 class PassingSettings:
@@ -952,8 +952,7 @@ class PlaylistStore:
                    and (p.get("mac") or "").upper() == mac
                    for p in self.items):
                 continue
-            row: dict[str, Any] = {"name": field("name")
-                   or server.split("//")[-1].split("/")[0],
+            row: dict[str, Any] = {"name": field("name") or source_name(server),
                    "kind": kind, "server": server, "username": user,
                    "password": pw, "epg_url": field("epg_url"),
                    "refresh": field("refresh") or "never"}

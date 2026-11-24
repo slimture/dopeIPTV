@@ -32,7 +32,6 @@ source the window then offers a calm "Add your own source" over its lists.
 
 from __future__ import annotations
 
-from html import escape
 from typing import Callable
 
 from PyQt6.QtCore import QLocale, QRectF, QSize, Qt, QTimer, pyqtSignal
@@ -53,6 +52,7 @@ from .box_finder import (
 from .dialogs import KindOwnFields, PlaylistDialog, stalker_available
 from .media_signin import MediaSignIn
 from .theme import P
+from .widgets import as_label
 
 #: The pages, in the stack's order.
 PAGE_WELCOME, PAGE_CHOOSE, PAGE_FORM, PAGE_WORK, PAGE_BRING = range(5)
@@ -85,69 +85,92 @@ STEP_WORDS = {"login": "ms_signing_in", "live": "onb_step_live",
               "vod": "onb_step_vod", "series": "onb_step_series"}
 
 
-class _Link(QLabel):
-    """A quiet link that wraps: a long translation goes on a second line
-    instead of being cut at the card's edge, as a button's text would.
-    Clicked, or Enter / Space with the focus on it."""
+class _Link(QPushButton):
+    """A quiet link: a flat button - a screen reader says a button, Space
+    and Enter press it - whose words wrap: a long translation goes on a
+    second line instead of being cut at the card's edge. Muted, the
+    theme's text colour and underlined while pointed at or focused."""
 
-    clicked = pyqtSignal()
+    PAD_Y = 3
 
     def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("OnbLink")
-        self.setWordWrap(True)
-        self.setTextFormat(Qt.TextFormat.RichText)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFlat(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self._plain = ""
+        sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
         self._hot = False
+        self._words = ""
         self.set_plain(text)
 
     def plain(self) -> str:
-        return self._plain
+        return self._words
 
     def set_plain(self, text: str) -> None:
-        self._plain = text
+        # The words painted as they are; the button's own text with "&"
+        # doubled, so a translation's "&" makes no shortcut (widgets.as_label).
+        self._words = text
+        self.setText(as_label(text))
         self.setAccessibleName(text)
-        self._paint()
+        self.updateGeometry()
+        self.update()
 
-    def _paint(self) -> None:
-        hot = self._hot or self.hasFocus()
-        colour = P["text"] if hot else P["muted"]
-        body = escape(self._plain)
-        self.setText(f"<span style='color:{colour}'>"
-                     + (f"<u>{body}</u>" if hot else body) + "</span>")
+    def _font(self) -> QFont:
+        f = QFont(self.font())
+        f.setPixelSize(12)
+        f.setUnderline(self._hot or self.hasFocus())
+        return f
+
+    def _flags(self) -> int:
+        return int(Qt.AlignmentFlag.AlignCenter) | int(Qt.TextFlag.TextWordWrap)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 - Qt's name
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 - Qt's name
+        fm = QFontMetrics(self._font())
+        r = fm.boundingRect(0, 0, max(1, width), 10_000, self._flags(), self._words)
+        return r.height() + 2 * self.PAD_Y
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        fm = QFontMetrics(self._font())
+        w = fm.horizontalAdvance(self._words) + 4
+        return QSize(w, fm.height() + 2 * self.PAD_Y)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        fm = QFontMetrics(self._font())
+        return QSize(min(120, self.sizeHint().width()), fm.height() + 2 * self.PAD_Y)
 
     def enterEvent(self, event) -> None:
         self._hot = True
-        self._paint()
+        self.update()
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
         self._hot = False
-        self._paint()
+        self.update()
         super().leaveEvent(event)
 
     def focusInEvent(self, event) -> None:
         super().focusInEvent(event)
-        self._paint()
+        self.update()
 
     def focusOutEvent(self, event) -> None:
         super().focusOutEvent(event)
-        self._paint()
+        self.update()
 
-    def mouseReleaseEvent(self, event) -> None:
-        super().mouseReleaseEvent(event)
-        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(
-                event.position().toPoint()):
-            self.clicked.emit()
-
-    def keyPressEvent(self, event) -> None:
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
-            self.clicked.emit()
-            return
-        super().keyPressEvent(event)
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        try:
+            p.setFont(self._font())
+            p.setPen(QColor(P["text"] if (self._hot or self.hasFocus()) else P["muted"]))
+            p.drawText(self.rect().adjusted(0, self.PAD_Y, 0, -self.PAD_Y), self._flags(),
+                       self._words)
+        finally:
+            p.end()
 
 
 class _Choice(QPushButton):
@@ -285,7 +308,7 @@ class WelcomeOverlay(QWidget):
         "Welkom", "Witaj", "Dobrodošli", "Добродошли", "Καλώς ήρθατε",
         "Hoş geldiniz", "Вітаємо", "Selamat datang", "Chào mừng", "स्वागत है",
         "ようこそ", "환영합니다", "Karibu", "مرحبا", "خوش آمدید",
-        "ברוכים הבאים", "خوش آمدید",
+        "ברוכים הבאים",
     )
     #: The card's width and its inner padding; the pages lay out in what is
     #: left between the paddings.
@@ -303,7 +326,13 @@ class WelcomeOverlay(QWidget):
                  on_explore: Callable[[], None],
                  on_language_change: Callable[[str], None],
                  on_demo: Callable[[], None],
-                 on_files: Callable[[], None] | None = None) -> None:
+                 on_files: Callable[[], None] | None = None,
+                 # Asked before a source is tried, settings are brought or
+                 # Nerd is switched: False keeps all as it is (a kids
+                 # profile without a grown-up's PIN, mw_onboarding).
+                 guard: Callable[[], bool] | None = None,
+                 # Whether a kids profile is in use: no Nerd offered to it.
+                 kids: Callable[[], bool] | None = None) -> None:
         super().__init__(parent)
         self._settings = settings
         self._on_connect = on_connect
@@ -311,13 +340,19 @@ class WelcomeOverlay(QWidget):
         self._on_language_change = on_language_change
         self._on_demo = on_demo
         self._on_files = on_files or on_explore
+        self._guard = guard or (lambda: True)
+        self._kids = kids or (lambda: False)
         self._family = IPTV
         self._filling = False
         # The connect step: trying (a try under way), done (a source came).
         self._trying = False
         self._done = False
         self._last_try: tuple = ()
+        # A found SAT>IP server's description, a Nerd preset's guide address
+        # and lists: for the kind they came with, until the address is
+        # typed anew or another kind is picked.
         self._extra: dict = {}
+        self._extra_kind = ""
 
         self.setObjectName("WelcomeOverlay")
         # Its own background painted (a plain QWidget paints none of its
@@ -413,7 +448,7 @@ class WelcomeOverlay(QWidget):
         self._greet_idx = 0
         self._flash = QTimer(self)
         self._flash.timeout.connect(self._next_greeting)
-        self._flash.start(1300)
+        self._start_greeting()
 
         # Enter presses the button that has the keys, as Space does (a
         # button outside a dialog takes Space alone): the guide is used with
@@ -507,7 +542,10 @@ class WelcomeOverlay(QWidget):
             self._cards[family] = card
             lay.addWidget(card)
         self._card_words()
-        lay.addSpacing(2)
+        # The demo where Get started leads, too, not only on the first page.
+        self._ch_demo = _Link(tr("onb_demo_link"))
+        self._ch_demo.clicked.connect(self._demo)
+        lay.addWidget(self._ch_demo)
         row = QHBoxLayout()
         self._ch_back = QPushButton(tr("onb_back"))
         self._ch_back.clicked.connect(lambda: self._stack.setCurrentIndex(PAGE_WELCOME))
@@ -535,7 +573,6 @@ class WelcomeOverlay(QWidget):
 
         form = QFormLayout()
         form.setSpacing(8)
-        s = self._settings
         self._conn_kind = QComboBox()
         # A long kind's name ("Enigma2 box (VU+, Dreambox, Zgemma...)") is
         # cut short rather than widening the form past the card.
@@ -550,15 +587,17 @@ class WelcomeOverlay(QWidget):
         for k in family_kinds(IPTV):
             self._conn_kind.addItem(tr(KIND_LABELS.get(k, f"playlist_kind_{k}")), k)
         self._filling = False
-        self._name = QLineEdit(s.value("playlist_name", "") if s else "")
+        # Empty: never what the settings keep of a source from before (its
+        # login - the last source's, app.py writes it there).
+        self._name = QLineEdit()
         self._name.setPlaceholderText(tr("playlist_name_hint"))
-        self._server = QLineEdit(s.value("server", "") if s else "")
+        self._server = QLineEdit()
         self._server.setPlaceholderText("http://server:port")
         # A single pasted link is recognised as Xtream (fans out into
         # server/username/password) or M3U (a playlist's address or file)
         # and the kind follows; manual entry is untouched. textEdited fires
         # on every user edit (paste too) but NOT on our own setText.
-        self._server.textEdited.connect(lambda _t: self._maybe_autodetect_link())
+        self._server.textEdited.connect(self._server_typed)
         self._browse = QPushButton(tr("onb_choose_file"))
         self._browse.setAutoDefault(False)
         self._browse.clicked.connect(self._pick_file)
@@ -568,8 +607,8 @@ class WelcomeOverlay(QWidget):
         srl.setSpacing(6)
         srl.addWidget(self._server, 1)
         srl.addWidget(self._browse)
-        self._user = QLineEdit(s.value("username", "") if s else "")
-        self._pw = QLineEdit(s.value("password", "") if s else "")
+        self._user = QLineEdit()
+        self._pw = QLineEdit()
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
         # A Stalker / Ministra portal logs in with the box's MAC address.
         self._mac = QLineEdit()
@@ -596,6 +635,9 @@ class WelcomeOverlay(QWidget):
         form.addRow(self._lbl_pw, self._pw)
         # A media server is signed in to here (ui/media_signin.py).
         self._signin = MediaSignIn(page, self._server, self._user, self._pw)
+        # Connect signs in (a name and password, Plex's PIN in the
+        # browser): one primary button - Quick Connect stays its own way.
+        self._signin.guided()
         self._signin.changed.connect(self._signin_changed)
         self._signin.finished.connect(self._signin_finished)
         self._server.textChanged.connect(self._signin.form_changed)
@@ -745,7 +787,7 @@ class WelcomeOverlay(QWidget):
         return bool(self._settings) and self._settings.value("nerd_enabled", "false") == "true"
 
     def _toggle_nerd(self) -> None:
-        if not self._settings:
+        if not self._settings or self._kids() or not self._guard():
             return
         self._settings.setValue("nerd_enabled", "false" if self._nerd_on() else "true")
         from ..core import nerd
@@ -755,6 +797,8 @@ class WelcomeOverlay(QWidget):
 
     def _sync_nerd_link(self) -> None:
         self._w_nerd.setText(tr("onb_nerd_on_now") if self._nerd_on() else tr("onb_nerd_offer"))
+        # A kids profile is offered no Nerd (mw_profiles' rule for Settings).
+        self._w_nerd.setVisible(not self._kids())
 
     # -- the choice and the form -----------------------------------------------
 
@@ -832,6 +876,9 @@ class WelcomeOverlay(QWidget):
         if self._filling:
             return
         kind = self._conn_kind.currentData() or ""
+        if kind != self._extra_kind:
+            # What a found server or a preset brought was for its own kind.
+            self._extra, self._extra_kind = {}, ""
         m3u, stalker = kind == "m3u", kind == "stalker"
         box = kind in BOX_KINDS
         media = kind in MEDIA_KINDS
@@ -926,6 +973,7 @@ class WelcomeOverlay(QWidget):
         self._server.setText(found.get("server", ""))
         if not self._name.text().strip():
             self._name.setText(str(found.get("name", "")).split(" - ")[0])
+        self._extra, self._extra_kind = {}, str(found.get("kind") or "")
         if found.get("kind") == "satip" and found.get("description"):
             self._extra = {"options": {"description": str(found.get("description"))}}
         if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
@@ -944,9 +992,15 @@ class WelcomeOverlay(QWidget):
             extra["epg_url"] = str(src["epg_url"])
         if src.get("m3u"):
             extra["options"] = {"m3u": str(src["m3u"])}
-        self._extra = extra
+        self._extra, self._extra_kind = extra, str(src.get("kind") or "")
         if not self._name.text().strip():
             self._name.setText(str(src.get("name") or ""))
+
+    def _server_typed(self, _text: str = "") -> None:
+        """The address typed or pasted by hand: what a found server or a
+        preset brought with it goes - then a whole link is read."""
+        self._extra, self._extra_kind = {}, ""
+        self._maybe_autodetect_link()
 
     def _maybe_autodetect_link(self) -> None:
         """Recognise a pasted provider link in the address field and set
@@ -970,6 +1024,8 @@ class WelcomeOverlay(QWidget):
     def _do_connect(self) -> None:
         if self._trying or self._stack.currentIndex() != PAGE_FORM:
             return
+        if not self._guard():
+            return
         kind = self._conn_kind.currentData()
         server = self._server.text().strip()
         name = self._name.text().strip()
@@ -986,12 +1042,18 @@ class WelcomeOverlay(QWidget):
                 self._connect_media(kind)
             elif self._signin.busy:
                 return
+            elif kind == "plex":
+                # Plex signs in with a PIN in the browser: Connect starts it,
+                # and connects once it is done.
+                self._signin.start_plex()
+                self._connect_signed = True
+                self._hide_error()
             elif self._signin.sign_in():
-                # Name and password typed, Sign in not pressed: Connect does it.
+                # Name and password typed: Connect signs in, then connects.
                 self._connect_signed = True
                 self._hide_error()
             else:
-                self._show_error(tr("ms_sign_in_needed"))
+                self._show_error(tr("onb_fill_media"))
             return
         if kind in BOX_KINDS:
             if not server:
@@ -1023,10 +1085,12 @@ class WelcomeOverlay(QWidget):
         """The source tried: the connect step shows, the window tries it."""
         if self._trying:
             return
-        extra = dict(self._extra) if kind in ("m3u", "satip") else {}
+        extra = (dict(self._extra) if kind in ("m3u", "satip") and kind == self._extra_kind
+                 else {})
         self._last_try = (server, user, pw, kind, name, mac, signed, extra)
         self._trying, self._done = True, False
-        shown = name or server.split("//")[-1].split("/")[0] or SHORT_NAMES.get(kind, "")
+        from ..core.names import source_name
+        shown = name or source_name(server) or SHORT_NAMES.get(kind, "")
         self._k_title.setText(tr("onb_connecting", name=shown))
         self._k_title.setAccessibleName(self._k_title.text())
         self._k_bar.setVisible(True)
@@ -1052,15 +1116,19 @@ class WelcomeOverlay(QWidget):
         """The window: the source worked and is kept - what came."""
         self._trying, self._done = False, True
         loc = QLocale()
-        parts = [tr("count_channels", n=loc.toString(int(channels)))] if channels else []
+
+        def count(key: str, n: int) -> str:
+            return tr(f"{key}_one" if n == 1 else key, n=loc.toString(int(n)))
+
+        parts = [count("count_channels", channels)] if channels else []
         if movies:
-            parts.append(tr("count_movies", n=loc.toString(int(movies))))
+            parts.append(count("count_movies", movies))
         if series:
-            parts.append(tr("count_series", n=loc.toString(int(series))))
+            parts.append(count("count_series", series))
         self._k_title.setText(tr("onb_done_title"))
         self._k_bar.setVisible(False)
         self._k_step.setVisible(False)
-        self._k_text.setText(tr("onb_done_counts", what=", ".join(parts)))
+        self._k_text.setText(tr("onb_done_counts", what=tr("onb_list_sep").join(parts)))
         self._k_text.setObjectName("OnbOk")
         self._restyle(self._k_text)
         self._k_text.setVisible(True)
@@ -1125,6 +1193,15 @@ class WelcomeOverlay(QWidget):
         self._c_err.setText(text)
         self._c_err.setVisible(True)
         self._fit_card(self._stack.currentIndex())
+        # On a low window the page scrolls: the words and Connect brought
+        # into sight once laid out (they were cut off at the card's foot).
+        QTimer.singleShot(0, self._error_in_sight)
+
+    def _error_in_sight(self) -> None:
+        if not self._c_err.isVisible():
+            return
+        self._scroll.ensureWidgetVisible(self._c_connect, 0, 8)
+        self._scroll.ensureWidgetVisible(self._c_err, 0, 8)
 
     def _hide_error(self) -> None:
         self._c_err.setText("")
@@ -1133,11 +1210,16 @@ class WelcomeOverlay(QWidget):
     # -- the Bring step: what the window says back ----------------------------
 
     def sync_failed(self, text: str) -> None:
-        """The sync did not bring anything: why, and the code to try again."""
+        """The sync did not bring anything: why, and the code to try again -
+        the keys back in its field with what was typed chosen (the field was
+        off while it fetched, and Enter on Back left the page)."""
         self._set_busy(False)
         self._b_err.setText(text)
         self._b_err.setVisible(True)
         self._fit_card(self._stack.currentIndex())
+        if self._b_code.isEnabled() and self.isVisible():
+            self._b_code.setFocus(Qt.FocusReason.OtherFocusReason)
+            self._b_code.selectAll()
 
     def sync_no_sources(self, saved: str = "") -> None:
         """Settings and profiles came, no source: the choice of what to
@@ -1203,6 +1285,8 @@ class WelcomeOverlay(QWidget):
         if not text:
             self._b_code.setFocus()
             return
+        if not self._guard():
+            return
         self._b_err.setVisible(False)
         self._set_busy(True)
         self.sync_asked.emit(text)
@@ -1213,7 +1297,7 @@ class WelcomeOverlay(QWidget):
             self._fit_card(self._stack.currentIndex())
 
     def _ask_restore(self) -> None:
-        if self._b_busy:
+        if self._b_busy or not self._guard():
             return
         self._b_rerr.setVisible(False)
         self.restore_asked.emit()
@@ -1244,9 +1328,22 @@ class WelcomeOverlay(QWidget):
 
     # -- actions -------------------------------------------------------------
 
+    def _start_greeting(self) -> None:
+        """The greeting goes once round the languages - not at all where
+        the desktop asks for less motion - and rests on the first."""
+        from .notice_widgets import reduced_motion
+        self._greet_idx = 0
+        self._hero.setText(self._GREETINGS[0])
+        if reduced_motion():
+            self._flash.stop()
+        elif not self._flash.isActive():
+            self._flash.start(1300)
+
     def _next_greeting(self) -> None:
         self._greet_idx = (self._greet_idx + 1) % len(self._GREETINGS)
         self._hero.setText(self._GREETINGS[self._greet_idx])
+        if self._greet_idx == 0:
+            self._flash.stop()          # once round, then still
 
     def _language_picked(self) -> None:
         code = self._lang_combo.currentData()
@@ -1278,7 +1375,21 @@ class WelcomeOverlay(QWidget):
 
     def _finish(self) -> None:
         self._flash.stop()
+        if self._done:
+            self._forget_login()
         self.hide()
+
+    def _forget_login(self) -> None:
+        """A source kept: what was typed for it goes from the form - every
+        kind's (KindOwnFields), the last try, what came with a found server.
+        The guide opened again starts empty, never with its login."""
+        self._last_try = ()
+        self._extra, self._extra_kind = {}, ""
+        self._kind_own.forget()
+        with self._signin.filling():
+            for field in (self._server, self._user, self._pw, self._mac, self._name):
+                field.clear()
+        self._signin.forget()
 
     def _retranslate(self) -> None:
         self.setAccessibleDescription(tr("onb_welcome_sub"))
@@ -1290,6 +1401,7 @@ class WelcomeOverlay(QWidget):
         self._sync_nerd_link()
         self._ch_title.setText(tr("onb_choose_title"))
         self._card_words()
+        self._ch_demo.set_plain(tr("onb_demo_link"))
         self._ch_back.setText(tr("onb_back"))
         self._lbl_kind.setText(tr("playlist_kind"))
         self._lbl_name.setText(tr("playlist_name"))
@@ -1380,7 +1492,9 @@ class WelcomeOverlay(QWidget):
         cur = self._stack.widget(idx)
         if cur is None:
             return
-        width = self.CARD_W - 2 * self.PAD
+        # Inside the card's 1 px border too: two pixels more were a line
+        # fewer than the page then had (a long note cut off at its end).
+        width = self.CARD_W - 2 * self.PAD - 2 * self._card.frameWidth()
         need = self._page_height(cur, width)
         room = self._room()
         if room and need > room:
@@ -1399,6 +1513,23 @@ class WelcomeOverlay(QWidget):
         self._fit_card(self._stack.currentIndex(), cover=False)
 
     # -- the keys -------------------------------------------------------------
+
+    def event(self, e) -> bool:  # noqa: D401 - Qt's hook
+        """The window's own shortcuts wait while the keys are in the guide:
+        a key is the guide's (a field's letter, Tab, Enter), never TV mode's
+        T, the palette's Ctrl+K or a channel's digit acting under it. Esc
+        stays the window's (it closes the guide: _on_escape), and Quit."""
+        from PyQt6.QtCore import QEvent
+        from PyQt6.QtGui import QKeySequence
+        if e.type() == QEvent.Type.ShortcutOverride and self.isVisible():
+            alt_only = (e.modifiers() & Qt.KeyboardModifier.AltModifier
+                        and not e.modifiers() & Qt.KeyboardModifier.ControlModifier)
+            # Esc, Quit and the menus' Alt keys stay the window's.
+            if (e.key() != Qt.Key.Key_Escape and not alt_only
+                    and not e.matches(QKeySequence.StandardKey.Quit)):
+                e.accept()
+                return True
+        return super().event(e)
 
     def _stops(self) -> list[QWidget]:
         """The page's Tab stops, in the window's focus order."""
@@ -1459,8 +1590,8 @@ class WelcomeOverlay(QWidget):
         self._b_rerr.setVisible(False)
         self._set_busy(False)
         self._trying = self._done = False
-        if not self._flash.isActive():
-            self._flash.start(1300)
+        self._sync_nerd_link()
+        self._start_greeting()
 
     def cover(self) -> None:
         """Resize to fully cover the parent window's content area, on top."""
@@ -1468,6 +1599,8 @@ class WelcomeOverlay(QWidget):
         central = (parent.centralWidget()
                    if hasattr(parent, "centralWidget") else None)
         self.setGeometry(central.geometry() if central else parent.rect())
+        # The profile may have changed while it was hidden (a kids one).
+        self._sync_nerd_link()
         self.raise_()
         self.show()
         self._fit_card(self._stack.currentIndex(), cover=False)

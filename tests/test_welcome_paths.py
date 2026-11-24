@@ -644,7 +644,7 @@ def test_plex_signed_in_in_the_browser_from_the_guide(app, tmp_path, media_devic
         pl = w.playlist_store.playlists()[0]
         assert pl["kind"] == "plex" and pl["token"] == "den-tok" and pl["server"] == s.base
         # No live TV on this server: its films and series came.
-        assert tr("count_movies", n="1") in ov._k_text.text()
+        assert tr("count_movies_one", n="1") in ov._k_text.text()      # "1 movie"
     finally:
         s.close()
 

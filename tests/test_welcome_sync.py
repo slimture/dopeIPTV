@@ -180,7 +180,9 @@ def test_the_link_shows_and_opens_the_step(qapp, tmp_path, site):
     w, ov = _window(tmp_path)
     first = ov._stack.widget(PAGE_WELCOME)
     assert ov._w_bring.isVisibleTo(first) and ov._w_bring.plain() == tr("onb_bring_offer")
-    assert ov._w_bring.wordWrap()            # a long translation wraps, never cut off
+    # A long translation wraps, never cut off: narrower, more lines.
+    assert ov._w_bring.hasHeightForWidth()
+    assert ov._w_bring.heightForWidth(60) > ov._w_bring.heightForWidth(2000)
     ov._w_bring.clicked.emit()
     assert ov._stack.currentIndex() == PAGE_BRING
     step = ov._stack.widget(PAGE_BRING)
@@ -242,7 +244,10 @@ def test_a_good_code_without_sources_goes_to_connect_with_the_note(qapp, tmp_pat
     from dopeiptv.ui.qt_i18n import format_when
     assert w._sync_joined_saved and note.endswith(
         tr("sync_joined_saved", when=format_when(w._sync_joined_saved, "d MMM yyyy HH:mm")))
-    assert w.switched == [] and w.picked == 0
+    # The profiles that came asked about as at start ("Who's watching?" - the
+    # window shows it only with more than one, over the guide held meanwhile:
+    # tests/test_welcome_review.py).
+    assert w.switched == [] and w.picked == 1
     assert w.settings.value("theme") == "nord" and w._sync_on()
     # Nothing to follow: this computer's switches stay as they were.
     assert sync.chosen(w.settings) == sync.DEFAULT_CATS

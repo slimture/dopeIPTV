@@ -222,12 +222,16 @@ if SCENARIO == "xtream_keys":
     link = f"{srv.base}/get.php?username=anna&password=s3cret%20pw&type=m3u_plus&output=ts"
     connect_keyboard_only(link, 12)
     assert isinstance(w.client, XtreamClient), type(w.client)
-    assert ov._user.text() == "anna" and ov._pw.text() == "s3cret pw"
+    # The login the link held went into the fields, was kept with the source
+    # and left the guide with Done: nothing of it stays in a hidden field.
+    assert ov._user.text() == "" and ov._pw.text() == "" and ov._server.text() == ""
+    assert not ov._last_try
     assert tr("onb_done_title") == ov._k_title.text()
     words = ov._k_text.text()
     assert "12" in words and "7" in words and "3" in words, words
     pls = store.playlists()
     assert len(pls) == 1 and store.active()["kind"] == "xtream" and store.active()["username"] == "anna"
+    assert store.active()["password"] == "s3cret pw"          # the link's, decoded
     assert list_names()[:2] == ["Ch 1", "Ch 2"], list_names()[:3]
     # One login: the window took the client that logged in at Connect.
     logins = [q for p, q in srv.seen if p == "/player_api.php" and "action" not in q]

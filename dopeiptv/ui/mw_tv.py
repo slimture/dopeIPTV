@@ -261,6 +261,11 @@ class _TvMixin:
     def enter_tv_mode(self) -> None:
         if self._tv_on:
             return
+        if self._tv_guide_up():
+            # The first-run guide keeps the window: TV mode's key filter
+            # would take its keys (ui/welcome.py).
+            log.info("tv mode: not while the first-run guide is up")
+            return
         from .tv_mode import TvPage
         log.info("tv mode: on")
         before = self._tv_before()
@@ -586,6 +591,13 @@ class _TvMixin:
 
     # -- the phone remote, the remote API, Home Assistant ----------------------------------
 
+    def _tv_guide_up(self) -> bool:
+        guide = getattr(self, "_welcome", None)
+        try:
+            return guide is not None and guide.isVisible()
+        except RuntimeError:            # deleted under us
+            return False
+
     def tv_command(self, what: str, value: Any = None) -> dict[str, Any]:
         """TV mode asked from elsewhere - the phone remote, the remote API,
         Home Assistant: one way in for all of them. *what* "tv": on, off or
@@ -595,6 +607,8 @@ class _TvMixin:
             mode = tv_input.switch_mode(value)
             if mode is None:
                 raise ValueError('"mode" is on, off or toggle')
+            if self._tv_guide_up() and mode != "off":
+                raise ValueError("the first-run guide is open on the computer")
             on = not self._tv_on if mode == "toggle" else mode == "on"
             if on and not self._tv_on:
                 self._come_forward()

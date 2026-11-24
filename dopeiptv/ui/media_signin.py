@@ -103,6 +103,8 @@ class MediaSignIn(QWidget):
         self._plex_user = ""
         self._picking: dict[str, Any] = {}
         self._filling = False
+        # guided(): the first-run guide's form, whose Connect signs in.
+        self._guided = False
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
@@ -239,11 +241,34 @@ class MediaSignIn(QWidget):
     def _typed_server(self, kind: str) -> str:
         return _server_of(self._server_field.text(), kind) if kind != "plex" else ""
 
+    def guided(self) -> None:
+        """In the first-run guide: its Connect signs in (a name and
+        password, Plex's PIN in the browser) - Sign in and Sign in with Plex
+        not shown beside it, one primary button; Quick Connect stays."""
+        self._guided = True
+        self._buttons()
+
+    def start_plex(self) -> None:
+        """Plex's sign-in started (the guide's Connect): its PIN in the
+        browser, as Sign in with Plex does."""
+        if not self._busy:
+            self._plex_clicked()
+
+    def forget(self) -> None:
+        """What a sign-in left goes (the guide, once a source is kept)."""
+        self._stop()
+        self._state = {}
+        self._for = ("", "", "")
+        self._servers = []
+        self._plex_token = self._plex_user = ""
+        self._say("")
+        self._buttons()
+
     def _buttons(self) -> None:
         jelly = self._kind in ("jellyfin", "emby")
-        self.sign_btn.setVisible(jelly)
+        self.sign_btn.setVisible(jelly and not self._guided)
         self.qc_btn.setVisible(self._kind == "jellyfin")
-        self.plex_btn.setVisible(self._kind == "plex")
+        self.plex_btn.setVisible(self._kind == "plex" and not self._guided)
         self.server_row.setVisible(self._kind == "plex" and len(self._servers) > 1)
         for b in (self.sign_btn, self.qc_btn, self.plex_btn):
             b.setEnabled(not self._busy)

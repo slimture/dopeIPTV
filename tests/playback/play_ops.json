@@ -1,4 +1,117 @@
 {
+ "after_loop": {
+  "args": [
+   "http://192.0.2.1/live/u/p/2.ts",
+   0.0,
+   {
+    "buffer_key": "live:2",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/2.ts",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "Two"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    ""
+   ],
+   [
+    "set",
+    "tls-verify",
+    false
+   ],
+   [
+    "set",
+    "tls-ca-file",
+    ""
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    true
+   ],
+   [
+    "set",
+    "ao",
+    "null"
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://127.0.0.1:41000/live.ts?t=loop"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
  "after_web": {
   "args": [
    "http://192.0.2.1/live/u/p/1.ts",
@@ -305,6 +418,123 @@
    [
     "play",
     "http://127.0.0.1:41000/live.ts?t=x"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "loop": {
+  "args": [
+   "https://example.com/films/bbb.mp4",
+   0.0,
+   {
+    "buffer_key": "live:loop",
+    "local_buffer": false,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": false,
+  "current": "https://example.com/films/bbb.mp4",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "Loop"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    "50MiB"
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "set",
+    "tls-verify",
+    true
+   ],
+   [
+    "set",
+    "tls-ca-file",
+    "@CA@"
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    true
+   ],
+   [
+    "set",
+    "ao",
+    "null"
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "command",
+    "loadfile",
+    "https://example.com/films/bbb.mp4",
+    "replace",
+    "-1",
+    "loop-file=inf"
    ],
    [
     "pause",

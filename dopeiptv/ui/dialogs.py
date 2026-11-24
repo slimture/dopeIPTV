@@ -71,6 +71,11 @@ class KindOwnFields:
         for k, f in self._fields.items():
             f.setText(own.get(k, ""))
 
+    def forget(self) -> None:
+        """What every kind kept goes (the first-run guide, once a source is
+        kept: its login is not held for the next one)."""
+        self._by_kind.clear()
+
 
 def stalker_available() -> bool:
     """Whether this build has the Stalker / Ministra portal client: the
@@ -422,7 +427,10 @@ class SourceFields:
     def values(self) -> dict:
         name = self.name.text().strip()
         if not name:
-            name = self.server.text().strip().split("//")[-1].split("/")[0]
+            # The server's host, or a playlist file's name - never a login
+            # its address carries (core/names.py).
+            from ..core.names import source_name
+            name = source_name(self.server.text())
         out = {
             "name": name,
             "kind": self.kind.currentData(),
@@ -453,7 +461,8 @@ class SourceFields:
                 options.pop(key, None)
             options.update(got["options"])
             if not self.name.text().strip():
-                out["name"] = got["name"] or got["server"].split("//")[-1].split("/")[0]
+                from ..core.names import source_name
+                out["name"] = got["name"] or source_name(got["server"])
         elif self._had_token:
             out["token"] = ""
             for key in ("user_id", "server_id", "connections"):

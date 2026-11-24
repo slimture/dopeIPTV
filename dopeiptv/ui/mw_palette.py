@@ -175,6 +175,9 @@ class _PaletteMixin:
     def _open_palette(self) -> None:
         if getattr(self, "_tv_on", False):
             return            # TV mode takes the keys: the palette's field would get none
+        guide = getattr(self, "_welcome", None)
+        if guide is not None and not sip.isdeleted(guide) and guide.isVisible():
+            return            # the first-run guide keeps the window and its keys
         active = QApplication.activeWindow()
         if active is not None and active is not self:
             return            # the pop-out, multiview: the palette is the window's

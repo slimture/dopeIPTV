@@ -43,12 +43,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   certificate that does not check out). Back keeps what you typed; nothing
   is saved until it worked, and closing the guide meanwhile keeps nothing.
   It works with the keyboard alone (Enter on its buttons, Tab round its own
-  controls). The Trakt step and the red "+ Add provider" button are gone: a
-  calm strip under the list says when there is no source of your own yet.
+  controls), and no window shortcut, TV mode or the command palette opens
+  under it. "Who's watching?" comes first: the guide waits behind it. A kids
+  profile adds no source, brings no settings and turns no Nerd on without a
+  grown-up's PIN. Nothing you typed stays in the guide once the source is
+  kept. The Trakt step and the red "+ Add provider" button are gone: a calm
+  strip under the list says when there is no source of your own yet - put
+  away with its ✕ for the session - and a source added in Settings
+  meanwhile is used at once.
 - A new demo: Akamai's and Unified Streaming's live test streams, the
   Blender Foundation's open films on a loop and under Movies, and Apple's
-  test pattern, with logos, posters and a guide made by the app. Nothing of
-  it is kept, and leaving it for your own source leaves nothing behind.
+  test pattern, with logos, posters and a guide made by the app. The films
+  on a loop play over and over without a reconnect, their guide in blocks
+  of the films' own length. Nothing of it is kept or named in the log, and
+  leaving it - for your own source, or with Leave the demo for none -
+  leaves nothing behind; your own History, resume points and files stay
+  yours meanwhile.
   `tools/check_demo.py` asks every demo stream before a release.
 - Playlists sent or saved gzipped, and lists of bare stream addresses, are
   read; an empty list, a web page and a list with no entries are told
@@ -76,6 +86,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- A source added without a name was named after its address with the login
+  written into it ("user:password@host" - the quick form, a list of
+  sources imported): it is named by the server's host and port now, or by a
+  playlist file's own name.
+- The status line said "1 channels", "1 movies": one is said in the
+  singular, in every language.
 - A kids profile can play a channel of another source found by the search
   across sources: it was shown, but refused when played.
 - An Xtream link pasted in its path form (`/live/user/pass/1.ts`) with a

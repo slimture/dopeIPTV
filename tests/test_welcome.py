@@ -67,10 +67,16 @@ def test_the_welcome_page_has_one_clear_way_on_and_two_quiet_links(app):
     ov, got = _overlay()
     page = ov._stack.widget(PAGE_WELCOME)
     assert ov._w_next.text() == tr("onb_get_started") and ov._w_next.objectName() == "Primary"
-    # The only button on the page beside the Nerd link: the rest are links.
+    # The only button on the page beside the Nerd link: the rest are links -
+    # flat buttons of their own (a screen reader's button, a Tab stop).
     from PyQt6.QtWidgets import QPushButton
+
+    from dopeiptv.ui.welcome import _Link
     buttons = [b for b in page.findChildren(QPushButton) if b.isVisibleTo(page)]
-    assert set(buttons) == {ov._w_next, ov._w_nerd}
+    links = {b for b in buttons if isinstance(b, _Link)}
+    assert set(buttons) - links == {ov._w_next, ov._w_nerd}
+    assert links == {ov._w_demo, ov._w_bring}
+    assert all(b.isFlat() and b.focusPolicy() == Qt.FocusPolicy.StrongFocus for b in links)
     assert ov._w_demo.plain() == tr("onb_demo_link") and ov._w_bring.plain() == tr("onb_bring_offer")
     ov._w_next.click()
     assert ov._stack.currentIndex() == PAGE_CHOOSE

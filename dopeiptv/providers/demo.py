@@ -44,6 +44,9 @@ FILMS: tuple[tuple[int, str, int, int, str, str, str], ...] = (
     (103, "Tears of Steel", 2012, 12, "indigo", "tos", "demo_plot_tos"),
 )
 
+#: Each film's own length in seconds: its loop's blocks in the guide.
+FILM_SECONDS = {"bbb": 596, "sintel": 888, "tos": 734}
+
 #: The categories, in the order they are listed.
 LIVE_CATEGORIES = (("demo-live", "demo_cat_live"), ("demo-loop", "demo_cat_loop"),
                    ("demo-test", "demo_cat_test"))
@@ -73,11 +76,13 @@ def _programmes(what: str, start: int, stop: int) -> list[tuple[int, int, str, s
     out: list[tuple[int, int, str, str]] = []
     film = _film(what)
     if film is not None:
-        # A film on a loop, in half-hour blocks: it plays again and again.
+        # A film on a loop, block after block of its own length: it plays
+        # again and again (the window loops the file, DemoClient.loops).
         title, year = film[1], film[2]
         desc = tr("demo_prog_loop_desc", title=title, year=year) + " " + tr("demo_credit")
-        for t in range(start, stop, 1800):
-            out.append((t, t + 1800, title, desc))
+        step = FILM_SECONDS.get(what) or film[3] * 60
+        for t in range(start, stop, step):
+            out.append((t, t + step, title, desc))
         return out
     if what == "test":
         title, desc = tr("demo_prog_test"), tr("demo_prog_test_desc")
@@ -143,6 +148,12 @@ class DemoClient(OfflineClient):
 
     def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
         return self._live.get(_int(stream_id), "")
+
+    def loops(self, stream_id: Any) -> bool:
+        """Whether channel *stream_id* is a film on a loop: the window has
+        the player loop the file (main_window._loop_arm)."""
+        sid = _int(stream_id)
+        return any(c[0] == sid and _film(c[6]) is not None for c in CHANNELS)
 
     def own_guide(self, progress_cb: Callable[[int], None] | None = None) -> bytes:
         """The guide, made here (XmltvGuide asks it as a box's own guide)."""

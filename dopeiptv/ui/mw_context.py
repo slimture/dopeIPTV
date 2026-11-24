@@ -385,6 +385,10 @@ class _ContextMenuMixin:
     # -- channel numbers of the user's own (Nerd; core/channel_numbers.py) ---------
 
     def _chno_pid(self) -> str | None:
+        # The demo's channels numbered under no stored source's id.
+        own = getattr(self, "_own_source_id", None)
+        if callable(own):
+            return own()
         store = getattr(self, "playlist_store", None)
         return store.active_id if store is not None else None
 
