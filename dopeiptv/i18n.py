@@ -3454,6 +3454,31 @@ def current_language() -> str:
     return _current_language
 
 
+#: The current language's strings back to their English source, made the
+#: first time english_of is asked in that language (one language kept).
+_ENGLISH_OF: dict[str, dict[str, str]] = {}
+
+
+def english_of(text: str) -> str:
+    """The English source of *text*, a whole string as tr() gives it in the
+    current language - "" in English, or when no string reads so (a text
+    with its placeholders filled in, a name). Settings' search finds a row
+    by its English words too, whatever the language."""
+    lang = _current_language
+    if lang == "en" or not text:
+        return ""
+    table = _ENGLISH_OF.get(lang)
+    if table is None:
+        table = {}
+        for entry in _STRINGS.values():
+            said, en = entry.get(lang), entry.get("en")
+            if said and en and said != en:
+                table.setdefault(said, en)
+        _ENGLISH_OF.clear()
+        _ENGLISH_OF[lang] = table
+    return table.get(text, "")
+
+
 def tr(key: str, **kwargs: object) -> str:
     """Return the translated string for *key* in the current language.
 

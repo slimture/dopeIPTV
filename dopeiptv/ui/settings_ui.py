@@ -40,6 +40,9 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.log import log
+from ..core.palette_match import fold as _fold
+from ..core.palette_match import words as _words
+from ..i18n import english_of
 from .theme import (
     P, THEMES, _luminance, _mix, corner_radius,
     resolve_accent, rounded,
@@ -119,6 +122,21 @@ def set_shown(w: QWidget, on: bool) -> None:
         w.setVisible(on)
 
 
+def findable(*texts: str) -> str:
+    """What a row is found under: its texts and, in another language, the
+    English each was translated from - folded as the command palette folds
+    (case, accents and punctuation left out, words a space apart)."""
+    parts = [t for t in texts if t]
+    parts += [en for en in (english_of(t) for t in parts) if en]
+    return _fold(" ".join(parts))
+
+
+def all_found(terms: list[str], *where: str) -> bool:
+    """Every one of *terms* (from palette_match.words) in one of *where*
+    (each from findable)."""
+    return all(any(t in w for w in where) for t in terms)
+
+
 class SettingsCard(QFrame):
     """A section of a page: a surface a shade off the page, with a hairline
     between its rows. No frame - the colour groups it."""
@@ -132,7 +150,7 @@ class SettingsCard(QFrame):
         self._lay.setSpacing(0)
         self.rows: list[tuple[QWidget, str]] = []
         self._shown_if: dict[int, object] = {}
-        self._needle, self._whole = "", False
+        self._needle, self._whole, self._context = "", False, ""
 
     def _add(self, w: QWidget, search: str) -> QWidget:
         if self.rows:
@@ -142,7 +160,7 @@ class SettingsCard(QFrame):
             self._lay.addWidget(line)
             w.setProperty("_divider", line)
         self._lay.addWidget(w)
-        self.rows.append((w, search.casefold()))
+        self.rows.append((w, search))
         return w
 
     def row(self, label: str, control=None, hint: str = "",
@@ -201,7 +219,7 @@ class SettingsCard(QFrame):
                 self._page.column.append(control)
             h.addWidget(control, 1 if stretch_control else 0,
                         Qt.AlignmentFlag.AlignVCenter)
-        return self._add(w, f"{label} {hint} {search}")
+        return self._add(w, findable(label, hint, search))
 
     def toggle(self, label: str, checked: bool, hint: str = "",
                badge: QWidget | None = None) -> ToggleSwitch:
@@ -217,7 +235,7 @@ class SettingsCard(QFrame):
         v = QVBoxLayout(holder)
         v.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         v.addWidget(w)
-        return self._add(holder, search)
+        return self._add(holder, findable(search))
 
     def layout_row(self, lay: QLayout, search: str = "") -> QWidget:
         """A full-width row of controls - buttons, mostly. Found by search
@@ -228,7 +246,7 @@ class SettingsCard(QFrame):
         words = [search] + [w.text() for w in holder.findChildren(QWidget)
                             if hasattr(w, "text") and callable(w.text)
                             and isinstance(w.text(), str)]
-        return self._add(holder, " ".join(words))
+        return self._add(holder, findable(*words))
 
     def note(self, text: str) -> QLabel:
         lbl = _muted(text)
@@ -236,7 +254,7 @@ class SettingsCard(QFrame):
         v = QVBoxLayout(holder)
         v.setContentsMargins(0, ROW_PAD, 0, ROW_PAD)
         v.addWidget(lbl)
-        self._add(holder, text)
+        self._add(holder, findable(text))
         return lbl
 
     def link(self, label: str, hint: str, target: str,
@@ -260,7 +278,7 @@ class SettingsCard(QFrame):
     def set_search(self, row: QWidget, text: str) -> None:
         """The words *row* is found under, from now on (a list whose
         entries change: the sources by name)."""
-        self.rows = [(w, text.casefold() if w is row else t) for w, t in self.rows]
+        self.rows = [(w, findable(text) if w is row else t) for w, t in self.rows]
 
     def shown_if(self, row: QWidget, predicate) -> None:
         """Show *row* only while *predicate()* holds (re-checked by
@@ -269,16 +287,19 @@ class SettingsCard(QFrame):
         self.refresh()
 
     def refresh(self) -> None:
-        self.apply_filter(self._needle, self._whole)
+        self.apply_filter(self._needle, self._whole, self._context)
 
-    def apply_filter(self, needle: str, whole: bool) -> bool:
-        """Show the rows that match *needle* (all of them when *whole*);
-        True when anything is left showing."""
-        self._needle, self._whole = needle, whole
+    def apply_filter(self, needle: str, whole: bool, context: str = "") -> bool:
+        """Show the rows that match *needle* (all of them when *whole*):
+        each of its words in the row's text or in *context* (its page's and
+        section's names, from findable) - "subtitle size" finds Size under
+        "How subtitles look". True when anything is left showing."""
+        self._needle, self._whole, self._context = needle, whole, context
+        terms = _words(needle)
         shown = False
         first = True
         for w, text in self.rows:
-            hit = whole or not needle or needle in text
+            hit = whole or not terms or all_found(terms, text, context)
             cond = self._shown_if.get(id(w))
             if cond is not None and not cond():
                 hit = False
@@ -424,16 +445,19 @@ class SettingsPage(QScrollArea):
         return c
 
     def apply_filter(self, needle: str) -> bool:
-        whole = bool(needle) and (needle in self.title.casefold()
-                                  or needle in self.nav_title.casefold())
+        """Show the rows *needle* finds - each of its words in a row, its
+        section's heading or this page's name; every row when the page's
+        name holds them all, every row of a section when its heading does
+        ("trakt": its card on the Watch history page)."""
+        terms = _words(needle)
+        own = findable(self.title, self.nav_title)
+        whole = bool(terms) and all_found(terms, own)
         shown = False
         for c in self.cards:
-            # A section's heading found shows the section ("trakt": its
-            # card on the Watch history page).
             head = c.property("_title")
-            all_of = whole or (bool(needle) and head is not None
-                               and needle in head.text().casefold())
-            if c.apply_filter(needle, all_of):
+            context = own + (findable(head.text()) if head is not None else "")
+            all_of = whole or (bool(terms) and all_found(terms, context))
+            if c.apply_filter(needle, all_of, context):
                 shown = True
         if self._subtitle is not None:
             set_shown(self._subtitle, not needle)
