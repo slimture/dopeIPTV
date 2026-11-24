@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Lägg till din egen källa",
   "onb_strip_demo": "Du provar demon: fria testströmmar och fritt licensierade filmer. Inget du gör här sparas.",
   "onb_strip_none": "Ingen källa än. Lägg till din IPTV-leverantör, en mediaserver eller en box hemma för att se kanaler och filmer här.",
+  "onb_strip_unreached": "Det gick inte att nå {name}, så det finns inget därifrån att visa än.",
   "err_m3u_empty": "Spellistan är tom – kontrollera länken, eller be din leverantör om en ny.",
   "err_m3u_html": "Den här adressen ger en webbsida, inte en spellista. Kontrollera att du kopierade själva spellistans länk.",
   "err_m3u_too_large": "Spellistan är större än {mb} MB – mer än appen läser.",

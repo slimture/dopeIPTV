@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Ongeza chanzo chako mwenyewe",
   "onb_strip_demo": "Unajaribu toleo la majaribio: mitiririko ya majaribio ya bure na filamu zenye leseni huria. Hakuna unachofanya hapa kinachohifadhiwa.",
   "onb_strip_none": "Bado hakuna chanzo. Ongeza mtoa huduma wako wa IPTV, seva ya media au kisanduku nyumbani ili kuona vituo na filamu hapa.",
+  "onb_strip_unreached": "Imeshindikana kufikia {name}, kwa hivyo bado hakuna cha kuonyesha kutoka kwake.",
   "err_m3u_empty": "Orodha ya kucheza ni tupu — kagua kiungo, au muombe mtoa huduma wako kiungo kipya.",
   "err_m3u_html": "Anwani hii inatoa ukurasa wa wavuti, si orodha ya kucheza. Hakikisha umenakili kiungo cha orodha yenyewe.",
   "err_m3u_too_large": "Orodha ya kucheza ni kubwa kuliko MB {mb} — zaidi ya kile programu inachosoma.",

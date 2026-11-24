@@ -224,11 +224,16 @@ class _TvMixin:
             self.enter_tv_mode()
 
     def _maybe_start_tv_mode(self) -> None:
-        """"Start in TV mode": once the window is up - not over the first
-        run's welcome."""
+        """"Start in TV mode": once the window is up - not at a start the
+        first-run guide comes to (no source yet: mw_onboarding's
+        _welcome_due), even before it is shown or while it waits behind
+        "Who's watching?", nor over it: the guide is used with the keys
+        TV mode's filter would take."""
         if self.settings.value("tv_mode_start", "false") != "true":
             return
-        if self._welcome is not None and self._welcome.isVisible():
+        due = getattr(self, "_welcome_due", None)
+        if self._tv_guide_up() or (callable(due) and due()):
+            log.info("tv mode: not at start - the first-run guide comes first")
             return
         self.enter_tv_mode()
 
@@ -592,6 +597,12 @@ class _TvMixin:
     # -- the phone remote, the remote API, Home Assistant ----------------------------------
 
     def _tv_guide_up(self) -> bool:
+        """The first-run guide covers the window - or waits behind "Who's
+        watching?" to come back (mw_onboarding's _welcome_waits): TV mode is
+        not turned on under it either, or the guide would come up over TV
+        mode, where no key reaches it."""
+        if getattr(self, "_welcome_waits", None) is not None:
+            return True
         guide = getattr(self, "_welcome", None)
         try:
             return guide is not None and guide.isVisible()

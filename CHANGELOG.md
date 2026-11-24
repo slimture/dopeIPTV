@@ -238,6 +238,30 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   episodes unmarked on its page, in the list, in TV mode and on the phone
   remote. Every episode of it now shows as watched; unmarking one episode
   leaves the others watched, and unmarking the series unmarks them all.
+- With no source yet, "Who's watching?" asked at start and "Start in TV
+  mode" on, the welcome came up over TV mode, where no key reached it: Enter
+  and Esc did nothing in it, and the remote's Back left TV mode underneath.
+  TV mode now waits at a start the welcome comes to, is not turned on while
+  the welcome waits behind "Who's watching?", and the welcome shown while TV
+  mode is on leaves it first - its keys are always the welcome's.
+- Closing the welcome (Esc, Back to the choice, Just my files and radio)
+  while it signed in to Jellyfin, Emby or Plex left the sign-in running:
+  when it ended - a Plex PIN approved in the browser minutes later - the
+  server was tried, kept and switched to, replacing the demo. The sign-in now
+  stops with the welcome and the form's Back, and its late answer connects
+  nothing.
+- A file, a link or `--play` opened at the very first start played under
+  the welcome: sound, no picture. What a command plays now closes the
+  welcome first, as Esc does (after a link's own question), and one waiting
+  behind "Who's watching?" does not come back over it.
+- A login typed for a try that failed stayed in the closed welcome's form
+  for the session; it goes with the welcome now, however it is closed.
+- Quitting while the welcome's Bring step still fetched the other
+  computer's settings left sync turned on with the code kept, although
+  nothing had come; it is left off, as Back leaves it.
+- After a backup or a sync brought a source whose first login failed, the
+  strip under the list said there was no source yet. It now says the source
+  could not be reached, with Try again and Settings › Sources.
 
 ## [1.6.12]
 

@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Dodaj vlastiti izvor",
   "onb_strip_demo": "Isprobavaš demo: slobodni testni prijenosi i filmovi sa slobodnom licencom. Ništa što ovdje radiš ne sprema se.",
   "onb_strip_none": "Još nema izvora. Dodaj svog IPTV pružatelja, medijski poslužitelj ili prijemnik kod kuće da bi ovdje vidio kanale i filmove.",
+  "onb_strip_unreached": "{name} nije dostupan, pa s njega još nema ničega za prikaz.",
   "err_m3u_empty": "Popis je prazan – provjeri poveznicu ili zatraži novu od pružatelja.",
   "err_m3u_html": "Ova adresa daje web-stranicu, a ne popis. Provjeri jesi li kopirao poveznicu samog popisa.",
   "err_m3u_too_large": "Popis je veći od {mb} MB – više nego što aplikacija čita.",

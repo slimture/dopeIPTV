@@ -314,6 +314,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "onb_list_sep": {"en": ", "},
     "onb_strip_demo": {"en": "You are trying the demo: free test streams and freely licensed films. Nothing you do here is kept."},
     "onb_strip_none": {"en": "No source yet. Add your IPTV provider, a media server or a box at home to see channels and movies here."},
+    "onb_strip_unreached": {"en": "Could not reach {name}, so there is nothing from it to show yet."},
     "err_m3u_empty": {"en": "The playlist is empty - check the link, or ask your provider for a new one."},
     "err_m3u_html": {"en": "This address gives a web page, not a playlist. Check that you copied the playlist's own link."},
     "err_m3u_too_large": {"en": "The playlist is larger than {mb} MB - more than the app reads."},

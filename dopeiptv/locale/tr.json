@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Kendi kaynağını ekle",
   "onb_strip_demo": "Demoyu deniyorsun: serbest test yayınları ve özgür lisanslı filmler. Burada yaptığın hiçbir şey saklanmaz.",
   "onb_strip_none": "Henüz kaynak yok. Kanalları ve filmleri burada görmek için IPTV sağlayıcını, bir medya sunucusunu ya da evdeki bir alıcıyı ekle.",
+  "onb_strip_unreached": "{name} kaynağına ulaşılamadı, bu yüzden ondan henüz gösterilecek bir şey yok.",
   "err_m3u_empty": "Oynatma listesi boş — bağlantıyı kontrol et ya da sağlayıcından yenisini iste.",
   "err_m3u_html": "Bu adres bir oynatma listesi değil, bir web sayfası veriyor. Oynatma listesinin kendi bağlantısını kopyaladığını kontrol et.",
   "err_m3u_too_large": "Oynatma listesi {mb} MB'tan büyük — uygulamanın okuduğundan fazla.",

@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Dodaj sopstveni izvor",
   "onb_strip_demo": "Isprobavaš demo: slobodni test strimovi i filmovi sa slobodnom licencom. Ništa što ovde radiš se ne čuva.",
   "onb_strip_none": "Još nema izvora. Dodaj svog IPTV provajdera, medijski server ili risiver kod kuće da bi ovde video kanale i filmove.",
+  "onb_strip_unreached": "{name} nije dostupan, pa sa njega još nema ničega za prikaz.",
   "err_m3u_empty": "Plejlista je prazna – proveri link ili zatraži novi od provajdera.",
   "err_m3u_html": "Ova adresa daje veb stranicu, a ne plejlistu. Proveri da li si kopirao link same plejliste.",
   "err_m3u_too_large": "Plejlista je veća od {mb} MB – više nego što aplikacija čita.",

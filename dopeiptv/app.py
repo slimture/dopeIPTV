@@ -770,10 +770,12 @@ def main() -> int:
     if command is not None:
         # After the window and its source are up: a channel needs its list.
         QTimer.singleShot(1500, lambda: w.handle_command(command))
-    if welcome and settings.value("welcome_files_only", "") != "true":
+    if welcome and w._welcome_due():
         # The guide - unless the person chose their own files and radio
         # alone there (ui/mw_onboarding.FILES_ONLY_KEY): Settings > Sources
-        # and the strip over the lists still add a source.
+        # and the strip over the lists still add a source. "Start in TV
+        # mode" asks the same and waits for it (mw_tv); a command that
+        # plays something takes it away first (mw_commands).
         w.show_welcome()
     if "--updated" in sys.argv:
         # Opened by the installer at the end of an update (Windows,

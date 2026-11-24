@@ -1283,6 +1283,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         def fail(msg):
             self._hide_busy()
             self._set_status("")
+            # No source in use yet (a first start's sync or backup brought
+            # it): the strip says it could not be reached, with Try again
+            # (mw_onboarding) - not "no source yet".
+            self._source_not_reached(pid)
             # Nerd: its pinned server showed another certificate - said
             # plainly, with the new one to look at (ui/cert_trust.py).
             from .cert_trust import offer_review
@@ -3819,6 +3823,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._save_resume_position()
             self._maybe_auto_mark_watched()
             self._ms_close()
+            # The guide's Bring step still fetching: stopped as its Back
+            # stops it, so a sync that brought nothing stays off (mw_onboarding).
+            self._wizard_closing()
             self._sync_on_close()
             self._stats_close()
         self.wake.release()

@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Eigene Quelle hinzufügen",
   "onb_strip_demo": "Du probierst die Demo aus: freie Teststreams und frei lizenzierte Filme. Nichts, was du hier tust, wird gespeichert.",
   "onb_strip_none": "Noch keine Quelle. Füge deinen IPTV-Anbieter, einen Medienserver oder eine Box zu Hause hinzu, um hier Sender und Filme zu sehen.",
+  "onb_strip_unreached": "{name} war nicht erreichbar, daher gibt es davon noch nichts zu zeigen.",
   "err_m3u_empty": "Die Playlist ist leer – prüfe den Link oder bitte deinen Anbieter um einen neuen.",
   "err_m3u_html": "Diese Adresse liefert eine Webseite, keine Playlist. Prüfe, ob du den Link der Playlist selbst kopiert hast.",
   "err_m3u_too_large": "Die Playlist ist größer als {mb} MB – mehr, als die App liest.",

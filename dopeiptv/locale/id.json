@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Tambahkan sumber Anda sendiri",
   "onb_strip_demo": "Anda sedang mencoba demo: siaran uji gratis dan film berlisensi bebas. Tidak ada yang Anda lakukan di sini yang disimpan.",
   "onb_strip_none": "Belum ada sumber. Tambahkan penyedia IPTV, server media, atau set-top box di rumah untuk melihat saluran dan film di sini.",
+  "onb_strip_unreached": "{name} tidak dapat dijangkau, jadi belum ada yang bisa ditampilkan darinya.",
   "err_m3u_empty": "Daftar putar kosong — periksa tautannya, atau minta tautan baru ke penyedia Anda.",
   "err_m3u_html": "Alamat ini memberikan halaman web, bukan daftar putar. Pastikan Anda menyalin tautan daftar putar itu sendiri.",
   "err_m3u_too_large": "Daftar putar lebih besar dari {mb} MB — lebih dari yang dibaca aplikasi.",
