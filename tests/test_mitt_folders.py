@@ -99,6 +99,8 @@ w.player.play = fake_play
 # -- the stores: Pirat (in use) the window's own, Nordic's kept in the settings -----------
 own = w._own(w.settings)
 chans = {c["stream_id"]: dict(c) for c in w.client.live_streams(None)}   # ids 1..5, "demo"
+# The demo's names, whatever they are now: a loose one and Sport's two.
+C1, C3, C4 = chans[1]["name"], chans[3]["name"], chans[4]["name"]
 w.favs.add("all", chans[1])
 w.favs.add("Sport", chans[3])
 w.favs.add("Sport", chans[4])
@@ -173,19 +175,19 @@ page.set_tab("folders")
 w._mitt_render()
 assert tiles()[0] == tr("nav_favorites") and tiles().count("Sport") == 1, tiles()
 assert "Nordic only" in tiles() and f"Vuxen  {LOCK}" in tiles() and f"Barn  {LOCK}" in tiles()
-assert sorted(titles()) == ["Big Buck Bunny", "Nordic News"], titles()   # every source's loose
+assert sorted(titles()) == sorted([C1, "Nordic News"]), titles()   # every source's loose
 w._mitt_folder_picked(tile("Sport"))
 assert [(c.title, c.data.source) for c in cards()] == [
-    ("Sintel", "pa"), ("Art of Motion", "pa"), ("Nordic Sport", "pb"), ("Nordic Golf", "pb"),
+    (C3, "pa"), (C4, "pa"), ("Nordic Sport", "pb"), ("Nordic Golf", "pb"),
     ("Nordic Tennis", "pb"), ("Matchen", "pa"), ("Nordic Film", "pb")], titles()
 # Each title says its source, after its kind; Nordic's locked category's not there.
-assert card("Sintel").line == f"{tr('mitt_kind_channel')} · Pirat"
+assert card(C3).line == f"{tr('mitt_kind_channel')} · Pirat"
 assert card("Nordic Sport").line == f"{tr('mitt_kind_channel')} · Nordic"
 assert card("Nordic Film").line == f"{tr('mitt_kind_film')} · Nordic"
 assert tile("Sport").line == " · ".join([tr("mitt_n_channels", n=5), tr("mitt_n_films", n=2)])
 
 # -- played as Mine plays them: another source's channel without switching ----------------
-act(card("Sintel"))
+act(card(C3))
 assert w._last_playback["kind"] == "live" and str(w._last_playback["key"]) == "3"
 elsewhere = []
 w._play_channel_elsewhere = lambda pl, row: elsewhere.append((pl["id"], row))
@@ -220,8 +222,8 @@ assert "Nordic only" in seen and "Sport" not in seen                       # Mov
 
 # -- a move: each title in its own source's store ----------------------------------------
 pa_movies = json.dumps(w.movie_favs.groups)
-w._mitt_folder_drop([card("Nordic Golf"), card("Art of Motion")], tile("Nordic only"))
-assert "Nordic Golf" not in titles() and "Art of Motion" not in titles()   # at once
+w._mitt_folder_drop([card("Nordic Golf"), card(C4)], tile("Nordic only"))
+assert "Nordic Golf" not in titles() and C4 not in titles()   # at once
 assert ids(pb()["Nordic only"]) == [79, 78] and 78 not in ids(pb()["Sport"])
 assert ids(w.favs.groups["Nordic only"]) == [4] and 4 not in ids(w.favs.groups["Sport"])
 assert json.dumps(w.movie_favs.groups) == pa_movies and "Nordic only" not in pb("movie_favorites")
@@ -232,7 +234,7 @@ pa_sport = json.dumps(w.favs.groups["Sport"])
 w._mitt_folder_reorder([card("Nordic Tennis")], 0)
 assert ids(pb()["Sport"]) == [82, 81, 77], pb()["Sport"]       # the hidden one keeps its place
 assert json.dumps(w.favs.groups["Sport"]) == pa_sport
-assert titles()[:3] == ["Sintel", "Nordic Tennis", "Nordic Sport"], titles()
+assert titles()[:3] == [C3, "Nordic Tennis", "Nordic Sport"], titles()
 
 # -- renamed in every source that holds it ------------------------------------------------
 QInputDialog.getText = staticmethod(lambda *a, **k: ("Sporten", True))
