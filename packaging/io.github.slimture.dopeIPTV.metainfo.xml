@@ -70,6 +70,20 @@
   </developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.7.0" date="2026-11-24">
+      <description>
+        <p>Download films and episodes to watch without the network, offline mode, every source's channels in one list, a new first-run guide with a demo, and every message in the app's own look.</p>
+        <ul>
+          <li>Download films and episodes, at a calm pace, to watch anywhere</li>
+          <li>Offline mode shows what is downloaded and sends nothing to the internet</li>
+          <li>Every source: the channels of all your sources in one list</li>
+          <li>A new first-run guide that says plainly what went wrong, and a demo with free test streams</li>
+          <li>Start on the last channel you watched, if you like</li>
+          <li>Favourite folders across every source, and a history of what the app said</li>
+          <li>Every message and question in the app's own look</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.12" date="2026-11-22">
       <description>
         <p>A security round from two independent reviews of 1.6.11, and guide descriptions without HTML code.</p>

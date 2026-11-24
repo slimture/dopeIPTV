@@ -5,10 +5,26 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
-## [Unreleased]
+## [1.7.0]
 
 ### Added
 
+- Downloads to watch without the network: **Download** on a film's or an
+  episode's menu, and **Download this season** / **Download all episodes**
+  on a series' page and its row, keeps the title on this computer - one at
+  a time, over one connection to the provider. A download that was cut
+  carries on where it stopped; an HLS film is saved as MP4. Downloaded
+  titles are marked **Downloaded** on their cards, a series' episodes and
+  under the poster, and play their file as the same title (resume points,
+  watched marks, History and Continue are the title's own). **Downloaded**
+  in the sidebar lists what downloads and waits, then the films and the
+  series. Settings → Recording → Downloads: the folder (your videos folder
+  by default) and the space they may take (50 GB by default, never below
+  1 GB free). A download gives way to the rest of the app on the account,
+  and asks first when it would be one connection too many; nothing
+  downloads while viewing privately; a kids profile downloads and sees only
+  what its lists show. Downloads are never synced nor in a backup, and
+  nothing on the disk names their address or a login.
 - Downloads keep a calm pace: a download reads a few times as fast as the
   title plays (about 20 Mbit/s when its length is not known) and the next
   waits a few minutes, so to the provider it looks like someone watching.
