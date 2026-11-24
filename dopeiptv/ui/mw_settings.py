@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
+from functools import partial
 from datetime import datetime
 from typing import Any, Callable
 
@@ -133,13 +134,177 @@ class SettingsContext:
     soon: Callable[..., None] | None = None
 
 
-#: The pages a menu elsewhere leads to, by key: their title's string - the
-#: one open_settings gives the page (the link reads "Settings › <title>…").
-LINKED_PAGES = {
-    "playback": "tab_playback", "audio": "set_page_av", "guide": "sec_guide",
-    "multiview": "tab_multiview", "recording": "tab_recording",
-    "casting": "set_page_casting", "tv": "set_page_tv", "local": "nav_local",
-}
+#: Settings' everyday pages, in the sidebar's order: (key, title, what it
+#: holds, icon, a shorter name for the sidebar or "", its builder - one
+#: module per group, run the first time the page is needed). Each setting
+#: has one page, the one a person looks on (docs/SETTINGS_MAP.md).
+PAGES: tuple[tuple[str, str, str, str, str, Callable[[SettingsContext], None]], ...] = (
+    ("playback", "tab_playback", "set_page_playback_sub", "play", "", set_watch.build_playback),
+    # Sound, subtitles and picture on one page: they were two pages of four
+    # and five rows, both about how a stream plays.
+    ("audio", "set_page_av", "set_page_av_sub", "picture", "", set_watch.build_audio),
+    ("guide", "sec_guide", "set_page_guide_sub", "guide", "", set_watch.build_guide),
+    ("multiview", "tab_multiview", "set_page_multiview_sub", "grid", "", set_watch.build_multiview),
+    ("recording", "tab_recording", "set_page_recording_sub", "rec", "", set_watch.build_recording),
+    ("casting", "set_page_casting", "set_page_casting_sub", "cast", "", set_watch.build_casting),
+    # TV mode and what controls it - the remotes, the game controllers and
+    # the phone: it was a section of General.
+    ("tv", "set_page_tv", "set_page_tv_sub", "tv", "tv_mode", set_watch.build_tv),
+    ("playlists", "set_page_sources", "set_page_playlists_sub", "stack", "", set_content.build_sources),
+    # Mine's own (the place that holds favourites, Watch later and
+    # history): the series followed and how their news is said.
+    ("mine", "nav_mine", "set_page_mine_sub", "star", "", set_content.build_mine),
+    ("local", "nav_local", "local_settings_hint", "folder", "", set_content.build_local),
+    ("metadata", "set_page_posters", "set_page_metadata_sub", "image", "", set_content.build_metadata),
+    # Its explanation names Simkl only where this build offers it.
+    ("history", "set_page_history", "set_page_history_sub", "trakt", "", set_services.build_history),
+    # Its whole title is too long for the sidebar in most languages.
+    ("sync", "sync_title", "set_page_sync_sub", "sync", "sync_nav", set_services.build_sync),
+    ("integrations", "set_page_integrations", "set_page_integrations_sub", "plug", "",
+     set_services.build_integrations),
+    ("general", "set_page_general", "set_page_general_sub", "gear", "", set_system.build_general),
+    # What the app keeps of what is watched, and everything in one file:
+    # private viewing, clearing history and the backup were General's.
+    ("privacy", "set_page_privacy", "set_page_privacy_sub", "shield", "", set_system.build_privacy),
+    ("appearance", "set_page_appearance", "set_page_appearance_sub", "palette", "",
+     set_system.build_appearance),
+    # A whole feature of its own (every action's key), for everyone: it was
+    # lost at the top of Advanced.
+    ("shortcuts", "sc_title", "set_page_shortcuts_sub", "keyboard", "", set_system.build_shortcuts),
+    # One per person in the household (mw_profiles): a service of its own,
+    # beside the parental lock its kids profiles follow.
+    ("profiles", "profile_page", "profile_page_sub", "person", "", set_system.build_profiles),
+    ("parental", "set_page_parental", "set_page_parental_sub", "lock", "", set_system.build_parental),
+    ("advanced", "set_page_advanced", "set_page_advanced_sub", "wrench", "", set_system.build_advanced),
+)
+
+#: Nerd's pages but Status, by the part ui/nerd_settings.py puts on each:
+#: (part, key, title, what it holds, icon); in Nerd's own colour, shown
+#: only while it is on.
+NERD_PAGES = (
+    ("net", "nerd_net", "nerd_pg_net", "nerd_pg_net_sub", "network"),
+    ("boxes", "nerd_boxes", "nerd_pg_boxlists", "nerd_pg_boxlists_sub", "box"),
+    ("player", "nerd_player", "nerd_pg_player", "nerd_pg_player_sub", "knobs"),
+    ("serve", "nerd_serve", "nerd_pg_remote", "nerd_pg_remote_sub", "remote"),
+    ("diag", "nerd_diag", "nerd_pg_diag", "nerd_pg_diag_sub", "pulse"),
+)
+
+#: The sidebar's groups, by what a person is doing (AGENTS.md, "Where a
+#: setting goes"): watching, what there is to watch, the accounts and
+#: services around it, the app itself - and Nerd's after, in its colour.
+GROUPS = (
+    ("set_grp_watch", ("playback", "audio", "guide", "multiview", "recording", "casting", "tv")),
+    ("set_grp_content", ("playlists", "mine", "local", "metadata")),
+    ("set_grp_accounts", ("history", "sync", "integrations")),
+    ("set_sec_system", ("general", "privacy", "appearance", "shortcuts", "profiles",
+                        "parental", "advanced")),
+)
+
+#: Each everyday page's title by its key: a menu's way to it reads
+#: "Settings › <title>…" (settings_link_text).
+PAGE_TITLES = {key: title for key, title, *_rest in PAGES}
+
+#: What the player reads as it starts a stream: a change re-applies its
+#: defaults (apply_default_options).
+PLAYER_KEYS = frozenset({
+    "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_live", "sub_scale",
+    "sub_color", "sub_background", "aspect_mode",
+    "video_deinterlace", "video_sharpen", "video_tonemapping"})
+
+
+class _SettingsSources:
+    """The sources as one Settings window handles them - shared by Sources,
+    the backup (Privacy and data) and Nerd's boxes: a source's own page, the
+    quick form for a new one, an account looked up, the backup made and
+    put back."""
+
+    def __init__(self, win: Any, dialog: QDialog, shell: SettingsShell,
+                 shared: dict, nerd_on: Callable[[], bool]) -> None:
+        self.win, self.dialog, self.shell = win, dialog, shell
+        self.shared, self.nerd_on = shared, nerd_on
+        self.store = win.playlist_store
+
+    def changed(self, pid) -> None:
+        """A source added, saved or restored: the Sources page's list
+        again with *pid* picked, if it is built - else the sidebar's
+        switcher alone, which that list's reload also updates."""
+        lst = self.shared.get("sources")
+        if lst is not None:
+            lst["reload"]()
+            lst["select"](pid)
+        else:
+            self.win._update_playlist_btn()
+
+    def account_of(self, pl, done) -> None:
+        """The account behind source *pl* (looked up off the window's
+        thread), handed to *done(info)*; the app's own connections to
+        it as it is asked: what the provider counts besides them is
+        another device's."""
+        win = self.win
+        pid = pl.get("id")
+        seen = getattr(win, "_conn_seen", None)
+        own = (win._conn_own(win._conn_uses(), str(pid))
+               if seen is not None else 0)
+
+        def fetch(pl=pl):
+            try:
+                return make_client(pl).account_info()
+            except Exception:
+                return {}
+
+        def got(info):
+            if seen is not None and info:
+                seen(str(pid), info, own)
+            done(info)
+
+        run_async(win.pool, fetch, got, lambda _e: done({}))
+
+    def saved(self, pid) -> None:
+        self.changed(pid)
+
+    def left(self, pid, changed: bool) -> None:
+        # The source in use connects again with what was changed.
+        if changed and self.store and pid == self.store.active_id:
+            self.win.switch_playlist(pid)
+
+    def account(self, pl, done) -> None:
+        if (pl.get("kind") or "xtream") == "m3u":
+            return
+        self.account_of(pl, lambda info: done(
+            self.win._format_account(info) if (info or {}).get("user_info") else ""))
+
+    def edit(self, pid, under=None):
+        """The source's own page, in place of the page it is opened
+        from (Sources, or Nerd's boxes), with a way back to it."""
+        store, shell = self.store, self.shell
+        pl = store.get(pid) if (store and pid) else None
+        if not pl:
+            return
+        under = under or "playlists"
+        title = next((p.title for p in shell.pages if p.key == under), "")
+        src_page = SourcePage(pl, store=store, nerd_on=self.nerd_on(), crumb=title,
+                              back=shell.leave_sub, open_page=shell.show_page,
+                              account=self.account, saved=self.saved,
+                              left=self.left, settings=self.win.settings)
+        self.win._install_wheel_guard(src_page)
+        shell.open_sub(src_page, under)
+
+    def add(self, prefill=None):
+        # The quick form, then on to the new source's page.
+        dlg = PlaylistDialog(self.dialog, prefill=prefill)
+        if dlg.exec():
+            pl = self.store.add(dlg.values())
+            self.changed(pl["id"])
+            self.edit(pl["id"], self.shell.current_key())
+
+    def export(self, password: str = "") -> bool:
+        return self.win._backup_save(self.dialog, password)
+
+    def added(self) -> None:
+        self.changed(self.store.active_id)
+
+    def import_(self):
+        self.win._backup_restore(self.dialog, self.added)
 
 
 class _SettingsMixin:
@@ -147,9 +312,9 @@ class _SettingsMixin:
 
     def settings_link_text(self, page: str) -> str:
         """"Settings › Picture & sound…": a menu's way to the page its
-        settings are on (LINKED_PAGES), in the window's direction."""
+        settings are on (PAGE_TITLES), in the window's direction."""
         rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
-        return f"{tr('settings_title')} {'‹' if rtl else '›'} {tr(LINKED_PAGES[page])}…"
+        return f"{tr('settings_title')} {'‹' if rtl else '›'} {tr(PAGE_TITLES[page])}…"
 
     def open_settings_at(self, page: str) -> None:
         """Settings on *page*, once the menu or window that asked is gone."""
@@ -934,78 +1099,21 @@ class _SettingsMixin:
         def flag(box) -> str:
             return "true" if box.isChecked() else "false"
 
-        # -- the pages, in the order the sidebar shows them ---------------------
+        # -- the pages, in the order the sidebar shows them (PAGES) ---------------
         # Made first, each filled by its builder below the first time it is
-        # needed; each setting has one page, the one a person looks on
-        # (docs/SETTINGS_MAP.md).
+        # needed.
         nerd_tint = P.get("nerd", P["accent"])
-        play = page("playback", tr("tab_playback"),
-                    tr("set_page_playback_sub"), "play")
-        # Sound, subtitles and picture on one page: they were two pages of
-        # four and five rows, both about how a stream plays.
-        audio = page("audio", tr("set_page_av"), tr("set_page_av_sub"),
-                     "picture")
-        guide = page("guide", tr("sec_guide"), tr("set_page_guide_sub"),
-                     "guide")
-        mv = page("multiview", tr("tab_multiview"),
-                  tr("set_page_multiview_sub"), "grid")
-        rec = page("recording", tr("tab_recording"),
-                   tr("set_page_recording_sub"), "rec")
-        casting = page("casting", tr("set_page_casting"),
-                       tr("set_page_casting_sub"), "cast")
-        # TV mode and what controls it - the remotes, the game controllers
-        # and the phone: it was a section of General.
-        tv_page = page("tv", tr("set_page_tv"), tr("set_page_tv_sub"),
-                       "tv", nav=tr("tv_mode"))
-        playlists = page("playlists", tr("set_page_sources"),
-                         tr("set_page_playlists_sub"), "stack")
-        # Mine's own (the place that holds favourites, Watch later and
-        # history): the series followed and how their news is said.
-        mine = page("mine", tr("nav_mine"), tr("set_page_mine_sub"), "star")
-        loc = page("local", tr("nav_local"), tr("local_settings_hint"),
-                   "folder")
-        meta = page("metadata", tr("set_page_posters"),
-                    tr("set_page_metadata_sub"), "image")
         simkl = getattr(self, "simkl", None)
         simkl_offered = simkl is not None and simkl.available()
-        history = page("history", tr("set_page_history"),
-                       tr("set_page_history_sub" if simkl_offered
-                          else "set_page_trakt_sub"), "trakt")
-        # Its whole title is too long for the sidebar in most languages.
-        sync_page = page("sync", tr("sync_title"), tr("set_page_sync_sub"),
-                         "sync", nav=tr("sync_nav"))
-        integrations = page("integrations", tr("set_page_integrations"),
-                            tr("set_page_integrations_sub"), "plug")
-        general = page("general", tr("set_page_general"),
-                       tr("set_page_general_sub"), "gear")
-        # What the app keeps of what is watched, and everything in one
-        # file: private viewing, clearing history and the backup were
-        # sections of General.
-        privacy_page = page("privacy", tr("set_page_privacy"),
-                            tr("set_page_privacy_sub"), "shield")
-        look = page("appearance", tr("set_page_appearance"),
-                    tr("set_page_appearance_sub"), "palette")
-        # A whole feature of its own (every action's key), for everyone: it
-        # was lost at the top of Advanced.
-        keys_page = page("shortcuts", tr("sc_title"),
-                         tr("set_page_shortcuts_sub"), "keyboard")
-        # One per person in the household (mw_profiles): a service of its
-        # own, beside the parental lock its kids profiles follow.
-        prof_page = page("profiles", tr("profile_page"), tr("profile_page_sub"), "person")
-        par = page("parental", tr("set_page_parental"),
-                   tr("set_page_parental_sub"), "lock")
-        adv = page("advanced", tr("set_page_advanced"),
-                   tr("set_page_advanced_sub"), "wrench")
+        for key, title, about_it, icon, nav, _build in PAGES:
+            if key == "history" and not simkl_offered:
+                about_it = "set_page_trakt_sub"
+            page(key, tr(title), tr(about_it), icon, nav=tr(nav) if nav else "")
         # Nerd's pages, in its own colour; all but Status only while it is on.
         nerd_page = page("nerd", tr("nerd_pg_status"), tr("nerd_page_sub"),
                          "nerd", nerd_tint)
-        nerd_pages = {
-            "net": page("nerd_net", tr("nerd_pg_net"), tr("nerd_pg_net_sub"), "network", nerd_tint),
-            "boxes": page("nerd_boxes", tr("nerd_pg_boxlists"), tr("nerd_pg_boxlists_sub"), "box", nerd_tint),
-            "player": page("nerd_player", tr("nerd_pg_player"), tr("nerd_pg_player_sub"), "knobs", nerd_tint),
-            "serve": page("nerd_serve", tr("nerd_pg_remote"), tr("nerd_pg_remote_sub"), "remote", nerd_tint),
-            "diag": page("nerd_diag", tr("nerd_pg_diag"), tr("nerd_pg_diag_sub"), "pulse", nerd_tint),
-        }
+        nerd_pages = {part: page(key, tr(title), tr(about_it), icon, nerd_tint)
+                      for part, key, title, about_it, icon in NERD_PAGES}
         # A Nerd setting has its place under NERD; the everyday page beside
         # it says so in one row that leads there, while Nerd is on.
         nerd_switch: dict = {"box": None}
@@ -1054,87 +1162,7 @@ class _SettingsMixin:
                 chip.refresh()
 
         # -- the sources: shared by Sources, the backup and Nerd's boxes ----
-        store = self.playlist_store
-
-        def sources_changed(pid) -> None:
-            """A source added, saved or restored: the Sources page's list
-            again with *pid* picked, if it is built - else the sidebar's
-            switcher alone, which that list's reload also updates."""
-            lst = shared.get("sources")
-            if lst is not None:
-                lst["reload"]()
-                lst["select"](pid)
-            else:
-                self._update_playlist_btn()
-
-        def account_of(pl, done) -> None:
-            """The account behind source *pl* (looked up off the window's
-            thread), handed to *done(info)*; the app's own connections to
-            it as it is asked: what the provider counts besides them is
-            another device's."""
-            pid = pl.get("id")
-            seen = getattr(self, "_conn_seen", None)
-            own = (self._conn_own(self._conn_uses(), str(pid))
-                   if seen is not None else 0)
-
-            def fetch(pl=pl):
-                try:
-                    return make_client(pl).account_info()
-                except Exception:
-                    return {}
-
-            def got(info):
-                if seen is not None and info:
-                    seen(str(pid), info, own)
-                done(info)
-
-            run_async(self.pool, fetch, got, lambda _e: done({}))
-
-        def source_saved(pid) -> None:
-            sources_changed(pid)
-
-        def source_left(pid, changed: bool) -> None:
-            # The source in use connects again with what was changed.
-            if changed and store and pid == store.active_id:
-                self.switch_playlist(pid)
-
-        def source_account(pl, done) -> None:
-            if (pl.get("kind") or "xtream") == "m3u":
-                return
-            account_of(pl, lambda info: done(
-                self._format_account(info) if (info or {}).get("user_info") else ""))
-
-        def edit_source(pid, under=None):
-            """The source's own page, in place of the page it is opened
-            from (Sources, or Nerd's boxes), with a way back to it."""
-            pl = store.get(pid) if (store and pid) else None
-            if not pl:
-                return
-            under = under or "playlists"
-            title = next((p.title for p in shell.pages if p.key == under), "")
-            src_page = SourcePage(pl, store=store, nerd_on=nerd_on(), crumb=title,
-                                  back=shell.leave_sub, open_page=shell.show_page,
-                                  account=source_account, saved=source_saved,
-                                  left=source_left, settings=self.settings)
-            self._install_wheel_guard(src_page)
-            shell.open_sub(src_page, under)
-
-        def add_playlist(prefill=None):
-            # The quick form, then on to the new source's page.
-            dlg = PlaylistDialog(d, prefill=prefill)
-            if dlg.exec():
-                pl = store.add(dlg.values())
-                sources_changed(pl["id"])
-                edit_source(pl["id"], shell.current_key())
-
-        def export_playlists(password: str = "") -> bool:
-            return self._backup_save(d, password)
-
-        def playlists_added() -> None:
-            sources_changed(store.active_id)
-
-        def import_playlists():
-            self._backup_restore(d, playlists_added)
+        sources = _SettingsSources(self, d, shell, shared, nerd_on)
 
         # -- each page's builder, run the first time the page is needed ------
         # One builder per page, one module per group (ui/set_watch.py,
@@ -1146,31 +1174,12 @@ class _SettingsMixin:
             on=on, rtl=rtl, is_on=is_on, flag=flag, own=own, nerd_link=nerd_link,
             nerd_switch=nerd_switch, link_cards=link_cards,
             page_commits=page_commits, shared=shared,
-            restyle_dialog=restyle_dialog, store=store,
-            account_of=account_of, edit_source=edit_source,
-            add_playlist=add_playlist, export_playlists=export_playlists,
-            import_playlists=import_playlists)
-        play.set_builder(lambda: set_watch.build_playback(ctx))
-        audio.set_builder(lambda: set_watch.build_audio(ctx))
-        guide.set_builder(lambda: set_watch.build_guide(ctx))
-        mv.set_builder(lambda: set_watch.build_multiview(ctx))
-        rec.set_builder(lambda: set_watch.build_recording(ctx))
-        casting.set_builder(lambda: set_watch.build_casting(ctx))
-        tv_page.set_builder(lambda: set_watch.build_tv(ctx))
-        playlists.set_builder(lambda: set_content.build_sources(ctx))
-        mine.set_builder(lambda: set_content.build_mine(ctx))
-        loc.set_builder(lambda: set_content.build_local(ctx))
-        meta.set_builder(lambda: set_content.build_metadata(ctx))
-        history.set_builder(lambda: set_services.build_history(ctx))
-        sync_page.set_builder(lambda: set_services.build_sync(ctx))
-        integrations.set_builder(lambda: set_services.build_integrations(ctx))
-        general.set_builder(lambda: set_system.build_general(ctx))
-        privacy_page.set_builder(lambda: set_system.build_privacy(ctx))
-        look.set_builder(lambda: set_system.build_appearance(ctx))
-        keys_page.set_builder(lambda: set_system.build_shortcuts(ctx))
-        prof_page.set_builder(lambda: set_system.build_profiles(ctx))
-        par.set_builder(lambda: set_system.build_parental(ctx))
-        adv.set_builder(lambda: set_system.build_advanced(ctx))
+            restyle_dialog=restyle_dialog, store=sources.store,
+            account_of=sources.account_of, edit_source=sources.edit,
+            add_playlist=sources.add, export_playlists=sources.export,
+            import_playlists=sources.import_)
+        for key, *_rest, build in PAGES:
+            ctx.pages[key].set_builder(lambda build=build: build(ctx))
 
         # -- Nerd -------------------------------------------------------------
         # Its six pages are one build (nerd_settings.build): the first of
@@ -1179,42 +1188,7 @@ class _SettingsMixin:
         # as stored, without building them.
         shell.set_gated("nerd", [p.key for p in nerd_pages.values()])
         shell.set_group_enabled("nerd", is_on("nerd_enabled", "false"))
-        nerd_client = self.client
-
-        def build_nerd() -> None:
-            from . import nerd_settings
-
-            def show_nerd_pages(on: bool) -> None:
-                shell.set_group_enabled("nerd", on)
-            nerd_commit = nerd_settings.build(
-                nerd_page, self.settings, d,
-                boxes=[p for p in (self.playlist_store.playlists() if self.playlist_store else [])
-                       if p.get("kind") in nerd_settings.BOX_NAMES],
-                edit=lambda pid: edit_source(pid, "nerd_boxes"),
-                add=lambda: add_playlist({"kind": "enigma2"}),
-                pages=nerd_pages, show_pages=show_nerd_pages,
-                source=lambda: self.playlist_store.active() if self.playlist_store else None,
-                channels=lambda: nerd_client.live_streams(None),
-                rec_dir=lambda: self.rec.directory(),
-                playlists=lambda: ((self.playlist_store.playlists(), self.playlist_store.active_id)
-                                   if self.playlist_store else ([], None)),
-                remote=self._remote_apply,
-                open_page=shell.show_page,
-                health_store=lambda: self.health,
-                numbers=self._chno_settings,
-                in_use=getattr(self, "_in_use_card", None),
-                analysis=lambda: (d.accept(), QTimer.singleShot(0, self.open_ts_analysis)),
-                server=getattr(self, "_server_state", None))
-            # The link rows to Nerd's pages follow its switch (a turn of it
-            # runs every page's filter again); shown now if it is on.
-            nerd_switch["box"] = getattr(nerd_commit, "switch", None)
-            for card in link_cards:
-                card.refresh()
-
-            def commit_nerd(put, changed: set, final: bool) -> None:
-                nerd_commit(put)
-            page_commits["nerd"] = commit_nerd
-
+        build_nerd = self._settings_nerd(ctx, nerd_page, nerd_pages, sources)
         for pg in (nerd_page, *nerd_pages.values()):
             pg.set_builder(build_nerd)
 
@@ -1232,21 +1206,11 @@ class _SettingsMixin:
         fl.addWidget(close_btn)
         outer.addWidget(footer)
 
-        # Grouped by what a person is doing (AGENTS.md, "Where a setting
-        # goes"): watching, what there is to watch, the accounts and services
-        # around it, the app itself - and Nerd, in its own colour.
-        shell.arrange([
-            (tr("set_grp_watch"), ["playback", "audio", "guide", "multiview",
-                                   "recording", "casting", "tv"]),
-            (tr("set_grp_content"), ["playlists", "mine", "local",
-                                     "metadata"]),
-            (tr("set_grp_accounts"), ["history", "sync", "integrations"]),
-            (tr("set_sec_system"), ["general", "privacy", "appearance",
-                                    "shortcuts", "profiles", "parental",
-                                    "advanced"]),
-            (tr("nerd_page"), ["nerd", *(p.key for p in nerd_pages.values())],
-             nerd_tint),
-        ])
+        # Grouped by what a person is doing (GROUPS) - and Nerd, in its own
+        # colour.
+        shell.arrange([(tr(group), list(keys)) for group, keys in GROUPS]
+                      + [(tr("nerd_page"), ["nerd", *(p.key for p in nerd_pages.values())],
+                          nerd_tint)])
         # Whatever changed during this visit, for what only runs on close.
         visit: set[str] = set()
         # The profile the controls were read for: a switch while the window
@@ -1254,86 +1218,7 @@ class _SettingsMixin:
         # not put this profile's own values into the next one.
         from ..core import profiles as _profiles
         built_for = _profiles.active_id()
-        player_keys = {
-            "audio_lang", "sub_mode", "sub_lang", "sub_lang2", "sub_live", "sub_scale",
-            "sub_color", "sub_background", "aspect_mode",
-            "video_deinterlace", "video_sharpen", "video_tonemapping"}
-
-        def commit(final: bool = False) -> None:
-            """Store what the controls of every page built say and apply it.
-            Runs a moment after each change and once more on close. Writes
-            only what differs from what is stored, so an untouched window
-            changes nothing."""
-            if getattr(self, "_resetting", False):
-                return            # "Reset all" cleared everything: leave it
-            changed: set[str] = set()
-
-            def put(key: str, value) -> None:
-                if _profiles.is_own(key) and _profiles.active_id() != built_for:
-                    return
-                cur = self.settings.value(key)
-                if cur is None or str(cur) != str(value):
-                    self.settings.setValue(key, value)
-                    changed.add(key)
-
-            for pg in shell.pages:
-                page_commit = page_commits.get(pg.key)
-                if page_commit is not None:
-                    page_commit(put, changed, final)
-            if final and "general" not in page_commits and sys.platform.startswith("linux"):
-                # As when General is built: the window closed with the
-                # desktop entry's switch in it answers the status-row offer.
-                from ..core import desktop_entry as _de
-                if _de.is_installed() or _de.can_offer():
-                    self.settings.setValue("desktop_entry_asked", "true")
-                    self.desktop_entry_btn.hide()
-            if any(k.startswith("nerd_") for k in changed):
-                from ..core import nerd
-                nerd.install(self.settings)
-                # The player that is playing takes the change now.
-                self._nerd_to_player()
-                # The source's own route (own DNS, IP version): the client's
-                # next request takes it.
-                self._nerd_route_to_client()
-                if changed & {"nerd_enabled", "nerd_picon_dir", "nerd_picon_override", "nerd_udpxy"}:
-                    self._nerd_lists_changed = True
-                if changed & {"nerd_enabled", "nerd_remote", "nerd_share", "nerd_remote_lan",
-                              "nerd_remote_port", "nerd_remote_token"}:
-                    self._remote_apply()
-                if "nerd_enabled" in changed or any(k.startswith(("nerd_hooks", "nerd_mqtt")) for k in changed):
-                    self._events_apply()
-                if "nerd_enabled" in changed or any(k.startswith("nerd_server") for k in changed):
-                    self._server_apply()
-
-            if any(k.startswith("mv_") for k in changed):
-                self._apply_multiview_settings()
-            if changed & set(_places.POPULAR_KEYS.values()):
-                self._popular_changed()     # Movies' and Series' tops ask again
-            if changed & _places.LOOK_KEYS:
-                # What the places show: the sidebar and the places at once.
-                self._places_look_changed("settings")
-            if changed & {"metadata_source", "tmdb_api_key"}:
-                self.cover.reload()
-                self._popular_changed()     # TMDB on or off: the tops ask again
-            if changed & player_keys and self.player:
-                self.player.apply_default_options()
-            if "show_stream_info" in changed and self.player:
-                self.player._read_stream_info()
-            if changed & {"view_density", "sort_order", "show_stream_info",
-                          "list_channel_numbers"}:
-                self._apply_view_settings()
-                self.list_model.refresh_all()
-            visit.update(changed)
-            if final and visit:
-                self._apply_view_settings()
-                self.list_model.refresh_all()
-                # Re-render the open detail panel so a changed "upcoming
-                # count" (and other view tweaks) take effect without
-                # re-selecting. On close only: re-selecting can start a
-                # preview.
-                cur = self.listw.currentIndex()
-                if cur.isValid():
-                    self._on_current_changed(cur)
+        commit = partial(self._settings_commit, shell, page_commits, built_for, visit)
 
         # A change is applied a moment after it is made - long enough that a
         # held stepper button or a dragged slider applies once, not forty
@@ -1347,26 +1232,7 @@ class _SettingsMixin:
             live.start()
         ctx.soon = soon
 
-        controls_of = (QComboBox, QAbstractButton, QAbstractSpinBox,
-                       QAbstractSlider, QLineEdit, QPlainTextEdit)
-
-        def page_built(pg: SettingsPage) -> None:
-            """A page just built: one walk over its widgets for every
-            control the wheel guard and the changes applied as made need."""
-            controls = pg.findChildren(controls_of)
-            self._install_wheel_guard(pg, controls)
-            for w in controls:
-                if isinstance(w, QComboBox):
-                    w.currentIndexChanged.connect(soon)
-                if isinstance(w, QAbstractButton) and w.isCheckable():
-                    w.toggled.connect(soon)
-                if isinstance(w, (QSpinBox, QAbstractSlider)):
-                    w.valueChanged.connect(soon)
-                if (isinstance(w, QLineEdit) and w is not shell.search
-                        and not isinstance(w.parent(), QAbstractSpinBox)):
-                    w.editingFinished.connect(soon)
-                if isinstance(w, QPlainTextEdit):
-                    w.textChanged.connect(soon)
+        page_built = partial(self._settings_page_built, shell, soon)
 
         # Back on the page that was open last time this session (built only
         # once the window is put together, below).
@@ -1404,7 +1270,7 @@ class _SettingsMixin:
         d.finished.connect(lambda _r: self._nerd_lists_rebuild())
         d.setUpdatesEnabled(True)
         if pending:
-            edit_source(pending)
+            sources.edit(pending)
         from ..i18n import current_language
         language = current_language()
 
@@ -1419,6 +1285,153 @@ class _SettingsMixin:
         else:
             self._settings_index = None
         self._settings_closed(d)
+
+
+    def _settings_nerd(self, ctx: SettingsContext, nerd_page: SettingsPage,
+                       nerd_pages: dict[str, SettingsPage],
+                       sources: _SettingsSources) -> Callable[[], None]:
+        """Nerd's six pages' one builder (nerd_settings.build): the first
+        of them needed fills them all."""
+        shell, d = ctx.shell, ctx.dialog
+        nerd_switch, link_cards, page_commits = ctx.nerd_switch, ctx.link_cards, ctx.page_commits
+        nerd_client = self.client
+
+        def build_nerd() -> None:
+            from . import nerd_settings
+
+            def show_nerd_pages(on: bool) -> None:
+                shell.set_group_enabled("nerd", on)
+            nerd_commit = nerd_settings.build(
+                nerd_page, self.settings, d,
+                boxes=[p for p in (self.playlist_store.playlists() if self.playlist_store else [])
+                       if p.get("kind") in nerd_settings.BOX_NAMES],
+                edit=lambda pid: sources.edit(pid, "nerd_boxes"),
+                add=lambda: sources.add({"kind": "enigma2"}),
+                pages=nerd_pages, show_pages=show_nerd_pages,
+                source=lambda: self.playlist_store.active() if self.playlist_store else None,
+                channels=lambda: nerd_client.live_streams(None),
+                rec_dir=lambda: self.rec.directory(),
+                playlists=lambda: ((self.playlist_store.playlists(), self.playlist_store.active_id)
+                                   if self.playlist_store else ([], None)),
+                remote=self._remote_apply,
+                open_page=shell.show_page,
+                health_store=lambda: self.health,
+                numbers=self._chno_settings,
+                in_use=getattr(self, "_in_use_card", None),
+                analysis=lambda: (d.accept(), QTimer.singleShot(0, self.open_ts_analysis)),
+                server=getattr(self, "_server_state", None))
+            # The link rows to Nerd's pages follow its switch (a turn of it
+            # runs every page's filter again); shown now if it is on.
+            nerd_switch["box"] = getattr(nerd_commit, "switch", None)
+            for card in link_cards:
+                card.refresh()
+
+            def commit_nerd(put, changed: set, final: bool) -> None:
+                nerd_commit(put)
+            page_commits["nerd"] = commit_nerd
+
+        return build_nerd
+
+    def _settings_commit(self, shell: SettingsShell, page_commits: dict, built_for: str,
+                         visit: set[str], final: bool = False) -> None:
+        """Store what the controls of every page built say and apply it.
+        Runs a moment after each change and once more on close. Writes
+        only what differs from what is stored, so an untouched window
+        changes nothing. *built_for*: the profile the controls were read
+        for; *visit*: whatever changed during this visit, gathered."""
+        from ..core import profiles as _profiles
+        if getattr(self, "_resetting", False):
+            return            # "Reset all" cleared everything: leave it
+        changed: set[str] = set()
+
+        def put(key: str, value) -> None:
+            if _profiles.is_own(key) and _profiles.active_id() != built_for:
+                return
+            cur = self.settings.value(key)
+            if cur is None or str(cur) != str(value):
+                self.settings.setValue(key, value)
+                changed.add(key)
+
+        for pg in shell.pages:
+            page_commit = page_commits.get(pg.key)
+            if page_commit is not None:
+                page_commit(put, changed, final)
+        if final and "general" not in page_commits and sys.platform.startswith("linux"):
+            # As when General is built: the window closed with the
+            # desktop entry's switch in it answers the status-row offer.
+            from ..core import desktop_entry as _de
+            if _de.is_installed() or _de.can_offer():
+                self.settings.setValue("desktop_entry_asked", "true")
+                self.desktop_entry_btn.hide()
+        if any(k.startswith("nerd_") for k in changed):
+            from ..core import nerd
+            nerd.install(self.settings)
+            # The player that is playing takes the change now.
+            self._nerd_to_player()
+            # The source's own route (own DNS, IP version): the client's
+            # next request takes it.
+            self._nerd_route_to_client()
+            if changed & {"nerd_enabled", "nerd_picon_dir", "nerd_picon_override", "nerd_udpxy"}:
+                self._nerd_lists_changed = True
+            if changed & {"nerd_enabled", "nerd_remote", "nerd_share", "nerd_remote_lan",
+                          "nerd_remote_port", "nerd_remote_token"}:
+                self._remote_apply()
+            if "nerd_enabled" in changed or any(k.startswith(("nerd_hooks", "nerd_mqtt")) for k in changed):
+                self._events_apply()
+            if "nerd_enabled" in changed or any(k.startswith("nerd_server") for k in changed):
+                self._server_apply()
+
+        if any(k.startswith("mv_") for k in changed):
+            self._apply_multiview_settings()
+        if changed & set(_places.POPULAR_KEYS.values()):
+            self._popular_changed()     # Movies' and Series' tops ask again
+        if changed & _places.LOOK_KEYS:
+            # What the places show: the sidebar and the places at once.
+            self._places_look_changed("settings")
+        if changed & {"metadata_source", "tmdb_api_key"}:
+            self.cover.reload()
+            self._popular_changed()     # TMDB on or off: the tops ask again
+        if changed & PLAYER_KEYS and self.player:
+            self.player.apply_default_options()
+        if "show_stream_info" in changed and self.player:
+            self.player._read_stream_info()
+        if changed & {"view_density", "sort_order", "show_stream_info",
+                      "list_channel_numbers"}:
+            self._apply_view_settings()
+            self.list_model.refresh_all()
+        visit.update(changed)
+        if final and visit:
+            self._apply_view_settings()
+            self.list_model.refresh_all()
+            # Re-render the open detail panel so a changed "upcoming
+            # count" (and other view tweaks) take effect without
+            # re-selecting. On close only: re-selecting can start a
+            # preview.
+            cur = self.listw.currentIndex()
+            if cur.isValid():
+                self._on_current_changed(cur)
+
+
+    def _settings_page_built(self, shell: SettingsShell, soon: Callable[..., None],
+                             pg: SettingsPage) -> None:
+        """A page just built: one walk over its widgets for every
+        control the wheel guard and the changes applied as made need."""
+        controls_of = (QComboBox, QAbstractButton, QAbstractSpinBox,
+                       QAbstractSlider, QLineEdit, QPlainTextEdit)
+        controls = pg.findChildren(controls_of)
+        self._install_wheel_guard(pg, controls)
+        for w in controls:
+            if isinstance(w, QComboBox):
+                w.currentIndexChanged.connect(soon)
+            if isinstance(w, QAbstractButton) and w.isCheckable():
+                w.toggled.connect(soon)
+            if isinstance(w, (QSpinBox, QAbstractSlider)):
+                w.valueChanged.connect(soon)
+            if (isinstance(w, QLineEdit) and w is not shell.search
+                    and not isinstance(w.parent(), QAbstractSpinBox)):
+                w.editingFinished.connect(soon)
+            if isinstance(w, QPlainTextEdit):
+                w.textChanged.connect(soon)
 
     #: How long a closed Settings window is kept before it is deleted.
     SETTINGS_KEEP_MS = 60_000

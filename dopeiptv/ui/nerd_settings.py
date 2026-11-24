@@ -7,7 +7,11 @@ core/nerd.py turns what is stored here into what the player and the network
 do.
 
 ``build`` fills the page and returns ``commit(put)``, which open_settings
-calls with its own put() like every other page's controls.
+calls with its own put() like every other page's controls. Each of Nerd's
+pages has a builder of its own (``_build_network``, ``_build_lists``,
+``_build_player``, ``_build_serve``, ``_build_recordings`` - on Remote and
+automation's page -, ``_build_diag``), handed what they share as a
+``_Ctx``; each returns its values(), the keys it stores.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from __future__ import annotations
 import os
 import platform
 import sys
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from PyQt6 import sip
@@ -168,6 +173,62 @@ class _PartRow(QFrame):
         super().keyPressEvent(event)
 
 
+@dataclass(eq=False)
+class _Ctx:
+    """What every page of Nerd's takes from ``build``: the stored values, the
+    window, the pages, and the window's callbacks (build's docstring says
+    what each does). One per Settings window."""
+
+    n: _Defaults
+    settings: Any
+    parent: QWidget
+    page: SettingsPage
+    sub: dict[str, SettingsPage]
+    source: Callable[[], dict | None] | None = None
+    boxes: list[dict] | None = None
+    edit: Callable[[str], None] | None = None
+    add: Callable[[], None] | None = None
+    channels: Callable[[], list[dict]] | None = None
+    rec_dir: Callable[[], str] | None = None
+    playlists: Callable[[], tuple[list[dict], str | None]] | None = None
+    remote: Callable[[dict], dict] | None = None
+    health_store: Callable[[], Any] | None = None
+    numbers: Callable[[str, bool, Callable[[int], None]], None] | None = None
+    in_use: Callable[[Callable[[list[tuple[str, str]]], None]], None] | None = None
+    analysis: Callable[[], None] | None = None
+    server: Callable[[], dict] | None = None
+    #: Every check line made, started once Nerd is on and the window shows.
+    lines: list[CheckLine] = field(default_factory=list)
+    #: Nerd's switch, on Status (Remote and automation asks it).
+    switch: Any = None
+
+    def at(self, key: str) -> SettingsPage:
+        """The page *key*'s part goes on: its own, the one it shares
+        (PART_HOME), else Status."""
+        return self.sub.get(key) or self.sub.get(PART_HOME.get(key, "")) or self.page
+
+    def val(self, key: str, default: str = "") -> str:
+        return self.n.get(key, default)
+
+    def check(self, job: Callable[[], Any], title: str, test: bool = False,
+              test_text: str = "") -> CheckLine:
+        line = CheckLine(job, title, test=test, test_text=test_text)
+        self.lines.append(line)
+        return line
+
+    def src(self) -> dict | None:
+        return self.source() if self.source is not None else None
+
+
+@dataclass(eq=False)
+class _Serve:
+    """Remote and automation's part: what it stores, and the port it answers
+    on now (None while all of it is off)."""
+
+    values: Callable[[], dict[str, str]]
+    on_port: Callable[[], int | None]
+
+
 def build(page: SettingsPage, settings: Any, parent: QWidget,
           boxes: list[dict] | None = None,
           edit: Callable[[str], None] | None = None,
@@ -208,23 +269,11 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     server mode stands now (ui/mw_server.py's state), for its line."""
     n = _Defaults(settings)
     sub = pages or {}
-
-    def at(key: str) -> SettingsPage:
-        return sub.get(key) or sub.get(PART_HOME.get(key, "")) or page
-
-    def val(key: str, default: str = "") -> str:
-        return n.get(key, default)
-
-    lines: list[CheckLine] = []
-
-    def check(job: Callable[[], Any], title: str, test: bool = False,
-              test_text: str = "") -> CheckLine:
-        line = CheckLine(job, title, test=test, test_text=test_text)
-        lines.append(line)
-        return line
-
-    def src() -> dict | None:
-        return source() if source is not None else None
+    ctx = _Ctx(n=n, settings=settings, parent=parent, page=page, sub=sub, source=source,
+               boxes=boxes, edit=edit, add=add, channels=channels, rec_dir=rec_dir,
+               playlists=playlists, remote=remote, health_store=health_store,
+               numbers=numbers, in_use=in_use, analysis=analysis, server=server)
+    lines = ctx.lines
 
     # -- Nerd's own page: the switch, then how it works -------------------------
     c = page.card()
@@ -254,7 +303,104 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     if pages:
         how.append(("nerd_how_pages_t", "nerd_how_pages"))
     c.widget(_how_block(how), " ".join(tr(t) + " " + tr(b) for t, b in how))
+    ctx.switch = switch
 
+    parts = (_build_network(ctx), _build_lists(ctx), _build_player(ctx))
+    serve = _build_serve(ctx)
+    parts += (serve.values, _build_recordings(ctx), _build_diag(ctx))
+
+    def values() -> dict[str, str]:
+        out = {"nerd_enabled": "true" if switch.isChecked() else "false"}
+        for part in parts:
+            out.update(part())
+        return out
+    # Off: the switch and what Nerd holds, nothing else. On: all of it - on
+    # their own pages where there are pages, else gated here.
+    first = page.cards[gated_from - 1]
+    first.shown_if(teaser_row, lambda: not switch.isChecked())
+    for card in page.cards[gated_from:]:
+        for row, _text in card.rows:
+            prev = card._shown_if.get(id(row))
+            card.shown_if(row, lambda prev=prev: switch.isChecked() and (prev is None or prev()))
+
+    def start_checks() -> None:
+        for line in lines:
+            if line.test_btn is None or getattr(line, "auto", False):
+                line.start()
+
+    def part_summary(key: str) -> tuple[str, bool]:
+        if key == "boxes" and boxes:
+            return tr("nerd_part_boxes", n=len(boxes)), True
+        on = serve.on_port() if key == "serve" else None
+        if on is not None:
+            return tr("nerd_part_on", port=on), True
+        now = values()
+        changed = sum(1 for k in PART_KEYS.get(key, ()) if now.get(k, "") != n.defaults.get(k, ""))
+        if changed:
+            return tr("nerd_part_changed", n=changed), True
+        return tr("nerd_part_no_boxes" if key == "boxes" else "nerd_part_untouched"), False
+
+    def refresh_parts() -> None:
+        for key, row in part_rows:
+            row.set_summary(*part_summary(key))
+    if part_rows:
+        page.installEventFilter(_OnShow(page, refresh_parts))
+
+    def unfold(card: QWidget) -> None:
+        """The list opens downwards rather than appearing all at once."""
+        from PyQt6.QtCore import QEasingCurve, QPropertyAnimation
+        end = card.sizeHint().height()
+        anim = QPropertyAnimation(card, b"maximumHeight", card)
+        anim.setDuration(220)
+        anim.setStartValue(0)
+        anim.setEndValue(end)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.finished.connect(lambda: card.setMaximumHeight(16777215) if not sip.isdeleted(card) else None)
+        anim.start()
+
+    def flip(on: bool) -> None:
+        for card in page.cards:
+            card.refresh()
+        if show_pages is not None:
+            show_pages(on)
+        if on:
+            start_checks()
+            refresh_parts()
+            if parts_card is not None and parts_card.isVisibleTo(page):
+                unfold(parts_card)
+    switch.toggled.connect(flip)
+    if show_pages is not None:
+        show_pages(n.on)
+    if n.on:
+        # Once the window is up, not while it is being built: their threads
+        # took turns with the build, and each answer restyled its line
+        # before the window had shown anything.
+        after_shown(parent, start_checks)
+
+    shown = values()
+    refresh_parts()
+
+    def commit(put: Callable[[str, Any], None]) -> None:
+        """Only what was changed is written: a key never stored that still
+        says what the page showed stays unstored (an untouched window
+        changes nothing)."""
+        for key, value in values().items():
+            # A key the page did not hold as it was built (the tuner's
+            # mode, once chosen) is written as it now is.
+            if settings.value(key) is None and value == shown.get(key):
+                continue
+            put(key, value)
+
+    commit.lines = lines  # type: ignore[attr-defined]
+    #: The switch: the link rows on other pages show only while it is on.
+    commit.switch = switch  # type: ignore[attr-defined]
+    return commit
+
+
+def _build_network(ctx: _Ctx) -> Callable[[], dict[str, str]]:
+    """Network: who the app says it is, the proxy, the connection, own DNS,
+    the VPN guard and the other networks (VLANs). Returns its values()."""
+    n, at, val, check, src, lines = ctx.n, ctx.at, ctx.val, ctx.check, ctx.src, ctx.lines
     # -- network: who the app says it is -------------------------------------------
     c = at("net").card(tr("nerd_card_identity"))
     c.note(tr("nerd_identity_intro"))
@@ -375,6 +521,36 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     # -- network: the other networks to search (VLANs) ------------------------------------
     lan_values = net_advanced.networks_card(at("net"), n, lines)
 
+    def values() -> dict[str, str]:
+        out: dict[str, str] = {}
+
+        def put(key: str, value: Any) -> None:
+            out[key] = str(value)
+        ua = ua_box.currentData()
+        put("nerd_user_agent", ua_custom.text().strip() if ua == "custom" else ua)
+        put("nerd_referer", referer.text().strip())
+        put("nerd_headers", headers.toPlainText().strip())
+        put("nerd_proxy", proxy.text().strip())
+        put("nerd_proxy_player", "true" if proxy_player.isChecked() else "false")
+        put("nerd_ip_family", ip_box.currentData())
+        put("nerd_net_timeout", str(timeout.value()))
+        put("nerd_reconnect_max", str(recon.value()))
+        put("nerd_tls_strict", "true" if tls_strict.isChecked() else "false")
+        put("nerd_vpn_guard", "true" if guard.isChecked() else "false")
+        put("nerd_vpn_iface", iface.text().strip())
+        put("nerd_vpn_lan", "true" if vpn_lan.isChecked() else "false")
+        out.update(dns_values())
+        out.update(lan_values())
+        return out
+    return values
+
+
+def _build_lists(ctx: _Ctx) -> Callable[[], dict[str, str]]:
+    """Boxes and lists: the box sources, picons, udpxy, failover, the guide
+    and channel numbers of the user's own. Returns its values()."""
+    n, at, val, check, src, parent = ctx.n, ctx.at, ctx.val, ctx.check, ctx.src, ctx.parent
+    boxes, edit, add, channels = ctx.boxes, ctx.edit, ctx.add, ctx.channels
+    playlists, numbers = ctx.playlists, ctx.numbers
     # -- boxes and servers ---------------------------------------------------------------
     if boxes is not None:
         c = at("boxes").card(tr("nerd_card_boxes"))
@@ -517,6 +693,25 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     else:
         chno_said(0)
 
+    def values() -> dict[str, str]:
+        out: dict[str, str] = {}
+
+        def put(key: str, value: Any) -> None:
+            out[key] = str(value)
+        put("nerd_picon_dir", picon_dir.text().strip())
+        put("nerd_picon_override", "true" if picon_over.isChecked() else "false")
+        put("nerd_udpxy", udpxy.text().strip())
+        put("nerd_failover", "true" if fail_on.isChecked() else "false")
+        put("nerd_numbers_keep", "true" if chno_keep.isChecked() else "false")
+        return out
+    return values
+
+
+def _build_player(ctx: _Ctx) -> Callable[[], dict[str, str]]:
+    """Player: picture and sound, channel start and buffer, low latency,
+    adaptive streams and mpv itself. Returns its values()."""
+    n, at, val, check, lines, parent = ctx.n, ctx.at, ctx.val, ctx.check, ctx.lines, ctx.parent
+    from . import net_advanced
     # -- the player: picture and sound -------------------------------------------------------
     c = at("player").card(tr("nerd_card_player"))
     spdif_on = set(val("nerd_spdif").split(","))
@@ -650,6 +845,33 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="mpv.conf options", below=raw_line)
     c.note(tr("nerd_applies_mpv"))
 
+    def values() -> dict[str, str]:
+        out: dict[str, str] = {}
+
+        def put(key: str, value: Any) -> None:
+            out[key] = str(value)
+        put("nerd_spdif", ",".join(k for (k, _l), chip in zip(SPDIF_LABELS, spdif, strict=True) if chip.isChecked()))
+        put("nerd_video_sync", sync.currentData())
+        put("nerd_interpolation", "true" if interp.isChecked() else "false")
+        put("nerd_probe", probe.currentData())
+        put("nerd_demux_max_mb", cache.currentData())
+        put("nerd_mpv_config_dir", conf_dir.text().strip())
+        put("nerd_shaders", shaders.toPlainText().strip())
+        put("nerd_mpv_options", raw.toPlainText().strip())
+        put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
+        put("nerd_hls_quality", hls_q.currentData())
+        put("nerd_hls_max_kbps", str(hls_spin.value()))
+        out.update(latency_values())
+        return out
+    return values
+
+
+def _build_serve(ctx: _Ctx) -> _Serve:
+    """Remote and automation: the remote API and sharing, who reaches them,
+    server mode, webhooks and MQTT. Its values() and the port it is on."""
+    n, at, val, check, lines = ctx.n, ctx.at, ctx.val, ctx.check, ctx.lines
+    settings, switch, playlists = ctx.settings, ctx.switch, ctx.playlists
+    remote, server = ctx.remote, ctx.server
     # -- remote control and sharing --------------------------------------------------------
     from ..core import remote_api
     c = at("serve").card(tr("nerd_card_remote"))
@@ -749,6 +971,35 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
     # -- events pushed out: webhooks and MQTT ------------------------------------------------
     hooks = _events_cards(at("serve"), n, lines)
 
+    def values() -> dict[str, str]:
+        out: dict[str, str] = {}
+
+        def put(key: str, value: Any) -> None:
+            out[key] = str(value)
+        put("nerd_remote", "true" if remote_on.isChecked() else "false")
+        put("nerd_share", "true" if share_on.isChecked() else "false")
+        put("nerd_remote_lan", "true" if who.currentData() == "lan" else "false")
+        put("nerd_remote_port", port.value())
+        put("nerd_remote_token", token.text().strip())
+        out.update(hooks())
+        out.update(server_values())
+        return out
+
+    def on_port() -> int | None:
+        """The port it answers on while the remote API, sharing or server
+        mode is on, else None (the summary in Nerd's list of parts)."""
+        if remote_on.isChecked() or share_on.isChecked():
+            return port.value()
+        if server_on.isChecked():
+            return server_values.port()  # type: ignore[attr-defined]
+        return None
+    return _Serve(values, on_port)
+
+
+def _build_recordings(ctx: _Ctx) -> Callable[[], dict[str, str]]:
+    """Recordings (on Remote and automation's page): the file names, the
+    folder's check and the command after one. Returns its values()."""
+    at, val, check, rec_dir = ctx.at, ctx.val, ctx.check, ctx.rec_dir
     # -- recordings: names, the folder, what follows ------------------------------------------
     from ..core import rec_extras
     c = at("rec").card(tr("nerd_card_rec_files"))
@@ -786,6 +1037,23 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
           search="command script comskip post-processing after recording", below=post_line)
     c.note(tr("nerd_applies_rec"))
 
+    def values() -> dict[str, str]:
+        out: dict[str, str] = {}
+
+        def put(key: str, value: Any) -> None:
+            out[key] = str(value)
+        put("nerd_rec_template", template.text().strip())
+        put("nerd_rec_post", post.text().strip())
+        return out
+    return values
+
+
+def _build_diag(ctx: _Ctx) -> Callable[[], dict[str, str]]:
+    """Diagnostics: the logs, the diagnostics to copy, how the video is
+    drawn, Test connection, stream analysis, stats over the video, stream
+    health and what is in use now. Returns its values()."""
+    n, at, val, src, parent, settings = ctx.n, ctx.at, ctx.val, ctx.src, ctx.parent, ctx.settings
+    sub, health_store, in_use, analysis = ctx.sub, ctx.health_store, ctx.in_use, ctx.analysis
     # -- diagnostics: the logs, the app's own report, the connection ------------------------
     # On a page of its own the page's title says it already.
     c = at("diag").card("" if "diag" in sub else tr("nerd_card_diag"))
@@ -883,142 +1151,17 @@ def build(page: SettingsPage, settings: Any, parent: QWidget,
             in_use(used.fill)
         at("diag").installEventFilter(_OnShow(at("diag"), show_used))
 
-
     def values() -> dict[str, str]:
         out: dict[str, str] = {}
 
         def put(key: str, value: Any) -> None:
             out[key] = str(value)
-        put("nerd_enabled", "true" if switch.isChecked() else "false")
-        ua = ua_box.currentData()
-        put("nerd_user_agent", ua_custom.text().strip() if ua == "custom" else ua)
-        put("nerd_referer", referer.text().strip())
-        put("nerd_headers", headers.toPlainText().strip())
-        put("nerd_proxy", proxy.text().strip())
-        put("nerd_proxy_player", "true" if proxy_player.isChecked() else "false")
-        put("nerd_ip_family", ip_box.currentData())
-        put("nerd_net_timeout", str(timeout.value()))
-        put("nerd_reconnect_max", str(recon.value()))
-        put("nerd_tls_strict", "true" if tls_strict.isChecked() else "false")
-        put("nerd_vpn_guard", "true" if guard.isChecked() else "false")
-        put("nerd_vpn_iface", iface.text().strip())
-        put("nerd_vpn_lan", "true" if vpn_lan.isChecked() else "false")
-        put("nerd_spdif", ",".join(k for (k, _l), chip in zip(SPDIF_LABELS, spdif, strict=True) if chip.isChecked()))
-        put("nerd_video_sync", sync.currentData())
-        put("nerd_interpolation", "true" if interp.isChecked() else "false")
-        put("nerd_probe", probe.currentData())
-        put("nerd_demux_max_mb", cache.currentData())
-        put("nerd_mpv_config_dir", conf_dir.text().strip())
-        put("nerd_shaders", shaders.toPlainText().strip())
-        put("nerd_mpv_options", raw.toPlainText().strip())
         put("nerd_log_level", level.currentData())
         put("nerd_log_file", "true" if log_file.isChecked() else "false")
         put("nerd_overlay_more", "true" if overlay.isChecked() else "false")
-        put("nerd_picon_dir", picon_dir.text().strip())
-        put("nerd_picon_override", "true" if picon_over.isChecked() else "false")
-        put("nerd_udpxy", udpxy.text().strip())
-        put("nerd_adelay_per_channel", "true" if adelay.isChecked() else "false")
-        put("nerd_hls_quality", hls_q.currentData())
-        put("nerd_hls_max_kbps", str(hls_spin.value()))
-        put("nerd_rec_template", template.text().strip())
-        put("nerd_rec_post", post.text().strip())
-        put("nerd_failover", "true" if fail_on.isChecked() else "false")
         put("nerd_health", "true" if health_on.isChecked() else "false")
-        put("nerd_numbers_keep", "true" if chno_keep.isChecked() else "false")
-        put("nerd_remote", "true" if remote_on.isChecked() else "false")
-        put("nerd_share", "true" if share_on.isChecked() else "false")
-        put("nerd_remote_lan", "true" if who.currentData() == "lan" else "false")
-        put("nerd_remote_port", port.value())
-        put("nerd_remote_token", token.text().strip())
-        out.update(hooks())
-        out.update(server_values())
-        out.update(dns_values())
-        out.update(lan_values())
-        out.update(latency_values())
         return out
-
-    # Off: the switch and what Nerd holds, nothing else. On: all of it - on
-    # their own pages where there are pages, else gated here.
-    first = page.cards[gated_from - 1]
-    first.shown_if(teaser_row, lambda: not switch.isChecked())
-    for card in page.cards[gated_from:]:
-        for row, _text in card.rows:
-            prev = card._shown_if.get(id(row))
-            card.shown_if(row, lambda prev=prev: switch.isChecked() and (prev is None or prev()))
-
-    def start_checks() -> None:
-        for line in lines:
-            if line.test_btn is None or getattr(line, "auto", False):
-                line.start()
-
-    def part_summary(key: str) -> tuple[str, bool]:
-        if key == "boxes" and boxes:
-            return tr("nerd_part_boxes", n=len(boxes)), True
-        if key == "serve" and (remote_on.isChecked() or share_on.isChecked()):
-            return tr("nerd_part_on", port=port.value()), True
-        if key == "serve" and server_on.isChecked():
-            return tr("nerd_part_on", port=server_values.port()), True  # type: ignore[attr-defined]
-        now = values()
-        changed = sum(1 for k in PART_KEYS.get(key, ()) if now.get(k, "") != n.defaults.get(k, ""))
-        if changed:
-            return tr("nerd_part_changed", n=changed), True
-        return tr("nerd_part_no_boxes" if key == "boxes" else "nerd_part_untouched"), False
-
-    def refresh_parts() -> None:
-        for key, row in part_rows:
-            row.set_summary(*part_summary(key))
-    if part_rows:
-        page.installEventFilter(_OnShow(page, refresh_parts))
-
-    def unfold(card: QWidget) -> None:
-        """The list opens downwards rather than appearing all at once."""
-        from PyQt6.QtCore import QEasingCurve, QPropertyAnimation
-        end = card.sizeHint().height()
-        anim = QPropertyAnimation(card, b"maximumHeight", card)
-        anim.setDuration(220)
-        anim.setStartValue(0)
-        anim.setEndValue(end)
-        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        anim.finished.connect(lambda: card.setMaximumHeight(16777215) if not sip.isdeleted(card) else None)
-        anim.start()
-
-    def flip(on: bool) -> None:
-        for card in page.cards:
-            card.refresh()
-        if show_pages is not None:
-            show_pages(on)
-        if on:
-            start_checks()
-            refresh_parts()
-            if parts_card is not None and parts_card.isVisibleTo(page):
-                unfold(parts_card)
-    switch.toggled.connect(flip)
-    if show_pages is not None:
-        show_pages(n.on)
-    if n.on:
-        # Once the window is up, not while it is being built: their threads
-        # took turns with the build, and each answer restyled its line
-        # before the window had shown anything.
-        after_shown(parent, start_checks)
-
-    shown = values()
-    refresh_parts()
-
-    def commit(put: Callable[[str, Any], None]) -> None:
-        """Only what was changed is written: a key never stored that still
-        says what the page showed stays unstored (an untouched window
-        changes nothing)."""
-        for key, value in values().items():
-            # A key the page did not hold as it was built (the tuner's
-            # mode, once chosen) is written as it now is.
-            if settings.value(key) is None and value == shown.get(key):
-                continue
-            put(key, value)
-
-    commit.lines = lines  # type: ignore[attr-defined]
-    #: The switch: the link rows on other pages show only while it is on.
-    commit.switch = switch  # type: ignore[attr-defined]
-    return commit
+    return values
 
 
 def _server_card(page: SettingsPage, n: nerd.Nerd, settings: Any, lines: list[CheckLine],

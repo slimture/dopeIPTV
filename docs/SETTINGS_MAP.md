@@ -11,7 +11,7 @@ this file names every page.
 The pages are built one module per group - `ui/set_watch.py`,
 `ui/set_content.py`, `ui/set_services.py` and `ui/set_system.py`, each
 page's `build_<page>` - and put together in `ui/mw_settings.py`
-(`open_settings`); Nerd's in `ui/nerd_settings.py` (with
+(`open_settings`, from its tables `PAGES`, `GROUPS` and `NERD_PAGES`); Nerd's in `ui/nerd_settings.py` (with
 `ui/net_advanced.py`), the shortcuts in `ui/shortcuts.py`, Simkl in
 `ui/mw_simkl.py`, sync in `ui/mw_sync.py`, Discord in `ui/mw_discord.py`. A row without a key is an action or a
 status. "(inverted)" is stored the other way round from what the row says.

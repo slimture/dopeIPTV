@@ -1,5 +1,5 @@
 """The ways to Settings from where its settings matter (ui/mw_settings.py:
-LINKED_PAGES, settings_link_text, add_settings_link): the player's options
+PAGE_TITLES, settings_link_text, add_settings_link): the player's options
 menu, the guide's menu, Recordings' ⋯, Local files' menu, a multiview cell's
 menu and the cast window each lead to the page their settings are on - a
 page that exists, under the title it has there."""
@@ -37,7 +37,7 @@ def pages(self):
     return 0
 QDialog.exec = pages
 w.open_settings()
-for key, title_key in mw_settings.LINKED_PAGES.items():
+for key, title_key in mw_settings.PAGE_TITLES.items():
     assert seen.get(key) == tr(title_key), (key, seen.get(key), tr(title_key))
 assert w.settings_link_text("audio") == tr("settings_title") + " › " + tr("set_page_av") + "…"
 
