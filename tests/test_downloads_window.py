@@ -117,6 +117,7 @@ def until(cond, secs=20.0):
 
 pump(20)
 w._dl_born -= 1000                      # the app's own start is over
+w.downloads.rest_s = 0                  # the rest between downloads: its own part below
 w.downloads.resolve = lambda job: (
     f"{base}/{'movie' if job.kind == 'movie' else 'series'}/kund/hemligt/{job.stream_id}.mp4",
     None)
@@ -261,6 +262,53 @@ w.set_private_viewing(False)
 w.downloads.cancel(made[0].id)
 slow.set()
 until(lambda: w.downloads.current() is None)
+# -- how a running download goes, and the rest before the next ----------------------
+from dopeiptv.ui.notices import hub_of
+hub = hub_of(w)
+d = w.downloads
+MB = 1024 * 1024
+run = dl.Job(id="x1", kind="movie", source="a1b2c3d4", stream_id="9300", key="9300",
+             title="Snabb", state=dl.RUNNING, done=620 * MB, total=1400 * MB)
+d.speed = lambda: 2.5 * MB
+out["words"] = [w._dl_progress_words(run), w._dl_state_text(run)]
+del d.speed
+d._rest_until = time.monotonic() + 125
+rested = w._dl_queue_many("movie", [{"name": "Vilan", "stream_id": 9400, "category_id": "3"}])
+w._dl_tick()
+pump(5)
+entry = next((e for e in hub.jobs() if "Vilan" in e.text), None)
+out["rest"] = {"notice": entry.text if entry else None,
+               "button": entry.cancel_text if entry else None,
+               "card": w._dl_state_text(d.job(rested[0].id)), "left": d.rest_left() > 100,
+               "running": d.current() is not None}
+slow.clear()
+hub.request_cancel([entry.token])                   # its Start now
+# Held until its notice shows (the history keeps only work it showed).
+until(lambda: w._dl_notice_job == rested[0].id and hub.job(w._dl_notice) is not None
+      and hub.job(w._dl_notice).shown_at is not None)
+slow.set()
+until(lambda: d.find("a1b2c3d4", "movie", "9400") is not None)
+until(lambda: not w._dl_notice)
+said = [(h.level, h.text) for h in hub.history(("done", "cancelled"))]
+out["rest_after"] = {"downloaded": d.find("a1b2c3d4", "movie", "9400") is not None,
+                     "history": [x for x in said if "Vilan" in x[1]]}
+d.delete("a1b2c3d4", "movie", "9400")             # the rest of the test as it was
+# ...and Cancel in the panel is kept as cancelled, in plain words.
+slow.clear()
+gone = w._dl_queue_many("movie", [{"name": "Avbruten", "stream_id": 9500, "category_id": "3"}])
+until(lambda: d.current() is not None and w._dl_notice_job == gone[0].id)
+entry = next((e for e in hub.jobs() if "Avbruten" in e.text), None)
+out["cancel_button"] = entry.cancel_text if entry else None
+hub.request_cancel([entry.token])
+until(lambda: d.current() is None)
+w._dl_tick()
+pump(5)
+w._dl_tick()
+slow.set()
+out["cancelled"] = {"queued": [j.title for j in d.jobs()],
+                    "history": [(h.level, h.text) for h in hub.history(("done", "cancelled"))
+                                if "Avbruten" in h.text],
+                    "notice": [e.text for e in hub.jobs() if "Avbruten" in e.text]}
 # -- a kids profile: only what its lists show ---------------------------------------
 w._profile_kids = lambda: True
 adult = {"name": "Vuxen", "stream_id": 9200, "category_id": "18"}
@@ -373,6 +421,27 @@ def test_a_kids_profile_downloads_only_what_its_lists_show(seen):
 def test_a_locked_categorys_download_is_hidden_while_the_lock_is_shut(seen):
     assert seen["locked"] == ["Huset · S1 E2 · Piloten"]
     assert seen["unlocked"] == ["Hemma", "Huset · S1 E2 · Piloten"]
+
+
+def test_a_running_download_says_how_it_goes(seen):
+    assert seen["words"] == ["620.0 MB of 1.4 GB · 2.5 MB/s · 6 min left",
+                             "Downloading · 44% · 620.0 MB of 1.4 GB · 2.5 MB/s · 6 min left"]
+
+
+def test_the_rest_before_the_next_download_is_said_and_can_be_skipped(seen):
+    rest = seen["rest"]
+    assert rest["notice"] == "Next download in 3 min: Vilan" and rest["button"] == "Start now"
+    assert rest["card"] == "Starts in 3 min" and rest["left"] and not rest["running"]
+    after = seen["rest_after"]
+    # Done is kept in plain words; the rest itself is no news.
+    assert after["downloaded"] and after["history"] == [["done", "Downloading Vilan"]]
+
+
+def test_cancel_in_the_panel_is_kept_as_cancelled_never_as_done(seen):
+    assert seen["cancel_button"] == "Cancel download"
+    c = seen["cancelled"]
+    assert c["queued"] == [] and c["notice"] == []
+    assert c["history"] == [["cancelled", "Downloading Avbruten"]]
 
 
 def test_nothing_on_the_disk_or_in_the_queue_names_an_address_or_login(seen):

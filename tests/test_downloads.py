@@ -507,3 +507,112 @@ def test_a_download_under_the_recordings_folder_is_no_recording(tmp_path):
         assert [f["_filename"] for f in rec.files(None)] == ["News 2026-01-01 21.00"]
     finally:
         rec._timer.stop()
+
+
+# -- the pace and the rest between downloads -------------------------------------------
+
+def test_the_pace_is_a_few_times_its_bit_rate_within_its_bounds():
+    # 1.5 GB over two hours: five times its 1.7 Mbit/s.
+    assert dl.pace_rate(1_500_000_000, 7200) == pytest.approx(5 * 1_500_000_000 / 7200)
+    assert dl.pace_rate(100_000_000, 7200) == dl.PACE_MIN
+    assert dl.pace_rate(40_000_000_000, 7200) == dl.PACE_MAX
+    for total, length in ((None, 7200), (1_500_000_000, None), (0, 7200), (1_500_000_000, 0),
+                          ("x", "1e999"), (1_500_000_000, 10), (float("nan"), 7200),
+                          (True, 7200), (1_500_000_000, "Infinity")):
+        assert dl.pace_rate(total, length) == dl.PACE_UNKNOWN
+
+
+def test_the_pace_lets_its_start_through_then_waits_and_earns_no_burst():
+    now = [100.0]
+    pace = dl.Pace(1000.0, clock=lambda: now[0])
+    assert pace.wait_after(2000) == 0.0                 # its first two seconds at once
+    assert pace.wait_after(1000) == pytest.approx(1.0)
+    now[0] += 1.0
+    assert pace.wait_after(0) == 0.0
+    now[0] += 60.0                                      # a slow stretch...
+    assert pace.wait_after(2000) == 0.0                 # ...earns two seconds, no more
+    assert pace.wait_after(1000) == pytest.approx(1.0)
+
+
+def test_full_speed_is_read_and_kept():
+    assert not dl.full_speed(Settings({})) and not dl.full_speed(None)
+    assert dl.full_speed(Settings({dl.FULL_KEY: "true"})) and dl.full_speed(Settings({dl.FULL_KEY: True}))
+    assert not dl.full_speed(Settings({dl.FULL_KEY: "false"}))
+    s = Settings({})
+    m = dl.Downloads(s, gated=False)
+    assert not m.full_speed()
+    m.set_full_speed(True)
+    assert s[dl.FULL_KEY] is True and m.full_speed() and dl.Downloads(s).full_speed()
+
+
+def test_a_paced_download_takes_its_time_hears_a_stop_and_goes_at_full_speed(
+        tmp_path, provider, monkeypatch):
+    monkeypatch.setattr(dl, "PACE_BURST_S", 0.0)
+    monkeypatch.setattr(dl, "PACE_MIN", 2_000_000)
+    m, s = _manager(tmp_path, provider.url())
+    try:
+        began = time.monotonic()
+        _film(m)
+        assert _until(lambda: _done(m))
+        # 3 MB at 2 MB a second: no quicker than its pace.
+        assert time.monotonic() - began >= 1.2
+    finally:
+        m.close()
+    monkeypatch.setattr(dl, "PACE_MIN", 100_000)
+    m, s = _manager(tmp_path / "b", provider.url())
+    try:
+        job = _film(m)
+        assert _until(lambda: (m.job(job.id).done or 0) > 0)
+        m.pause(job.id)
+        assert _until(lambda: m.job(job.id).state == dl.PAUSED, 2.0)    # heard in its pause
+        m.resume(job.id)
+        assert _until(lambda: (m.current() or job).state == dl.RUNNING)
+        m.set_full_speed(True)                          # the running one too
+        assert _until(lambda: _done(m), 10.0)
+    finally:
+        m.close()
+
+
+def test_the_next_download_rests_first_unless_started_or_at_full_speed(tmp_path, provider):
+    m, s = _manager(tmp_path, provider.url(), rest_s=60.0)
+    try:
+        _film(m)
+        assert _until(lambda: _done(m))
+        assert m.rest_left() == 0.0                     # nothing waits
+        b = m.add("movie", "a1b2c3d4", 9002, key=9002, title="Borta", ext="mp4")
+        time.sleep(1.2)
+        assert m.job(b.id).state == dl.WAITING and m.rest_left() > 50
+        m.skip_rest()
+        assert _until(lambda: m.find("a1b2c3d4", "movie", "9002") is not None)
+        c = m.add("movie", "a1b2c3d4", 9003, key=9003, title="Tredje", ext="mp4")
+        time.sleep(1.2)
+        assert m.job(c.id).state == dl.WAITING and m.rest_left() > 50
+        m.set_full_speed(True)
+        assert m.rest_left() == 0.0
+        assert _until(lambda: m.find("a1b2c3d4", "movie", "9003") is not None)
+        d = m.add("movie", "a1b2c3d4", 9004, key=9004, title="Fjärde", ext="mp4")
+        assert _until(lambda: m.find("a1b2c3d4", "movie", "9004") is not None)   # no rest
+        assert d is not None and m.rest_left() == 0.0
+    finally:
+        m.close()
+
+
+def test_the_speed_over_the_last_seconds(monkeypatch):
+    m = dl.Downloads(Settings({}), gated=False)
+    clock = [1000.0]
+    monkeypatch.setattr(dl.time, "monotonic", lambda: clock[0])
+    assert m.speed() is None                            # none running
+    m._current = dl.Job(id="j", kind="movie", source="s", stream_id="1", key="1", title="T",
+                        state=dl.RUNNING)
+    for i in range(5):
+        clock[0] = 1000.0 + i
+        m._took(i * 1_000_000)
+    assert m.speed() == pytest.approx(1_000_000)
+    clock[0] = 1004.5                                   # the last piece is fresh
+    assert m.speed() == pytest.approx(1_000_000)
+    clock[0] = 1008.0                                   # stalled: it slows down
+    assert m.speed() == pytest.approx(4_000_000 / 8)
+    clock[0] = 1020.0                                   # stalled long: nothing said
+    assert m.speed() is None
+    m._took(0)                                          # from the start again
+    assert list(m._samples) == [(1020.0, 0)]

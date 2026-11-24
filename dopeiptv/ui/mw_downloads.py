@@ -94,6 +94,19 @@ HOLD_KEYS = {"connection": "dl_state_wait_conn", "private": "dl_state_wait_priva
              "starting": "dl_state_waiting"}
 
 
+def left_text(secs: float) -> str:
+    """How long a download has to go: "under a minute left", "6 min left",
+    "1 h 12 min left"."""
+    s = max(0, int(secs))
+    if s < 60:
+        return tr("dl_left_soon")
+    m = (s + 59) // 60
+    if m < 60:
+        return tr("dl_left_min", n=m)
+    h, m = divmod(m, 60)
+    return tr("dl_left_h", h=h, m=m)
+
+
 def size_text(n: Any) -> str:
     from ..core.recording import format_size
     try:
@@ -135,6 +148,10 @@ class _DownloadsMixin:
     _dl_timer: QTimer | None = None
     _dl_notice = 0
     _dl_notice_job = ""
+    _dl_notice_plain = ""
+    #: The downloads whose notice ends as done (the rest end as nothing);
+    #: made in _init_downloads.
+    _dl_done_ids: set[str]
     _dl_seen = -1
     _dl_items_sig: tuple = ()
     _dl_jobs_sig: tuple = ()
@@ -149,6 +166,7 @@ class _DownloadsMixin:
 
     def _init_downloads(self) -> None:
         self._dl_born = time.monotonic()
+        self._dl_done_ids = set()
         self._dl_sources: dict = {}
         self._dl_clients: dict = {}
         self.downloads = dl.Downloads(self.settings, resolve=self._dl_resolve,
@@ -222,6 +240,11 @@ class _DownloadsMixin:
             if d.version != self._dl_seen:
                 self._dl_seen = d.version
                 self._dl_changed(jobs)
+            elif d.rest_left() > 0:             # "Starts in 2 min" counts down
+                if self._dl_showing():
+                    self._dl_render_running()
+                if self._dl_detail_of is not None:
+                    self._dl_detail_show(*self._dl_detail_of)
             busy = bool(jobs) or bool(d.dirty) or not d.scanned
             want = TICK_MS if busy else IDLE_TICK_MS
             if self._dl_timer is not None and self._dl_timer.interval() != want:
@@ -334,18 +357,53 @@ class _DownloadsMixin:
 
     def _dl_state_text(self, job: dl.Job) -> str:
         if job.state == dl.RUNNING:
-            if job.total:
-                return tr("dl_state_running", pct=round(100 * (job.progress or 0.0)))
-            return tr("dl_state_running_size", size=size_text(job.done) or "0 B")
+            more = self._dl_progress_words(job, sizes=bool(job.total))
+            head = (tr("dl_state_running", pct=round(100 * (job.progress or 0.0))) if job.total
+                    else tr("dl_state_running_size", size=size_text(job.done) or "0 B"))
+            return " · ".join(w for w in (head, more) if w)
         if job.state == dl.PAUSED:
             return tr("dl_state_paused")
         if job.state == dl.FAILED:
             return tr("dl_state_failed", why=self._dl_why(job))
+        rest = self._dl_rest_of(job)
+        if rest is not None:
+            return tr("dl_state_rest_soon") if rest < 60 else \
+                tr("dl_state_rest", n=(int(rest) + 59) // 60)
         hold = self.downloads.holds.get(job.id, "")
         return tr(HOLD_KEYS.get(hold, "dl_state_waiting"))
 
+    def _dl_progress_words(self, job: dl.Job, sizes: bool = True) -> str:
+        """How the running *job* goes: "620 MB of 1.4 GB · 2.4 MB/s · 6 min
+        left", each part only once it is known (*sizes* False: without the
+        first)."""
+        parts = []
+        if sizes:
+            if job.total:
+                parts.append(tr("dl_of", done=size_text(job.done) or "0 B",
+                                total=size_text(job.total)))
+            elif job.done:
+                parts.append(size_text(job.done))
+        speed = self.downloads.speed() if job.state == dl.RUNNING else None
+        if speed and speed > 0:
+            parts.append(tr("dl_speed", size=size_text(speed)))
+            if job.total and job.total > job.done:
+                parts.append(left_text((job.total - job.done) / speed))
+        return " · ".join(parts)
+
+    def _dl_rest_of(self, job: dl.Job) -> float | None:
+        """Seconds until *job* starts after the last download's rest - only
+        for the next one in the queue, None for any other."""
+        d = self.downloads
+        left = d.rest_left()
+        if left <= 0 or job.state != dl.WAITING:
+            return None
+        nxt = next((j for j in d.jobs() if j.state == dl.WAITING), None)
+        return left if nxt is not None and nxt.id == job.id else None
+
     def _dl_announce(self, what: str, job: dl.Job, item: dl.Item | None) -> None:
         if what == "done":
+            if job.id == self._dl_notice_job:
+                self._dl_done_ids.add(job.id)       # its notice ends as done
             self._show_toast(tr("dl_done", title=job.title), 4000)
             return
         hub_of(self).post(tr("dl_failed", title=job.title, why=self._dl_why(job)),
@@ -354,27 +412,82 @@ class _DownloadsMixin:
 
     def _dl_notice_sync(self, jobs: list[dl.Job]) -> None:
         """The running download as a job in the notices: its words and its
-        progress, Cancel, a click opens the place."""
-        hub = hub_of(self)
+        progress, Cancel, a click opens the place - or the rest before the
+        next, with Start now."""
         cur = next((j for j in jobs if j.state == dl.RUNNING), None)
         if cur is None:
-            if self._dl_notice:
-                hub.finish(self._dl_notice)
-                self._dl_notice, self._dl_notice_job = 0, ""
+            # Resting before the next: said, with Start now.
+            nxt = next((j for j in jobs if j.state == dl.WAITING), None)
+            rest = self._dl_rest_of(nxt) if nxt is not None else None
+            if nxt is not None and rest is not None:
+                text = tr("dl_rest_soon", title=nxt.title) if rest < 60 else \
+                    tr("dl_rest", title=nxt.title, n=(int(rest) + 59) // 60)
+                self._dl_notice_put("rest:" + nxt.id, text, None, None,
+                                    self._dl_start_now, tr("dl_start_now"))
+                return
+            self._dl_notice_end()
             return
-        text = tr("dl_notice", title=cur.title)
+        plain = tr("dl_notice", title=cur.title)
+        more = self._dl_progress_words(cur)
         done = float(cur.done) if cur.total else None
         total = float(cur.total) if cur.total else None
-        if self._dl_notice and self._dl_notice_job == cur.id and hub.alive(self._dl_notice):
-            hub.update(self._dl_notice, text, done=done, total=total)
+        self._dl_notice_put(cur.id, plain + (" · " + more if more else ""), done, total,
+                            partial(self._dl_notice_cancel, cur.id), tr("dl_cancel"), plain)
+
+    def _dl_notice_put(self, ident: str, text: str, done: float | None, total: float | None,
+                       cancel: Any, cancel_text: str, plain: str = "") -> None:
+        """The download's one job in the notices says *text* - the same job
+        again while *ident* stays, a new one for another. *plain*: what the
+        history keeps of it once it ends (its words without the numbers)."""
+        hub = hub_of(self)
+        if self._dl_notice and self._dl_notice_job == ident:
+            if hub.alive(self._dl_notice):
+                self._dl_notice_plain = plain
+                hub.update(self._dl_notice, text, done=done, total=total)
+            # else the person ended it in the panel: its job is stopping -
+            # not started again.
             return
-        if self._dl_notice:
-            hub.finish(self._dl_notice)
+        self._dl_notice_end()
+        self._dl_notice_plain = plain
         self._dl_notice = hub.start(text, key="download", kind="download", mine=True,
-                                    cancel=partial(self._dl_cancel, cur.id),
-                                    cancel_text=tr("dl_cancel"), act=self._dl_open_place,
+                                    cancel=cancel, cancel_text=cancel_text,
+                                    act=self._dl_open_place,
                                     done=done, total=total, timeout_ms=30 * 60_000)
-        self._dl_notice_job = cur.id
+        self._dl_notice_job = ident
+
+    def _dl_notice_end(self) -> None:
+        """The download's job in the notices ends: a download as done (the
+        history keeps it), a rest before the next as nothing that happened."""
+        token, ident, plain = self._dl_notice, self._dl_notice_job, self._dl_notice_plain
+        self._dl_notice, self._dl_notice_job, self._dl_notice_plain = 0, "", ""
+        if not token:
+            return
+        hub = hub_of(self)
+        if ident not in self._dl_done_ids:
+            # A rest, or a download paused, failed (its message says so) or
+            # cancelled: nothing the history keeps as done.
+            hub.cancel(token)
+            return
+        self._dl_done_ids.discard(ident)
+        if plain:
+            hub.update(token, plain)
+        hub.finish(token)
+
+    def _dl_notice_cancel(self, job_id: str) -> Any:
+        """The panel's Cancel on the running download: the history keeps
+        its words without the numbers."""
+        if self._dl_notice and self._dl_notice_plain:
+            hub_of(self).update(self._dl_notice, self._dl_notice_plain)
+        self.downloads.cancel(job_id)
+        return True
+
+    def _dl_start_now(self) -> bool:
+        """The rest's Start now: the next download starts at the next beat,
+        whose notice takes this one's place (False: the panel leaves it, and
+        nothing is kept as cancelled)."""
+        self.downloads.skip_rest()
+        QTimer.singleShot(0, self._dl_tick)
+        return False
 
     def _dl_changed(self, jobs: list[dl.Job]) -> None:
         """What the downloads show, again: the place, the pills where a file
@@ -393,10 +506,12 @@ class _DownloadsMixin:
                 self._dl_render_running()
         if files:
             self._dl_pills_changed()
-        if files or listed:
+        running = any(j.state == dl.RUNNING for j in jobs)
+        if files or listed or running:
             shown = self._dl_detail_of
             if shown is not None:
-                self._dl_detail_show(*shown)
+                self._dl_detail_show(*shown)    # a running one's progress too
+        if files or listed:
             nav = getattr(self, "_refresh_nav_status", None)
             if callable(nav):
                 nav()

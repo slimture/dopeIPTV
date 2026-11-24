@@ -9,6 +9,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
+- Downloads keep a calm pace: a download reads a few times as fast as the
+  title plays (about 20 Mbit/s when its length is not known) and the next
+  waits a few minutes, so to the provider it looks like someone watching.
+  Settings → Recording → Downloads → Download at full speed (off by
+  default) takes both away; **Start now** on the waiting notice starts the
+  next at once. The notice says how much of how much, how fast and how long
+  is left, and so do the Downloaded place and the column under the poster.
+  History keeps a finished download as done and one cancelled as cancelled
+  - never one paused or failed as done.
+- A click on the activity line while it says a passing note opens the
+  panel too (History keeps the note), not only the bell.
 - Start on the last channel (Settings → General → Start; off by default,
   each profile its own): as the app opens, the live channel you watched
   last on the source in use plays again, like a TV switched on. Only once

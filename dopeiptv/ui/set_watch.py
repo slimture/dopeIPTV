@@ -541,7 +541,7 @@ def build_recording(ctx: SettingsContext) -> None:
     c.row(tr("rec_total_label"), rec_total_box)
     # Downloads to watch without the network (core/downloads.py): their
     # folder and the space they may take - never below the disk's floor.
-    dl_box, dl_cap_mb = _downloads_card(win, d, rec.card(tr("set_card_downloads")))
+    dl_box, dl_cap_mb, dl_full_box = _downloads_card(win, d, rec.card(tr("set_card_downloads")))
     # Minutes before and after a programme recorded from the guide
     # (and by a series rule); 0 and 0 record its listed times, as
     # before.
@@ -677,6 +677,8 @@ def build_recording(ctx: SettingsContext) -> None:
             put("rec_total_unit", unit)
         if dl_box.value() != dl_cap_mb:
             win.downloads.set_cap_gb(dl_box.value() / 1000)
+        if dl_full_box.isChecked() != win.downloads.full_speed():
+            win.downloads.set_full_speed(dl_full_box.isChecked())
         # Untouched and never set: not written (0 is the default).
         for skey, box, was in ((srules.PAD_BEFORE_KEY, pad_before_box, pad_before),
                                (srules.PAD_AFTER_KEY, pad_after_box, pad_after)):
@@ -687,8 +689,8 @@ def build_recording(ctx: SettingsContext) -> None:
 
 def _downloads_card(win, d, c):
     """Settings > Recording's Downloads: where they are saved, the space
-    they may take, what they take now and how they behave. (The space's
-    stepper, the space as it was in MB.)"""
+    they may take, what they take now, their pace and how they behave. (The
+    space's stepper, the space as it was in MB, the full speed switch.)"""
     from ..core import downloads as dl
     folder_btn = QPushButton(tr("btn_choose_folder"))
     folder_row = c.row(tr("dl_folder"), folder_btn, win.downloads.folder())
@@ -711,9 +713,12 @@ def _downloads_card(win, d, c):
     box = Stepper(spin, width=spin.widest() + 80)
     box.setAccessibleName(tr("dl_cap"))
     c.row(tr("dl_cap"), box, tr("dl_cap_hint"))
+    # Off, a download keeps a calm pace and the next waits a few minutes
+    # (core/downloads.py, "The pace").
+    full = c.toggle(tr("dl_full_speed"), win.downloads.full_speed(), tr("dl_full_speed_hint"))
     c.note(tr("dl_used", size=format_size(win.downloads.used_bytes())))
     c.note(tr("dl_note"))
-    return box, cap_mb
+    return box, cap_mb, full
 
 
 def build_casting(ctx: SettingsContext) -> None:

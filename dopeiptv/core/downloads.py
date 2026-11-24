@@ -45,6 +45,17 @@ poster's file), season, number and title. No address, no login, no account
 recording's DISK_FLOOR free on their disk: a job past either stops and
 says so (its .part kept, Try again carries it on once there is room).
 
+**The pace.** A download reads about as fast as a person watching it a few
+times over would, not as fast as the line allows: ``PACE_TIMES`` its own
+bit rate (its size over its length), within ``PACE_MIN`` and ``PACE_MAX``,
+``PACE_UNKNOWN`` when its length is not known (``pace_rate``, ``Pace``) -
+a provider sees a viewer, never a burst no player makes. After one is done
+the next waits ``REST_S`` (a series' episodes are not fetched back to
+back). Settings > Recording > Downloads' "Download at full speed"
+(``FULL_KEY``, off by default) takes both away. The speed over the last
+seconds and the rest still to go are the window's to show (``speed``,
+``rest_left``).
+
 **Privacy and the account.** No job starts, and none runs on, while private
 viewing is on (it waits, and carries on after). The window says per job
 whether it may run now (``holds``): a download gives way to everything else
@@ -70,6 +81,7 @@ import sys
 import threading
 import time
 import uuid
+from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
@@ -77,6 +89,7 @@ from urllib.parse import urlsplit
 
 from . import privacy
 from .log import log
+from .num import number
 from .privacy import for_log
 
 KINDS = ("movie", "episode")
@@ -159,6 +172,25 @@ SCAN_DEPTH = 4
 SCAN_MAX = 50_000
 #: An HLS film's ffmpeg: how long its end may take once its output ended.
 HLS_END_S = 30.0
+#: "Download at full speed" (Settings > Recording > Downloads): no pace and
+#: no rest between downloads. Off by default.
+FULL_KEY = "downloads_full_speed"
+#: How many times its own bit rate a download reads at by default, and the
+#: least and most that comes to (bytes a second) - PACE_UNKNOWN when its
+#: length is not known.
+PACE_TIMES = 5
+PACE_MIN = 8_000_000 // 8
+PACE_MAX = 50_000_000 // 8
+PACE_UNKNOWN = 20_000_000 // 8
+#: What a paced download may read at once - its start, or catching up
+#: after a slow stretch - in seconds of its pace.
+PACE_BURST_S = 2.0
+#: The longest one pause of the pace (a stop is heard between them).
+PACE_STEP_S = 0.25
+#: The wait before the next download, once one is done.
+REST_S = 180.0
+#: The speed is the bytes of the last this many seconds.
+SPEED_WINDOW_S = 8.0
 
 #: What a sidecar keeps beside the fields every one has, and of what type.
 _TEXT = 4000
@@ -229,6 +261,41 @@ def cap_gb(settings: Settings | None) -> float:
     except (TypeError, ValueError):
         return float(DEFAULT_CAP_GB)
     return v if v >= 0 and v == v and v < 1e9 else float(DEFAULT_CAP_GB)
+
+
+def full_speed(settings: Settings | None) -> bool:
+    """Whether downloads go at full speed (no pace, no rest)."""
+    v = settings.value(FULL_KEY, False) if settings is not None else False
+    return v is True or str(v).strip().lower() in ("true", "1", "yes")
+
+
+def pace_rate(total: Any, length: Any) -> float:
+    """The bytes a second a download reads at by default: PACE_TIMES its own
+    bit rate - *total* bytes over *length* seconds - within PACE_MIN and
+    PACE_MAX, PACE_UNKNOWN without both."""
+    size = number(total, None, lo=1, hi=10 ** 15)
+    secs = number(length, None, lo=60, hi=7 * 24 * 3600)
+    if size is None or secs is None:
+        return float(PACE_UNKNOWN)
+    return float(min(PACE_MAX, max(PACE_MIN, PACE_TIMES * size / secs)))
+
+
+class Pace:
+    """A steady rate for one connection's bytes: how long to wait after
+    each piece so they come at about *rate* a second. Its first
+    PACE_BURST_S of bytes come at once, and a slow stretch earns no more
+    than that to catch up with - never a burst past it."""
+
+    def __init__(self, rate: float, clock: Callable[[], float] = time.monotonic) -> None:
+        self.rate = max(1.0, float(rate))
+        self._clock = clock
+        self._due = clock() - PACE_BURST_S
+
+    def wait_after(self, n: int) -> float:
+        """*n* more bytes read: the seconds to wait now (0 when on time)."""
+        now = self._clock()
+        self._due = max(self._due, now - PACE_BURST_S) + max(0, int(n)) / self.rate
+        return max(0.0, self._due - now)
 
 
 def _floor() -> int:
@@ -680,7 +747,8 @@ class Downloads:
                  picture: Picture | None = None,
                  opener: Callable[..., Any] | None = None,
                  ffmpeg: Callable[[], str | None] | None = None,
-                 free: Callable[[str], int] | None = None, gated: bool = True) -> None:
+                 free: Callable[[str], int] | None = None, gated: bool = True,
+                 rest_s: float = REST_S) -> None:
         self.settings = settings
         #: A job runs only once the window said it may (``holds``); without
         #: a window to ask (*gated* False) unless a hold says otherwise.
@@ -717,6 +785,12 @@ class Downloads:
         #: now brought (the worker's own).
         self._tries = 0
         self._got = 0
+        #: Full speed (no pace, no rest), the wait after a download, when
+        #: the next may start, and the running job's (time, bytes) of late.
+        self._full = full_speed(settings)
+        self.rest_s = float(rest_s)
+        self._rest_until = 0.0
+        self._samples: deque[tuple[float, int]] = deque(maxlen=64)
 
     # -- the settings (the window's thread) ------------------------------------------
 
@@ -761,6 +835,21 @@ class Downloads:
         self.settings.setValue(CAP_KEY, f"{max(0.0, float(gb)):g}")
         self._cap = int(cap_gb(self.settings) * GB)
 
+    def full_speed(self) -> bool:
+        return self._full
+
+    def set_full_speed(self, on: bool) -> None:
+        """Full speed on or off from now on - the running download too; on
+        ends a rest at once."""
+        on = bool(on)
+        self.settings.setValue(FULL_KEY, on)
+        with self._lock:
+            self._full = on
+            if on:
+                self._rest_until = 0.0
+            self._bump()
+        self._wake.set()
+
     # -- what there is (any thread) ---------------------------------------------------
 
     def _bump(self) -> None:
@@ -781,6 +870,38 @@ class Downloads:
         with self._lock:
             j = next((j for j in self._jobs if j.ident == ident), None)
             return replace(j, meta=dict(j.meta)) if j is not None else None
+
+    def speed(self) -> float | None:
+        """The running download's bytes a second over the last seconds; None
+        before there is enough to tell, or with none running."""
+        now = time.monotonic()
+        with self._lock:
+            if self._current is None or len(self._samples) < 2:
+                return None
+            (t0, b0), (t1, b1) = self._samples[0], self._samples[-1]
+        # A download that stalled slows down to now, one stalled long says
+        # nothing.
+        end = t1 if now - t1 < 1.0 else now
+        if now - t1 > SPEED_WINDOW_S or end - t0 < 1.0 or b1 <= b0:
+            return None
+        return (b1 - b0) / (end - t0)
+
+    def rest_left(self) -> float:
+        """Seconds until the next download may start after the last one
+        (0: none waits, or no rest)."""
+        with self._lock:
+            if self._full or self._current is not None \
+                    or not any(j.state == WAITING for j in self._jobs):
+                return 0.0
+            return max(0.0, self._rest_until - time.monotonic())
+
+    def skip_rest(self) -> None:
+        """The next download starts now, not after its rest (the person's
+        Start now)."""
+        with self._lock:
+            self._rest_until = 0.0
+            self._bump()
+        self._wake.set()
 
     def current(self) -> Job | None:
         with self._lock:
@@ -1018,6 +1139,8 @@ class Downloads:
         if privacy.private():
             return None
         with self._lock:
+            if not self._full and time.monotonic() < self._rest_until:
+                return None
             for j in self._jobs:
                 said = j.id in self.holds or not self.gated
                 if j.state == WAITING and said and not self.holds.get(j.id):
@@ -1025,6 +1148,7 @@ class Downloads:
                     self._current = j
                     self._halt = ""
                     self._halted.clear()
+                    self._samples.clear()
                     self._bump()
                     return j
         return None
@@ -1049,6 +1173,8 @@ class Downloads:
                 self._items[item.ident] = item
                 self._events.append(("done", replace(job), item))
                 self.dirty = True
+                if not self._full and self.rest_s > 0:
+                    self._rest_until = time.monotonic() + self.rest_s
             log.info("downloads: %s - done (%d MB)", for_log(job.title), item.size // 10**6)
         except _Stopped as s:
             part = ""
@@ -1199,6 +1325,34 @@ class Downloads:
         except _Playlist:
             log.info("downloads: %s is an HLS playlist - read by ffmpeg", for_log(job.title))
             return self._fetch_hls(job, url, src)
+
+    def _took(self, done: int) -> None:
+        # (under the lock) The running job has *done* bytes: kept for the speed.
+        now = time.monotonic()
+        samples = self._samples
+        if samples and done < samples[-1][1]:
+            samples.clear()
+        if samples and now - samples[-1][0] < 0.5:
+            return
+        samples.append((now, done))
+        while len(samples) > 2 and now - samples[1][0] > SPEED_WINDOW_S:
+            samples.popleft()
+
+    def _pace_for(self, job: Job, total: int | None) -> Pace:
+        return Pace(pace_rate(total, job.meta.get("length") if isinstance(job.meta, dict)
+                              else None))
+
+    def _paced(self, pace: Pace, n: int) -> None:
+        """After *n* bytes: a pause, if the download runs ahead of its pace -
+        in short steps, so a stop is heard at once. None at full speed."""
+        if self._full:
+            return
+        wait = pace.wait_after(n)
+        while wait > 0 and not self._full:
+            step = min(PACE_STEP_S, wait)
+            self._halted.wait(step)
+            self._check()
+            wait -= step
 
     def _try_again(self, e: BaseException, fails: int, wrote: bool = False) -> int:
         """A try that failed: given up at once for a certificate or where it
@@ -1377,6 +1531,7 @@ class Downloads:
             raise _Failed(WHY_FOLDER, type(e).__name__) from e
         done = have
         since = 0
+        pace = self._pace_for(job, total)
         with os.fdopen(fd, "ab" if have else "wb") as fh:
             for chunk in _chain(first, chunks):
                 self._check()
@@ -1388,7 +1543,9 @@ class Downloads:
                 self._got += len(chunk)
                 with self._lock:
                     job.done = done
+                    self._took(done)
                     self.version += 1
+                self._paced(pace, len(chunk))
                 if since >= SPACE_EVERY:
                     since = 0
                     fh.flush()
@@ -1420,6 +1577,7 @@ class Downloads:
             job.done, job.total = 0, 0
         done = 0
         since = 0
+        pace = self._pace_for(job, None)
         try:
             fd = os.open(ts_part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _nofollow(), 0o644)
             with os.fdopen(fd, "wb") as fh:
@@ -1432,7 +1590,9 @@ class Downloads:
                     since += len(chunk)
                     with self._lock:
                         job.done = done
+                        self._took(done)
                         self.version += 1
+                    self._paced(pace, len(chunk))
                     if since >= SPACE_EVERY:
                         since = 0
                         fh.flush()

@@ -60,8 +60,9 @@ has two profiles or more.
 - Limits: `rec_max_value` + `rec_max_unit`, `rec_total_value` + `rec_total_unit`
 - Downloads: `downloads_dir` (the folder; by default one in the videos
   folder), `downloads_cap_gb` (the space they may take, 50 GB by default, 0
-  none - never below 1 GB free on the disk), what they take now and how they
-  behave; the queue `downloads_queue`, the Downloaded place's
+  none - never below 1 GB free on the disk), `downloads_full_speed` (Download
+  at full speed: off by default - a calm pace and a few minutes' rest between
+  downloads), what they take now and how they behave; the queue `downloads_queue`, the Downloaded place's
   `downloads_view` and `downloads_sort` (no row). This computer's: never
   synced, never in a backup
 - Padding: `rec_pad_before_min`, `rec_pad_after_min`
