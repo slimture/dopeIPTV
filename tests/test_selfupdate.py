@@ -722,6 +722,45 @@ def test_a_folder_others_may_change_gets_no_update(tmp_path):
     assert not selfupdate.shared_folder(sticky), "the sticky bit keeps ours ours"
 
 
+def test_a_folder_its_group_may_change_is_shared_unless_the_group_is_ours_alone(monkeypatch, tmp_path):
+    """Group-writable with this user's own group is fine only while no
+    other account is in that group - a member, or one whose group it is."""
+    import os
+    from types import SimpleNamespace as NS
+    if os.name != "posix":
+        pytest.skip("POSIX folders")
+    import grp
+    import pwd
+    folder = tmp_path / "group"
+    folder.mkdir()
+    os.chmod(folder, 0o775)
+    real = os.stat(folder)
+    ours = os.stat_result((real.st_mode, real.st_ino, real.st_dev, real.st_nlink,
+                           os.geteuid(), os.getegid(), real.st_size,
+                           int(real.st_atime), int(real.st_mtime), int(real.st_ctime)))
+    orig = os.stat
+    monkeypatch.setattr(os, "stat", lambda p, *a, **k: ours if str(p) == str(folder)
+                        else orig(p, *a, **k))
+    me = NS(pw_name="me", pw_gid=os.getegid())
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: me)
+
+    monkeypatch.setattr(grp, "getgrgid", lambda gid: NS(gr_mem=[]))
+    monkeypatch.setattr(pwd, "getpwall", lambda: [me, NS(pw_name="other", pw_gid=os.getegid() + 1)])
+    assert not selfupdate.shared_folder(folder), "a user's own group is theirs alone"
+
+    monkeypatch.setattr(grp, "getgrgid", lambda gid: NS(gr_mem=["me", "other"]))
+    assert selfupdate.shared_folder(folder), "another member of the group may change it"
+
+    monkeypatch.setattr(grp, "getgrgid", lambda gid: NS(gr_mem=[]))
+    monkeypatch.setattr(pwd, "getpwall", lambda: [me, NS(pw_name="other", pw_gid=os.getegid())])
+    assert selfupdate.shared_folder(folder), "another account whose own group it is"
+
+    def gone(gid):
+        raise KeyError(gid)
+    monkeypatch.setattr(grp, "getgrgid", gone)
+    assert selfupdate.shared_folder(folder), "a group not looked up counts as shared"
+
+
 def test_the_appimage_is_checked_again_before_it_runs_and_before_it_is_put_in_place(monkeypatch, tmp_path):
     import hashlib
     order = []

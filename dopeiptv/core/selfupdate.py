@@ -282,11 +282,29 @@ def verify_again(path: Path) -> None:
         raise UpdateError("upd_err_checksum")
 
 
+def _others_in_group(gid: int) -> bool:
+    """Whether an account other than this one is in group *gid* - a member
+    of it, or an account whose own group it is. A group that cannot be
+    looked up counts as shared (fails closed)."""
+    try:
+        import grp
+        import pwd
+        me = pwd.getpwuid(os.geteuid()).pw_name
+        members = set(grp.getgrgid(gid).gr_mem)
+        if members - {me}:
+            return True
+        return any(p.pw_gid == gid and p.pw_name != me for p in pwd.getpwall())
+    except (ImportError, KeyError, OSError):
+        return True
+
+
 def shared_folder(folder: Path) -> bool:
     """Whether another account could put a file of its own in *folder*'s
     place for one of ours - rename ours away, write one under its name:
     a folder not ours or root's, or one others may write to without the
-    sticky bit (which keeps what is ours ours). POSIX only."""
+    sticky bit (which keeps what is ours ours) - its group too, unless no
+    other account is in it (a user's own group, as Debian and Fedora make
+    one per account). POSIX only."""
     if os.name != "posix":
         return False
     try:
@@ -299,7 +317,9 @@ def shared_folder(folder: Path) -> bool:
         return False
     if st.st_mode & 0o002:
         return True
-    return bool(st.st_mode & 0o020) and st.st_gid != os.getegid()
+    if not st.st_mode & 0o020:
+        return False
+    return st.st_gid != os.getegid() or _others_in_group(st.st_gid)
 
 
 def download(asset: dict, dest: Path,

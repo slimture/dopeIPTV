@@ -20,6 +20,7 @@
 - **Every message and question** - Reset all, a delete, a wrong PIN, a name asked for - is in the app's own look on every theme instead of the desktop's grey boxes.
 - **Enter never stops a recording or deletes a download:** in those questions it answers the safe choice; Stop and Delete take a click.
 - Every source's programme descriptions come at once on a very large guide.
+- An AppImage updates itself in a folder its group may change only when no other account is in that group.
 - The app's new texts read better in all 26 other languages.
 
 ### Fixed

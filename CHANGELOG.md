@@ -160,6 +160,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   closed: when the settings cannot be read to check a request for a login
   added since, nothing is sent to the site (the update check then asks
   GitHub). From an independent review of 1.7.0.
+- An AppImage in a folder its group may write to takes an update only while
+  no other account is in that group - a member of it, or an account whose
+  own group it is (a user's own group, as most distributions make one per
+  account, still takes it). Before, any folder of the user's own group
+  did, even one shared with others; a group that cannot be looked up now
+  counts as shared, and the update window says to move the app or download
+  it by hand. From the second independent review of 1.7.0.
 - With `DOPEIPTV_LOG=debug` the log says where the window's thread is when
   it has not answered for 3 seconds (the desktop's spinning pointer), and
   the cast window's search says how many Chromecasts it found, as it does
