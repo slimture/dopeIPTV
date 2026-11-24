@@ -1339,8 +1339,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self.refresh_playlist(force=False)
         # Its account running out: said from this login's answer.
         self._expiry_check(pl, auth)
-        # Only the local network is offline for a source on the internet.
-        self._offline_source_changed()
         if then is not None:
             then()
 

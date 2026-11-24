@@ -856,7 +856,16 @@ host, the home network or a multicast group: judged by the host as
 written in any spelling and again on the socket, before a byte is sent; a
 public name is refused without being looked up, unless the person gave it
 (a source's own server), which is then judged by every address it
-resolves to (`tests/test_security_rules.py` holds every way out). The sidecar
+resolves to (`tests/test_security_rules.py` holds every way out, and every
+program the app starts). What a program opens itself is judged before it
+starts: a web page before yt-dlp is looked for or run, an external mpv or
+VLC by the address it is handed, a stream's address with every address
+written inside it (mpv's ytdl://, lavf://, edl://, FFmpeg's concat:), and
+a playlist or a stream's manifest on this computer - known by its name or
+its first bytes, read at most 1 MiB - by the addresses it names; one that
+names another list on this computer, is longer than that or spells an
+address in XML's character references is refused, as it cannot be judged.
+The sidecar
 now keeps a category's own name too (a kids profile's lists judge it
 offline), and a series' known episodes are kept in the app's cache - id,
 season, number and title - for a series' page offline, never while
@@ -865,10 +874,17 @@ viewing privately.
 Not covered: a home name (one without a dot, or with a home ending) is
 looked up by the system's resolver, which may ask a DNS server outside;
 what the system, the desktop or another program sends is theirs; a
-Chromecast or a TV cast to fetches what it plays itself; and detection is
-the system's word (Qt's QNetworkInformation) - offline mode by itself
-starts only once the system says there is no network, so in the seconds
-before it the app may still try.
+Chromecast or a TV cast to fetches what it plays itself; a stream at home
+whose own playlist names the internet (an HLS list a server at home hands
+out) is fetched by the player as it names it; and detection is the
+system's word (Qt's QNetworkInformation) - offline mode by itself starts
+only once the system says there is no network (its "limited" or "No
+Internet" alone, which a DNS blocker or a VPN can make it say with the
+internet working, is no reason: a login that fails for want of a network
+is), so in the seconds before it the app may still try, and it never
+stops what plays: while something plays from the internet it waits, and
+that stream's connections go on until it ends. Offline mode turned on by
+hand stops it at once.
 
 ### Logins are in the settings files, not a keyring
 

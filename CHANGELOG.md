@@ -140,6 +140,27 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Offline mode no longer turns itself on, nor stops what plays, on the
+  system's "limited" / "No Internet" word alone (Qt's Site and Local):
+  NetworkManager and Windows say it whenever their own check of the
+  internet fails - behind a DNS blocker, a VPN or a privacy tool with the
+  internet working too. By itself offline mode now comes on only when the
+  system says there is no network, or when the source's login fails for
+  want of one - and the start asks the source's login as ever on that word.
+  It never stops a stream that plays: while something plays from the
+  internet (the player, a multiview cell, a cast) it waits, and comes on
+  once that has ended. Go online holds until the system says something new
+  and definite (online, or no network after online).
+- Offline mode let web streams out: a YouTube or Twitch page played through
+  mpv's ytdl:// (its host read as "https", a name without a dot), yt-dlp
+  run by the app before any check where the libmpv has no hook, and an
+  external mpv or VLC never asked. A web page is now refused before
+  anything, yt-dlp refuses to run on it, an external player is not started
+  on the internet, every address written inside another (ytdl://, lavf://,
+  edl://, concat:) is judged, and a playlist or stream manifest on this
+  computer that names the internet does not play offline.
+- A wrong login when offline mode ended was never said (it looked for the
+  old English words): it is told by the error's key, as at the start.
 - With server mode on in the window, a scheduled recording could take the
   connection of a channel a device (a TV, Plex, VLC) was watching through
   it and cut that device off. It now does as `dopeiptv --server` does: a

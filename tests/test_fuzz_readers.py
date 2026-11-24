@@ -118,6 +118,52 @@ def test_fuzz_stream_addresses():
         assert stream_address.played(odd) == ""
 
 
+PLAYLISTS = ("#EXTM3U\n#EXTINF:6,\nhttps://cdn.example.com/1.ts\nseg2.ts\n",
+             '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="https://k.example/k"\n720p.m3u8\n',
+             "[playlist]\nFile1=http://192.168.1.5:8000/a\n",
+             '<?xml version="1.0"?><MPD><BaseURL>http://nas:8080</BaseURL></MPD>',
+             "# mpv EDL v0\n%18%http://cdn.example/x,0,10\n\\\\nas\\a.mp3\n//cdn.example/b")
+
+
+def test_fuzz_offline_mode_on_addresses_and_playlists(monkeypatch):
+    """Offline mode's judge of what a program opens itself
+    (core/offline.py): a stream's address with every address inside it,
+    and a playlist's text - a string always, nothing looked up, time in
+    proportion to the text."""
+    from dopeiptv.core import dest_guard, offline
+
+    def look(*_a, **_k):
+        raise AssertionError("looked up")
+    monkeypatch.setattr(socket, "getaddrinfo", look)
+    dest_guard.forget_names()
+    offline.reset()
+    offline.set_mode(offline.HAND, offline.WHY_HAND)
+    try:
+        def address(text: str) -> object:
+            got = offline.stream_refusal(text)
+            assert got in ("", offline.INTERNET)
+            assert isinstance(offline.needs_network(text), bool)
+            return got
+        fz.fuzz("offline-address", address, lambda rng: fz.decoded(text_from(rng, ADDRESSES)),
+                seeds=list(ADDRESSES))
+
+        def playlist(data: bytes) -> object:
+            got = offline._names_refusal(offline._text_of(data))
+            assert got in ("", offline.INTERNET)
+            return got
+        fz.fuzz("offline-playlist", playlist, lambda rng: (
+            fz.odd_encoding(rng, fz.mutate_text(rng, rng.choice(PLAYLISTS), tokens=TEXT_TOKENS))
+            if rng.random() < 0.3 else fz.mutate_bytes(rng, rng.choice(PLAYLISTS).encode(),
+                                                       tokens=TEXT_TOKENS)),
+                seeds=[p.encode() for p in PLAYLISTS])
+        for unit in ("a://", "x://" + "a" * 50 + " ", "a" * 40 + "://b@c\n", "//nas/x.ts\n",
+                     "http://192.168.1.5/s.ts\n"):
+            fz.linear(offline._names_refusal, lambda n, u=unit: u * n, 2000)
+        fz.linear(offline.stream_refusal, lambda n: "ytdl://" + "a" * n, 5000)
+    finally:
+        offline.reset()
+
+
 NETWORKS = ("192.168.2.0/24\n10.0.5.10-10.0.5.40", "172.16.0.0/22, 192.168.3.7", "fd00::/120",
             "192.168.1.0/16", "8.8.8.8", "not a network", "10.0.0.1-10.0.0.0")
 

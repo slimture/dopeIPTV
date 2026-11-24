@@ -6,16 +6,21 @@ the lists it shows).
   Qt's QNetworkInformation where its backend loads - read, never asked of
   anyone; ``DOPEIPTV_NETWORK`` instead where it says so. No backend, no
   detection: the window opens as ever. Settled by core/offline.Watch, a
-  QTimer for what is still to settle (``_off_said``, ``_off_tick``).
+  QTimer for what is still to settle (``_off_said``, ``_off_tick``). By
+  itself it never stops what plays: while the player, a multiview cell or a
+  cast plays from the internet (``_off_network_plays``) it waits, looking
+  again every ``PLAY_LOOK_S``, and comes on once that has ended.
 * **By hand**: File's "Work offline" (a checkable action, so the command
-  palette lists it too) and the strip's "Go online" (``set_offline``). It
-  lasts the session.
+  palette lists it too) and the strip's "Go online" (``set_offline``). On
+  lasts the session; Go online until the system says something new and
+  definite.
 * **Going offline** (``_off_enter``): the source's client steps aside for
   its downloads (``DownloadedClient``: the Movies and Series places, a
   series' page, Mine, Search, a kids profile's lists and the phone's read
-  them), what plays from the internet stops as Stop does, multiview closes,
-  Watch together is left, the downloads wait; TV and Radio say they need the
-  network (``_off_note_sync``), a passing note says it, the strip stays.
+  them), Watch together is left, the downloads wait - and, turned on by
+  hand, what plays from the internet stops as Stop does and multiview
+  closes; TV and Radio say they need the network (``_off_note_sync``), a
+  passing note says it, the strip stays.
 * **Coming back** (``_off_leave``): the source's own client made again and
   its login asked off the window's thread as at the start (its account's end
   said; a login that fails for want of a network takes offline mode back,
@@ -27,9 +32,11 @@ the lists it shows).
   video fills the screen, the picture is popped out or the welcome covers the
   window (as the notices are, ``_notices_held``), wrapped in a narrow window
   and mirrored right to left; TV mode says it in its header.
-* **What still plays**: a file (a download, a local file, a recording), and
-  a stream at home; anything on the internet is refused at the player's door
-  with a calm word (``_offline_may_play``). A downloaded title says
+* **What still plays**: a file (a download, a local file, a recording - not
+  a playlist that names the internet), and a stream at home; anything on the
+  internet is refused at the player's door with a calm word
+  (``_offline_may_play``, ``_offline_refused`` - an external player and a
+  web page through yt-dlp say it the same way). A downloaded title says
   "Offline" by its title while it plays (``_offline_mark``).
 """
 
@@ -52,6 +59,9 @@ from .theme import P
 #: The folder under the app's cache where a series' episodes are kept for a
 #: series' page offline (core/downloads.keep_episodes).
 EPISODES_CACHE = "series-episodes"
+#: How often offline mode by itself looks again while what plays keeps it
+#: waiting (seconds).
+PLAY_LOOK_S = 2.0
 
 
 def _network_information() -> Any:
@@ -120,6 +130,8 @@ class _OfflineMixin:
     #: Every change counts one: a login asked as offline mode ended that
     #: comes back after another change is left alone.
     _off_gen = 0
+    #: Offline mode by itself waits for what plays (said once per wait).
+    _off_waited = False
 
     @staticmethod
     def _offline() -> bool:
@@ -137,7 +149,7 @@ class _OfflineMixin:
             self._off_episodes = str(default_image_cache_dir(EPISODES_CACHE))
         except Exception:
             self._off_episodes = ""
-        self._off_watch = offline.Watch(home_source=self._off_home_source())
+        self._off_watch = offline.Watch()
         t = QTimer(self)
         t.setSingleShot(True)
         t.timeout.connect(self._off_tick)
@@ -146,7 +158,8 @@ class _OfflineMixin:
         if word:
             # At the start the system's word is as it is now: settled.
             self._off_watch.said(word, time.monotonic() - offline.SETTLE_S)
-            change = self._off_watch.tick(time.monotonic(), offline.mode(), offline.why())
+            change = self._off_watch.tick(time.monotonic(), offline.mode(), offline.why(),
+                                          playing=self._off_network_plays())
             if change is not None:
                 offline.set_mode(*change)
         if offline.on():
@@ -174,20 +187,23 @@ class _OfflineMixin:
             log.info("offline mode: the network information is not read (%s)", e)
             return ""
 
-    def _off_home_source(self) -> bool:
-        """Whether the source in use is at home: there only no network at all
-        turns offline mode on by itself - with the local network it answers."""
-        store = getattr(self, "playlist_store", None)
-        pl = store.active() if store is not None else None
-        if not isinstance(pl, dict):
-            return False
-        kind, server = str(pl.get("kind") or "xtream"), str(pl.get("server") or "")
-        if kind == "m3u" and not server.lower().startswith(("http://", "https://")):
-            return False                # a file's list: its streams may be anywhere
+    def _off_network_plays(self) -> bool:
+        """Whether something plays from the internet here - the player, a
+        multiview cell, a cast: offline mode by itself waits for it to end,
+        never stops it (core/offline.needs_network: as written, nothing
+        looked up, no file read). Never raises."""
         try:
-            from ..providers.client import _on_internet
-            return not _on_internet(kind, server, pl.get("options") or {})
+            urls = [getattr(getattr(self, "player", None), "current_url", None)]
+            mv = getattr(self, "_multiview_win", None)
+            if mv is not None and not sip.isdeleted(mv):
+                urls += [getattr(c, "url", None) for c in getattr(mv, "cells", ())]
+            runs = getattr(self, "_cast_runs", None)
+            if callable(runs) and runs():
+                ctx = getattr(self, "_cast_ctx", None) or {}
+                urls += [ctx.get("source"), ctx.get("url")]
+            return any(u and offline.needs_network(str(u)) for u in urls)
         except Exception:
+            log.debug("offline mode: what plays not told", exc_info=True)
             return False
 
     def _off_reach(self, reach: Any) -> None:
@@ -216,9 +232,22 @@ class _OfflineMixin:
         if w.wait_left(now) > 0:
             self._off_schedule()
             return
-        change = w.tick(now, offline.mode(), offline.why())
+        change = w.tick(now, offline.mode(), offline.why(), playing=self._off_network_plays())
         if change is not None:
             self._offline_apply(*change)
+        self._off_look_again()
+
+    def _off_look_again(self) -> None:
+        """While what plays keeps offline mode by itself waiting: a look
+        again in a moment (said once a wait)."""
+        w, t = self._off_watch, self._off_timer
+        waiting = w is not None and w.waiting
+        if waiting and not self._off_waited:
+            log.info("offline mode: due by itself, but what plays from the internet "
+                     "goes on - it waits for it")
+        self._off_waited = waiting
+        if waiting and t is not None:
+            t.start(int(PLAY_LOOK_S * 1000))
 
     # -- the person's switch, the login's hint ------------------------------------------
 
@@ -227,16 +256,23 @@ class _OfflineMixin:
         w = self._off_watch or offline.Watch()
         self._off_watch = w
         self._offline_apply(*w.by_hand(bool(on), time.monotonic()))
+        self._off_waited = False
 
     def _offline_unreached(self, exc: BaseException | None) -> bool:
         """The source's login failed: when for want of a network, offline mode
-        on by itself (until the system's word changes). True when it did."""
+        on by itself (until the system's word changes) - once nothing plays
+        from the internet any more. True when it did, or will."""
         if not offline.no_network(exc):
             return False
         w = self._off_watch
-        change = w.unreached(offline.mode()) if w is not None else None
-        if change is None:
+        if w is None:
             return False
+        change = w.unreached(offline.mode(), playing=self._off_network_plays())
+        if change is None:
+            if not w.waiting:
+                return False
+            self._off_look_again()
+            return True
         log.info("offline mode: the source could not be reached - no network")
         self._offline_apply(*change)
         return True
@@ -314,7 +350,10 @@ class _OfflineMixin:
 
     def _off_enter(self) -> None:
         """Offline mode began (the module's docstring)."""
-        self._off_stop_network()
+        if offline.mode() == offline.HAND:
+            # The person's own switch. By itself nothing from the internet
+            # plays now: core/offline.Watch waited for it to end.
+            self._off_stop_network()
         if getattr(self, "_together_room", None) is not None:
             self.together_leave(quiet=True)
         self._off_take_client()
@@ -324,8 +363,8 @@ class _OfflineMixin:
         self._off_reload()
 
     def _off_stop_network(self) -> None:
-        """What plays from the internet stops as Stop does; multiview's
-        cells, which all do, close."""
+        """Offline mode turned on by hand: what plays from the internet
+        stops as Stop does; multiview's cells, which all do, close."""
         mv = getattr(self, "_close_multiview_if_active", None)
         if callable(mv):
             try:
@@ -391,7 +430,8 @@ class _OfflineMixin:
             except Exception:
                 log.debug("offline mode: the certificate review not offered", exc_info=True)
             # A real credential rejection, said as the start says it (app.py).
-            if isinstance(value, RuntimeError) and "username or password" in str(value):
+            from ..providers.client import wrong_login
+            if wrong_login(value):
                 from PyQt6.QtWidgets import QMessageBox
 
                 from .widgets import plain_text
@@ -462,17 +502,7 @@ class _OfflineMixin:
     def _offline_source_switched(self, pid: str) -> Any:
         """switch_playlist while offline: the new source's downloads as its
         client - nothing asked of it."""
-        w = self._off_watch
-        if w is not None:
-            w.home_source = self._off_home_source()
         return self._offline_client(pid)
-
-    def _offline_source_changed(self) -> None:
-        """Another source in use (online): whether only the local network
-        counts as offline for it."""
-        w = self._off_watch
-        if w is not None:
-            w.home_source = self._off_home_source()
 
     # -- what is shown ------------------------------------------------------------------
 
@@ -612,18 +642,23 @@ class _OfflineMixin:
     def _offline_may_play(self, url: str, kind: str) -> bool:
         """The player's door while offline mode is on: a file, or a stream at
         home - anything on the internet is not opened, said calmly."""
-        why = offline.stream_refusal(str(url or ""))
-        if not why:
+        if not offline.stream_refusal(str(url or "")):
             return True
+        self._offline_refused(kind)
+        return False
+
+    def _offline_refused(self, kind: str = "") -> None:
+        """What was asked needs the network and offline mode is on: said
+        calmly - the player's door, an external player (media/players
+        .launch_player), a web page (mw_webstreams)."""
         log.info("offline mode: %s not played - it needs the network", kind or "a stream")
         if getattr(self, "_tv_on", False) and callable(getattr(self, "_tv_tell", None)):
             # TV mode holds the notices: said as TV mode says things.
             self._tv_tell(tr("offline_mark"), tr("offline_needs_network"))
-            return False
+            return
         show = getattr(self, "_show_toast", None)
         if callable(show):
             show(tr("offline_needs_network"), 5000)
-        return False
 
     def _offline_playing_download(self) -> bool:
         """Offline mode is on and what plays is a downloaded file."""

@@ -395,7 +395,11 @@ def show(self):
     real_show(self)
 
     def report():
+        if not offline.on() and time.monotonic() - t0 < 20:
+            QTimer.singleShot(250, report)          # the login's answer still to come
+            return
         seen["on"] = offline.on()
+        seen["why"] = offline.why()
         seen["client"] = type(self.client).__name__
         seen["strip"] = self._off_strip.isVisible()
         seen["films"] = sorted(r["name"] for r in self.client.vod_streams())
@@ -589,9 +593,205 @@ def test_the_app_started_with_no_network_opens_at_once_and_asks_nobody(tmp_path_
     pytest.importorskip("PyQt6.QtWidgets")
     got = _run(_START, tmp_path_factory.mktemp("offline-start"))
     assert got["shown_after"] < 30
-    assert got["on"] and got["client"] == "DownloadedClient" and got["strip"]
+    assert got["on"] and got["why"] == "no_network"
+    assert got["client"] == "DownloadedClient" and got["strip"]
     assert got["films"] == ["Hemma", "Okänd", "Vuxen"]
     assert got["asked"] == []
+
+
+def test_the_app_started_on_the_systems_limited_word_asks_the_source_first(tmp_path_factory):
+    """"Limited" / "No Internet" (Qt's Site) alone is no reason to skip the
+    login at the start: the source is asked - and only its failing for
+    want of a network turns offline mode on."""
+    pytest.importorskip("PyQt6.QtWidgets")
+    script = _START.replace('os.environ["DOPEIPTV_NETWORK"] = "disconnected"',
+                            'os.environ["DOPEIPTV_NETWORK"] = "site"')
+    got = _run(script, tmp_path_factory.mktemp("offline-start-site"))
+    assert ["lookup", "provider.example.com"] in got["asked"]      # the login was asked
+    assert got["on"] and got["why"] == "unreached"
+    assert got["client"] == "DownloadedClient"
+
+
+# -- the window's side of the system's word, in this process --------------------------
+
+_LIVE = "http://provider.example.com/live/kund/hemligt/5.ts"
+
+
+@pytest.fixture
+def host(monkeypatch):
+    """ui/mw_offline.py's mixin on a small host: a player whose Stop is
+    counted, the clock in the test's hand."""
+    pytest.importorskip("PyQt6.QtWidgets")
+    from types import SimpleNamespace
+
+    from PyQt6.QtCore import QObject
+    from PyQt6.QtWidgets import QApplication
+
+    from dopeiptv.core import offline, workers
+    from dopeiptv.providers import client as client_mod
+    from dopeiptv.ui import mw_offline
+
+    app = QApplication.instance() or QApplication([])
+    offline.reset()
+    clock = [1000.0]
+    monkeypatch.setattr(mw_offline, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setenv("DOPEIPTV_NETWORK", "online")
+    monkeypatch.setattr(workers, "run_async",
+                        lambda pool, fn, done, fail=None, *a, **k: done(fn()))
+
+    class Back:
+        def authenticate(self):
+            return {"user_info": {}}
+
+    monkeypatch.setattr(client_mod, "make_client", lambda pl: Back())
+
+    class Stop:
+        clicks = 0
+
+        def click(self):
+            Stop.clicks += 1
+            h.player.current_url = None
+
+    class Host(QObject, mw_offline._OfflineMixin):
+        def __init__(self):
+            super().__init__()
+            self.client = SimpleNamespace(offline=False)
+            self.playlist_store = SimpleNamespace(
+                active_id="a1b2c3d4", get=lambda pid: None,
+                active=lambda: {"id": "a1b2c3d4", "name": "Pirat", "kind": "xtream",
+                                "server": "http://provider.example.com"})
+            self.player = SimpleNamespace(current_url=None, stop_btn=Stop())
+            self.pool = None
+            self.toasts: list[str] = []
+
+        def _show_toast(self, text, ms=0):
+            self.toasts.append(text)
+
+        def _off_reload(self):
+            pass
+
+        def _offline_client(self, pid):
+            return SimpleNamespace(offline=True)
+
+        def tick(self, secs: float) -> None:
+            clock[0] += secs
+            self._off_tick()
+
+    h = Host()
+    h._init_offline()
+    yield h, offline
+    offline.reset()
+    del app
+
+
+def test_the_systems_limited_word_never_stops_what_plays(host):
+    h, offline = host
+    h.player.current_url = _LIVE
+    for word in ("site", "local", "site", "local"):
+        h._off_said(word)
+        h.tick(10)
+        assert not offline.on(), word
+        assert h.player.stop_btn.clicks == 0 and h.player.current_url == _LIVE
+        h._off_said("online")
+        h.tick(10)
+    assert type(h.client).__name__ == "SimpleNamespace" and not h.client.offline
+
+
+def test_no_network_waits_for_what_plays_from_the_internet_then_comes_on(host):
+    h, offline = host
+    h.player.current_url = _LIVE
+    h._off_said("disconnected")
+    h.tick(10)
+    assert not offline.on() and h.player.stop_btn.clicks == 0
+    assert h._off_timer.isActive()                      # it looks again
+    h.tick(10)
+    assert not offline.on() and h.player.current_url == _LIVE
+    h.player.current_url = None                         # the stream ended by itself
+    h.tick(3)
+    assert offline.mode() == offline.ITSELF and offline.why() == offline.WHY_NO_NETWORK
+    assert h.player.stop_btn.clicks == 0 and h.client.offline
+
+
+def test_a_stream_at_home_keeps_nothing_waiting(host):
+    h, offline = host
+    h.player.current_url = "http://192.168.1.5:9981/stream/channel/1"
+    h._off_said("disconnected")
+    h.tick(10)
+    assert offline.mode() == offline.ITSELF
+    assert h.player.stop_btn.clicks == 0 and h.player.current_url.startswith("http://192.168")
+
+
+def test_go_online_by_hand_holds_until_the_system_says_something_new(host):
+    h, offline = host
+    h._off_said("disconnected")
+    h.tick(10)
+    assert offline.mode() == offline.ITSELF
+    h.set_offline(False)
+    assert not offline.on()
+    for word in ("site", "disconnected", "local", "disconnected"):
+        h._off_said(word)
+        h.tick(10)
+        assert not offline.on(), word
+    h._off_said("online")
+    h.tick(10)
+    h._off_said("disconnected")
+    h.tick(10)
+    assert offline.mode() == offline.ITSELF
+
+
+def test_work_offline_by_hand_stops_what_plays_from_the_internet(host):
+    h, offline = host
+    h.player.current_url = _LIVE
+    h.set_offline(True)
+    assert offline.mode() == offline.HAND and h.player.stop_btn.clicks == 1
+
+
+def test_a_login_failing_for_want_of_a_network_waits_for_what_plays(host):
+    import socket
+    h, offline = host
+    h.player.current_url = _LIVE
+    gone = socket.gaierror(socket.EAI_AGAIN, "Temporary failure in name resolution")
+    assert h._offline_unreached(gone) is True           # told: no error to click away
+    assert not offline.on() and h.player.stop_btn.clicks == 0
+    h.tick(3)
+    assert not offline.on()
+    h.player.current_url = None
+    h.tick(3)
+    assert offline.mode() == offline.ITSELF and offline.why() == offline.WHY_UNREACHED
+    assert h.player.stop_btn.clicks == 0
+
+
+def test_a_wrong_login_after_coming_back_online_is_said(host, monkeypatch):
+    """The words are "Wrong user name or password." now: told by the
+    error's key, as the start tells it (providers/client.wrong_login)."""
+    from PyQt6.QtWidgets import QMessageBox
+
+    from dopeiptv.i18n import LocalizedError
+    from dopeiptv.providers import client as client_mod
+    from dopeiptv.ui import cert_trust
+    h, offline = host
+    told: list = []
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: told.append(a[2])))
+    monkeypatch.setattr(cert_trust, "offer_review", lambda *a, **k: False)
+
+    class Refused:
+        def authenticate(self):
+            raise LocalizedError("err_wrong_login")
+
+    monkeypatch.setattr(client_mod, "make_client", lambda pl: Refused())
+    h.set_offline(True)
+    h.set_offline(False)
+    assert len(told) == 1
+    assert told[0].startswith("Pirat: Wrong user name or password.")
+
+    class Timeout:
+        def authenticate(self):
+            raise RuntimeError("timed out")
+
+    monkeypatch.setattr(client_mod, "make_client", lambda pl: Timeout())
+    h.set_offline(True)
+    h.set_offline(False)
+    assert len(told) == 1                               # not a login refused: nothing said
 
 
 def test_offline_with_no_source_the_guide_shows_and_its_connect_says_so(tmp_path_factory):

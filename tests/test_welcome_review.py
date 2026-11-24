@@ -497,14 +497,17 @@ def test_the_reviewed_words():
 
 def test_a_refused_login_at_start_is_still_told_as_one_after_the_words_changed():
     """app.py told a refused login by its English words: "username" is
-    "user name" now - it goes by the error's key."""
-    from dopeiptv.app import _wrong_login
+    "user name" now - it goes by the error's key (providers/client.wrong_login,
+    which the login as offline mode ends asks too)."""
     from dopeiptv.i18n import LocalizedError
+    from dopeiptv.providers.client import wrong_login
     i18n.set_language("sv")
-    assert _wrong_login(LocalizedError("err_wrong_login"))
-    assert _wrong_login(RuntimeError("Wrong username or password."))       # a server's own
-    assert not _wrong_login(LocalizedError("err_box_login_needed"))
-    assert not _wrong_login(RuntimeError("timed out"))
+    assert wrong_login(LocalizedError("err_wrong_login"))
+    assert wrong_login(RuntimeError("Wrong username or password."))       # a server's own
+    assert not wrong_login(LocalizedError("err_box_login_needed"))
+    assert not wrong_login(RuntimeError("timed out"))
+    assert not wrong_login(ValueError("Wrong user name or password."))  # not a login's error
+    assert not wrong_login(None)
 
 
 def test_one_of_a_kind_is_said_in_the_singular_with_the_languages_separator(app):

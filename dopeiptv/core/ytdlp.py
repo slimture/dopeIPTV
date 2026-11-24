@@ -85,7 +85,8 @@ class YtdlpError(Exception):
     """*reason*: platform (no release binary for this computer), pin (this
     build names no release, or none for this computer), download, checksum, runs (the
     downloaded binary does not start), busy (the copy is in use), missing,
-    failed (yt-dlp could not open the address; *detail* says why)."""
+    failed (yt-dlp could not open the address; *detail* says why), offline
+    (offline mode is on: not run)."""
 
     def __init__(self, reason: str, detail: str = "") -> None:
         super().__init__(f"{reason}: {detail}" if detail else reason)
@@ -370,7 +371,11 @@ def resolve(path: str, url: str, run: Callable[..., Any] = subprocess.run,
             timeout: float = 60.0) -> dict[str, Any]:
     """Ask yt-dlp for the stream behind *url* (one stream with picture and
     sound): {"url", "title", "live", "headers"}. For a libmpv without the
-    ytdl hook. The app's own copy is hashed against its mark first."""
+    ytdl hook. The app's own copy is hashed against its mark first; while
+    offline mode refuses *url* nothing runs - yt-dlp goes to the page itself."""
+    from . import offline
+    if offline.refusal(url):
+        raise YtdlpError("offline", "offline mode")
     if not _may_run(path):
         raise YtdlpError("checksum", "the app's copy changed since it was checked")
     cmd = [path, "-J", "--no-playlist", "--no-warnings", "-f", FORMAT, "--", url]

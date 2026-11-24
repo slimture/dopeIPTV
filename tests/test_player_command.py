@@ -70,6 +70,40 @@ def test_launch_player_starts_that_command(monkeypatch):
 
 
 @pytest.mark.parametrize("player", ["mpv", "vlc"])
+def test_offline_an_external_player_is_never_handed_the_internet(player, monkeypatch, tmp_path):
+    """Offline mode: an external mpv or VLC (and an external mpv's own
+    yt-dlp) is not started on an address on the internet - said as the
+    window's door says it; a file and a stream at home start as ever."""
+    from dopeiptv.core import offline
+    started, told, said = [], [], []
+    monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/" + player)
+    monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: started.append(cmd))
+    monkeypatch.setattr(players.QMessageBox, "information",
+                        staticmethod(lambda *a, **_k: told.append(a[-1])))
+
+    class Window:
+        def _offline_refused(self, kind=""):
+            said.append(kind)
+
+    web = tmp_path / "web.m3u8"
+    web.write_text("#EXTM3U\n#EXTINF:6,\nhttps://cdn.example.com/1.ts\n")
+    offline.reset()
+    offline.set_mode(offline.HAND, offline.WHY_HAND)
+    try:
+        for url in ("https://www.youtube.com/watch?v=x", "http://8.8.8.8/live/1.ts",
+                    "srt://cdn.example.com:9000", str(web)):
+            players.launch_player(player, url, "T", Window())
+        players.launch_player(player, "rtmp://cdn.example.com/live", "T")
+        assert started == [] and len(said) == 4
+        assert told == [players.tr("offline_needs_network")]
+        players.launch_player(player, "udp://@239.0.0.1:1234", "T", Window())
+        players.launch_player(player, "/films/a film.mkv", "T", Window())
+        assert len(started) == 2
+    finally:
+        offline.reset()
+
+
+@pytest.mark.parametrize("player", ["mpv", "vlc"])
 def test_no_handoff_file_no_player_never_the_address_instead(player, monkeypatch):
     """The handoff file could not be made (no runtime folder, a full disk):
     the player is not started and the person is told - the address never

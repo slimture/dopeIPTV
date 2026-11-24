@@ -68,13 +68,12 @@ def test_the_environment_word():
 
 def test_what_the_systems_word_means():
     assert offline.offline_word(offline.DISCONNECTED) is True
-    assert offline.offline_word(offline.LOCAL) is True
-    assert offline.offline_word(offline.SITE) is True
     assert offline.offline_word(offline.ONLINE) is False
     assert offline.offline_word(offline.UNKNOWN) is None
-    # A source at home still answers on the local network.
-    assert offline.offline_word(offline.LOCAL, home_source=True) is None
-    assert offline.offline_word(offline.DISCONNECTED, home_source=True) is True
+    # "Limited" / "No Internet": what the system says when its own check of
+    # the internet fails, the internet working or not - nothing alone.
+    assert offline.offline_word(offline.LOCAL) is None
+    assert offline.offline_word(offline.SITE) is None
 
 
 # -- the system's word, settled ------------------------------------------------------
@@ -105,13 +104,129 @@ def test_a_flapping_network_toggles_nothing():
         t += 3.0
 
 
-def test_only_the_local_network_is_offline_for_a_source_on_the_internet():
-    w = offline.Watch(home_source=False)
-    w.said(offline.LOCAL, 0.0)
-    assert _run(w, 10.0) == (offline.ITSELF, offline.WHY_LOCAL)
-    home = offline.Watch(home_source=True)
-    home.said(offline.SITE, 0.0)
-    assert _run(home, 10.0) is None
+def test_the_systems_limited_word_alone_turns_nothing_on():
+    """NetworkManager's "limited" and Windows' "No Internet" (Qt's Site and
+    Local) are what they say when their own check of the internet fails -
+    behind a DNS blocker, a VPN or a privacy tool with the internet working
+    too: alone they turn offline mode on for no source, however long they
+    hold, and however often they come back (the reviewer's run)."""
+    for word in (offline.LOCAL, offline.SITE):
+        w = offline.Watch()
+        w.said(offline.ONLINE, 0.0)
+        assert _run(w, 10.0) is None
+        t = 20.0
+        for _ in range(3):
+            w.said(word, t)
+            assert _run(w, t + 1000.0) is None
+            w.said(offline.ONLINE, t + 1001.0)
+            assert _run(w, t + 1010.0) is None
+            t += 2000.0
+
+
+def test_with_the_limited_word_a_login_that_failed_for_want_of_a_network_turns_it_on():
+    w = offline.Watch()
+    w.said(offline.SITE, 0.0)
+    assert _run(w, 10.0) is None
+    assert w.unreached(offline.OFF) == (offline.ITSELF, offline.WHY_UNREACHED)
+    # It stays on until the system says online (no back and forth with the
+    # login on the same word).
+    assert _run(w, 100.0, offline.ITSELF, offline.WHY_UNREACHED) is None
+    w.said(offline.ONLINE, 110.0)
+    assert _run(w, 120.0, offline.ITSELF, offline.WHY_UNREACHED) == (offline.OFF, "")
+
+
+def test_no_network_by_itself_ends_once_the_system_no_longer_says_it():
+    """On by itself because the system said there is no network: over once
+    it says anything else - a "limited" word after a cable is back too (the
+    login, asked then, tells whether the network really is there)."""
+    for word in (offline.SITE, offline.LOCAL, offline.ONLINE):
+        w = offline.Watch()
+        w.said(offline.DISCONNECTED, 0.0)
+        assert _run(w, 10.0) == (offline.ITSELF, offline.WHY_NO_NETWORK)
+        w.said(word, 20.0)
+        assert _run(w, 22.0, offline.ITSELF, offline.WHY_NO_NETWORK) is None
+        assert _run(w, 26.0, offline.ITSELF, offline.WHY_NO_NETWORK) == (offline.OFF, "")
+    w = offline.Watch()
+    w.said(offline.DISCONNECTED, 0.0)
+    assert _run(w, 10.0) == (offline.ITSELF, offline.WHY_NO_NETWORK)
+    w.said(offline.UNKNOWN, 20.0)                   # the system cannot tell: stays
+    assert _run(w, 100.0, offline.ITSELF, offline.WHY_NO_NETWORK) is None
+
+
+def test_go_online_holds_until_the_system_says_something_new_and_definite():
+    w = offline.Watch()
+    w.said(offline.DISCONNECTED, 0.0)
+    assert _run(w, 10.0) == (offline.ITSELF, offline.WHY_NO_NETWORK)
+    assert w.by_hand(False, 10.0) == (offline.OFF, "")
+    # Back and forth through words that say nothing, and the same "no
+    # network" again: Go online holds.
+    for t, word in ((20.0, offline.SITE), (30.0, offline.DISCONNECTED), (40.0, offline.LOCAL),
+                    (50.0, offline.DISCONNECTED), (60.0, offline.UNKNOWN),
+                    (70.0, offline.DISCONNECTED)):
+        w.said(word, t)
+        assert _run(w, t + 6.0) is None, word
+    assert w.unreached(offline.OFF) is None             # nor the login's hint
+    # Online, then no network: something new and definite.
+    w.said(offline.ONLINE, 80.0)
+    assert _run(w, 86.0) is None
+    w.said(offline.DISCONNECTED, 90.0)
+    assert _run(w, 96.0) == (offline.ITSELF, offline.WHY_NO_NETWORK)
+    # What the system was saying as the person chose is nothing new, though
+    # it had not held long enough yet.
+    w = offline.Watch()
+    w.said(offline.ONLINE, 0.0)
+    assert _run(w, 10.0) is None
+    assert w.by_hand(True, 11.0) == (offline.HAND, offline.WHY_HAND)
+    w.said(offline.DISCONNECTED, 20.0)
+    assert w.by_hand(False, 21.0) == (offline.OFF, "")
+    assert _run(w, 30.0) is None
+
+
+def test_go_online_holds_against_the_logins_hint_too():
+    w = offline.Watch()
+    w.said(offline.ONLINE, 0.0)
+    assert _run(w, 10.0) is None
+    assert w.unreached(offline.OFF) == (offline.ITSELF, offline.WHY_UNREACHED)
+    assert w.by_hand(False, 20.0) == (offline.OFF, "")
+    # The login asked again fails again: Go online holds.
+    assert w.unreached(offline.OFF) is None
+    w.said(offline.SITE, 30.0)
+    w.said(offline.ONLINE, 31.0)                       # online again: nothing new
+    assert _run(w, 40.0) is None
+    assert w.unreached(offline.OFF) is None
+    w.said(offline.DISCONNECTED, 50.0)
+    assert _run(w, 56.0) == (offline.ITSELF, offline.WHY_NO_NETWORK)
+
+
+def test_offline_by_itself_waits_while_something_plays_from_the_internet():
+    """Never a stream that plays stopped on the system's word: offline mode
+    by itself waits until nothing plays from the internet any more (it
+    failed, or was stopped)."""
+    w = offline.Watch()
+    w.said(offline.DISCONNECTED, 0.0)
+    assert w.tick(10.0, offline.OFF, "", playing=True) is None and w.waiting
+    assert w.tick(12.0, offline.OFF, "", playing=True) is None and w.waiting
+    assert w.tick(14.0, offline.OFF, "", playing=False) == (offline.ITSELF,
+                                                            offline.WHY_NO_NETWORK)
+    assert not w.waiting
+    # The login's hint likewise.
+    w = offline.Watch()
+    w.said(offline.SITE, 0.0)
+    assert w.unreached(offline.OFF, playing=True) is None and w.waiting
+    assert w.tick(10.0, offline.OFF, "", playing=True) is None
+    assert w.tick(11.0, offline.OFF, "", playing=False) == (offline.ITSELF,
+                                                            offline.WHY_UNREACHED)
+    # The system says online meanwhile: nothing waits any more.
+    w = offline.Watch()
+    w.said(offline.SITE, 0.0)
+    assert w.unreached(offline.OFF, playing=True) is None
+    w.said(offline.ONLINE, 5.0)
+    assert w.tick(11.0, offline.OFF, "", playing=False) is None and not w.waiting
+    # Turned on by hand: nothing waits either.
+    w = offline.Watch()
+    w.said(offline.DISCONNECTED, 0.0)
+    assert w.tick(10.0, offline.OFF, "", playing=True) is None and w.waiting
+    assert w.by_hand(True, 11.0) == (offline.HAND, offline.WHY_HAND) and not w.waiting
 
 
 def test_on_by_hand_stays_until_turned_off():
@@ -238,7 +353,7 @@ def test_a_name_the_person_gave_is_judged_by_where_it_resolves(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", look)
     for name in answers:
         dest_guard.note_own(f"http://{name}")
-    offline.set_mode(offline.ITSELF, offline.WHY_LOCAL)
+    offline.set_mode(offline.ITSELF, offline.WHY_UNREACHED)
     assert offline.refusal("http://tv.example.org:8096/") == ""          # a server at home
     assert offline.refusal("http://far.example.org/") == offline.INTERNET
     assert offline.refusal("http://gone.example.org/") == offline.INTERNET
@@ -255,6 +370,106 @@ def test_a_stream_is_judged_by_its_host_and_a_file_is_this_computers():
     assert offline.stream_refusal("rtmp://cdn.example.com/live") == offline.INTERNET
     offline.set_mode(offline.OFF)
     assert offline.stream_refusal("http://8.8.8.8/live/1.ts") == ""
+
+
+def test_an_address_inside_another_is_judged_too(no_lookup):
+    """mpv's ytdl:// (the app's own way to a web page: urlsplit read its
+    host as "https", a name without a dot - a home name) and the other ways
+    mpv and FFmpeg wrap an address: every address written inside."""
+    offline.set_mode(offline.HAND, offline.WHY_HAND)
+    for url in ("ytdl://https://www.youtube.com/watch?v=x", "YTDL://https://www.twitch.tv/x",
+                "ytdl://ytdl://https://www.youtube.com/x", "ytdl://ytsearch:something",
+                "lavf://https://cdn.example.com/x.m3u8", "ffmpeg://http://8.8.8.8/x.ts",
+                "edl://%30%http://cdn.example.com/x.mkv,0,10",
+                "slice://0-100@http://cdn.example.com/x", "appending://http://cdn.example.com/x",
+                "concat:http://192.168.1.5/a.ts|http://cdn.example.com/b.ts",
+                "http://192.168.1.5/play?u=http://cdn.example.com/x"):
+        assert offline.stream_refusal(url) == offline.INTERNET, url
+    for url in ("ytdl://nas/page", "ytdl://http://192.168.1.5/page", "lavf://http://192.168.1.5/x",
+                "http://192.168.1.5/live/1.ts", "udp://@239.1.1.1:1234",
+                "concat:http://192.168.1.5/a.ts|http://nas/b.ts"):
+        assert offline.stream_refusal(url) == "", url
+    assert no_lookup == []
+
+
+def test_what_needs_the_network_is_told_while_offline_mode_is_off(no_lookup):
+    """What plays keeps offline mode by itself waiting: told as written,
+    with offline mode off - nothing looked up, no file read."""
+    assert not offline.on()
+    assert offline.needs_network("http://cdn.example.com/live/1.ts")
+    assert offline.needs_network("ytdl://https://www.youtube.com/watch?v=x")
+    assert offline.needs_network("https://8.8.8.8/x")
+    assert not offline.needs_network("http://192.168.1.5/live/1.ts")
+    assert not offline.needs_network("rtsp://nas/1")
+    assert not offline.needs_network("/home/me/film.mkv")
+    assert not offline.needs_network("")
+    dest_guard.note_own("http://tv.example.org")
+    assert offline.needs_network("http://tv.example.org:8096/x")     # not looked up: counted
+    assert no_lookup == []
+
+
+def _list(tmp_path, name: str, text: str, encoding: str = "utf-8") -> str:
+    path = tmp_path / name
+    path.write_bytes(text.encode(encoding))
+    return str(path)
+
+
+def test_a_local_playlist_is_judged_by_the_addresses_it_names(tmp_path, no_lookup):
+    """mpv and FFmpeg open what a playlist or a stream's manifest names
+    themselves: one on this computer that names the internet is not
+    played offline - known by its name or its first bytes, read bounded."""
+    offline.set_mode(offline.HAND, offline.WHY_HAND)
+    film = tmp_path / "film.mkv"
+    film.write_bytes(b"\x1aE\xdf\xa3" + b"\x00" * 64 + b"http://cdn.example.com/x")
+    assert offline.stream_refusal(str(film)) == ""          # a media file: never read as a list
+    allowed = {
+        "local.m3u8": "#EXTM3U\n#EXTINF:10,\nseg1.ts\n#EXTINF:10,\n/home/me/seg2.ts\n",
+        "home.m3u": "#EXTM3U\n#EXTINF:-1,Ett\nhttp://192.168.1.5:9981/stream/1\nrtsp://nas/2\n",
+        "home.mpd": '<?xml version="1.0"?><MPD><BaseURL>http://192.168.1.5:8080</BaseURL></MPD>',
+        "home.xspf": '<playlist><track><location>http://nas:8080</location>'
+                     '<location src="http://192.168.1.5/a.mp3"/></track></playlist>',
+        "music.m3u": "#EXTM3U\n\\\\nas\\music\\a.mp3\n//nas/music/b.mp3\n",
+        "group.m3u": "#EXTM3U\nudp://@239.1.1.1:1234\n",
+    }
+    for name, text in allowed.items():
+        assert offline.stream_refusal(_list(tmp_path, name, text)) == "", name
+    refused = {
+        "web.m3u8": "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nhttps://cdn.example.com/1.ts\n",
+        "film.ts": "#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nhttps://cdn.example.com/1.ts\n",
+        "key.m3u8": '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="https://keys.example.com/k"\na.ts\n',
+        "web.mpd": '<?xml version="1.0"?><MPD><BaseURL>https://cdn.example.com/</BaseURL></MPD>',
+        "spelled.mpd": "<MPD><BaseURL>https&#x3a;//cdn.example.com/</BaseURL></MPD>",
+        "trick.m3u": '#EXTM3U\nhttp://nas"@cdn.example.com/x.ts\n',
+        "nested.m3u8": "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\n720p.m3u8\n",
+        "unc.m3u": "#EXTM3U\n//cdn.example.com/seg.ts\n",
+        "unc2.m3u": "#EXTM3U\n\\\\cdn.example.com\\share\\a.mp3\n",
+        "radio.pls": "[playlist]\nFile1=http://radio.example.com/stream\n",
+        "list.txt": "[Playlist]\r\nFile1=http://radio.example.com/stream\r\n",
+        "cut.edl": "# mpv EDL v0\nhttp://cdn.example.com/x.mkv,0,10\n",
+        "ytdl.m3u": "#EXTM3U\nytdl://https://www.youtube.com/watch?v=x\n",
+        "public.m3u": "#EXTM3U\nhttp://8.8.8.8/live/1.ts\n",
+    }
+    for name, text in refused.items():
+        assert offline.stream_refusal(_list(tmp_path, name, text)) == offline.INTERNET, name
+    wide = _list(tmp_path, "wide.m3u", "#EXTM3U\nhttps://cdn.example.com/a.ts\n", "utf-16")
+    assert offline.stream_refusal(wide) == offline.INTERNET
+    bom = _list(tmp_path, "bom.mp3", "﻿#EXTM3U\nhttps://cdn.example.com/a.ts\n")
+    assert offline.stream_refusal(bom) == offline.INTERNET
+    long = _list(tmp_path, "long.m3u8", "#EXTM3U\n" + "a.ts\n" * (offline.LIST_MAX // 5 + 10))
+    assert offline.stream_refusal(long) == offline.INTERNET    # too long to judge
+    web = str(tmp_path / "web.m3u8")
+    assert offline.stream_refusal("file://" + web) == offline.INTERNET
+    assert offline.stream_refusal("file://cdn.example.com/share/a.mkv") == offline.INTERNET
+    assert offline.stream_refusal(str(tmp_path / "missing.m3u8")) == ""
+    assert offline.stream_refusal(str(tmp_path)) == ""       # a folder: this computer's
+    if hasattr(os, "mkfifo"):
+        pipe = tmp_path / "pipe.m3u8"
+        os.mkfifo(pipe)
+        assert offline.stream_refusal(str(pipe)) == ""       # never waited on
+    assert no_lookup == []
+    offline.set_mode(offline.OFF)
+    assert offline.stream_refusal(web) == ""
+    assert offline.file_refusal(web) == ""
 
 
 def test_a_refusal_is_said_once_per_host(caplog):
