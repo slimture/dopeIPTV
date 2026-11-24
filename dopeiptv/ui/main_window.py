@@ -2443,6 +2443,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                         item=None, catchup: bool = False,
                         start_at: float = 0.0, to_cast: bool = True,
                         own_buffer: bool = True) -> None:
+        # The one way in for everything that plays here, in steps that keep
+        # their order (tests/test_playback_path.py holds it): may it start,
+        # what is left, where it starts, what is kept of it, who is told,
+        # then the player is made ready and opens it.
         # start_at: how far into a catch-up link to start (a portal's
         # archive link plays a programme from its own start).
         # to_cast: a live channel may go to a running cast (False: here).
@@ -2458,20 +2462,57 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         restart = reconnect or catchup or (
             key is not None and str(key) == str(getattr(self, "_playing_key", None))
             and getattr(self, "_playing_group", None) is not None)
+        if not self._play_may_start(url, title, icon_url, key, kind, item, catchup, to_cast):
+            return
+        self._play_leave(url, key, catchup)
+        resume_at = self._play_start_at(key, kind, item, catchup, start_at)
+        self._play_note(url, title, icon_url, key, kind, item, record, own_buffer)
+        self._play_tell(title, key, kind, item, restart)
+        log.info("play: embedded path kind=%s player=%s %s",
+                 kind, "yes" if self.player else "NO", for_log(title))
+        if self.player:
+            self._play_prepare(url, title, key, kind, item)
+            self._play_open(url, title, icon_url, key, kind, item, catchup, own_buffer,
+                            resume_at, reconnect)
+        else:
+            # No embedded player (libmpv unavailable): open externally.
+            launch_player("mpv", url, title, self)
+        # Reflect the new playback state on the poster overlay (play -> pause /
+        # stop) when the item being played is the one shown in the detail pane.
+        self._apply_play_icon()
+        self._apply_seek_mode(item, kind)
+        # Catch-up sanity check: some providers accept an archive URL but just
+        # serve the live feed (the seekbar jumps back yet you're still live).
+        # A real archive segment is seekable; verify a few seconds in and, if
+        # it isn't, try the next candidate or report it unavailable.
+        if catchup:
+            token = getattr(self, "_catchup_verify_token", 0) + 1
+            self._catchup_verify_token = token
+            QTimer.singleShot(5000, lambda t=token: self._verify_catchup(t))
+
+    def _play_may_start(self, url: str, title: str, icon_url, key, kind: str, item,
+                        catchup: bool, to_cast: bool) -> bool:
+        """Whether this may start here at all - nothing is changed when it
+        may not, nor when a running cast takes it instead."""
         # A kids profile plays only what its lists may show, however it was
         # asked (mw_profiles).
         if not self._kids_may_play(kind, item):
-            return
+            return False
         if not self._guard_stream_switch(url, title):
-            return
+            return False
         # The guard is about streams: the user's own files always play.
         if kind not in ("local", "recording") and self._vpn_guard_blocks(url):
-            return
+            return False
         # A cast runs: a live channel goes to the same receiver and the
         # player stays as it is (mw_cast). Stopping the cast is explicit.
         if to_cast and self._cast_zap(url, title, icon_url, key, kind, item,
                                       catchup):
-            return
+            return False
+        return True
+
+    def _play_leave(self, url: str, key, catchup: bool) -> None:
+        """What played before is left: its failover, a cast or multiview in
+        the way, its archive state, where it got to and its marks."""
         self._failover_leave(url, key)
         self._reconnect_off = False
         # A click that led here also armed the auto-preview timer; kill it so
@@ -2503,6 +2544,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._save_resume_position()
         self._maybe_auto_mark_watched()
         self._ms_leave()          # a media server hears where it got to
+
+    def _play_start_at(self, key, kind: str, item, catchup: bool, start_at: float) -> float:
+        """Where it starts: where the room is (watch together), a series
+        page's Continue, else its resume point; an archive link's own."""
         # Watch together: what the room plays starts where the room is,
         # without the resume question.
         together_at = self._together_take_start()
@@ -2516,6 +2561,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                          if kind in self._RESUMABLE else 0.0)
         if catchup and start_at > 0:
             resume_at = float(start_at)
+        return resume_at
+
+    def _play_note(self, url: str, title: str, icon_url, key, kind: str, item,
+                   record: bool, own_buffer: bool) -> None:
+        """What is kept of it: History, the watch accounts, the channel left,
+        what Stop and Play replays, the episode queue, the window's state."""
         self._trakt_stop_current()
         self._simkl_stop_current()
         if record and kind:
@@ -2574,6 +2625,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                                "recording": "rec",
                                "local": "local", "radio": "radio",
                                "web": "web"}.get(kind)
+
+    def _play_tell(self, title: str, key, kind: str, item, restart: bool) -> None:
+        """Every place that marks what plays is told, the pane follows it, and
+        the window's title and status line say it."""
         # A series' page marks what plays and goes to it (autoplay's next).
         self._sp_playback_started(key, kind)
         # ...and the column under the video shows the episode's series.
@@ -2612,110 +2667,103 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self.listw.viewport().update()
         self.setWindowTitle(title or self._base_title)
         self._set_status(self._status_playing(title))
-        log.info("play: embedded path kind=%s player=%s %s",
-                 kind, "yes" if self.player else "NO", for_log(title))
-        if self.player:
-            self.rec.finish_all_inplayer("channel changed")
-            self.player.show()
-            self.player.set_overlay_info(title)
-            # A radio station is music too: the visualiser and equaliser.
-            self._apply_audio_visuals(url, audio=kind == "radio")
-            # Music bookkeeping - the detail panel and the play queue. This
-            # MUST stay inside the embedded branch: written as a top-level
-            # "if kind == local" it closed this block, so everything below
-            # (including player.play()) fell into the else and every stream
-            # opened in an external mpv window.
-            if kind == "local":
-                if item is not None and self._is_audio(url):
-                    # Show THIS track - a queue rolling on by itself must
-                    # not leave the panel on the first one.
-                    try:
-                        self._show_detail(item)
-                    except Exception as e:
-                        log.debug("music detail refresh failed: %s", e)
-                # Video too, not just music: without a queue position a
-                # local episode had no "next" and every series stopped
-                # dead at the end of each episode.
-                self._place_in_queue(url, title, item)
-                self._sync_queue_buttons()
-            # Replay with the same audio/subtitle tracks the user picked last
-            # time for this title (one-shot; play() consumes them).
-            if kind in self._RESUMABLE:
-                prefs = self._track_prefs()
-                # This exact title first; failing that, whatever was chosen
-                # for the series, so the next episode keeps the subtitles.
-                pref = prefs.get(f"{kind}:{key}")
-                if not isinstance(pref, dict):
-                    pref = next((prefs[k] for k in self._series_pref_keys(kind)
-                                 if isinstance(prefs.get(k), dict)), None)
-                if isinstance(pref, dict):
-                    self.player.set_track_prefs(pref.get("aid"),
-                                                pref.get("sid"))
-                # A subtitle fetched or picked for this title before.
-                self.player.set_sub_files(
-                    self._remembered_subtitles(kind, key))
-            # Nerd: a live channel (its catch-up too) plays with the
-            # settings of its own; anything else with the app's.
-            self._chanprefs_arm(key, item, kind)
-            before = getattr(self, "_tv_before_play", None)
-            if before is not None:
-                before()
-            self._arm_loading(icon_url, reconnect)
-            # own_buffer False is an address opened by hand (a dopeiptv://
-            # link, --play, the remote API, Open address…): the source's
-            # Nerd headers only on the source's own server. A radio station
-            # is no source's either: none of the source's headers go to it,
-            # and where it is decides its way out (core/net_bridge.py).
-            outside = kind == "radio" or (not own_buffer and self._from_outside(url))
-            self.player.refusal = ""
-            if self.player.play(url, title, start=resume_at,
-                                local_buffer=kind == "live" and not catchup,
-                                buffer_key=f"{kind}:{key}" if key else None,
-                                web=kind == "web", own_buffer=own_buffer,
-                                outside=outside):
-                self.wake.acquire(wake_reason(title))
-                self._health_begin(key, title, item, kind, catchup)
-                self._events_started(key, title, item, kind, catchup)
-                self._together_started(key, title, item, kind, catchup)
-                self._stats_begin(key, title, item, kind, catchup)
-                self._discord_started(key, title, item, kind, catchup)
-                if not catchup:
-                    self._ms_started(url, key, kind, item, resume_at)
-                # TV mode: the picture fills the screen, whoever asked.
-                self._tv_started(kind)
-            elif getattr(self.player, "refusal", ""):
-                # Not opened on purpose (its certificate cannot be checked
-                # here): said on the video - never another player instead.
-                self._show_stream_error(self.player.refusal)
-                if getattr(self, "_tv_on", False):
-                    self._tv_refused()
-            elif getattr(self, "_tv_on", False):
-                # TV mode fills the screen: another window would open
-                # behind it, out of reach of the remote.
-                log.warning("embedded play() refused %s in TV mode",
-                            url_for_log(url))
-                self._show_stream_error(tr("tv_play_refused"))
-                self._tv_refused()      # said on its page, back on it
-            else:
-                log.warning("embedded play() refused %s - falling back to an "
-                            "external mpv window", url_for_log(url))
-                self.player.hide()
-                launch_player("mpv", url, title, self)
+
+    def _play_prepare(self, url: str, title: str, key, kind: str, item) -> None:
+        """The docked player made ready: a recording of the stream before let
+        go, the overlay, the sound's picture, the music queue, the tracks and
+        subtitles kept for this title, a channel's own settings."""
+        self.rec.finish_all_inplayer("channel changed")
+        self.player.show()
+        self.player.set_overlay_info(title)
+        # A radio station is music too: the visualiser and equaliser.
+        self._apply_audio_visuals(url, audio=kind == "radio")
+        # Music bookkeeping - the detail panel and the play queue. Only with
+        # a player (_start_playback's embedded branch calls this step): once
+        # written there as a top-level "if kind == local", it closed that
+        # branch, so player.play() fell into the else and every stream
+        # opened in an external mpv window.
+        if kind == "local":
+            if item is not None and self._is_audio(url):
+                # Show THIS track - a queue rolling on by itself must
+                # not leave the panel on the first one.
+                try:
+                    self._show_detail(item)
+                except Exception as e:
+                    log.debug("music detail refresh failed: %s", e)
+            # Video too, not just music: without a queue position a
+            # local episode had no "next" and every series stopped
+            # dead at the end of each episode.
+            self._place_in_queue(url, title, item)
+            self._sync_queue_buttons()
+        # Replay with the same audio/subtitle tracks the user picked last
+        # time for this title (one-shot; play() consumes them).
+        if kind in self._RESUMABLE:
+            prefs = self._track_prefs()
+            # This exact title first; failing that, whatever was chosen
+            # for the series, so the next episode keeps the subtitles.
+            pref = prefs.get(f"{kind}:{key}")
+            if not isinstance(pref, dict):
+                pref = next((prefs[k] for k in self._series_pref_keys(kind)
+                             if isinstance(prefs.get(k), dict)), None)
+            if isinstance(pref, dict):
+                self.player.set_track_prefs(pref.get("aid"),
+                                            pref.get("sid"))
+            # A subtitle fetched or picked for this title before.
+            self.player.set_sub_files(
+                self._remembered_subtitles(kind, key))
+        # Nerd: a live channel (its catch-up too) plays with the
+        # settings of its own; anything else with the app's.
+        self._chanprefs_arm(key, item, kind)
+        before = getattr(self, "_tv_before_play", None)
+        if before is not None:
+            before()
+
+    def _play_open(self, url: str, title: str, icon_url, key, kind: str, item,
+                   catchup: bool, own_buffer: bool, resume_at: float,
+                   reconnect: bool) -> None:
+        """The player opens it; then whoever follows a playback is told - or,
+        not opened, it is said on the video, or an external mpv takes it."""
+        self._arm_loading(icon_url, reconnect)
+        # own_buffer False is an address opened by hand (a dopeiptv://
+        # link, --play, the remote API, Open address…): the source's
+        # Nerd headers only on the source's own server. A radio station
+        # is no source's either: none of the source's headers go to it,
+        # and where it is decides its way out (core/net_bridge.py).
+        outside = kind == "radio" or (not own_buffer and self._from_outside(url))
+        self.player.refusal = ""
+        if self.player.play(url, title, start=resume_at,
+                            local_buffer=kind == "live" and not catchup,
+                            buffer_key=f"{kind}:{key}" if key else None,
+                            web=kind == "web", own_buffer=own_buffer,
+                            outside=outside):
+            self.wake.acquire(wake_reason(title))
+            self._health_begin(key, title, item, kind, catchup)
+            self._events_started(key, title, item, kind, catchup)
+            self._together_started(key, title, item, kind, catchup)
+            self._stats_begin(key, title, item, kind, catchup)
+            self._discord_started(key, title, item, kind, catchup)
+            if not catchup:
+                self._ms_started(url, key, kind, item, resume_at)
+            # TV mode: the picture fills the screen, whoever asked.
+            self._tv_started(kind)
+        elif getattr(self.player, "refusal", ""):
+            # Not opened on purpose (its certificate cannot be checked
+            # here): said on the video - never another player instead.
+            self._show_stream_error(self.player.refusal)
+            if getattr(self, "_tv_on", False):
+                self._tv_refused()
+        elif getattr(self, "_tv_on", False):
+            # TV mode fills the screen: another window would open
+            # behind it, out of reach of the remote.
+            log.warning("embedded play() refused %s in TV mode",
+                        url_for_log(url))
+            self._show_stream_error(tr("tv_play_refused"))
+            self._tv_refused()      # said on its page, back on it
         else:
-            # No embedded player (libmpv unavailable): open externally.
+            log.warning("embedded play() refused %s - falling back to an "
+                        "external mpv window", url_for_log(url))
+            self.player.hide()
             launch_player("mpv", url, title, self)
-        # Reflect the new playback state on the poster overlay (play -> pause /
-        # stop) when the item being played is the one shown in the detail pane.
-        self._apply_play_icon()
-        self._apply_seek_mode(item, kind)
-        # Catch-up sanity check: some providers accept an archive URL but just
-        # serve the live feed (the seekbar jumps back yet you're still live).
-        # A real archive segment is seekable; verify a few seconds in and, if
-        # it isn't, try the next candidate or report it unavailable.
-        if catchup:
-            token = getattr(self, "_catchup_verify_token", 0) + 1
-            self._catchup_verify_token = token
-            QTimer.singleShot(5000, lambda t=token: self._verify_catchup(t))
 
     def _arm_loading(self, icon_url, reconnect: bool = False) -> None:
         """What the player's loading indicator shows while the next stream

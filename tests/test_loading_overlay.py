@@ -778,8 +778,10 @@ def test_the_apps_reconnect_is_said_and_every_start_arms_it():
     assert h._reconnect_key == "k" and calls
     # Taken before anything can turn the start away, armed right before play().
     src = inspect.getsource(MainWindow._start_playback)
-    assert src.index("self._reconnect_key = None") < src.index("_guard_stream_switch")
-    assert src.index("self._arm_loading(icon_url, reconnect)") < src.index("self.player.play(")
+    assert src.index("self._reconnect_key = None") < src.index("self._play_may_start(")
+    assert "_guard_stream_switch" in inspect.getsource(MainWindow._play_may_start)
+    opening = inspect.getsource(MainWindow._play_open)
+    assert opening.index("self._arm_loading(icon_url, reconnect)") < opening.index("self.player.play(")
     preview = inspect.getsource(MainWindow._play_preview)
     assert preview.index("self._arm_loading(") < preview.index("self.player.play(")
     errors = inspect.getsource(MainWindow._show_stream_error)

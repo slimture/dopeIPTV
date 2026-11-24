@@ -61,7 +61,9 @@ def test_every_episode_start_goes_through_it():
     page, Continue, the next one, TV mode, the phone, watch together."""
     src = (Path(_REPO_ROOT) / "dopeiptv" / "ui" / "main_window.py").read_text(encoding="utf-8")
     body = src.split("def _start_playback(", 1)[1].split("\n    def ", 1)[0]
-    assert 'if kind == "episode":\n            try:\n                self._detail_follow_episode(item, key)' in body
+    assert "self._play_tell(title, key, kind, item, restart)" in body
+    tell = src.split("def _play_tell(", 1)[1].split("\n    def ", 1)[0]
+    assert 'if kind == "episode":\n            try:\n                self._detail_follow_episode(item, key)' in tell
 
 
 _CHILD_PAGE = r"""

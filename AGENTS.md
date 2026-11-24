@@ -579,7 +579,7 @@ row in the table above; in short:
   Assistant's commands).
 
 What stays in `main_window.py` is the `__init__`/`_build_ui` composition
-and the playback path (start/stop, seek, fullscreen, reconnect; a stream whose certificate did not check out asked about once per source, `_tls_offer`; one the player would not open because it cannot check its certificate said on the video, never handed to an external player - `EmbeddedPlayer.refusal`; a radio station played as no source's) - keep
+and the playback path (start/stop, seek, fullscreen, reconnect; `_start_playback` in its steps, in this order - `_play_may_start`, `_play_leave`, `_play_start_at`, `_play_note`, `_play_tell`, then with a player `_play_prepare` and `_play_open` - which `tests/test_playback_path.py` holds call for call; a stream whose certificate did not check out asked about once per source, `_tls_offer`; one the player would not open because it cannot check its certificate said on the video, never handed to an external player - `EmbeddedPlayer.refusal`; a radio station played as no source's) - keep
 playback code there. `_build_ui` itself only calls the window's parts in
 the order they were always made - each built in `mw_build` (`_BuildMixin`;
 the detail column, the cast card and the player in its base
