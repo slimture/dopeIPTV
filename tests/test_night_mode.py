@@ -336,7 +336,8 @@ def test_every_play_puts_it_on_its_core_before_the_stream_opens():
     pytest.importorskip("PyQt6.QtWidgets")
     from dopeiptv.media.embedded import EmbeddedPlayer
     src = inspect.getsource(EmbeddedPlayer.play)
-    assert src.index("self._sync_night()") < src.index("m.play(source or url)")
+    assert src.index("self._sync_night()") < src.index("self._play_load(")
+    assert "m.play(source or url)" in inspect.getsource(EmbeddedPlayer._play_load)
     # The video side is never part of it.
     night = (inspect.getsource(EmbeddedPlayer._sync_night)
              + inspect.getsource(EmbeddedPlayer._night_on_event) + inspect.getsource(nm))

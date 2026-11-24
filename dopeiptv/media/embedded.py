@@ -1582,6 +1582,60 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
                                                "buffer_key": buffer_key, "web": web,
                                                "own_buffer": own_buffer,
                                                "outside": outside})
+        # Its steps, in the order mpv must hear them (tests/test_play_ops.py
+        # holds every word): this stream's state, where it is read from, a
+        # fresh start, the core, its base options, the app's defaults and
+        # night mode, Nerd's and the way out, the tracks kept, the sound,
+        # then the load.
+        live = local_buffer
+        chan, loading_art, local_buffer = self._play_arm(url, buffer_key, local_buffer)
+        source = self._play_source(url, buffer_key, live, local_buffer, web, own_buffer)
+        try:
+            self._play_fresh(title)
+            m = self._play_core()
+            self._play_base_options(m, title, local_buffer)
+            self.apply_default_options(load=True, live=live)
+            # Night mode: on a core that has not had it yet (nothing at all
+            # is written while it is off and always was).
+            self._sync_night()
+            self._play_nerd(m, url, source, chan, buffer_key, live, web, outside)
+            self._play_tracks(m, live)
+            self._play_sound(m)
+            self._play_load(m, url, title, start, source, web, loading_art)
+            return True
+        except CertificateUnchecked as e:
+            # The stream's certificate is to be checked and this core will
+            # not: not opened, and the stream before it ends too - never a
+            # stream played unchecked in its place.
+            log.warning("play: %s - its certificate cannot be checked here, not opened (%s)",
+                        url_for_log(url), e)
+            self.refusal = tr("player_tls_unverifiable")
+            try:
+                if self.video.mpv is not None:
+                    self.video.mpv.command("stop")
+            except Exception as stop_err:
+                log.debug("play: the stream before not stopped: %s", stop_err)
+            self._play_failed()
+            return False
+        except Exception as e:
+            log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
+            self._play_failed()
+            return False
+
+    def _play_failed(self) -> None:
+        """Not opened: nothing of it kept, its rewind buffer let go."""
+        self.current_url = None
+        self._reset_stream_info()
+        self._ao_reset()
+        self._ld_clear()
+        self._end_dvr()
+
+    def _play_arm(self, url: str, buffer_key: str | None,
+                  local_buffer: bool) -> tuple:
+        """This stream's own state: Nerd's channel and its settings, the
+        loading indicator's picture, the stream information and teletext
+        reset. Returns (the channel, the picture, whether the app's rewind
+        buffer is on for it)."""
         live = local_buffer
         # Nerd: the channel this is (set_channel, one-shot) and the settings
         # of its own it plays with - none for anything else.
@@ -1593,6 +1647,13 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self._ttx_reset(live)
         self._chan_own = self._channel_own(chan, buffer_key or url)
         local_buffer = local_buffer and self._live_rewind_minutes() > 0
+        return chan, loading_art, local_buffer
+
+    def _play_source(self, url: str, buffer_key: str | None, live: bool,
+                     local_buffer: bool, web: bool, own_buffer: bool) -> str | None:
+        """Where mpv reads it from: server mode's session of this channel,
+        else the app's own rewind buffer, else (None) the address itself;
+        the rewind row made ready for it."""
         # A session of the app's own buffer ends here: its provider
         # connection goes before the next stream opens one. Then, where
         # Settings asks for it, a live channel gets one: mpv plays its local
@@ -1622,277 +1683,279 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self._dvr_live, self._live_ahead, self._dvr_span = True, 0.0, 0.0
         self._label_live_button()
         self.local_buffer_bar.hide()
-        try:
-            # Fresh play cycle - drop the stop-in-progress flag so any real
-            # error from this new stream (auth failed, 404, ...) is surfaced.
-            self._stopping = False
-            self._stall_since = 0.0
-            self._eof_seen = False
-            self._frame_told = False
-            self._contest_told = False
-            self._hide_nextup()     # new title: no stale card
-            self._blackout.hide()
-            self.video.set_blank(False)
-            self.title_lbl.setText(title or "")
-            self._hide_seek_ui()
-            if self.video.mpv is None:
+        return source
+
+    def _play_fresh(self, title: str) -> None:
+        """A fresh play cycle: the stop and stall flags down, the last
+        title's card, blackout and seek row gone, this title shown."""
+        # Fresh play cycle - drop the stop-in-progress flag so any real
+        # error from this new stream (auth failed, 404, ...) is surfaced.
+        self._stopping = False
+        self._stall_since = 0.0
+        self._eof_seen = False
+        self._frame_told = False
+        self._contest_told = False
+        self._hide_nextup()     # new title: no stale card
+        self._blackout.hide()
+        self.video.set_blank(False)
+        self.title_lbl.setText(title or "")
+        self._hide_seek_ui()
+
+    def _play_core(self):
+        """The mpv core, started now if it was not - the window-thread
+        surface in the place of one that could not start."""
+        if self.video.mpv is None:
+            self.video.show()
+            QApplication.instance().processEvents()
+            ensure = getattr(self.video, "ensure_started", None)
+            if ensure is not None:
+                ensure()
+            if self.video.mpv is None and self._video_swapped:
+                # The threaded surface could not start: the window-thread
+                # one took its place (_video_fallback) and starts now.
+                self._video_swapped = False
                 self.video.show()
                 QApplication.instance().processEvents()
-                ensure = getattr(self.video, "ensure_started", None)
-                if ensure is not None:
-                    ensure()
-                if self.video.mpv is None and self._video_swapped:
-                    # The threaded surface could not start: the window-thread
-                    # one took its place (_video_fallback) and starts now.
-                    self._video_swapped = False
-                    self.video.show()
-                    QApplication.instance().processEvents()
-            if self.video.mpv is None:
-                raise RuntimeError("OpenGL context not ready")
-            m = self.video.mpv
-            # A web page's file had options of its own: it ends first, so
-            # that mpv does not put them back over what is set below.
-            if self._own_file_options:
-                self._own_file_options = False
-                end_file_options(m)
-            # Re-enable mpv's video output in case a previous stop() set it
-            # to "no" - without this the stream would play with audio only.
-            # Also reset the audio track to auto: picking a specific track
-            # earlier pins aid to that track *index*, and that index leaks into
-            # the next stream. Switching e.g. a movie -> a TV channel that has
-            # fewer/other audio tracks then selects a non-existent track and
-            # plays silent until a manual reload. Auto lets each new stream pick
-            # its own default (apply_default_options re-applies any language
-            # preference right after).
-            try:
-                m["vid"] = "auto"
-                m["aid"] = "auto"
-            except Exception:
-                pass
-            try:
-                m["force-media-title"] = title or "dopeIPTV"
-            except Exception:
-                pass
-            try:
-                m["cache"] = "yes"
-                m["cache-secs"] = float(self._cache_secs())
-            except Exception:
-                pass
-            try:
-                # The rewind buffer is in memory unless Settings put it on
-                # disk. mpv's disk cache is append-only - its hidden file grows
-                # 1-4 GB an hour for as long as a channel plays - so that is
-                # the user's choice, for a long rewind without the memory.
-                mpv_rewind = local_buffer and self._dvr is None
-                # Never on a disk for a private playback (core/privacy): its
-                # rewind stays in mpv's memory, at the memory's size.
-                on_disk = bool(mpv_rewind and self._live_rewind_disk()
-                               and not self._dvr_playing_private())
-                m["cache-on-disk"] = "yes" if on_disk else "no"
-                self._mpv_cache_on_disk = on_disk
-                m["demuxer-max-back-bytes"] = self._back_buffer(mpv_rewind, on_disk)
-            except Exception as e:
-                log.warning("live rewind buffer unavailable: %s", e)
-            # Decode mode, set per stream (not in apply_default_options - that
-            # also runs on every Settings save, and re-assigning hwdec
-            # mid-playback reinitialises the decoder and glitches the video). A
-            # changed setting takes effect on the next opened stream. The
-            # default is software ('no'); hardware is opt-in for those who want
-            # it, and DOPEIPTV_HWDEC still wins over the setting.
-            try:
-                m["hwdec"] = self._hwdec_base()
-            except Exception:
-                pass
-            self.apply_default_options(load=True, live=live)
-            # Night mode: on a core that has not had it yet (nothing at all
-            # is written while it is off and always was).
-            self._sync_night()
-            # Nerd: user agent, headers and proxy for this source (nothing
-            # while Nerd is off and never was; the defaults back once it was).
-            # For everyone: an internet source's stream through the app's
-            # bridge, and its certificate checked - or not opened at all
-            # (CertificateUnchecked, below).
-            try:
-                from ..core import live_latency, nerd
-                # A web page is no source's: not its proxy or headers; nor
-                # an address from outside its lists. Nor the bridge: a page
-                # of the person's own, which yt-dlp opens and resolves
-                # itself - played as it always was.
-                self._nerd_applied = nerd.apply_stream(
-                    m, None if web or outside else nerd.source(),
-                    getattr(self, "_nerd_applied", False),
-                    url=url, opened=source or url, guard=not web)
-                # Nerd: low latency for a live channel the player takes
-                # from the provider - not from the rewind buffer; anything
-                # else gets back what the last one changed.
-                live_latency.apply(m, live and source is None)
-                # Nerd: adaptive streams up to a picture size - the variant
-                # is chosen once mpv has opened the stream (core/hls_cap.py).
-                self._hls_cap = nerd.current().hls_cap()
-                if self._hls_cap.picks:
-                    self._watch_variants(m)
-                # Nerd: each channel's own audio delay (lip sync), as set
-                # for it last - in its settings, or for anything that is no
-                # channel under a key of its own; untouched while Nerd is
-                # off, but for the last stream's own delay, which is not
-                # this one's.
-                self._delay_key = self._delay_chan = None
-                if channel_prefs.delay_enabled():
-                    if chan:
-                        self._delay_chan = chan
-                        value = channel_prefs.delay(self._chan_own.get("adelay"))
-                    else:
-                        self._delay_key = _delay_key(buffer_key or url)
-                        value = float(self._settings.value(self._delay_key, 0)
-                                      or 0) if self._settings else 0.0
-                    m["audio-delay"] = value
-                    self._delay_set = bool(value)
-                elif self._delay_set:
-                    m["audio-delay"] = 0.0
-                    self._delay_set = False
-            except CertificateUnchecked:
-                raise
-            except Exception as e:
-                log.debug("nerd stream options: %s", e)
-            # Remembered per-title track choices (resume): set before load,
-            # exactly like the multiview cells do - mpv keeps a sid/aid set
-            # while loading and selects that track once the file's tracks are
-            # known. One-shot: consumed here so the next stream starts clean.
-            pref_aid, pref_sid = self._pref_aid, self._pref_sid
-            self._pref_aid = self._pref_sid = None
-            try:
-                if pref_aid is not None:
-                    m["aid"] = int(pref_aid)
-                if pref_sid == "no":
-                    # Off for this title: on a film the track chosen at
-                    # the start stays, hidden (_sub_defaults).
-                    self._sub_rule = None
-                    if live:
-                        m["sid"] = "no"
-                    else:
-                        m["sub-visibility"] = False
-                elif pref_sid is not None:
-                    self._sub_rule = None
-                    m["sid"] = int(pref_sid)
-                    m["sub-visibility"] = True
-            except Exception as e:
-                log.debug("track prefs (aid=%r sid=%r) failed: %s",
-                          pref_aid, pref_sid, e)
-            # A subtitle fetched or picked for this title before. Through
-            # change-list: a path is one item whatever characters it holds,
-            # where the option's own string form splits on the separator.
-            sub_files, self._pref_sub_files = self._pref_sub_files, []
-            try:
-                m.command("change-list", "sub-files", "clr", "")
-                for path in sub_files:
-                    m.command("change-list", "sub-files", "append",
-                              _subtitle_to_load(path))
-                if sub_files:
-                    # Chosen for this title on purpose: shown, whatever the
-                    # default subtitle mode says (mpv prefers an external
-                    # track when it picks one).
-                    self._sub_rule = None
-                    m["sid"] = "auto"
-                    _set_forced_only(m, False)
-                    m["sub-visibility"] = True
-            except Exception as e:
-                log.debug("sub-files %r failed: %s", for_log(sub_files), e)
-            try:
-                # While muted the slider reads 0. Sending that as the volume
-                # would leave the stream silent even after unmuting, since mute
-                # is a separate flag and clearing it can't restore a zero
-                # volume - so start from the real, pre-mute level.
-                level = (getattr(self, "_vol_before_mute", None)
-                         if self._muted else None)
-                m["volume"] = float(self.vol.value() if level is None
-                                    else level)
-                m["mute"] = self._muted
-            except Exception:
-                pass
-            self._quiet_output(m, reload=False)
-            self._sync_pause_label(False)
-            try:
-                m.pause = False
-            except Exception:
-                pass
-            # Resume playback at a saved offset (in seconds) via mpv's start
-            # option; reset it otherwise so it doesn't leak to the next file.
-            try:
-                m["start"] = str(float(start)) if start and start > 1 else "none"
-            except Exception:
-                pass
-            try:
-                self._arm_stream_info(m, source or url)
-            except Exception as e:
-                log.debug("Stream info unavailable: %s", e)
-            # Whether it is sound alone - known once mpv lists its tracks.
-            # Only read here: the window draws the visualiser for it.
-            try:
-                self._ao_arm(m, source or url)
-            except Exception as e:
-                log.debug("audio-only check unavailable: %s", e)
-            # The loading indicator: from this load's start-file to its
-            # playback-restart (media/loading_overlay.py). Never raises.
-            self._ld_hook(m)
-            self._ld_begin(title, loading_art)
-            rtsp_opts = {} if web or source else rtsp_file_options(url)
-            if web:
-                self._own_file_options = load_with_options(m, url, WEB_FILE_OPTIONS)
-            elif rtsp_opts:
-                self._own_file_options = load_with_options(m, url, rtsp_opts)
-            else:
-                m.play(source or url)
-            self.current_url = url
-            # Unpause AGAIN, after the load. keep-open=yes pauses mpv when a
-            # file ends, and that pause is PLAYER state, not file state: it
-            # survives loading the next one. Clearing it before the load (as
-            # above) is not enough, because mpv is still sitting at the old
-            # file's end and re-asserts it - which is why autoplay put the
-            # next episode on screen and left it standing still.
-            self._user_paused = False
-            try:
-                m.pause = False
-            except Exception:
-                pass
-            self._play_gen = getattr(self, "_play_gen", 0) + 1
-            gen = self._play_gen
-            for delay in (250, 900):
-                QTimer.singleShot(
-                    delay, lambda g=gen: self._ensure_unpaused(g))
-            self._pos_timer.start()
-            # Safety net for the "silent until you replay it" case: switching
-            # streams while the previous one tears down can land with no audio
-            # track selected even though aid=auto. Re-check shortly after load
-            # and force the first audio track if none is active.
-            for delay in (500, 1500):
-                QTimer.singleShot(delay, self._ensure_audio_selected)
-            return True
-        except CertificateUnchecked as e:
-            # The stream's certificate is to be checked and this core will
-            # not: not opened, and the stream before it ends too - never a
-            # stream played unchecked in its place.
-            log.warning("play: %s - its certificate cannot be checked here, not opened (%s)",
-                        url_for_log(url), e)
-            self.refusal = tr("player_tls_unverifiable")
-            try:
-                if self.video.mpv is not None:
-                    self.video.mpv.command("stop")
-            except Exception as stop_err:
-                log.debug("play: the stream before not stopped: %s", stop_err)
-            self.current_url = None
-            self._reset_stream_info()
-            self._ao_reset()
-            self._ld_clear()
-            self._end_dvr()
-            return False
+        if self.video.mpv is None:
+            raise RuntimeError("OpenGL context not ready")
+        return self.video.mpv
+
+    def _play_base_options(self, m, title: str, local_buffer: bool) -> None:
+        """What every stream starts with: the last web page's options ended,
+        picture and sound tracks on auto, its title, mpv's cache and rewind
+        (never on a disk for a private playback), the decoder."""
+        # A web page's file had options of its own: it ends first, so
+        # that mpv does not put them back over what is set below.
+        if self._own_file_options:
+            self._own_file_options = False
+            end_file_options(m)
+        # Re-enable mpv's video output in case a previous stop() set it
+        # to "no" - without this the stream would play with audio only.
+        # Also reset the audio track to auto: picking a specific track
+        # earlier pins aid to that track *index*, and that index leaks into
+        # the next stream. Switching e.g. a movie -> a TV channel that has
+        # fewer/other audio tracks then selects a non-existent track and
+        # plays silent until a manual reload. Auto lets each new stream pick
+        # its own default (apply_default_options re-applies any language
+        # preference right after).
+        try:
+            m["vid"] = "auto"
+            m["aid"] = "auto"
+        except Exception:
+            pass
+        try:
+            m["force-media-title"] = title or "dopeIPTV"
+        except Exception:
+            pass
+        try:
+            m["cache"] = "yes"
+            m["cache-secs"] = float(self._cache_secs())
+        except Exception:
+            pass
+        try:
+            # The rewind buffer is in memory unless Settings put it on
+            # disk. mpv's disk cache is append-only - its hidden file grows
+            # 1-4 GB an hour for as long as a channel plays - so that is
+            # the user's choice, for a long rewind without the memory.
+            mpv_rewind = local_buffer and self._dvr is None
+            # Never on a disk for a private playback (core/privacy): its
+            # rewind stays in mpv's memory, at the memory's size.
+            on_disk = bool(mpv_rewind and self._live_rewind_disk()
+                           and not self._dvr_playing_private())
+            m["cache-on-disk"] = "yes" if on_disk else "no"
+            self._mpv_cache_on_disk = on_disk
+            m["demuxer-max-back-bytes"] = self._back_buffer(mpv_rewind, on_disk)
         except Exception as e:
-            log.error("Embedded playback failed: %s: %s", type(e).__name__, e)
-            self.current_url = None
-            self._reset_stream_info()
-            self._ao_reset()
-            self._ld_clear()
-            self._end_dvr()
-            return False
+            log.warning("live rewind buffer unavailable: %s", e)
+        # Decode mode, set per stream (not in apply_default_options - that
+        # also runs on every Settings save, and re-assigning hwdec
+        # mid-playback reinitialises the decoder and glitches the video). A
+        # changed setting takes effect on the next opened stream. The
+        # default is software ('no'); hardware is opt-in for those who want
+        # it, and DOPEIPTV_HWDEC still wins over the setting.
+        try:
+            m["hwdec"] = self._hwdec_base()
+        except Exception:
+            pass
+
+    def _play_nerd(self, m, url: str, source: str | None, chan, buffer_key: str | None,
+                   live: bool, web: bool, outside: bool) -> None:
+        """Nerd's and the way out: user agent, headers and proxy for this
+        source, an internet stream through the app's bridge with its
+        certificate checked (CertificateUnchecked goes up), low latency,
+        an adaptive stream's cap, the channel's own audio delay."""
+        # Nerd: user agent, headers and proxy for this source (nothing
+        # while Nerd is off and never was; the defaults back once it was).
+        # For everyone: an internet source's stream through the app's
+        # bridge, and its certificate checked - or not opened at all
+        # (CertificateUnchecked, below).
+        try:
+            from ..core import live_latency, nerd
+            # A web page is no source's: not its proxy or headers; nor
+            # an address from outside its lists. Nor the bridge: a page
+            # of the person's own, which yt-dlp opens and resolves
+            # itself - played as it always was.
+            self._nerd_applied = nerd.apply_stream(
+                m, None if web or outside else nerd.source(),
+                getattr(self, "_nerd_applied", False),
+                url=url, opened=source or url, guard=not web)
+            # Nerd: low latency for a live channel the player takes
+            # from the provider - not from the rewind buffer; anything
+            # else gets back what the last one changed.
+            live_latency.apply(m, live and source is None)
+            # Nerd: adaptive streams up to a picture size - the variant
+            # is chosen once mpv has opened the stream (core/hls_cap.py).
+            self._hls_cap = nerd.current().hls_cap()
+            if self._hls_cap.picks:
+                self._watch_variants(m)
+            # Nerd: each channel's own audio delay (lip sync), as set
+            # for it last - in its settings, or for anything that is no
+            # channel under a key of its own; untouched while Nerd is
+            # off, but for the last stream's own delay, which is not
+            # this one's.
+            self._delay_key = self._delay_chan = None
+            if channel_prefs.delay_enabled():
+                if chan:
+                    self._delay_chan = chan
+                    value = channel_prefs.delay(self._chan_own.get("adelay"))
+                else:
+                    self._delay_key = _delay_key(buffer_key or url)
+                    value = float(self._settings.value(self._delay_key, 0)
+                                  or 0) if self._settings else 0.0
+                m["audio-delay"] = value
+                self._delay_set = bool(value)
+            elif self._delay_set:
+                m["audio-delay"] = 0.0
+                self._delay_set = False
+        except CertificateUnchecked:
+            raise
+        except Exception as e:
+            log.debug("nerd stream options: %s", e)
+
+    def _play_tracks(self, m, live: bool) -> None:
+        """The tracks and subtitles kept for this title (one-shot)."""
+        # Remembered per-title track choices (resume): set before load,
+        # exactly like the multiview cells do - mpv keeps a sid/aid set
+        # while loading and selects that track once the file's tracks are
+        # known. One-shot: consumed here so the next stream starts clean.
+        pref_aid, pref_sid = self._pref_aid, self._pref_sid
+        self._pref_aid = self._pref_sid = None
+        try:
+            if pref_aid is not None:
+                m["aid"] = int(pref_aid)
+            if pref_sid == "no":
+                # Off for this title: on a film the track chosen at
+                # the start stays, hidden (_sub_defaults).
+                self._sub_rule = None
+                if live:
+                    m["sid"] = "no"
+                else:
+                    m["sub-visibility"] = False
+            elif pref_sid is not None:
+                self._sub_rule = None
+                m["sid"] = int(pref_sid)
+                m["sub-visibility"] = True
+        except Exception as e:
+            log.debug("track prefs (aid=%r sid=%r) failed: %s",
+                      pref_aid, pref_sid, e)
+        # A subtitle fetched or picked for this title before. Through
+        # change-list: a path is one item whatever characters it holds,
+        # where the option's own string form splits on the separator.
+        sub_files, self._pref_sub_files = self._pref_sub_files, []
+        try:
+            m.command("change-list", "sub-files", "clr", "")
+            for path in sub_files:
+                m.command("change-list", "sub-files", "append",
+                          _subtitle_to_load(path))
+            if sub_files:
+                # Chosen for this title on purpose: shown, whatever the
+                # default subtitle mode says (mpv prefers an external
+                # track when it picks one).
+                self._sub_rule = None
+                m["sid"] = "auto"
+                _set_forced_only(m, False)
+                m["sub-visibility"] = True
+        except Exception as e:
+            log.debug("sub-files %r failed: %s", for_log(sub_files), e)
+
+    def _play_sound(self, m) -> None:
+        """The volume - the real level while muted - mute, the sound output,
+        and not paused."""
+        try:
+            # While muted the slider reads 0. Sending that as the volume
+            # would leave the stream silent even after unmuting, since mute
+            # is a separate flag and clearing it can't restore a zero
+            # volume - so start from the real, pre-mute level.
+            level = (getattr(self, "_vol_before_mute", None)
+                     if self._muted else None)
+            m["volume"] = float(self.vol.value() if level is None
+                                else level)
+            m["mute"] = self._muted
+        except Exception:
+            pass
+        self._quiet_output(m, reload=False)
+        self._sync_pause_label(False)
+        try:
+            m.pause = False
+        except Exception:
+            pass
+
+    def _play_load(self, m, url: str, title: str, start: float, source: str | None,
+                   web: bool, loading_art) -> None:
+        """Where it starts, what watches it (stream information, sound
+        alone, the loading indicator), the load itself - a web page's and
+        an RTSP stream's with their own options - and unpaused again."""
+        # Resume playback at a saved offset (in seconds) via mpv's start
+        # option; reset it otherwise so it doesn't leak to the next file.
+        try:
+            m["start"] = str(float(start)) if start and start > 1 else "none"
+        except Exception:
+            pass
+        try:
+            self._arm_stream_info(m, source or url)
+        except Exception as e:
+            log.debug("Stream info unavailable: %s", e)
+        # Whether it is sound alone - known once mpv lists its tracks.
+        # Only read here: the window draws the visualiser for it.
+        try:
+            self._ao_arm(m, source or url)
+        except Exception as e:
+            log.debug("audio-only check unavailable: %s", e)
+        # The loading indicator: from this load's start-file to its
+        # playback-restart (media/loading_overlay.py). Never raises.
+        self._ld_hook(m)
+        self._ld_begin(title, loading_art)
+        rtsp_opts = {} if web or source else rtsp_file_options(url)
+        if web:
+            self._own_file_options = load_with_options(m, url, WEB_FILE_OPTIONS)
+        elif rtsp_opts:
+            self._own_file_options = load_with_options(m, url, rtsp_opts)
+        else:
+            m.play(source or url)
+        self.current_url = url
+        # Unpause AGAIN, after the load. keep-open=yes pauses mpv when a
+        # file ends, and that pause is PLAYER state, not file state: it
+        # survives loading the next one. Clearing it before the load (as
+        # above) is not enough, because mpv is still sitting at the old
+        # file's end and re-asserts it - which is why autoplay put the
+        # next episode on screen and left it standing still.
+        self._user_paused = False
+        try:
+            m.pause = False
+        except Exception:
+            pass
+        self._play_gen = getattr(self, "_play_gen", 0) + 1
+        gen = self._play_gen
+        for delay in (250, 900):
+            QTimer.singleShot(
+                delay, lambda g=gen: self._ensure_unpaused(g))
+        self._pos_timer.start()
+        # Safety net for the "silent until you replay it" case: switching
+        # streams while the previous one tears down can land with no audio
+        # track selected even though aid=auto. Re-check shortly after load
+        # and force the first audio track if none is active.
+        for delay in (500, 1500):
+            QTimer.singleShot(delay, self._ensure_audio_selected)
 
     def nerd_reapply(self) -> dict[str, list[str]] | None:
         """Nerd's settings changed while this player's core plays: onto the

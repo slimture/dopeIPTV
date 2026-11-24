@@ -251,7 +251,9 @@ def test_the_player_plays_a_private_channel_without_a_buffer_and_never_mpvs_on_d
     from dopeiptv.media import dvr_player, embedded
     src = inspect.getsource(dvr_player.DvrPlayerMixin._dvr_start)
     assert "NoPrivateBuffer" in src and "return None" in src
-    src = inspect.getsource(embedded.EmbeddedPlayer.play)
+    # play()'s step that sets mpv's cache and rewind for each stream.
+    src = inspect.getsource(embedded.EmbeddedPlayer._play_base_options)
+    assert "self._play_base_options(" in inspect.getsource(embedded.EmbeddedPlayer.play)
     assert "not self._dvr_playing_private()" in src
     assert 'm["cache-on-disk"] = "yes" if on_disk else "no"' in src
     assert "self._mpv_cache_on_disk = on_disk" in src
