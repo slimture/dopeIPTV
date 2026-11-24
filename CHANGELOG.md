@@ -154,6 +154,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   recording?", another channel while one records and "Delete download?" it
   answers the safe choice (keep recording, keep watching, Cancel), the one
   TV mode's question opens on too. Stop and Delete take a click.
+- Every source: moving from row to row of another source is quick on a
+  very large guide. Each row picked read that source's whole guide from
+  disk again for its descriptions - about a second a row with tens of
+  thousands of channels. The guide is now read once per copy on disk and
+  its programmes kept beside it a channel at a time (`<guide>.texts`,
+  providers/epg_texts.py): a row reads its own channel's alone, in well
+  under a millisecond, and a later session finds them there.
 
 ### Fixed
 

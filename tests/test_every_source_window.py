@@ -262,6 +262,11 @@ assert w.now_title.text() == "Nordic Show", w.now_title.text()
 settle(lambda: w.now_desc.text().startswith("Nordic Show tonight"), what="the programme's words")
 assert list((w._sa_sources._texts.get("b") or {})) == [es.play_key("b", 8)]
 assert all(not d for d in w._xs_tables["b"].schedule(vegas)[3])    # the list's table keeps none
+# Its guide written down a channel at a time beside its copy, for the rows
+# picked next (providers/epg_texts.py).
+from dopeiptv.providers import epg_texts
+settle(lambda: os.path.exists(epg_texts.path_for(epgmod.epg_cache_path("b"))),
+       what="Nordic's guide written down")
 assert epgmod.epg_cache_path("b") not in downloads, downloads
 # Its tooltip says where it is from.
 from PyQt6.QtCore import QEvent

@@ -113,8 +113,9 @@ def shared_there(doc: dict[str, Any]) -> set[str]:
 
 
 def drop_source_files(pid: str) -> None:
-    """What a source tried and never kept left in the cache: its guide and
-    its index, its lists, a playlist's id map (core/m3u_ids.py)."""
+    """What a source tried and never kept left in the cache: its guide, its
+    index and its texts (providers/epg_texts.py), its lists, a playlist's id
+    map (core/m3u_ids.py)."""
     from ..core.source_files import file_part
     from ..providers.epg import _epg_cache_dir
     try:
@@ -122,8 +123,8 @@ def drop_source_files(pid: str) -> None:
         part = file_part(pid)
     except Exception:
         return
-    for name in (f"epg_{part}.xml", f"epg_{part}.xml.idx", f"lists_{part}.json",
-                 f"m3u_ids_{part}.json"):
+    for name in (f"epg_{part}.xml", f"epg_{part}.xml.idx", f"epg_{part}.xml.texts",
+                 f"lists_{part}.json", f"m3u_ids_{part}.json"):
         try:
             os.remove(d / name)
         except OSError:

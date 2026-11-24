@@ -167,6 +167,16 @@ Fixed, each with a test that fails without it:
 - **The image cache walked twice.** The window's logos and posters share one
   disk cache and each loader walked all of it five seconds after the start.
   Once per folder now. (`tests/test_memory.py`)
+- **Every source read a whole guide for each row's descriptions.** A row of
+  another source picked had that source's guide loaded from its index again
+  for its programmes' words: 1.1-1.3 s a row on 20 000 channels x 50
+  programmes (405 MB of XMLTV, a 59 MB index). The guide is read once per
+  copy and written down a channel at a time beside it
+  (`providers/epg_texts.py`, 77 MB, about 3 s on a thread of its own while
+  rows are read from the guide still in memory); a row then reads its own
+  block: 0.1 ms, at most 0.6 ms, and a later session's first row 0.1 s.
+  Memory as before - the guide's load is the peak - and 4 MB for the table
+  after. (`tests/test_epg_texts.py`)
 
 Found, and left - with why:
 

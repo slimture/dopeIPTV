@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 import zlib
 from array import array
 from bisect import bisect_left, bisect_right
+from collections.abc import Container, Mapping
 from datetime import date, datetime
 from itertools import chain
 from pathlib import Path
@@ -57,6 +58,10 @@ _TEXTS_PER_SLICE = 4096
 _INDEX_SUFFIX = ".idx"
 #: The pickled index of an app up to 1.6.8, beside the guide: deleted.
 _OLD_INDEX_SUFFIX = ".pkl"
+#: Beside the guide too: its programmes with their descriptions a channel
+#: at a time (providers/epg_texts.py), and that file while it is written.
+TEXTS_SUFFIX = ".texts"
+_TEXTS_PART = TEXTS_SUFFIX + ".part"
 
 # The command line that makes the app a guide parser (see index_main).
 INDEX_FLAG = "--epg-index"
@@ -197,6 +202,19 @@ def normalize_name(s: str | None) -> str:
     return "".join(c for c in (s or "").lower() if c.isalnum())
 
 
+def channel_key(item: Mapping[str, Any], ids: Container[str],
+                by_name: Mapping[str, str]) -> str | None:
+    """The guide's channel of *item* (a list's row): its epg_channel_id when
+    the guide has that channel (*ids*), else the one its name's normalised
+    form names - None without either. XmltvGuide.schedule's rule, and the
+    rule a guide's texts on disk find a row's by (providers/epg_texts.py)."""
+    cid = (item.get("epg_channel_id") or "").strip().lower()
+    if cid in ids:
+        return cid
+    named = by_name.get(normalize_name(item.get("name")))
+    return named if named is not None and named in ids else None
+
+
 def parse_xmltv_time(s: str | None) -> datetime | None:
     """Parse an XMLTV timestamp: YYYYMMDDHHMMSS [+-ZZZZ].
 
@@ -288,7 +306,8 @@ def prune_epg_caches(keep_ids) -> int:
     removed = 0
     for f in d.glob("epg_*.xml*"):
         name = f.name[4:]  # drop the "epg_" prefix
-        for suffix in (".xml" + _INDEX_SUFFIX, ".xml" + _OLD_INDEX_SUFFIX, ".xml"):
+        for suffix in (".xml" + _INDEX_SUFFIX, ".xml" + _OLD_INDEX_SUFFIX, ".xml" + _TEXTS_PART,
+                       ".xml" + TEXTS_SUFFIX, ".xml"):
             if name.endswith(suffix):
                 pid = name[:-len(suffix)]
                 break
@@ -775,7 +794,8 @@ class XmltvGuide:
         forget the loaded guide, so the next load re-fetches from the provider.
         Backs Settings' 'Clear EPG cache' - useful when a guide went stale or
         a provider changed its XMLTV."""
-        for p in (self.cache_path, self._index_path(), self._index_path(_OLD_INDEX_SUFFIX)):
+        for p in (self.cache_path, self._index_path(), self._index_path(_OLD_INDEX_SUFFIX),
+                  self._index_path(TEXTS_SUFFIX)):
             try:
                 if p is not None and p.exists():
                     p.unlink()
@@ -1101,14 +1121,16 @@ class XmltvGuide:
         loaded."""
         return self._sched_for(item) if self._loaded else None
 
+    def tables(self) -> tuple[dict[str, Schedule], dict[str, str]]:
+        """The guide in memory as it is kept - (schedules by channel id,
+        channel id by normalised name) -, nothing loaded: to be read, never
+        changed (providers/epg_texts.py writes its texts down from them)."""
+        return self._by_id, self._by_name
+
     def _sched_for(self, item: dict) -> tuple[array, array, tuple, tuple] | None:
-        cid = (item.get("epg_channel_id") or "").strip().lower()
-        sched = self._by_id.get(cid)
-        if sched is None:
-            name_cid = self._by_name.get(normalize_name(item.get("name")))
-            if name_cid is not None:
-                sched = self._by_id.get(name_cid)
-        return sched
+        by_id = self._by_id
+        cid = channel_key(item, by_id, self._by_name)
+        return None if cid is None else by_id.get(cid)
 
     @staticmethod
     def _entry(sched: tuple, i: int) -> dict:
