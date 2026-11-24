@@ -280,6 +280,53 @@ def _install_crash_hooks() -> None:
         _crash_target = target
 
 
+#: How long the window's thread may go without answering before the debug
+#: log says where it is (_watch_stalls), and how often that is looked at.
+STALL_S = 3.0
+STALL_LOOK_S = 1.0
+
+
+def _watch_stalls(app, stall_s: float = STALL_S, every: float = STALL_LOOK_S) -> bool:
+    """With DOPEIPTV_LOG=debug only: when the window's thread has not
+    answered for *stall_s* (GNOME's spinning pointer, a window that takes no
+    clicks), the log says where that thread is - its stack, code lines
+    only, no values - once per stall. A daemon thread that only reads; off
+    unless debugging. Whether it was started."""
+    import logging
+    if not log.isEnabledFor(logging.DEBUG):
+        return False
+    import threading
+    import time
+    import traceback
+    beat = [time.monotonic()]
+    timer = QTimer(app)
+    timer.setInterval(max(50, int(every * 500)))
+    timer.timeout.connect(lambda: beat.__setitem__(0, time.monotonic()))
+    timer.start()
+    app._dopeiptv_stall_timer = timer          # kept alive with the app
+    main_id = threading.main_thread().ident
+
+    def watch() -> None:
+        told = 0.0
+        while True:
+            time.sleep(every)
+            try:
+                last = beat[0]
+                gap = time.monotonic() - last
+                if gap < stall_s or last == told:
+                    continue
+                told = last
+                frame = sys._current_frames().get(main_id) if main_id else None
+                stack = "".join(traceback.format_stack(frame)) if frame is not None else "?"
+                log.debug("stall: the window's thread has not answered for %.1f s, at:\n%s",
+                          gap, stack)
+            except Exception:
+                pass                    # a diagnosis never stands in the way
+
+    threading.Thread(target=watch, name="dopeiptv-stall-watch", daemon=True).start()
+    return True
+
+
 def _watch_link_events(app, window) -> None:
     """macOS hands a dopeiptv:// link to a running app as an event, not on
     the command line. Elsewhere no such event ever comes, and a filter on
@@ -773,6 +820,7 @@ def main() -> int:
     w._server_apply()
     w._events_apply(started=True)
     _watch_link_events(app, w)
+    _watch_stalls(app)
     if command is not None:
         # After the window and its source are up: a channel needs its list.
         QTimer.singleShot(1500, lambda: w.handle_command(command))

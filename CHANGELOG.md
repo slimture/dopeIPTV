@@ -138,6 +138,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   for Mine's favourites of every source, as it does for History. Read on
   Mine's own worker, so thousands of favourites keep the window quick.
 
+### Changed
+
+- With `DOPEIPTV_LOG=debug` the log says where the window's thread is when
+  it has not answered for 3 seconds (the desktop's spinning pointer), and
+  the cast window's search says how many Chromecasts it found, as it does
+  for DLNA TVs and Kodi.
+
 ### Fixed
 
 - The first-run guide could lose the keyboard to the channel list behind it

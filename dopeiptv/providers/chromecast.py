@@ -528,6 +528,9 @@ class ChromecastManager:
             self.devices = list(devices)
             self._hosted = []
             self._add_hosts()
+            # As the DLNA and Kodi searches say theirs: how many, no names.
+            log.info("cast: %d Chromecast(s) on the network%s", len(devices),
+                     f" (+{len(self._hosted)} by address)" if self._hosted else "")
             # A running cast survives all this: the receiver plays the stream
             # by itself, so dropping the sender socket does not stop the TV.
             # Re-point 'active' at the freshly discovered object with the same
