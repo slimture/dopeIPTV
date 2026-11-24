@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from ..i18n import tr
 from .theme import P
+from .widgets import WhileShown
 
 
 def fmt_countdown(secs: int) -> str:
@@ -87,7 +88,10 @@ class RemindersDialog(QDialog):
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
-        self._timer.start()
+        # While it is open only: started with the window, it had counted
+        # down in a closed one once a second for the rest of the session -
+        # one more ticker each time it was opened (docs/PERFORMANCE.md).
+        WhileShown(self, self._timer)
 
     def _rebuild(self) -> None:
         self.list.clear()

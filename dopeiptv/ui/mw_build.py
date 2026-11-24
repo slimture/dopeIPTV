@@ -34,7 +34,7 @@ from .channel_list import (
 from .mw_build_detail import _BuildDetailMixin
 from .nav_widgets import NavButton, PlacesFold, PlacesLayout, SideRule, SourceAvatar, SourceLabel
 from .theme import P
-from .widgets import HeartButton, _SidebarLogo
+from .widgets import HeartButton, WhileShown, _SidebarLogo
 
 
 class _BuildMixin(_BuildDetailMixin):
@@ -802,12 +802,16 @@ class _BuildMixin(_BuildDetailMixin):
         self.tick.timeout.connect(self._refresh_progress)
         self.tick.start(60_000)
 
-        # Keep the timeshift live-timeline marker current (no-op unless a
-        # timeshift channel is on screen).
+        # Keep the timeshift live-timeline marker current - only while the
+        # timeline is on screen: it does nothing else, and running always
+        # it woke the idle app once a second (docs/PERFORMANCE.md).
         self._ts_segment_start = None
         self._ts_timeline_timer = QTimer(self)
+        self._ts_timeline_timer.setInterval(1000)
         self._ts_timeline_timer.timeout.connect(self._update_ts_timeline)
-        self._ts_timeline_timer.start(1000)
+        timeline = getattr(getattr(self, "player", None), "ts_timeline", None)
+        if timeline is not None:
+            WhileShown(timeline, self._ts_timeline_timer, self._update_ts_timeline)
 
         # Poll EPG reminders so one fires close to its programme's start.
         self._reminder_timer = QTimer(self)
