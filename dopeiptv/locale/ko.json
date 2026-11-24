@@ -3357,5 +3357,6 @@
   "offline_mark": "오프라인",
   "offline_none": "이 소스에서 다운로드한 항목이 없습니다",
   "offline_search": "오프라인 – 다운로드한 항목에서 검색",
-  "rec_reason_no_network": "네트워크 없음"
+  "rec_reason_no_network": "네트워크 없음",
+  "onb_err_no_network": "지금은 네트워크가 없습니다. 이 컴퓨터를 네트워크에 연결한 뒤 다시 시도하세요."
 }

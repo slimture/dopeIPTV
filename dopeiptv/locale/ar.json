@@ -3357,5 +3357,6 @@
   "offline_mark": "دون اتصال",
   "offline_none": "لم يُنزَّل شيء من هذا المصدر",
   "offline_search": "دون اتصال – البحث فيما نُزِّل",
-  "rec_reason_no_network": "لا توجد شبكة"
+  "rec_reason_no_network": "لا توجد شبكة",
+  "onb_err_no_network": "لا توجد شبكة الآن. صِل هذا الحاسوب بالشبكة ثم حاول مرة أخرى."
 }

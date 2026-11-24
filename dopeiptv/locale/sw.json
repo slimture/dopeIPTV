@@ -3357,5 +3357,6 @@
   "offline_mark": "Nje ya mtandao",
   "offline_none": "Hakuna kilichopakuliwa kutoka chanzo hiki",
   "offline_search": "Nje ya mtandao – inatafuta katika vilivyopakuliwa",
-  "rec_reason_no_network": "Hakuna mtandao"
+  "rec_reason_no_network": "Hakuna mtandao",
+  "onb_err_no_network": "Hakuna mtandao kwa sasa. Unganisha kompyuta hii na mtandao kisha ujaribu tena."
 }

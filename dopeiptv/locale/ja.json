@@ -3357,5 +3357,6 @@
   "offline_mark": "オフライン",
   "offline_none": "このソースからダウンロードしたものはありません",
   "offline_search": "オフライン – ダウンロード済みのものを検索",
-  "rec_reason_no_network": "ネットワークなし"
+  "rec_reason_no_network": "ネットワークなし",
+  "onb_err_no_network": "現在ネットワークがありません。このコンピューターをネットワークにつないでから、もう一度お試しください。"
 }

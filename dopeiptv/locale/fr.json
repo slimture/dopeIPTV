@@ -3357,5 +3357,6 @@
   "offline_mark": "Hors ligne",
   "offline_none": "Rien de cette source n'est téléchargé",
   "offline_search": "Hors ligne – recherche dans ce qui est téléchargé",
-  "rec_reason_no_network": "Pas de réseau"
+  "rec_reason_no_network": "Pas de réseau",
+  "onb_err_no_network": "Il n'y a pas de réseau pour le moment. Connectez cet ordinateur au réseau et réessayez."
 }

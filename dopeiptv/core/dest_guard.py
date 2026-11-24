@@ -300,6 +300,10 @@ def redirect_refusal(origin: str, target: str, resolve: bool = True) -> str:
     into the home network (but to the same host again); to this computer or
     a link-local host only from an address that was that very kind. By the
     name as written and - with *resolve* - by what it resolves to now."""
+    from . import offline
+    gone = offline.refusal(target)
+    if gone:
+        return gone                     # offline mode: not even looked up
     try:
         t = urlsplit(target)
         o = urlsplit(origin)

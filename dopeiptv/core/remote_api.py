@@ -428,10 +428,13 @@ def play_refusal(url: str, resolve: Callable[[str], list[str]] | None = None) ->
     AceStream's engine on this computer (127.0.0.1:6878/ace/) is the one
     address of this computer played, as from a playlist. Never on the
     window's thread: a name is looked up."""
-    from . import dest_guard, stream_address
+    from . import dest_guard, offline, stream_address
     text = str(url or "").strip()
     if stream_address.acestream(text):
         return ""
+    gone = offline.stream_refusal(text)
+    if gone:
+        return gone                     # offline mode: not even looked up
     try:
         parts = urlsplit(text)
         host = (parts.hostname or "").rstrip(".")

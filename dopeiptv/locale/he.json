@@ -3357,5 +3357,6 @@
   "offline_mark": "לא מקוון",
   "offline_none": "שום דבר מהמקור הזה לא הורד",
   "offline_search": "לא מקוון – חיפוש במה שהורד",
-  "rec_reason_no_network": "אין רשת"
+  "rec_reason_no_network": "אין רשת",
+  "onb_err_no_network": "אין רשת כרגע. חברו את המחשב הזה לרשת ונסו שוב."
 }

@@ -3357,5 +3357,6 @@
   "offline_mark": "Çevrimdışı",
   "offline_none": "Bu kaynaktan hiçbir şey indirilmedi",
   "offline_search": "Çevrimdışı – indirilenlerde aranıyor",
-  "rec_reason_no_network": "Ağ yok"
+  "rec_reason_no_network": "Ağ yok",
+  "onb_err_no_network": "Şu anda ağ yok. Bu bilgisayarı ağa bağlayıp yeniden deneyin."
 }

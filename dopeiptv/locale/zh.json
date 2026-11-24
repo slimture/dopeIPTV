@@ -3357,5 +3357,6 @@
   "offline_mark": "离线",
   "offline_none": "此来源没有已下载的内容",
   "offline_search": "离线 – 正在搜索已下载的内容",
-  "rec_reason_no_network": "没有网络"
+  "rec_reason_no_network": "没有网络",
+  "onb_err_no_network": "现在没有网络。请将这台电脑连接到网络后再试一次。"
 }

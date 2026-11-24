@@ -2844,6 +2844,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "offline_mark": {"en": "Offline"},
     "offline_none": {"en": "Nothing of this source is downloaded"},
     "offline_search": {"en": "Offline – searching what is downloaded"},
+    "onb_err_no_network": {"en": "There is no network right now. Connect this computer to the network and try again."},
     "rec_place_empty": {"en": "No recordings yet. Right-click a channel, or a programme in the guide, and choose Record."},
     "rec_when_today": {"en": "Today {time}"},
     "rec_when_yesterday": {"en": "Yesterday {time}"},

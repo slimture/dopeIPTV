@@ -847,6 +847,29 @@ Delete download removes the file, its sidecar and its poster.
 person chooses its folder. An HLS film cannot be carried on where it was
 cut: a pause or a cut starts it again.
 
+### Offline mode keeps the app off the internet - not the system
+
+While offline mode is on (`core/offline.py`) the app's own requests, the
+connections the bridge opens for the programs it starts, webhooks, MQTT,
+Test connection and Nerd's checks go only to this computer, a link-local
+host, the home network or a multicast group: judged by the host as
+written in any spelling and again on the socket, before a byte is sent; a
+public name is refused without being looked up, unless the person gave it
+(a source's own server), which is then judged by every address it
+resolves to (`tests/test_security_rules.py` holds every way out). The sidecar
+now keeps a category's own name too (a kids profile's lists judge it
+offline), and a series' known episodes are kept in the app's cache - id,
+season, number and title - for a series' page offline, never while
+viewing privately.
+
+Not covered: a home name (one without a dot, or with a home ending) is
+looked up by the system's resolver, which may ask a DNS server outside;
+what the system, the desktop or another program sends is theirs; a
+Chromecast or a TV cast to fetches what it plays itself; and detection is
+the system's word (Qt's QNetworkInformation) - offline mode by itself
+starts only once the system says there is no network, so in the seconds
+before it the app may still try.
+
 ### Logins are in the settings files, not a keyring
 
 Every login and token is in Qt's settings, as plain text, in files only

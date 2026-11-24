@@ -140,6 +140,9 @@ def reason(e: BaseException, kind: str = "") -> str:
         # notices mask them (an address its host alone, no login).
         return for_people(e.localized())
     exc = requests.exceptions
+    from ..core import offline
+    if isinstance(e, getattr(requests, "OfflineRefused", ())) or offline.no_network(e):
+        return tr("onb_err_no_network")
     if isinstance(e, exc.SSLError):
         return tr("diag_certificate") + " " + tr("onb_err_certificate_do")
     if isinstance(e, exc.Timeout):

@@ -3357,5 +3357,6 @@
   "offline_mark": "Offline",
   "offline_none": "Inget från den här källan är nedladdat",
   "offline_search": "Offline – söker i det nedladdade",
-  "rec_reason_no_network": "Inget nätverk"
+  "rec_reason_no_network": "Inget nätverk",
+  "onb_err_no_network": "Det finns inget nätverk just nu. Anslut datorn till nätverket och försök igen."
 }

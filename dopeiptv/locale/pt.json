@@ -3357,5 +3357,6 @@
   "offline_mark": "Offline",
   "offline_none": "Nada desta fonte foi baixado",
   "offline_search": "Offline – buscando no que foi baixado",
-  "rec_reason_no_network": "Sem rede"
+  "rec_reason_no_network": "Sem rede",
+  "onb_err_no_network": "No momento não há rede. Conecte este computador à rede e tente de novo."
 }

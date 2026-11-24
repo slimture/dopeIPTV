@@ -271,6 +271,11 @@ class ConnTest:
             dport = 8080
         # -- dns
         self._set("dns", RUN)
+        from . import offline
+        if offline.host_refusal(dhost, dport):
+            # Offline mode: nothing tried on the internet, said so.
+            self._set("dns", FAIL, "offline_needs_network", {}, 0, f"{dhost}: offline mode")
+            return False
         t0 = time.monotonic()
         family = {"ipv4": socket.AF_INET, "ipv6": socket.AF_INET6}.get(
             self._nerd.get("nerd_ip_family", "auto") if self._nerd.on else "auto", socket.AF_UNSPEC)

@@ -3357,5 +3357,6 @@
   "offline_mark": "Offline",
   "offline_none": "Von dieser Quelle ist nichts heruntergeladen",
   "offline_search": "Offline – Suche im Heruntergeladenen",
-  "rec_reason_no_network": "Kein Netzwerk"
+  "rec_reason_no_network": "Kein Netzwerk",
+  "onb_err_no_network": "Gerade gibt es kein Netzwerk. Verbinde diesen Computer mit dem Netzwerk und versuche es noch einmal."
 }

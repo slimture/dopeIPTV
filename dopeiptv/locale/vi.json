@@ -3357,5 +3357,6 @@
   "offline_mark": "Ngoại tuyến",
   "offline_none": "Chưa tải gì từ nguồn này",
   "offline_search": "Ngoại tuyến – đang tìm trong nội dung đã tải",
-  "rec_reason_no_network": "Không có mạng"
+  "rec_reason_no_network": "Không có mạng",
+  "onb_err_no_network": "Hiện không có mạng. Hãy kết nối máy tính này với mạng rồi thử lại."
 }

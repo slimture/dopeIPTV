@@ -30,6 +30,11 @@ os.environ["PYTHONUNBUFFERED"] = "1"
 # And a child that dies in Qt or mpv says where, instead of exiting with
 # nothing but a Qt warning on stderr (as on a Windows run).
 os.environ["PYTHONFAULTHANDLER"] = "1"
+# Offline mode by itself follows the system's word on the network
+# (core/offline.py): never this machine's in a test - a laptop on a train
+# would see every window offline. A test that wants it says a word of its
+# own (DOPEIPTV_NETWORK=disconnected) in its child's environment.
+os.environ["DOPEIPTV_NETWORK"] = "0"
 
 
 def pytest_collection_modifyitems(config, items):
@@ -66,6 +71,15 @@ def _collect_between_tests():
     yield
     _gen, _state["last_full"] = collect_due(
         _state["last_full"], time.monotonic(), full_every=10.0)
+
+
+@pytest.fixture(autouse=True)
+def _online_again():
+    """Offline mode is a process's state (core/offline.py): one a test
+    turned on never stays on for the next."""
+    yield
+    from dopeiptv.core import offline
+    offline.reset()
 
 
 @pytest.fixture(autouse=True)

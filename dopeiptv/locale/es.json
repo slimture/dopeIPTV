@@ -3357,5 +3357,6 @@
   "offline_mark": "Sin conexión",
   "offline_none": "No hay nada descargado de esta fuente",
   "offline_search": "Sin conexión – buscando en lo descargado",
-  "rec_reason_no_network": "Sin red"
+  "rec_reason_no_network": "Sin red",
+  "onb_err_no_network": "Ahora mismo no hay red. Conecta este equipo a la red y vuelve a intentarlo."
 }

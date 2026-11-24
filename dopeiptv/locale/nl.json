@@ -3357,5 +3357,6 @@
   "offline_mark": "Offline",
   "offline_none": "Niets van deze bron is gedownload",
   "offline_search": "Offline – zoeken in wat is gedownload",
-  "rec_reason_no_network": "Geen netwerk"
+  "rec_reason_no_network": "Geen netwerk",
+  "onb_err_no_network": "Er is nu geen netwerk. Verbind deze computer met het netwerk en probeer het opnieuw."
 }

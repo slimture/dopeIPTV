@@ -320,8 +320,11 @@ def host_refusal(host: str, port: int = 0) -> str:
     if not name:
         return INTERNET                 # nothing to judge: nothing goes
     try:
-        if stream_address._ip(name) is not None:
-            return "" if dest_guard.ip_kind(name) else INTERNET
+        ip = stream_address._ip(name)
+        if ip is not None:
+            # A multicast group is the local network's (IPTV through the
+            # router): joined there, never sent anywhere.
+            return "" if dest_guard.ip_kind(name) or ip.is_multicast else INTERNET
         if dest_guard.named_kind(name):
             return ""                   # this computer or a home name as written
         if not _given(name):

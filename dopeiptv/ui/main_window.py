@@ -1233,6 +1233,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._leave_demo()
         self.client = DemoClient()
         self._demo_stores()
+        # Offline mode: the demo needs the network - nothing of it is listed.
+        self._offline_demo_started()
         self._base_title = tr("demo_title")
         self.setWindowTitle(self._base_title)
         # Another source's category ids and lists say nothing about this one;

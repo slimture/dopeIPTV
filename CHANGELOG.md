@@ -9,6 +9,31 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Added
 
+- Offline mode: on by itself when the network is gone, or by hand from File →
+  Work offline and the command palette (for the session). A line over the
+  middle pane says "Offline – only what is downloaded is shown" (Go online
+  beside it; held while the video fills the screen, TV mode, the pop-out
+  and the first-run guide; TV mode says it in its header). Movies, Series and
+  a series' page show the source's downloads (providers/downloaded.py:
+  `DownloadedClient` stands in for the source's client, so the parental lock,
+  a kids profile and the phone remote's lists work on them as ever), the
+  episodes not downloaded dimmed where the app kept the series' episodes
+  before (core/downloads.keep_episodes); Mine shows what plays, Search the
+  downloads of every source, TV, the guide and Radio a calm word. "Offline"
+  by a downloaded title's name as it plays. Nothing to the internet:
+  core/offline.py's guard, asked by the one requests adapter
+  (`OfflineRefused`, a ConnectionError), dest_guard.check_peer, the bridge,
+  webhooks, MQTT, Test connection, Nerd's checks, RTSP and radio's DNS;
+  above it the update check, TMDB, sync, Trakt, Simkl, Discord, radio, the
+  guide, the follow checks, Popular right now, feedback answers and Watch
+  together ask nothing (tests/test_security_rules.py holds every way out).
+  Detection reads Qt's QNetworkInformation, settled for a few seconds
+  (`DOPEIPTV_NETWORK`: "0" none, a word to stand in for the system's), and a
+  login that fails for want of a network; the network back, the source logs
+  in and loads as at the start. Downloads wait offline, a recording due then
+  fails with "No network", server mode opens no channel on the internet. The
+  first-run guide's Connect says plainly there is no network; the demo
+  needs it, and lists nothing offline.
 - Start on the last channel (Settings → General → Start; off by default,
   each profile its own): as the app opens, the live channel you watched
   last on the source in use plays again, like a TV switched on. Only once

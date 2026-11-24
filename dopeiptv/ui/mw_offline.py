@@ -112,6 +112,10 @@ class _OfflineMixin:
     _off_btn: QPushButton | None = None
     _off_note: QLabel | None = None
     _off_action: QAction | None = None
+    #: The client offline mode's stands in for (the source's own, the
+    #: demo's) - its addresses made of words alone for History.
+    _off_held: Any = None
+    _off_held_demo = False
     #: Where a series' episodes are kept for a series' page offline.
     _off_episodes = ""
     #: Every change counts one: a login asked as offline mode ended that
@@ -282,19 +286,37 @@ class _OfflineMixin:
         return dl.known_episodes(self._off_episodes, pid, series_id)
 
     def _off_take_client(self) -> None:
+        """The client in use steps aside for offline mode's: a source's for
+        its downloads, the demo's for nothing at all - its channels and films
+        are on the internet, and none of it is ever downloaded. Explore mode
+        (no source) stays as it is."""
         if getattr(self.client, "offline", False):
             return
+        demo = self._off_demo()
         store = getattr(self, "playlist_store", None)
-        pid = str(getattr(store, "active_id", "") or "") if store is not None else ""
-        if not pid:
-            return                      # explore mode, the demo: nothing to stand in for
+        pid = "" if demo else (str(getattr(store, "active_id", "") or "")
+                               if store is not None else "")
+        if not pid and not demo:
+            return
         self._off_held = self.client
+        self._off_held_demo = demo
         self.client = self._offline_client(pid)
+
+    def _off_demo(self) -> bool:
+        """Whether the demo is the source (its stores in memory alone:
+        mw_onboarding's _demo_stores)."""
+        return getattr(self, "_demo_kept", None) is not None
+
+    def _offline_demo_started(self) -> None:
+        """start_demo while offline mode is on: the demo needs the network -
+        its lists stand aside as a source's do."""
+        if offline.on():
+            self._off_take_client()
 
     def _off_enter(self) -> None:
         """Offline mode began (the module's docstring)."""
         self._off_stop_network()
-        if getattr(self, "_together_on", lambda: False)():
+        if getattr(self, "_together_room", None) is not None:
             self.together_leave(quiet=True)
         self._off_take_client()
         dl_tick = getattr(self, "_dl_tick", None)
@@ -323,16 +345,17 @@ class _OfflineMixin:
     def _off_leave(self) -> None:
         """Offline mode ended: the source as at the start."""
         held, self._off_held = getattr(self, "_off_held", None), None
+        demo, self._off_held_demo = getattr(self, "_off_held_demo", False), False
         store = getattr(self, "playlist_store", None)
         pl = store.active() if store is not None else None
         if getattr(self.client, "offline", False):
-            if isinstance(pl, dict):
+            if isinstance(pl, dict) and not demo:
+                # Made anew, as at the start: its login asked below.
                 from ..providers.client import make_client
                 self.client = make_client(pl)
+                self._off_login(pl)
             elif held is not None:
-                self.client = held
-        if isinstance(pl, dict):
-            self._off_login(pl)
+                self.client = held      # the demo again
         dl_tick = getattr(self, "_dl_tick", None)
         if callable(dl_tick):
             dl_tick()

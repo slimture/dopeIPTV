@@ -3357,5 +3357,6 @@
   "offline_mark": "Izvan mreže",
   "offline_none": "Ništa iz ovog izvora nije preuzeto",
   "offline_search": "Izvan mreže – pretraživanje preuzetog",
-  "rec_reason_no_network": "Nema mreže"
+  "rec_reason_no_network": "Nema mreže",
+  "onb_err_no_network": "Trenutačno nema mreže. Spojite ovo računalo na mrežu i pokušajte ponovno."
 }

@@ -3357,5 +3357,6 @@
   "offline_mark": "Offline",
   "offline_none": "Tidak ada yang diunduh dari sumber ini",
   "offline_search": "Offline – mencari di yang diunduh",
-  "rec_reason_no_network": "Tidak ada jaringan"
+  "rec_reason_no_network": "Tidak ada jaringan",
+  "onb_err_no_network": "Saat ini tidak ada jaringan. Sambungkan komputer ini ke jaringan lalu coba lagi."
 }
