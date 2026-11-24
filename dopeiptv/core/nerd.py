@@ -223,12 +223,15 @@ def ipv4_any(text: str) -> Any:
     for part in parts:
         p = part.lower()
         try:
+            # Digits alone: int() also takes a sign, "_" and spaces, and
+            # "0-1" was -1 - no address, a ValueError further on
+            # (tests/test_fuzz_readers.py).
             if p.startswith("0x"):
-                if not p[2:] or len(p) > 10:
+                if not p[2:] or len(p) > 10 or p[2:].strip("0123456789abcdef"):
                     return None
                 nums.append(int(p[2:], 16))
             elif len(p) > 1 and p.startswith("0"):
-                if len(p) > 12:
+                if len(p) > 12 or p[1:].strip("01234567"):
                     return None
                 nums.append(int(p[1:], 8))
             elif p.isascii() and p.isdigit() and len(p) <= 10:

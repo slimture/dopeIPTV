@@ -59,7 +59,8 @@ def redact_url(url: str) -> str:
     netloc = u.netloc
     if "@" in netloc:
         netloc = MASK + "@" + netloc.rsplit("@", 1)[1]
-    q = "&".join(f"{quote(k)}={MASK if k.lower() in _SECRET_KEYS else quote(v)}"
+    q = "&".join(f"{quote(k, errors='replace')}="
+                 f"{MASK if k.lower() in _SECRET_KEYS else quote(v, errors='replace')}"
                  for k, v in parse_qsl(u.query, keep_blank_values=True))
     path = re.sub(r"^/(live|movie|series|timeshift)/[^/]+/[^/]+/", rf"/\1/{MASK}/{MASK}/", u.path)
     return urlunsplit((u.scheme, netloc, path, q, u.fragment))

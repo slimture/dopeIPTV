@@ -169,7 +169,12 @@ def read(value: Any) -> tuple[list[Entry], list[Problem]]:
             problems.append(Problem(n, text, "total"))
             continue
         total += new
-        covered.append((first, last))
+        if new:
+            # One that adds nothing is all in covered already: kept there it
+            # made every later entry's look longer - a list of one address
+            # thousands of times took time with its square
+            # (tests/test_fuzz_readers.py).
+            covered.append((first, last))
         entries.append(Entry(n, text, first, last))
     return entries, problems
 
@@ -199,10 +204,14 @@ def addresses(value: Any, skip: Any = ()) -> list[str]:
     entries, _bad = read(value)
     seen = {str(a) for a in skip}
     out: list[str] = []
+    walked: set[tuple[int, int]] = set()
     for e in entries:
         first, last = e.first, e.last
         if "/" in e.text and e.size >= 4:
             first, last = first + 1, last - 1
+        if (first, last) in walked:
+            continue                # the same addresses again: none new
+        walked.add((first, last))
         for i in range(first, last + 1):
             a = str(ipaddress.IPv4Address(i))
             if a not in seen:
