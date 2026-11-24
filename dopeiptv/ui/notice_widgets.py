@@ -16,13 +16,13 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
-    QApplication, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QPushButton,
-    QSizePolicy, QToolButton, QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel,
+    QPushButton, QScrollArea, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ..core.log import log
 from ..i18n import tr
-from .notices import Entry, Message, NoticeHub
+from .notices import Entry, HistoryItem, Message, NoticeHub
 from .theme import P, contrast, corner_radius, ink_on, tinted
 from .widgets import plain_text
 
@@ -183,6 +183,46 @@ def paint_level(p: QPainter, level: str, r: QRectF) -> None:
     p.restore()
 
 
+def paint_history_mark(p: QPainter, level: str, r: QRectF) -> None:
+    """A history item's mark: a message's for what was said, a tick in
+    the success colour for work done, a cross for work cancelled."""
+    if level not in ("done", "cancelled"):
+        paint_level(p, level, r)
+        return
+    colour = QColor(P["ok"] if level == "done" else P["muted2"])
+    p.save()
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(colour)
+    p.drawEllipse(r)
+    pen = QPen(QColor(ink_on(colour.name())), max(1.6, r.width() / 8.0))
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    p.setPen(pen)
+    x, y, s = r.left(), r.top(), r.width()
+    if level == "done":
+        p.drawPolyline([QPointF(x + 0.28 * s, y + 0.52 * s), QPointF(x + 0.44 * s, y + 0.68 * s),
+                        QPointF(x + 0.72 * s, y + 0.36 * s)])
+    else:
+        p.drawLine(QPointF(x + 0.34 * s, y + 0.34 * s), QPointF(x + 0.66 * s, y + 0.66 * s))
+        p.drawLine(QPointF(x + 0.66 * s, y + 0.34 * s), QPointF(x + 0.34 * s, y + 0.66 * s))
+    p.restore()
+
+
+def history_when(at: float, now: float | None = None) -> str:
+    """A history item's time: its clock time today, the day before it
+    otherwise - in the app's language (QLocale)."""
+    import time as _time
+    from PyQt6.QtCore import QDateTime, QLocale
+    now = _time.time() if now is None else now
+    dt = QDateTime.fromSecsSinceEpoch(int(at))
+    loc = QLocale()
+    clock = dt.time().toString("HH:mm:ss")
+    if _time.localtime(at)[:3] == _time.localtime(now)[:3]:
+        return clock
+    return loc.toString(dt.date(), QLocale.FormatType.ShortFormat) + " " + clock
+
+
 def paint_progress(p: QPainter, r: QRectF, progress: float | None, angle: int) -> None:
     """A spinner arc (no progress known) or a ring filled to *progress*."""
     p.save()
@@ -332,7 +372,9 @@ def one_line(text: str, fm: QFontMetrics, width: int) -> str:
 class ActivityLine(QWidget):
     """The line at the sidebar's foot: a passing note, else the running work
     (or, on the icon rail, a ring), and the count of unread messages on a
-    dot. Enter, Space or a click opens the panel."""
+    dot - unless a bell beside it says that (``set_bell``): then the line
+    shows only while something happens, and goes when nothing does. Enter,
+    Space or a click opens the panel."""
 
     open_panel = pyqtSignal()
     TICK_MS = 50
@@ -349,6 +391,7 @@ class ActivityLine(QWidget):
         self._entries: list[Entry] = []
         self._note = ""
         self._unread = 0
+        self._bell = False
         self._fader = _Fader(self)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
@@ -372,11 +415,17 @@ class ActivityLine(QWidget):
         self.updateGeometry()
         self.update()
 
+    def set_bell(self, on: bool) -> None:
+        """A bell beside it carries the unread count (NoticeBell): the line
+        itself is only the work and the passing words."""
+        self._bell = bool(on)
+        self.refresh()
+
     def refresh(self) -> None:
         hub = self._hub
         self._entries = hub.entries()
         self._note = hub.note_text()
-        self._unread = hub.unread()
+        self._unread = 0 if self._bell else hub.unread()
         if self._entries or self._note or self._unread:
             self.setToolTip(plain_text(self._tip()))
             self.setAccessibleName(self._tip().replace("\n", "; "))
@@ -552,30 +601,93 @@ class ActivityLine(QWidget):
         p.end()
 
     def _badge(self, p: QPainter, at: QPointF, text: str) -> None:
-        """The count of unread messages on a dot, in the worst one's colour."""
-        p.setFont(self._small)
-        fm = QFontMetrics(self._small)
-        w = max(14.0, fm.horizontalAdvance(text) + 6.0)
-        b = QRectF(at.x() - w / 2, at.y() - 7, w, 14)
-        fill = {"error": P["error"], "warning": P["warn"]}.get(self._hub.unread_level(),
-                                                               P["accent"])
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(fill))
-        p.drawRoundedRect(b, 7, 7)
-        p.setPen(QColor(ink_on(fill)))
-        p.drawText(b, int(Qt.AlignmentFlag.AlignCenter), text)
+        paint_badge(p, at, text, self._hub.unread_level(), self._small)
+
+
+def paint_badge(p: QPainter, at: QPointF, text: str, level: str, font: QFont) -> None:
+    """The count of unread messages on a dot centred on *at*, in the worst
+    one's colour."""
+    p.setFont(font)
+    fm = QFontMetrics(font)
+    w = max(14.0, fm.horizontalAdvance(text) + 6.0)
+    b = QRectF(at.x() - w / 2, at.y() - 7, w, 14)
+    fill = {"error": P["error"], "warning": P["warn"]}.get(level, P["accent"])
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(fill))
+    p.drawRoundedRect(b, 7, 7)
+    p.setPen(QColor(ink_on(fill)))
+    p.drawText(b, int(Qt.AlignmentFlag.AlignCenter), text)
+
+
+class NoticeBell(QPushButton):
+    """What the notices fold to while nothing happens: a small bell at the
+    sidebar's foot beside the source and Settings, the count of unread
+    messages on its dot. A click opens the panel - the messages, else what
+    was said since the app started (History) - and a click again closes it.
+    The line over the foot (ActivityLine) comes only while work runs or a
+    passing note is said."""
+
+    GLYPH = 18
+
+    def __init__(self, hub: NoticeHub, size: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("SideIcon")
+        self._hub = hub
+        self._unread = 0
+        self._small = _font(10, QFont.Weight.Bold)
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh()
+
+    def badge(self) -> int:
+        """The count on its dot: the messages not read yet."""
+        return self._unread
+
+    @staticmethod
+    def name() -> str:
+        """Its words: the menu entry's, without the dots."""
+        return tr("menu_activity").rstrip("…. ")
+
+    def refresh(self) -> None:
+        self._unread = self._hub.unread()
+        words = self.name()
+        if self._unread:
+            unread = tr("notice_unread", n=self._unread)
+            self.setToolTip(f"{words}\n{unread}")
+            self.setAccessibleName(f"{words}; {unread}")
+        else:
+            self.setToolTip(words)
+            self.setAccessibleName(words)
+        self.update()
+
+    def paintEvent(self, e) -> None:     # noqa: N802 - Qt hook
+        super().paintEvent(e)            # its background, from the style sheet
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        g = float(self.GLYPH)
+        r = QRectF((self.width() - g) / 2, (self.height() - g) / 2, g, g)
+        paint_kind(p, "bell", r, QColor(P["text2"]))
+        if self._unread:
+            rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+            at = QPointF(r.left() + 2 if rtl else r.right() - 2, r.top() + 3)
+            paint_badge(p, at, str(self._unread), self._hub.unread_level(), self._small)
+        p.end()
 
 
 class ActivityPanel(QFrame):
-    """The work and the messages, live: "Working on" - each job's icon,
-    words, progress and, where its producer can stop it, Cancel - and
-    "Messages", the newest first, each with its action and a dismiss, the
-    ones read before faded, Clear all. A child of the window over everything
-    (it shows in a grab of the window); Esc or a click elsewhere closes it,
-    and it closes by itself when nothing is left in it. Opening it marks the
-    messages read."""
+    """The work and the messages, live, and what was said: two tabs. "Now" -
+    "Working on" (each job's icon, words, progress and, where its producer
+    can stop it, Cancel) and "Messages", the newest first, each with its
+    action and a dismiss, the ones read before faded, Clear all. "History" -
+    everything said since the app started and the person's work that ended
+    (HistoryView). A child of the window over everything (it shows in a grab
+    of the window); Esc or a click elsewhere closes it. It opens on Now
+    while anything is there, else on History, and goes over to History when
+    Now empties. Opening it marks the messages read."""
 
     W = 340
+    #: Its width on the History tab (a line of time and words wants more).
+    W_HISTORY = 380
     MAX_ROWS = 8
 
     def __init__(self, hub: NoticeHub, parent: QWidget) -> None:
@@ -583,18 +695,36 @@ class ActivityPanel(QFrame):
         self.setObjectName("NoticePanel")
         self._hub = hub
         self._anchor: QWidget | None = None
+        self._align: QWidget | None = None
         self._beside: QWidget | bool = False
         self._angle = 0
         self._fresh: set[int] = set()
+        self._tab = "now"
+        self._w = self.W
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 12, 14, 12)
         lay.setSpacing(10)
+        tabs = QHBoxLayout()
+        tabs.setContentsMargins(0, 0, 0, 0)
+        tabs.setSpacing(4)
+        self._tab_group = QButtonGroup(self)
+        self._tab_group.setExclusive(True)
+        self.tab_now = self._tab_button(tr("notice_tab_now"), "now")
+        self.tab_history = self._tab_button(tr("nav_history"), "history")
+        tabs.addWidget(self.tab_now)
+        tabs.addWidget(self.tab_history)
+        tabs.addStretch(1)
+        lay.addLayout(tabs)
+        self._now = QWidget()
+        now = QVBoxLayout(self._now)
+        now.setContentsMargins(0, 0, 0, 0)
+        now.setSpacing(10)
         self._work_head = QLabel(tr("notice_working"))
         self._work_head.setObjectName("NoticePanelHead")
-        lay.addWidget(self._work_head)
+        now.addWidget(self._work_head)
         self._rows = QVBoxLayout()
         self._rows.setSpacing(10)
-        lay.addLayout(self._rows)
+        now.addLayout(self._rows)
         head = QHBoxLayout()
         head.setContentsMargins(0, 0, 0, 0)
         self._msg_head = QLabel(tr("notice_messages"))
@@ -608,10 +738,18 @@ class ActivityPanel(QFrame):
         head.addWidget(self.clear_btn)
         self._msg_head_row = QWidget()
         self._msg_head_row.setLayout(head)
-        lay.addWidget(self._msg_head_row)
+        now.addWidget(self._msg_head_row)
         self._msgs = QVBoxLayout()
         self._msgs.setSpacing(8)
-        lay.addLayout(self._msgs)
+        now.addLayout(self._msgs)
+        self._nothing = QLabel(tr("notice_now_nothing"))
+        self._nothing.setObjectName("NoticeRowBody")
+        self._nothing.setWordWrap(True)
+        now.addWidget(self._nothing)
+        lay.addWidget(self._now)
+        self.history = HistoryView(hub, self)
+        lay.addWidget(self.history)
+        self.history.hide()
         self.setFixedWidth(self.W)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAccessibleName(tr("notice_messages"))
@@ -621,18 +759,54 @@ class ActivityPanel(QFrame):
         hub.changed.connect(self._changed)
         self.hide()
 
+    def _tab_button(self, word: str, name: str) -> QPushButton:
+        b = QPushButton(word)
+        b.setObjectName("NoticeTab")
+        b.setCheckable(True)
+        b.setFlat(True)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setAccessibleName(word)
+        b.clicked.connect(lambda _c=False, n=name: self.show_tab(n))
+        self._tab_group.addButton(b)
+        return b
+
     def _empty(self) -> bool:
+        """Nothing on Now: no work, no message."""
         return not self._hub.entries() and not self._hub.messages()
 
-    def open_at(self, anchor: QWidget, beside: QWidget | bool = False) -> None:
+    @property
+    def tab(self) -> str:
+        return self._tab
+
+    def show_tab(self, name: str) -> None:
+        """Now or History shown (the other hidden), the panel fitted."""
+        self._tab = "history" if name == "history" else "now"
+        hist = self._tab == "history"
+        self.tab_now.setChecked(not hist)
+        self.tab_history.setChecked(hist)
+        self._now.setVisible(not hist)
+        self.history.setVisible(hist)
+        self._w = self.W_HISTORY if hist else self.W
+        self.setFixedWidth(self._w)
+        if hist:
+            self.history.refresh()
+        else:
+            self._fill()
+        if not self.isHidden():
+            self._place()
+
+    def open_at(self, anchor: QWidget, beside: QWidget | bool = False,
+                tab: str | None = None, align: QWidget | None = None) -> None:
         """Opened upward from *anchor* - or beside it, from the edge of
-        *beside* when that is a widget (the icon rail)."""
-        self._anchor, self._beside = anchor, beside
+        *beside* when that is a widget (the icon rail) - on *tab*, else on
+        Now while anything is there and on History when not. With *align*
+        its start lines up with that widget's (the bell's panel with the
+        sidebar's foot, not hanging off the bell into the list)."""
+        self._anchor, self._beside, self._align = anchor, beside, align
         self._fresh = {m.id for m in self._hub.messages() if not m.read}
         self.restyle()
         self._fill()
-        if self._empty():
-            return
+        self.show_tab(tab or ("history" if self._empty() else "now"))
         self.show()
         self.raise_()
         self._place()
@@ -667,15 +841,25 @@ class ActivityPanel(QFrame):
             f"#NoticeRowCancel:hover {{ background: {c['action_hover']}; }}"
             f"#NoticeDismiss {{ color: {c['dismiss']}; background: transparent;"
             " border: none; font-size: 12px; padding: 2px 5px; }"
-            f"#NoticeDismiss:hover {{ color: {c['title']}; }}")
+            f"#NoticeDismiss:hover {{ color: {c['title']}; }}"
+            f"#NoticeTab, #NoticeChip {{ color: {c['muted']}; background: transparent;"
+            f" border: none; border-radius: 7px; font-weight: 600; }}"
+            "#NoticeTab { font-size: 12px; padding: 4px 10px; }"
+            "#NoticeChip { font-size: 11px; padding: 3px 8px; }"
+            f"#NoticeTab:hover, #NoticeChip:hover {{ color: {c['title']}; }}"
+            f"#NoticeTab:checked, #NoticeChip:checked {{ color: {c['action']};"
+            f" background: {c['action_bg']}; }}"
+            f"#NoticeTab:focus, #NoticeChip:focus {{ border: 1px solid {P['accent']}; }}"
+            "#NoticeHistScroll, #NoticeHistBody { background: transparent; border: none; }")
 
     def _changed(self) -> None:
         if self.isHidden():
             return
-        if self._empty():
-            self.close_panel()
-            return
-        self._fill()
+        if self._tab == "now":
+            if self._empty():
+                self.show_tab("history")
+                return
+            self._fill()
         self._place()
 
     @staticmethod
@@ -702,6 +886,7 @@ class ActivityPanel(QFrame):
             more.setObjectName("NoticeRowPct")
             self._add(self._msgs, more)
         self._msg_head_row.setVisible(bool(msgs))
+        self._nothing.setVisible(not entries and not msgs)
         self._fit()
 
     @staticmethod
@@ -717,10 +902,14 @@ class ActivityPanel(QFrame):
         """As tall as its rows are at its own width: adjustSize alone sizes a
         wrapped line for the width it would like, wider than W, and a long
         message was cut off at the top and the foot."""
-        self.adjustSize()
         lay = self.layout()
+        if lay is not None:
+            lay.invalidate()            # a row gone, a tab changed: smaller too
+            lay.activate()
+        self.adjustSize()
         if lay is not None and lay.hasHeightForWidth():
-            self.resize(self.W, max(self.height(), lay.totalHeightForWidth(self.W)))
+            need = lay.totalHeightForWidth(self._w)
+            self.resize(self._w, need if need > 0 else self.height())
 
     def _place(self) -> None:
         a = self._anchor
@@ -736,7 +925,9 @@ class ActivityPanel(QFrame):
             x = ex - self.width() - 8 if rtl else ex + edge.width() + 8
             y = top_left.y() + a.height() - self.height()
         else:
-            x = top_left.x() + a.width() - self.width() if rtl else top_left.x()
+            ref = self._align if self._align is not None and self._align.isVisible() else a
+            rx = ref.mapTo(parent, QPoint(0, 0)).x()
+            x = rx + ref.width() - self.width() if rtl else rx
             y = top_left.y() - self.height() - 8
         x = max(8, min(x, parent.width() - self.width() - 8))
         y = max(8, y)
@@ -767,6 +958,212 @@ class ActivityPanel(QFrame):
                 self.close_panel()
                 return on_anchor        # a click on the line closes it, no reopen
         return False
+
+
+class HistoryView(QWidget):
+    """The panel's History: what the app said since it started and the
+    person's work that ended, the newest first - each with its mark, words
+    and time; chips to see only errors, warnings, notes or work done; Copy
+    (scrubbed of the person's values once more) and Clear. Built only while
+    it shows; the hub keeps it in memory alone (NoticeHub.history)."""
+
+    #: The chips: (key, the levels it shows - None all of them, its word).
+    FILTERS: tuple[tuple[str, tuple[str, ...] | None, str], ...] = (
+        ("all", None, "history_chip_all"),
+        ("error", ("error",), "notice_hist_errors"),
+        ("warning", ("warning",), "notice_hist_warnings"),
+        ("info", ("info",), "notice_hist_notes"),
+        ("done", ("done", "cancelled"), "rec_status_done"),
+    )
+    #: The tallest the list gets before it scrolls, and the most rows drawn.
+    MAX_H = 380
+    MAX_SHOWN = 300
+
+    def __init__(self, hub: NoticeHub, panel: QWidget) -> None:
+        super().__init__(panel)
+        self._hub = hub
+        self._levels: tuple[str, ...] | None = None
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+        chips = QHBoxLayout()
+        chips.setContentsMargins(0, 0, 0, 0)
+        chips.setSpacing(4)
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+        self.chips: dict[str, QPushButton] = {}
+        for key, levels, word in self.FILTERS:
+            b = QPushButton(tr(word))
+            b.setObjectName("NoticeChip")
+            b.setCheckable(True)
+            b.setFlat(True)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setAccessibleName(tr(word))
+            b.setChecked(levels is None)
+            b.clicked.connect(partial(self._pick, levels))
+            self._group.addButton(b)
+            chips.addWidget(b)
+            self.chips[key] = b
+        chips.addStretch(1)
+        v.addLayout(chips)
+        self.scroll = QScrollArea()
+        self.scroll.setObjectName("NoticeHistScroll")
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._body = QWidget()
+        self._body.setObjectName("NoticeHistBody")
+        self._rows = QVBoxLayout(self._body)
+        self._rows.setContentsMargins(0, 0, 6, 0)
+        self._rows.setSpacing(10)
+        self._rows.addStretch(1)
+        self.scroll.setWidget(self._body)
+        v.addWidget(self.scroll)
+        self.empty = QLabel()
+        self.empty.setObjectName("NoticeRowBody")
+        self.empty.setWordWrap(True)
+        v.addWidget(self.empty)
+        foot = QHBoxLayout()
+        foot.setContentsMargins(0, 0, 0, 0)
+        foot.setSpacing(6)
+        foot.addStretch(1)
+        self.copy_btn = self._foot_button(tr("problem_copy"), self._copy)
+        self.clear_btn = self._foot_button(tr("btn_clear"), hub.clear_history)
+        foot.addWidget(self.copy_btn)
+        foot.addWidget(self.clear_btn)
+        v.addLayout(foot)
+        hub.history_changed.connect(self._changed)
+
+    @staticmethod
+    def _foot_button(word: str, act: Callable[[], Any]) -> QPushButton:
+        b = QPushButton(word)
+        b.setObjectName("NoticeRowCancel")
+        b.setFlat(True)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setAccessibleName(word)
+        b.clicked.connect(lambda _c=False: act())
+        return b
+
+    def _pick(self, levels: tuple[str, ...] | None) -> None:
+        self._levels = levels
+        self.refresh()
+        panel = self.parentWidget()
+        if isinstance(panel, ActivityPanel) and not panel.isHidden():
+            panel._place()
+
+    def _changed(self) -> None:
+        if self.isVisible():
+            self.refresh()
+            panel = self.parentWidget()
+            if isinstance(panel, ActivityPanel) and not panel.isHidden():
+                panel._place()
+
+    def refresh(self) -> None:
+        """The rows drawn again from the hub's history, as the chip says."""
+        while self._rows.count() > 1:
+            item = self._rows.takeAt(0)
+            w = item.widget() if item is not None else None
+            if w is not None:
+                w.hide()
+                w.deleteLater()
+        everything = self._hub.history()
+        items = self._hub.history(self._levels)[:self.MAX_SHOWN]
+        for i, h in enumerate(items):
+            row = _HistoryRow(self._body, h)
+            self._rows.insertWidget(i, row)
+            row.show()
+        self.scroll.setVisible(bool(items))
+        self.empty.setText(tr("notice_hist_empty") if not everything
+                           else tr("notice_hist_none"))
+        self.empty.setVisible(not items)
+        self.copy_btn.setEnabled(bool(items))
+        self.clear_btn.setEnabled(bool(everything))
+        if items:
+            self._body.layout().activate()
+            # The width it will have on the History tab (its own may still be
+            # a hidden widget's guess, which wraps every line and is far taller).
+            width = ActivityPanel.W_HISTORY - 28 - self.scroll.verticalScrollBar().sizeHint().width()
+            need = self._rows.totalHeightForWidth(width - 6)
+            self.scroll.setFixedHeight(max(40, min(self.MAX_H, need + 2)))
+            self.scroll.verticalScrollBar().setValue(0)
+        # Its own layout measured anew now: the panel asks its height next,
+        # and a cached one is the list as it was before this.
+        lay = self.layout()
+        if lay is not None:
+            lay.invalidate()
+            lay.activate()
+        self.updateGeometry()
+
+    def _copy(self) -> None:
+        names = {"error": tr("notice_error"), "warning": tr("notice_warning"),
+                 "info": tr("notice_info"), "done": tr("rec_status_done"),
+                 "cancelled": tr("rec_status_cancelled")}
+        personal: Any = ()
+        win = self.window()
+        values = getattr(win, "_personal_values", None)
+        if callable(values):
+            try:
+                personal = values()
+            except Exception:
+                log.debug("notices: the person's values not had for the copy", exc_info=True)
+        QApplication.clipboard().setText(self._hub.history_text(self._levels, names, personal))
+        self.copy_btn.setText(tr("problem_copied"))
+        QTimer.singleShot(1500, self._copy_back)
+
+    def _copy_back(self) -> None:
+        try:
+            self.copy_btn.setText(tr("problem_copy"))
+        except RuntimeError:            # the window went meanwhile
+            pass
+
+
+class _HistoryRow(QWidget):
+    """One thing in the history: its mark, its words and its time."""
+
+    def __init__(self, parent: QWidget, h: HistoryItem) -> None:
+        super().__init__(parent)
+        self._level = h.level
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        self.mark = QWidget()
+        self.mark.setFixedSize(16, 18)
+        self.mark.paintEvent = self._paint_mark
+        lay.addWidget(self.mark, 0, Qt.AlignmentFlag.AlignTop)
+        col = QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(2)
+        head, _nl, body = h.text.partition("\n")
+        text = QLabel(breakable(head))
+        text.setObjectName("NoticeRowText")
+        text.setWordWrap(True)
+        text.setTextFormat(Qt.TextFormat.PlainText)     # a channel's, a server's words
+        col.addWidget(text)
+        if body.strip():
+            more = QLabel(breakable(body.strip()))
+            more.setObjectName("NoticeRowBody")
+            more.setWordWrap(True)
+            more.setTextFormat(Qt.TextFormat.PlainText)
+            col.addWidget(more)
+        stamp = history_when(h.at)
+        if h.level in ("done", "cancelled"):
+            stamp += " · " + tr("rec_status_" + h.level)
+        when = QLabel(stamp)
+        when.setObjectName("NoticeRowPct")
+        when.setTextFormat(Qt.TextFormat.PlainText)
+        col.addWidget(when)
+        lay.addLayout(col, 1)
+        self.text = h.text
+        word = {"error": "notice_error", "warning": "notice_warning", "info": "notice_info",
+                "done": "rec_status_done", "cancelled": "rec_status_cancelled"}[h.level]
+        self.setAccessibleName(f"{tr(word)}: {h.text.replace(chr(10), ' - ')}, "
+                               f"{history_when(h.at)}")
+
+    def _paint_mark(self, _e) -> None:
+        p = QPainter(self.mark)
+        paint_history_mark(p, self._level, QRectF(1, 2, 14, 14))
+        p.end()
 
 
 class _PanelRow(QWidget):

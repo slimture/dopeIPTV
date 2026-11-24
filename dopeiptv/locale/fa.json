@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "زمینه‌های کمتر",
   "rec_by_server": "سرور ضبط می‌کند",
   "rec_by_other_app": "dopeIPTV روی رایانهٔ دیگری ضبط می‌کند",
-  "srv_rec_by_app": "پنجرهٔ برنامه ضبط می‌کند"
+  "srv_rec_by_app": "پنجرهٔ برنامه ضبط می‌کند",
+  "notice_tab_now": "اکنون",
+  "notice_now_nothing": "اکنون کاری در جریان نیست.",
+  "notice_hist_errors": "خطاها",
+  "notice_hist_warnings": "هشدارها",
+  "notice_hist_notes": "یادداشت‌ها",
+  "notice_hist_empty": "هنوز چیزی نیست - آنچه برنامه به شما می‌گوید و کارهایی که شروع می‌کنید تا زمان بسته شدن آن اینجا نمایش داده می‌شود.",
+  "notice_hist_none": "موردی از این نوع نیست.",
+  "menu_activity": "فعالیت و پیام‌ها…"
 }

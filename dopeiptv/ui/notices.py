@@ -27,6 +27,12 @@ categories or the video.
   offer): one small card of the sidebar's width right above the line - an
   icon, its words in two lines at most, one action, a dismiss - and any
   more waiting behind it as a count, until answered or dismissed.
+- **History** - everything said since the app started, notes too, and the
+  person's own work that ended (done or cancelled): the panel's History
+  tab, the newest first, with its time (``history``, ``clear_history``,
+  ``history_text`` for Copy). Kept in memory only, at most
+  ``HISTORY_MAX``, never written anywhere; nothing is kept while private
+  viewing is on (core/privacy.private).
 
 While the video fills the screen, TV mode shows or the picture is popped
 out, nothing is drawn and no note is kept; messages and decisions wait.
@@ -51,6 +57,11 @@ from PyQt6.QtWidgets import QApplication
 from ..core.log import for_people, log
 
 LEVELS = ("info", "warning", "error")
+#: What a history item is: what was said at its level, or work that ended.
+HISTORY_LEVELS = LEVELS + ("done", "cancelled")
+#: The kinds of work whose end the history keeps even when the person did
+#: not start it (a recording saved, a download, a sync, an update).
+ENDS_KEPT = ("record", "download", "sync", "update")
 #: The kinds of work an icon is drawn for; anything else is "work".
 KINDS = ("work", "list", "guide", "folder", "search", "network", "sync", "update",
          "download", "record")
@@ -96,6 +107,18 @@ class Entry:
 
 
 @dataclass
+class HistoryItem:
+    """One thing the history keeps: when (wall-clock), its level
+    (HISTORY_LEVELS), its words (already for people) and, for work, its
+    kind."""
+    id: int
+    at: float
+    level: str
+    text: str
+    kind: str = ""
+
+
+@dataclass
 class Message:
     """A message in the panel - or, when it asks for a decision, the card
     over the activity line."""
@@ -121,6 +144,9 @@ class NoticeHub(QObject):
     and decisions."""
 
     changed = pyqtSignal()
+    #: The history gained or lost items (its own signal: the line need not
+    #: be drawn again for it).
+    history_changed = pyqtSignal()
 
     #: A job its owner never ended is let go after this (each word from it -
     #: ``update`` - starts the time again).
@@ -137,6 +163,8 @@ class NoticeHub(QObject):
     #: this session are kept for ``said``.
     MAX_MESSAGES = 30
     SAID = 50
+    #: The history's most items (the oldest go first).
+    HISTORY_MAX = 300
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -154,6 +182,7 @@ class NoticeHub(QObject):
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._note_over)
         self._said: list[str] = []
+        self._history: list[HistoryItem] = []
         self._held = False
 
     # -- jobs -------------------------------------------------------------------
@@ -218,7 +247,12 @@ class NoticeHub(QObject):
     def finish(self, token: int) -> bool:
         """The job is done. False for one that was over already (a late
         answer of a replaced job changes nothing)."""
-        return self._end(token)
+        job = self._jobs.get(token)
+        if not self._end(token):
+            return False
+        if job is not None and job.shown_at is not None and (job.mine or job.kind in ENDS_KEPT):
+            self._record("done", job.text, job.kind)
+        return True
 
     def cancel(self, token: int) -> bool:
         return self._end(token)
@@ -245,7 +279,9 @@ class NoticeHub(QObject):
                     continue                # asked, and the person said no
             except Exception:
                 log.debug("notices: a job's cancel failed", exc_info=True)
-            stopped = self._end(token, linger=False) or stopped
+            if self._end(token, linger=False):
+                stopped = True
+                self._record("cancelled", job.text, job.kind)
         return stopped
 
     def end_key(self, key: str) -> bool:
@@ -412,9 +448,10 @@ class NoticeHub(QObject):
         level = level if level in LEVELS else "info"
         decide = decide or answer
         if action is None and not decide and level != "error":
-            self.note(head + (" " + body if body else ""), ms=ms, key=key)
+            self.note(head + (" " + body if body else ""), ms=ms, key=key, level=level)
             return 0
         self._say(head + (" - " + body if body else ""))
+        self._record(level, head + ("\n" + body if body else ""))
         msg = next((m for m in self._messages if (key is not None and m.key == key)
                     or (key is None and m.key is None and m.title == head
                         and m.body == body and m.level == level)), None)
@@ -436,13 +473,16 @@ class NoticeHub(QObject):
         self.changed.emit()
         return msg.id
 
-    def note(self, text: str, *, ms: int | None = None, key: str | None = None) -> None:
-        """Passing words: the line says them for *ms*, then they are gone. A
-        note while the video fills the screen is no news later: dropped."""
+    def note(self, text: str, *, ms: int | None = None, key: str | None = None,
+             level: str = "info") -> None:
+        """Passing words: the line says them for *ms*, then they are gone
+        (the history keeps them). A note while the video fills the screen is
+        no news later on the line: dropped there."""
         text = for_people(str(text or "")).strip()
         if not text:
             return
         self._say(text)
+        self._record(level if level in LEVELS else "info", text)
         if self._held:
             return
         self._note = (text, key)
@@ -533,6 +573,57 @@ class NoticeHub(QObject):
     def _say(self, words: str) -> None:
         self._said.append(words)
         del self._said[:-self.SAID]
+
+    # -- history -------------------------------------------------------------
+
+    def _record(self, level: str, text: str, kind: str = "") -> None:
+        """*text* into the history - never while private viewing is on,
+        never anything that failed to be kept in the way of what said it."""
+        try:
+            from ..core import privacy
+            if privacy.private():
+                return
+            words = str(text or "").strip()
+            if not words:
+                return
+            self._seq += 1
+            self._history.append(HistoryItem(
+                self._seq, time.time(), level if level in HISTORY_LEVELS else "info",
+                words[:2000], kind if kind in KINDS else ""))
+            del self._history[:-self.HISTORY_MAX]
+            self.history_changed.emit()
+        except Exception:               # a nicety: never in the way of the words
+            log.debug("notices: not kept in the history", exc_info=True)
+
+    def history(self, levels: tuple[str, ...] | None = None) -> list[HistoryItem]:
+        """What the history keeps, the newest first - of *levels* alone
+        when given."""
+        items = reversed(self._history)
+        return [h for h in items if levels is None or h.level in levels]
+
+    def clear_history(self) -> None:
+        if self._history:
+            self._history.clear()
+            self.history_changed.emit()
+
+    def history_text(self, levels: tuple[str, ...] | None = None,
+                     names: dict[str, str] | None = None, personal: Any = ()) -> str:
+        """The history as plain text for Copy, the oldest first: its time,
+        its level's name (*names*, else the level) and its words - already
+        without logins or addresses (core/log.for_people), scrubbed once more
+        by core/report with the person's own values (*personal*)."""
+        lines = []
+        for h in reversed(self.history(levels)):
+            when = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(h.at))
+            name = (names or {}).get(h.level, h.level)
+            lines.append(f"{when}  {name}  " + h.text.replace("\n", " - "))
+        text = "\n".join(lines)
+        try:
+            from ..core.report import scrub
+            text = scrub(text, personal)
+        except Exception:
+            log.debug("notices: the history's copy not scrubbed again", exc_info=True)
+        return text
 
     # -- held ----------------------------------------------------------------
 

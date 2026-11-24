@@ -291,6 +291,66 @@ def test_only_an_entry_that_starts_dopeiptv_names_the_window(home, monkeypatch):
         assert desktop_entry.launched_app_id(env) is None, env
 
 
+def test_without_the_launcher_the_entry_that_starts_this_file_names_the_window(
+        home, monkeypatch):
+    """No GIO_LAUNCHED_DESKTOP_FILE (KDE, a start from the file manager, the
+    entry it named gone with the file): the entry whose Exec starts this
+    very AppImage - or the one an update's restart came from - names the
+    window, so the dock ties it to its pinned icon."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(desktop_entry, "_in_flatpak", lambda: False)
+    apps = home / "data" / "applications"
+    apps.mkdir(parents=True)
+    old = home / "dopeIPTV-1.6.11.20-x86_64.AppImage"
+    new = home / "dopeIPTV-1.6.11.21-x86_64.AppImage"
+    for f in (old, new):
+        f.write_text("")
+    (apps / "org.gnome.Terminal.desktop").write_text(
+        "[Desktop Entry]\nExec=gnome-terminal\n")
+    (apps / "gearlever_dopeiptv_ab12.desktop").write_text(
+        f'[Desktop Entry]\nExec="{old}" %u\n')
+    env = {"XDG_DATA_HOME": str(home / "data"), "XDG_DATA_DIRS": str(home / "nowhere")}
+    # Restarted after an update: the new file, the old one's pinned entry.
+    assert desktop_entry.launch_choice(
+        dict(env, APPIMAGE=str(new), DOPEIPTV_RESTARTED_FROM=str(old))) == (
+        "gearlever_dopeiptv_ab12", "file")
+    # A launcher that names a terminal is not the window's; the file decides.
+    term = str(apps / "org.gnome.Terminal.desktop")
+    assert desktop_entry.launched_app_id(
+        dict(env, APPIMAGE=str(old), GIO_LAUNCHED_DESKTOP_FILE=term)) == "gearlever_dopeiptv_ab12"
+    # The launcher wins over the file when it starts dopeIPTV.
+    (apps / "appimagekit_9-dopeIPTV.desktop").write_text(f"[Desktop Entry]\nExec={new}\n")
+    launcher = str(apps / "appimagekit_9-dopeIPTV.desktop")
+    assert desktop_entry.launch_choice(
+        dict(env, APPIMAGE=str(old), GIO_LAUNCHED_DESKTOP_FILE=launcher)) == (
+        "appimagekit_9-dopeIPTV", "launcher")
+    # Ours starting the file first: the window keeps "dopeiptv".
+    (apps / "dopeiptv.desktop").write_text(f"[Desktop Entry]\nExec={new} %u\n")
+    (apps / "appimagekit_9-dopeIPTV.desktop").unlink()
+    assert desktop_entry.launch_choice(dict(env, APPIMAGE=str(new))) == (None, "default")
+    # Nothing starts it, no AppImage, a relative path: the default.
+    assert desktop_entry.launch_choice(dict(env, APPIMAGE=str(home / "x.AppImage")))[0] is None
+    assert desktop_entry.launch_choice(env) == (None, "default")
+    assert desktop_entry.launch_choice(dict(env, APPIMAGE="dopeIPTV.AppImage"))[0] is None
+
+
+def test_the_look_for_this_files_entry_is_bounded(home, monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(desktop_entry, "_in_flatpak", lambda: False)
+    monkeypatch.setattr(desktop_entry, "ENTRIES_MAX", 3)
+    apps = home / "data" / "applications"
+    apps.mkdir(parents=True)
+    me = home / "dopeIPTV.AppImage"
+    me.write_text("")
+    for i in range(5):
+        (apps / f"a{i}.desktop").write_text("[Desktop Entry]\nExec=/usr/bin/other\n")
+    (apps / "z.desktop").write_text(f"[Desktop Entry]\nExec={me}\n")
+    env = {"XDG_DATA_HOME": str(home / "data"), "XDG_DATA_DIRS": "", "APPIMAGE": str(me)}
+    assert desktop_entry.entry_for_files([str(me)], env) is None          # past the bound
+    monkeypatch.setattr(desktop_entry, "ENTRIES_MAX", 10)
+    assert desktop_entry.entry_for_files([str(me)], env) == "z"
+
+
 def test_flatpak_and_other_systems_keep_their_own_id(home, monkeypatch):
     p = _launcher(home, "appimagekit_1-dopeIPTV.desktop",
                   "Exec=/opt/dopeIPTV.AppImage")

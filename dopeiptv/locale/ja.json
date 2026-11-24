@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "テーマを折りたたむ",
   "rec_by_server": "サーバーが録画中",
   "rec_by_other_app": "別のコンピューターの dopeIPTV が録画中",
-  "srv_rec_by_app": "アプリのウィンドウが録画中"
+  "srv_rec_by_app": "アプリのウィンドウが録画中",
+  "notice_tab_now": "現在",
+  "notice_now_nothing": "現在進行中のものはありません。",
+  "notice_hist_errors": "エラー",
+  "notice_hist_warnings": "警告",
+  "notice_hist_notes": "お知らせ",
+  "notice_hist_empty": "まだありません。アプリからのお知らせや開始した作業は、アプリを閉じるまでここに表示されます。",
+  "notice_hist_none": "この種類の項目はありません。",
+  "menu_activity": "アクティビティとメッセージ…"
 }

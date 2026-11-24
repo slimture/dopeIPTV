@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Mniej motywów",
   "rec_by_server": "nagrywa serwer",
   "rec_by_other_app": "nagrywa dopeIPTV na innym komputerze",
-  "srv_rec_by_app": "nagrywa okno aplikacji"
+  "srv_rec_by_app": "nagrywa okno aplikacji",
+  "notice_tab_now": "Teraz",
+  "notice_now_nothing": "W tej chwili nic się nie dzieje.",
+  "notice_hist_errors": "Błędy",
+  "notice_hist_warnings": "Ostrzeżenia",
+  "notice_hist_notes": "Uwagi",
+  "notice_hist_empty": "Jeszcze nic – to, co mówi aplikacja, i zadania, które uruchamiasz, pojawiają się tutaj do jej zamknięcia.",
+  "notice_hist_none": "Nic tego rodzaju.",
+  "menu_activity": "Aktywność i komunikaty…"
 }

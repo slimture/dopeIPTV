@@ -489,8 +489,13 @@ def restart_into(new: Path, pid: int | None = None) -> None:
     a second one started beside it, at some random later moment."""
     pid = pid or os.getpid()
     env = system_env()
+    # The file it came from: a tool's menu entry naming that one is the
+    # dock's pinned icon, and the new window takes its name (desktop_entry).
+    came_from = os.environ.get("APPIMAGE")
     for var in _RUNTIME_VARS:
         env.pop(var, None)
+    if came_from:
+        env[desktop_entry.RESTARTED_FROM] = came_from
     script = ('n=0; while kill -0 "$0" 2>/dev/null; do '
               'n=$((n+1)); [ "$n" -ge 1500 ] && exit 0; sleep 0.2; done; '
               'exec "$1"')

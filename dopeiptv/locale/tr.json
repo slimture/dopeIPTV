@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Daha az tema",
   "rec_by_server": "sunucu kaydediyor",
   "rec_by_other_app": "başka bir bilgisayardaki dopeIPTV kaydediyor",
-  "srv_rec_by_app": "uygulama penceresi kaydediyor"
+  "srv_rec_by_app": "uygulama penceresi kaydediyor",
+  "notice_tab_now": "Şimdi",
+  "notice_now_nothing": "Şu anda devam eden bir şey yok.",
+  "notice_hist_errors": "Hatalar",
+  "notice_hist_warnings": "Uyarılar",
+  "notice_hist_notes": "Notlar",
+  "notice_hist_empty": "Henüz bir şey yok – uygulamanın size söyledikleri ve başlattığınız işler, uygulama kapanana kadar burada görünür.",
+  "notice_hist_none": "Bu türden bir şey yok.",
+  "menu_activity": "Etkinlik ve mesajlar…"
 }

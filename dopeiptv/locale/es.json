@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Menos temas",
   "rec_by_server": "la graba el servidor",
   "rec_by_other_app": "la graba dopeIPTV en otro ordenador",
-  "srv_rec_by_app": "la graba la ventana de la app"
+  "srv_rec_by_app": "la graba la ventana de la app",
+  "notice_tab_now": "Ahora",
+  "notice_now_nothing": "No pasa nada en este momento.",
+  "notice_hist_errors": "Errores",
+  "notice_hist_warnings": "Avisos",
+  "notice_hist_notes": "Notas",
+  "notice_hist_empty": "Nada todavía: lo que la app te dice y las tareas que inicias aparecen aquí hasta que se cierra.",
+  "notice_hist_none": "Nada de este tipo.",
+  "menu_activity": "Actividad y mensajes…"
 }

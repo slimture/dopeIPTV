@@ -71,7 +71,7 @@ from ..core.num import whole
 from . import a11y, about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
-from .widgets import confirm, file_dialog_options, plain_text
+from .widgets import as_label, confirm, file_dialog_options, plain_text
 from .notices import hub_of
 from ..core.workers import run_async
 
@@ -317,9 +317,10 @@ class _SettingsMixin:
 
     def settings_link_text(self, page: str) -> str:
         """"Settings › Picture & sound…": a menu's way to the page its
-        settings are on (PAGE_TITLES), in the window's direction."""
+        settings are on (PAGE_TITLES), in the window's direction - as a menu
+        entry's or a button's words, its "&" not a shortcut's mark."""
         rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
-        return f"{tr('settings_title')} {'‹' if rtl else '›'} {tr(PAGE_TITLES[page])}…"
+        return as_label(f"{tr('settings_title')} {'‹' if rtl else '›'} {tr(PAGE_TITLES[page])}…")
 
     def open_settings_at(self, page: str) -> None:
         """Settings on *page*, once the menu or window that asked is gone."""

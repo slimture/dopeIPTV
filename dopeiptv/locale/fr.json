@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Moins de thèmes",
   "rec_by_server": "enregistré par le serveur",
   "rec_by_other_app": "enregistré par dopeIPTV sur un autre ordinateur",
-  "srv_rec_by_app": "enregistré par la fenêtre de l'application"
+  "srv_rec_by_app": "enregistré par la fenêtre de l'application",
+  "notice_tab_now": "Maintenant",
+  "notice_now_nothing": "Rien en cours pour le moment.",
+  "notice_hist_errors": "Erreurs",
+  "notice_hist_warnings": "Avertissements",
+  "notice_hist_notes": "Notes",
+  "notice_hist_empty": "Rien pour l'instant – ce que l'appli vous dit et les tâches que vous lancez s'affichent ici jusqu'à sa fermeture.",
+  "notice_hist_none": "Rien de ce type.",
+  "menu_activity": "Activité et messages…"
 }

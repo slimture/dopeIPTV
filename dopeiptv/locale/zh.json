@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "收起主题",
   "rec_by_server": "由服务器录制",
   "rec_by_other_app": "由另一台电脑上的 dopeIPTV 录制",
-  "srv_rec_by_app": "由应用窗口录制"
+  "srv_rec_by_app": "由应用窗口录制",
+  "notice_tab_now": "当前",
+  "notice_now_nothing": "当前没有正在进行的事项。",
+  "notice_hist_errors": "错误",
+  "notice_hist_warnings": "警告",
+  "notice_hist_notes": "提示",
+  "notice_hist_empty": "暂无内容——应用告诉你的信息和你开始的任务会显示在这里，直到应用关闭。",
+  "notice_hist_none": "没有此类内容。",
+  "menu_activity": "活动与消息…"
 }

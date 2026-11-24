@@ -7,8 +7,27 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- The notices at the sidebar's foot fold away to a small bell beside
+  Settings when nothing is happening, the unread messages counted on it;
+  the line comes back only while something runs or is said. The bell
+  (or View → Activity and messages…) opens the panel, now with a
+  History tab: everything the app said and the work you started that
+  finished or was cancelled since it started, filtered by errors,
+  warnings, notes and done, with Copy (scrubbed of your logins) and
+  Clear. Kept in memory only, and nothing while viewing privately.
+
 ### Fixed
 
+- "Settings › Picture & sound…" in the player's right-click menu (and
+  every such link) showed as "Picture_sound": Qt read the "&" as a
+  shortcut's mark.
+- After an AppImage update the restarted window could come up beside
+  its pinned dock icon, and the icon then started a second copy. The
+  window now also finds the menu entry that starts the AppImage (or the
+  one the update came from) when the desktop did not say which entry
+  launched it, and the log says at every start which entry it took.
 - An error from the provider (a 502 Bad Gateway while it was having
   trouble) showed in Messages with the whole address it failed on - the
   user name and password in it - and its row was cut off at the top and the

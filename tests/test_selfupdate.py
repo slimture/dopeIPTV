@@ -383,6 +383,8 @@ def test_the_restart_keeps_the_entry_it_was_launched_from(monkeypatch, tmp_path)
     selfupdate.restart_into(tmp_path / "dopeIPTV.AppImage", pid=1)
     assert seen["env"]["GIO_LAUNCHED_DESKTOP_FILE"] == "/x/applications/a.desktop"
     assert "APPIMAGE" not in seen["env"]
+    # And the file it came from: a tool's entry naming that one is the pin.
+    assert seen["env"]["DOPEIPTV_RESTARTED_FROM"] == "/old/dopeIPTV.AppImage"
 
 
 def _asset(name="dopeIPTV-1.4.6-x86_64.AppImage", digest="sha256:" + "ab" * 32):

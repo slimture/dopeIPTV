@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Minder thema's",
   "rec_by_server": "opgenomen door de server",
   "rec_by_other_app": "opgenomen door dopeIPTV op een andere computer",
-  "srv_rec_by_app": "opgenomen door het app-venster"
+  "srv_rec_by_app": "opgenomen door het app-venster",
+  "notice_tab_now": "Nu",
+  "notice_now_nothing": "Er gebeurt nu niets.",
+  "notice_hist_errors": "Fouten",
+  "notice_hist_warnings": "Waarschuwingen",
+  "notice_hist_notes": "Meldingen",
+  "notice_hist_empty": "Nog niets – wat de app je vertelt en het werk dat je start, verschijnt hier tot je hem sluit.",
+  "notice_hist_none": "Niets van deze soort.",
+  "menu_activity": "Activiteit en meldingen…"
 }

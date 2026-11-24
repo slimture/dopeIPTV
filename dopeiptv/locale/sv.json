@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Färre teman",
   "rec_by_server": "spelas in av servern",
   "rec_by_other_app": "spelas in av dopeIPTV på en annan dator",
-  "srv_rec_by_app": "spelas in av appens fönster"
+  "srv_rec_by_app": "spelas in av appens fönster",
+  "notice_tab_now": "Nu",
+  "notice_now_nothing": "Inget pågår just nu.",
+  "notice_hist_errors": "Fel",
+  "notice_hist_warnings": "Varningar",
+  "notice_hist_notes": "Notiser",
+  "notice_hist_empty": "Inget ännu – det appen berättar och det du sätter igång syns här tills den stängs.",
+  "notice_hist_none": "Inget av det slaget.",
+  "menu_activity": "Aktivitet och meddelanden…"
 }

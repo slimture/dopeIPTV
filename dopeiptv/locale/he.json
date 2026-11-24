@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "פחות ערכות נושא",
   "rec_by_server": "מוקלט על ידי השרת",
   "rec_by_other_app": "מוקלט על ידי dopeIPTV במחשב אחר",
-  "srv_rec_by_app": "מוקלט על ידי חלון האפליקציה"
+  "srv_rec_by_app": "מוקלט על ידי חלון האפליקציה",
+  "notice_tab_now": "עכשיו",
+  "notice_now_nothing": "שום דבר לא מתרחש כרגע.",
+  "notice_hist_errors": "שגיאות",
+  "notice_hist_warnings": "אזהרות",
+  "notice_hist_notes": "הערות",
+  "notice_hist_empty": "עדיין כלום - מה שהאפליקציה אומרת לך והפעולות שאתה מתחיל מופיעים כאן עד שהיא נסגרת.",
+  "notice_hist_none": "אין פריטים מסוג זה.",
+  "menu_activity": "פעילות והודעות…"
 }

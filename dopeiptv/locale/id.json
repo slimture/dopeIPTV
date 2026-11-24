@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Lebih sedikit tema",
   "rec_by_server": "direkam oleh server",
   "rec_by_other_app": "direkam oleh dopeIPTV di komputer lain",
-  "srv_rec_by_app": "direkam oleh jendela aplikasi"
+  "srv_rec_by_app": "direkam oleh jendela aplikasi",
+  "notice_tab_now": "Sekarang",
+  "notice_now_nothing": "Tidak ada yang sedang berjalan.",
+  "notice_hist_errors": "Kesalahan",
+  "notice_hist_warnings": "Peringatan",
+  "notice_hist_notes": "Catatan",
+  "notice_hist_empty": "Belum ada - apa yang disampaikan aplikasi dan pekerjaan yang Anda mulai tampil di sini sampai aplikasi ditutup.",
+  "notice_hist_none": "Tidak ada jenis ini.",
+  "menu_activity": "Aktivitas dan pesan…"
 }

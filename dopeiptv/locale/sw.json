@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Mandhari machache",
   "rec_by_server": "inarekodiwa na seva",
   "rec_by_other_app": "inarekodiwa na dopeIPTV kwenye kompyuta nyingine",
-  "srv_rec_by_app": "inarekodiwa na dirisha la programu"
+  "srv_rec_by_app": "inarekodiwa na dirisha la programu",
+  "notice_tab_now": "Sasa",
+  "notice_now_nothing": "Hakuna kinachoendelea sasa hivi.",
+  "notice_hist_errors": "Hitilafu",
+  "notice_hist_warnings": "Tahadhari",
+  "notice_hist_notes": "Taarifa",
+  "notice_hist_empty": "Bado hakuna - kile programu inakuambia na kazi unazoanzisha huonekana hapa hadi itakapofungwa.",
+  "notice_hist_none": "Hakuna cha aina hii.",
+  "menu_activity": "Shughuli na ujumbe…"
 }

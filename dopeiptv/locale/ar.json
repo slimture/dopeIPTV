@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "سمات أقل",
   "rec_by_server": "يسجّلها الخادم",
   "rec_by_other_app": "يسجّلها dopeIPTV على حاسوب آخر",
-  "srv_rec_by_app": "تسجّلها نافذة التطبيق"
+  "srv_rec_by_app": "تسجّلها نافذة التطبيق",
+  "notice_tab_now": "الآن",
+  "notice_now_nothing": "لا شيء يجري الآن.",
+  "notice_hist_errors": "أخطاء",
+  "notice_hist_warnings": "تحذيرات",
+  "notice_hist_notes": "ملاحظات",
+  "notice_hist_empty": "لا شيء بعد - ما يخبرك به التطبيق، والأعمال التي تبدؤها، يظهر هنا حتى يُغلق.",
+  "notice_hist_none": "لا شيء من هذا النوع.",
+  "menu_activity": "النشاط والرسائل…"
 }

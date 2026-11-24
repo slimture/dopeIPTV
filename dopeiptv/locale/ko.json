@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "테마 접기",
   "rec_by_server": "서버가 녹화 중",
   "rec_by_other_app": "다른 컴퓨터의 dopeIPTV가 녹화 중",
-  "srv_rec_by_app": "앱 창이 녹화 중"
+  "srv_rec_by_app": "앱 창이 녹화 중",
+  "notice_tab_now": "지금",
+  "notice_now_nothing": "지금 진행 중인 작업이 없습니다.",
+  "notice_hist_errors": "오류",
+  "notice_hist_warnings": "경고",
+  "notice_hist_notes": "알림",
+  "notice_hist_empty": "아직 없습니다. 앱이 알려 주는 내용과 시작한 작업은 앱을 닫을 때까지 여기에 표시됩니다.",
+  "notice_hist_none": "이 종류의 항목이 없습니다.",
+  "menu_activity": "활동 및 메시지…"
 }

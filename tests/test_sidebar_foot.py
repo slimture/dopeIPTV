@@ -125,7 +125,10 @@ gx, gy, gw, gh = rect(gear)
 _rx, ry, _rw, _rh = rect(w._bottom_rule)
 assert ry < ay and ry < gy
 assert abs(ay - gy) <= 1 and ax + aw <= gx            # avatar first (left)
-mid = (ax + gx + gw) / 2
+# The notices' bell last, in the same row (the line folds to it while idle).
+bx, by, bw, bh = rect(w._notice_bell)
+assert w._notice_bell.isVisible() and abs(by - gy) <= 1 and gx + gw <= bx
+mid = (ax + bx + bw) / 2
 side_mid = content.width() / 2
 assert abs(mid - side_mid) <= 3, (mid, side_mid)
 _lx, ly, _lw, lh = rect(w._sidebar_logo)
@@ -175,6 +178,9 @@ gx, gy, gw, gh = rect(gear)
 assert ay + ah <= gy and abs((ax + aw / 2) - (gx + gw / 2)) <= 1
 assert abs((ax + aw / 2) - content.width() / 2) <= 3, (ax, aw, content.width())
 assert avatar.isVisible() and gear.isVisible()
+bx, by, bw, bh = rect(w._notice_bell)
+assert gy + gh <= by and abs((bx + bw / 2) - (gx + gw / 2)) <= 1        # the bell under them
+assert by + bh <= content.height(), (by, bh, content.height())
 w._set_sidebar_collapsed(False)
 pump(20)
 

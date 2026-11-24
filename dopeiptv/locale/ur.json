@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "کم تھیمز",
   "rec_by_server": "سرور ریکارڈ کر رہا ہے",
   "rec_by_other_app": "dopeIPTV دوسرے کمپیوٹر پر ریکارڈ کر رہا ہے",
-  "srv_rec_by_app": "ایپ کی ونڈو ریکارڈ کر رہی ہے"
+  "srv_rec_by_app": "ایپ کی ونڈو ریکارڈ کر رہی ہے",
+  "notice_tab_now": "ابھی",
+  "notice_now_nothing": "اس وقت کچھ نہیں ہو رہا۔",
+  "notice_hist_errors": "خرابیاں",
+  "notice_hist_warnings": "انتباہات",
+  "notice_hist_notes": "اطلاعات",
+  "notice_hist_empty": "ابھی کچھ نہیں - ایپ جو بتاتی ہے اور جو کام آپ شروع کرتے ہیں، وہ ایپ بند ہونے تک یہاں دکھائی دیتے ہیں۔",
+  "notice_hist_none": "اس قسم کا کچھ نہیں۔",
+  "menu_activity": "سرگرمی اور پیغامات…"
 }

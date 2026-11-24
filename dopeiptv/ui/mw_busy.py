@@ -34,11 +34,12 @@ picture is popped out.
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QRect, Qt, QTimer
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from ..core.log import log
 from ..i18n import tr
-from .notice_widgets import ActivityLine, ActivityPanel, DecisionCard, Follow
+from .nav_widgets import SourceAvatar
+from .notice_widgets import ActivityLine, ActivityPanel, DecisionCard, Follow, NoticeBell
 from .notices import NoticeHub, hub_of
 from .theme import P
 from .widgets import WhileShown
@@ -84,6 +85,11 @@ class _BusyMixin:
         hub = self.notices = NoticeHub(self)
         line = self._activity_line = ActivityLine(hub)
         card = self._decision_card = DecisionCard(hub)
+        # What the line folds to while nothing happens: a bell beside the
+        # source and Settings, with the unread count - the line comes only
+        # while something runs or is said.
+        self._notice_bell = NoticeBell(hub, SourceAvatar.SIZE)
+        self._notice_bell.clicked.connect(self._notices_open_panel)
         self._notices_foot(card, line)
         self._activity_float = ActivityLine(hub, self, floating=True)
         self._decision_float = DecisionCard(hub, self, floating=True)
@@ -109,6 +115,16 @@ class _BusyMixin:
         if foot is not None:
             foot.insertWidget(0, card)
             foot.insertWidget(1, line)
+        bell = self._notice_bell
+        box = getattr(self, "_actions_box", None)
+        if box is not None:
+            box.addWidget(bell)
+            line.set_bell(True)
+            gear = getattr(self, "_settings_btn", None)
+            if gear is not None:
+                QWidget.setTabOrder(gear, bell)
+        else:
+            bell.hide()
 
     def _notices_changed(self) -> None:
         # Placed at once (cheap): a stand-in must not show a frame at the
@@ -151,6 +167,7 @@ class _BusyMixin:
             return
         rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
         m = self.NOTICE_MARGIN
+        self._notice_bell.refresh()
         if self._notices_sidebar_shown():
             floater.hide()
             line.refresh()
@@ -246,9 +263,37 @@ class _BusyMixin:
         if not panel.isHidden():
             panel.close_panel()
             return
-        line = self.sender() if isinstance(self.sender(), ActivityLine) else self._activity_line
-        rail = bool(getattr(self, "_sidebar_collapsed", False)) and line is self._activity_line
-        panel.open_at(line, beside=(getattr(self, "_side", None) or True) if rail else False)
+        src = self.sender()
+        anchor = src if isinstance(src, (ActivityLine, NoticeBell)) else self._activity_line
+        self._notices_open_from(anchor)
+
+    def _notices_open_from(self, anchor: QWidget, tab: str | None = None) -> None:
+        """The panel from *anchor*: beside the icon rail when the anchor is in
+        it, the bell's lined up with the sidebar's foot."""
+        in_side = anchor in (self._activity_line, self._notice_bell,
+                             getattr(self, "_playlist_btn", None))
+        rail = bool(getattr(self, "_sidebar_collapsed", False)) and in_side
+        align = getattr(self, "_side_foot", None) if anchor is self._notice_bell else None
+        self._notice_panel.open_at(
+            anchor, beside=(getattr(self, "_side", None) or True) if rail else False,
+            tab=tab, align=None if rail else align)
+
+    def _notices_open_history(self) -> None:
+        """The panel on its History tab (View > Activity and messages…, the
+        command palette): from the activity line when it shows, else from
+        the bell at the sidebar's foot - beside the icon rail, or from the
+        window's corner on a page with no sidebar."""
+        line, bell = self._activity_line, self._notice_bell
+        if not line.isHidden() and line.isVisible():
+            anchor: QWidget = line
+        elif not self._activity_float.isHidden():
+            anchor = self._activity_float
+        elif bell.isVisible():
+            anchor = bell
+        else:
+            avatar = getattr(self, "_playlist_btn", None)
+            anchor = avatar if avatar is not None and avatar.isVisible() else self
+        self._notices_open_from(anchor, tab="history")
 
     def _notices_restyle(self) -> None:
         card = getattr(self, "_decision_card", None)
@@ -258,6 +303,7 @@ class _BusyMixin:
             self._notice_panel.restyle()
             self._activity_line.update()
             self._activity_float.update()
+            self._notice_bell.update()
 
     # -- the list's work ----------------------------------------------------------
 

@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Thu gọn giao diện",
   "rec_by_server": "do máy chủ ghi",
   "rec_by_other_app": "do dopeIPTV trên máy tính khác ghi",
-  "srv_rec_by_app": "do cửa sổ ứng dụng ghi"
+  "srv_rec_by_app": "do cửa sổ ứng dụng ghi",
+  "notice_tab_now": "Bây giờ",
+  "notice_now_nothing": "Hiện không có gì đang diễn ra.",
+  "notice_hist_errors": "Lỗi",
+  "notice_hist_warnings": "Cảnh báo",
+  "notice_hist_notes": "Ghi chú",
+  "notice_hist_empty": "Chưa có gì - những gì ứng dụng thông báo và việc bạn bắt đầu sẽ hiện ở đây cho đến khi đóng ứng dụng.",
+  "notice_hist_none": "Không có mục nào thuộc loại này.",
+  "menu_activity": "Hoạt động và tin nhắn…"
 }

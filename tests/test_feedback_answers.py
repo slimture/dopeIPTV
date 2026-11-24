@@ -220,12 +220,12 @@ inbox.answers[report.code_hash("mid")] = [{"t": int(now - 3600), "code": "fixed"
 w._answers_last = 0.0
 w._ask_answers()
 assert wait(lambda: toasts), toasts
-# A message: a count on the activity line, its button in the panel.
+# A message: a count on the bell at the sidebar's foot, its button in the panel.
 from PyQt6.QtWidgets import QPushButton
 [msg] = [m for m in w.notices.messages() if "answered" in m.title]
-assert "answered" in toasts[-1] and w._activity_line.badge() >= 1
+assert "answered" in toasts[-1] and w._notice_bell.badge() >= 1
 assert w._answers_action.text() == tr("fba_menu") + " (1)…"
-w._activity_line.open_panel.emit()
+w._notice_bell.click()
 app.processEvents()
 panel = w._notice_panel
 rows = [panel._msgs.itemAt(i).widget() for i in range(panel._msgs.count())]

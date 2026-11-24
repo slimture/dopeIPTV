@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "ย่อธีม",
   "rec_by_server": "เซิร์ฟเวอร์กำลังบันทึก",
   "rec_by_other_app": "dopeIPTV บนคอมพิวเตอร์เครื่องอื่นกำลังบันทึก",
-  "srv_rec_by_app": "หน้าต่างแอปกำลังบันทึก"
+  "srv_rec_by_app": "หน้าต่างแอปกำลังบันทึก",
+  "notice_tab_now": "ตอนนี้",
+  "notice_now_nothing": "ตอนนี้ไม่มีงานที่กำลังทำอยู่",
+  "notice_hist_errors": "ข้อผิดพลาด",
+  "notice_hist_warnings": "คำเตือน",
+  "notice_hist_notes": "หมายเหตุ",
+  "notice_hist_empty": "ยังไม่มี - สิ่งที่แอปแจ้งและงานที่คุณเริ่มจะแสดงที่นี่จนกว่าจะปิดแอป",
+  "notice_hist_none": "ไม่มีรายการประเภทนี้",
+  "menu_activity": "กิจกรรมและข้อความ…"
 }

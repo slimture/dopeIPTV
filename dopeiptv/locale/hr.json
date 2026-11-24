@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Manje tema",
   "rec_by_server": "snima poslužitelj",
   "rec_by_other_app": "snima dopeIPTV na drugom računalu",
-  "srv_rec_by_app": "snima prozor aplikacije"
+  "srv_rec_by_app": "snima prozor aplikacije",
+  "notice_tab_now": "Sada",
+  "notice_now_nothing": "Trenutno se ništa ne događa.",
+  "notice_hist_errors": "Pogreške",
+  "notice_hist_warnings": "Upozorenja",
+  "notice_hist_notes": "Napomene",
+  "notice_hist_empty": "Još ništa – ono što vam aplikacija kaže i poslovi koje pokrenete prikazuju se ovdje dok se ne zatvori.",
+  "notice_hist_none": "Ništa ove vrste.",
+  "menu_activity": "Aktivnost i poruke…"
 }

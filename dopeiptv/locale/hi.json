@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "कम थीम",
   "rec_by_server": "सर्वर रिकॉर्ड कर रहा है",
   "rec_by_other_app": "dopeIPTV दूसरे कंप्यूटर पर रिकॉर्ड कर रहा है",
-  "srv_rec_by_app": "ऐप की विंडो रिकॉर्ड कर रही है"
+  "srv_rec_by_app": "ऐप की विंडो रिकॉर्ड कर रही है",
+  "notice_tab_now": "अभी",
+  "notice_now_nothing": "अभी कुछ नहीं चल रहा है।",
+  "notice_hist_errors": "त्रुटियाँ",
+  "notice_hist_warnings": "चेतावनियाँ",
+  "notice_hist_notes": "सूचनाएँ",
+  "notice_hist_empty": "अभी कुछ नहीं - ऐप जो बताता है और आप जो काम शुरू करते हैं, वह ऐप बंद होने तक यहाँ दिखता है।",
+  "notice_hist_none": "इस प्रकार का कुछ नहीं।",
+  "menu_activity": "गतिविधि और संदेश…"
 }

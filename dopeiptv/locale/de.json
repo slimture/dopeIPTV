@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Weniger Designs",
   "rec_by_server": "nimmt der Server auf",
   "rec_by_other_app": "nimmt dopeIPTV auf einem anderen Computer auf",
-  "srv_rec_by_app": "nimmt das App-Fenster auf"
+  "srv_rec_by_app": "nimmt das App-Fenster auf",
+  "notice_tab_now": "Jetzt",
+  "notice_now_nothing": "Gerade läuft nichts.",
+  "notice_hist_errors": "Fehler",
+  "notice_hist_warnings": "Warnungen",
+  "notice_hist_notes": "Hinweise",
+  "notice_hist_empty": "Noch nichts – was die App dir sagt und was du startest, erscheint hier, bis sie geschlossen wird.",
+  "notice_hist_none": "Nichts dieser Art.",
+  "menu_activity": "Aktivität und Meldungen…"
 }

@@ -3220,5 +3220,13 @@
   "set_themes_fewer": "Згорнути теми",
   "rec_by_server": "записує сервер",
   "rec_by_other_app": "записує dopeIPTV на іншому комп’ютері",
-  "srv_rec_by_app": "записує вікно застосунку"
+  "srv_rec_by_app": "записує вікно застосунку",
+  "notice_tab_now": "Зараз",
+  "notice_now_nothing": "Зараз нічого не відбувається.",
+  "notice_hist_errors": "Помилки",
+  "notice_hist_warnings": "Попередження",
+  "notice_hist_notes": "Примітки",
+  "notice_hist_empty": "Поки нічого – повідомлення застосунку й запущені вами завдання з'являються тут до його закриття.",
+  "notice_hist_none": "Нічого такого.",
+  "menu_activity": "Дії та повідомлення…"
 }
