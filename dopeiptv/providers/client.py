@@ -281,6 +281,17 @@ class ListCache:
             self._refetch_after = time.time()
 
 
+#: Making a client's session, or asking something of it, one thread at a time.
+_SESSION_LOCK = threading.RLock()
+
+
+def _agent(name: str) -> Any:
+    """A session's User-Agent as *name* (Mirrored.on_session)."""
+    def put(session: Any) -> None:
+        session.headers["User-Agent"] = name
+    return put
+
+
 class Mirrored:
     """Nerd's backup addresses on a client (core/mirrors.py): the addresses
     a request tries, the one that answered kept as ``server``. Without a
@@ -288,9 +299,46 @@ class Mirrored:
     alone, as it always did."""
 
     server: str
-    session: Any
     picker: mirrors.Picker | None = None
     LOG_NAME = "list"
+
+    # -- the requests session, made at its first use ---------------------------------
+
+    @property
+    def session(self) -> Any:
+        """The client's requests session - made as it is first used (on the
+        first request, usually on a worker), with what was asked of it so
+        far (on_session) put on it then: a client is made before the window
+        at every start, and making the session there brought requests,
+        urllib3 and certifi onto the start's import chain, before the first
+        frame (docs/PERFORMANCE.md)."""
+        made = self.__dict__.get("_session")
+        if made is None:
+            with _SESSION_LOCK:
+                made = self.__dict__.get("_session")
+                if made is None:
+                    made = requests.Session()
+                    # Kept until every one has taken: a setup that failed
+                    # is tried again with the next session, never left out.
+                    for setup in self.__dict__.get("_session_setup", ()):
+                        setup(made)
+                    self.__dict__.pop("_session_setup", None)
+                    self.__dict__["_session"] = made
+        return made
+
+    @session.setter
+    def session(self, value: Any) -> None:
+        self.__dict__["_session"] = value
+
+    def on_session(self, setup: Any) -> None:
+        """*setup(session)* on the client's session: at once when it is
+        made, else as it is made - in the order asked."""
+        with _SESSION_LOCK:
+            made = self.__dict__.get("_session")
+            if made is None:
+                self.__dict__.setdefault("_session_setup", []).append(setup)
+                return
+        setup(made)
 
     def use_mirrors(self, picker: mirrors.Picker | None) -> None:
         self.picker = picker
@@ -398,8 +446,7 @@ class XtreamClient(Mirrored, ListCache):
         # wherever they turn up - a stream URL, a requests exception, a line
         # written long after this call.
         register_secrets(username, password)
-        self.session = requests.Session()
-        self.session.headers["User-Agent"] = "dopeIPTV/1.0"
+        self.on_session(_agent("dopeIPTV/1.0"))
         super().__init__(cache_path)
         # Monotonic deadline for the fail-fast cooldown after a network error.
         self._net_down_until = 0.0
@@ -697,7 +744,6 @@ class OfflineClient(Mirrored):
         self.server = ""
         self.username = ""
         self.password = ""
-        self.session = requests.Session()
 
     def authenticate(self) -> dict:
         return {}
@@ -1177,16 +1223,24 @@ def make_client(playlist: dict):
                   _kind=(playlist or {}).get("kind") or "xtream",
                   _server=str((playlist or {}).get("server") or ""))
     route = net_route.route_for(source)
-    session = getattr(client, "session", None)
-    if session is not None:
+    # Nerd as it is now, whenever the session is made (Mirrored.session).
+    profile = nerd.current()
+
+    def setup(session: Any) -> None:
         # A source's lists and playlists are the largest answers there are:
         # their own ceiling, above any real one (core/_lazy_requests.py).
         from ..core._lazy_requests import LIST_MAX
         session.max_response = LIST_MAX
-        nerd.current().apply_session(session, source)
+        profile.apply_session(session, source)
         if route.active:
             from ..core import net_adapter
             net_adapter.mount(session, route)
+
+    later = getattr(client, "on_session", None)
+    if callable(later):
+        later(setup)
+    elif getattr(client, "session", None) is not None:
+        setup(client.session)
     try:
         client.net_route = route
     except AttributeError:

@@ -464,9 +464,8 @@ class StalkerClient(Mirrored, ListCache):
         # The MAC is the account: masked out of every log record, in the
         # shapes it travels in.
         register_secrets(self.mac, self.mac.lower(), quote(self.mac, safe=""))
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": USER_AGENT,
-                                     "X-User-Agent": X_USER_AGENT})
+        self.on_session(lambda s: s.headers.update({"User-Agent": USER_AGENT,
+                                                     "X-User-Agent": X_USER_AGENT}))
         super().__init__(cache_path)
         self._endpoints = portal_endpoints(self.server)
         self._endpoint: str | None = None

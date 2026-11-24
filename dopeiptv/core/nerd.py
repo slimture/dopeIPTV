@@ -676,6 +676,10 @@ def apply_ip_family(mode: str) -> None:
     """IPv4 or IPv6 only for the app's own connections (lists, guides,
     artwork); "auto" lets the system choose. The player follows the system."""
     global _ip_original
+    if mode not in ("ipv4", "ipv6") and _ip_original is None:
+        # Nothing was ever changed, so nothing to put back - and urllib3
+        # not imported at the start for nothing (docs/PERFORMANCE.md).
+        return
     try:
         from urllib3.util import connection
     except ImportError:
