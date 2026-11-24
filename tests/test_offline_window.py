@@ -143,6 +143,7 @@ toasts = []
 real_toast = w._show_toast
 w._show_toast = lambda text, ms=0: (toasts.append(text), real_toast(text, ms))[1]
 until(lambda: w.downloads.scanned)
+until(lambda: w._dl_seen == w.downloads.version)     # the downloads' beat has seen it
 pump(40)
 out["start"] = {"on": offline.on(), "mode": offline.mode(), "why": offline.why(),
                 "client": type(w.client).__name__, "strip": w._off_strip.isVisible(),
@@ -202,6 +203,14 @@ out["film_play"] = {"url": plays[-1] if plays else None, "status": w.count_lbl.t
                     "history": [(e.get("_url"), e.get("_kind")) for e in w.history.items()]}
 w._dl_detail_show(row, "movie")
 out["film_detail"] = w.d_dl_label.text()
+# TV mode's and the phone's way to a film take the download's path too.
+w.player.current_url = None
+w._playing_key = None
+w._tv_play_movie(dict(row))
+pump(20)
+out["tv_play"] = {"url": plays[-1] if plays else None,
+                  "paths_in_history": [e.get("_url") for e in w.history.items()
+                                       if not str(e.get("_url") or "").startswith("http")]}
 # -- a series' page offline --------------------------------------------------------
 dl.keep_episodes(w._off_episodes, "a1b2c3d4", "77",
                  [{"id": "501", "season": 1, "episode_num": 1, "title": "Ett"},
@@ -491,6 +500,7 @@ def test_a_downloaded_film_plays_offline_marked_offline(seen):
     assert ["http://provider.example.com/movie/kund/hemligt/11.mp4", "movie"] in play["history"]
     assert all(".mp4" not in str(u) or str(u).startswith("http") for u, _k in play["history"])
     assert seen["film_detail"].startswith("Offline · Downloaded · ")
+    assert seen["tv_play"]["url"] == play["url"] and seen["tv_play"]["paths_in_history"] == []
 
 
 def test_a_series_page_offline_dims_what_is_not_downloaded(seen):

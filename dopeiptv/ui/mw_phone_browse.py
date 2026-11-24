@@ -793,8 +793,10 @@ class _PhoneBrowseMixin:
         else:
             self._sp_start_once = (key, at) if at > 0 else None
         try:
-            self._start_playback(url, row.get("name") or row.get("title") or "dopeIPTV",
-                                 row.get("stream_icon") or row.get("cover"), key, "movie", item=row)
+            # A downloaded film plays its file, as this film (mw_downloads).
+            start = getattr(self, "_dl_start", self._start_playback)
+            start(url, row.get("name") or row.get("title") or "dopeIPTV",
+                  row.get("stream_icon") or row.get("cover"), key, "movie", item=row)
         finally:
             self._sp_start_once = None
         return True

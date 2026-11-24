@@ -186,8 +186,8 @@ class _OfflineMixin:
         if kind == "m3u" and not server.lower().startswith(("http://", "https://")):
             return False                # a file's list: its streams may be anywhere
         try:
-            from ..core.net_bridge import _source_on_internet
-            return not _source_on_internet(kind, server, pl.get("options") or {})
+            from ..providers.client import _on_internet
+            return not _on_internet(kind, server, pl.get("options") or {})
         except Exception:
             return False
 
@@ -387,9 +387,20 @@ class _OfflineMixin:
                 return
             try:
                 from .cert_trust import offer_review
-                offer_review(self, self.playlist_store, pl, self.switch_playlist)
+                if offer_review(self, self.playlist_store, pl, self.switch_playlist):
+                    return
             except Exception:
                 log.debug("offline mode: the certificate review not offered", exc_info=True)
+            # A real credential rejection, said as the start says it (app.py).
+            if isinstance(value, RuntimeError) and "username or password" in str(value):
+                from PyQt6.QtWidgets import QMessageBox
+
+                from .widgets import plain_text
+                where = f"{tr('settings_title')} → {tr('set_page_sources')}"
+                QMessageBox.warning(
+                    self, tr("msg_connection_failed"),
+                    plain_text(f"{pl.get('name') or ''}: {value}\n\n"
+                               + tr("msg_check_playlist_credentials", where=where)))
 
         run_async(self.pool, ask, done, lambda _m: None)
 
@@ -429,8 +440,14 @@ class _OfflineMixin:
     def _offline_downloads_changed(self) -> None:
         """A download came, went, or the folder was read (mw_downloads):
         offline mode's lists - which are the downloads - read again."""
-        if not getattr(self.client, "offline", False):
+        client = self.client
+        if not getattr(client, "offline", False):
             return
+        d = getattr(self, "downloads", None)
+        listed = getattr(client, "listed", None)
+        if d is not None and listed is not None and listed == frozenset(
+                i.ident for i in d.items() if i.source == getattr(client, "source", "")):
+            return                      # what the lists show already: nothing reset
         self._full_catalog = None
         self._search_index_cache = {}
         try:

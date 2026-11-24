@@ -43,6 +43,9 @@ class DownloadedClient(OfflineClient):
 
     #: Says to the window that its lists are offline mode's.
     offline = True
+    #: The downloads its lists were last made of (their idents): the window
+    #: reads them again only when what is downloaded changed since.
+    listed: frozenset | None = None
 
     def __init__(self, downloads: dl.Downloads | None, source: str, category: str = "",
                  known: Known | None = None) -> None:
@@ -63,7 +66,9 @@ class DownloadedClient(OfflineClient):
                 d.scan()                # a worker's thread: the folder read now
             except Exception:
                 return []
-        return [i for i in d.items() if i.source == self.source and i.kind == kind]
+        mine = [i for i in d.items() if i.source == self.source]
+        self.listed = frozenset(i.ident for i in mine)
+        return [i for i in mine if i.kind == kind]
 
     def _categories(self, items: list[dl.Item], id_key: str, name_key: str) -> list[dict]:
         named: dict[str, str] = {}
