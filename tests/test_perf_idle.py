@@ -95,7 +95,7 @@ def wakes():
     return total
 
 
-s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
+s = settings()
 w = mw.MainWindow(DemoClient(), s, PlaylistStore(s))
 w.show()
 pump()
@@ -129,6 +129,7 @@ w0, c0 = (wakes() if linux else 0), time.process_time()
 rate, top = timers.count(STRETCH)
 out["idle"] = {"timers": rate, "top": top, "cpu": (time.process_time() - c0) / STRETCH,
                "wakes": ((wakes() - w0) / STRETCH) if linux else None}
+out["tried"] = sorted(set(tried))
 done(out)
 """
 
@@ -233,3 +234,8 @@ def test_the_busy_spinner_stops_behind_a_page(qapp):
     h._hide_busy_overlay()
     assert not h._busy_spin_timer.isActive()
     h.deleteLater()
+
+
+def test_nothing_went_out(seen):
+    """What the idle window measures never waited on the internet."""
+    assert seen["tried"] == []

@@ -22,15 +22,47 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #: The longer local run.
 LONG = os.environ.get("DOPEIPTV_PERF_LONG", "").strip() not in ("", "0")
 
-#: The start of every window child: Qt offscreen, settings of its own, a
-#: window on the demo source, shown, and helpers to wait and pump.
+#: The start of every window child: Qt offscreen, settings of its own, and
+#: helpers to wait and pump. Nothing leaves this computer: a name that is
+#: not this computer's is not looked up (``tried`` lists what was asked),
+#: and the radio directory answers nothing - a window visits Radio, and
+#: what it measures must not wait on the internet. A child makes its own
+#: settings with ``settings()``: the update check and TMDB off.
 PRELUDE = r"""
-import json, os, sys, tempfile, time
+import json, os, socket, sys, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+tried = []
+_gai = socket.getaddrinfo
+
+
+def _getaddrinfo(host, *a, **k):
+    name = host.decode() if isinstance(host, bytes) else str(host or "")
+    if name not in ("localhost", "::1", "") and not name.startswith("127."):
+        tried.append(name)
+        raise socket.gaierror(socket.EAI_NONAME, "no network in this test")
+    return _gai(host, *a, **k)
+
+
+socket.getaddrinfo = _getaddrinfo
 from PyQt6.QtCore import QEventLoop, QSettings, QTimer
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 from PyQt6.QtWidgets import QApplication
 app = QApplication.instance() or QApplication([])
+from dopeiptv.providers import radio_browser as _radio
+
+
+def _no_radio(self, path, params=None):
+    raise _radio.RadioError("no network in this test")
+
+
+_radio.RadioBrowser.get = _no_radio
+
+
+def settings():
+    s = QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.Format.IniFormat)
+    s.setValue("check_updates", "false")
+    s.setValue("metadata_source", "off")
+    return s
 
 
 def wait(sec):
