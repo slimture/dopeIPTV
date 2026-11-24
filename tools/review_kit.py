@@ -53,7 +53,8 @@ WHOLE = [
      "sizes, connection counts and time limits? Can a page in the browser, another program or "
      "another user on the same computer, or another device on the network use one to read "
      "anything, play or record something, or make the app fetch an address of its choosing?",
-     ["dopeiptv/core/remote_api.py", "dopeiptv/core/phone_remote.py", "dopeiptv/core/phone_browse.py",
+     ["dopeiptv/core/home_gate.py", "dopeiptv/core/remote_api.py", "dopeiptv/core/phone_remote.py",
+      "dopeiptv/core/phone_browse.py",
       "dopeiptv/services/home_server.py", "dopeiptv/services/share.py", "dopeiptv/core/hdhr.py",
       "dopeiptv/core/restream.py", "dopeiptv/core/dvr_server.py", "dopeiptv/core/net_bridge.py",
       "dopeiptv/providers/cast_bridge.py", "dopeiptv/providers/airplay_bridge.py",
