@@ -201,9 +201,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "nightly-${V}" out/* --prerelease --latest=false \
-            --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
-            --notes-file notes.md
+          # A re-run of a build that failed or was cancelled (a macOS runner
+          # that never came) adds its files to the test build already
+          # published, with the signed list and the notes as they are now.
+          if gh release view "nightly-${V}" >/dev/null 2>&1; then
+            gh release upload "nightly-${V}" out/* --clobber
+            gh release edit "nightly-${V}" --notes-file notes.md
+          else
+            gh release create "nightly-${V}" out/* --prerelease --latest=false \
+              --target "${GITHUB_SHA}" --title "dopeIPTV ${V} (test build)" \
+              --notes-file notes.md
+          fi
       - name: Keep the newest three
         if: steps.gather.outputs.publish == 'true'
         env:
