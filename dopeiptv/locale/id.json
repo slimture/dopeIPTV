@@ -3289,5 +3289,22 @@
   "dl_why_refused": "mengarah ke tempat yang tidak diunduh oleh aplikasi",
   "dl_why_other": "ada yang salah",
   "notice_hist_copy_list": "Salin daftar",
-  "notice_hist_copy_tip": "Menyalin apa yang ditampilkan daftar sekarang sebagai teks, tanpa data login Anda. Klik kanan sebuah baris untuk menyalin baris itu saja."
+  "notice_hist_copy_tip": "Menyalin apa yang ditampilkan daftar sekarang sebagai teks, tanpa data login Anda. Klik kanan sebuah baris untuk menyalin baris itu saja.",
+  "dl_state_wait_offline": "Menunggu jaringan",
+  "offline_menu": "Kerja offline",
+  "offline_strip": "Offline – hanya yang diunduh yang ditampilkan",
+  "offline_strip_tip": "Tidak ada jaringan, atau mode offline dinyalakan: yang Anda unduh bisa diputar, Berkas lokal dan Rekaman bekerja seperti biasa, dan tidak ada yang dikirim ke internet.",
+  "offline_go_online": "Kembali online",
+  "offline_note_on": "Jaringan hilang – mode offline menyala",
+  "offline_note_hand": "Mode offline menyala",
+  "offline_note_off": "Online lagi",
+  "offline_tv": "TV memerlukan jaringan. Yang Anda unduh ada di Film, Serial, dan Diunduh.",
+  "offline_radio": "Radio memerlukan jaringan.",
+  "offline_needs_network": "Ini memerlukan jaringan – mode offline menyala.",
+  "offline_not_downloaded": "Belum diunduh",
+  "offline_not_downloaded_toast": "Episode ini belum diunduh – akan diputar saat jaringan kembali.",
+  "offline_mark": "Offline",
+  "offline_none": "Tidak ada yang diunduh dari sumber ini",
+  "offline_search": "Offline – mencari di yang diunduh",
+  "rec_reason_no_network": "Tidak ada jaringan"
 }

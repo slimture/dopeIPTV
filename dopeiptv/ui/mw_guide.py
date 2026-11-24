@@ -527,6 +527,11 @@ class _GuideMixin:
             # No provider yet (the first start): no guide to wait for, and
             # no "could not load" for one that was never there.
             return
+        from ..core import offline
+        if offline.on():
+            # Offline mode: no guide downloaded, none waited for - it is
+            # read again once the network is back (mw_offline).
+            return
         self._guide_loading = x
         token = self._guide_busy_begin(label)
         self._guide_load_token = token

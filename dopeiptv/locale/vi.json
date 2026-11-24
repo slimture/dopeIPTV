@@ -3289,5 +3289,22 @@
   "dl_why_refused": "nó dẫn tới nơi ứng dụng không tải từ đó",
   "dl_why_other": "đã có lỗi xảy ra",
   "notice_hist_copy_list": "Sao chép danh sách",
-  "notice_hist_copy_tip": "Sao chép những gì danh sách đang hiển thị dưới dạng văn bản, không kèm thông tin đăng nhập của bạn. Nhấp chuột phải vào một dòng để chỉ sao chép dòng đó."
+  "notice_hist_copy_tip": "Sao chép những gì danh sách đang hiển thị dưới dạng văn bản, không kèm thông tin đăng nhập của bạn. Nhấp chuột phải vào một dòng để chỉ sao chép dòng đó.",
+  "dl_state_wait_offline": "Đang chờ mạng",
+  "offline_menu": "Làm việc ngoại tuyến",
+  "offline_strip": "Ngoại tuyến – chỉ hiện nội dung đã tải",
+  "offline_strip_tip": "Không có mạng, hoặc đã bật chế độ ngoại tuyến: nội dung bạn đã tải vẫn phát, Tệp cục bộ và Bản ghi hoạt động như thường, và không có gì được gửi lên internet.",
+  "offline_go_online": "Trực tuyến",
+  "offline_note_on": "Mất mạng – chế độ ngoại tuyến đang bật",
+  "offline_note_hand": "Chế độ ngoại tuyến đang bật",
+  "offline_note_off": "Đã trực tuyến lại",
+  "offline_tv": "TV cần mạng. Nội dung bạn đã tải nằm trong Phim, Loạt phim và Đã tải.",
+  "offline_radio": "Radio cần mạng.",
+  "offline_needs_network": "Việc này cần mạng – chế độ ngoại tuyến đang bật.",
+  "offline_not_downloaded": "Chưa tải",
+  "offline_not_downloaded_toast": "Tập này chưa được tải – nó sẽ phát khi có mạng trở lại.",
+  "offline_mark": "Ngoại tuyến",
+  "offline_none": "Chưa tải gì từ nguồn này",
+  "offline_search": "Ngoại tuyến – đang tìm trong nội dung đã tải",
+  "rec_reason_no_network": "Không có mạng"
 }

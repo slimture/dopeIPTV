@@ -3289,5 +3289,22 @@
   "dl_why_refused": "es führte dorthin, wovon die App nicht herunterlädt",
   "dl_why_other": "etwas ist schiefgelaufen",
   "notice_hist_copy_list": "Liste kopieren",
-  "notice_hist_copy_tip": "Kopiert, was die Liste gerade zeigt, als Text – ohne deine Zugangsdaten. Rechtsklick auf eine Zeile kopiert nur diese."
+  "notice_hist_copy_tip": "Kopiert, was die Liste gerade zeigt, als Text – ohne deine Zugangsdaten. Rechtsklick auf eine Zeile kopiert nur diese.",
+  "dl_state_wait_offline": "Wartet auf das Netzwerk",
+  "offline_menu": "Offline arbeiten",
+  "offline_strip": "Offline – nur Heruntergeladenes wird angezeigt",
+  "offline_strip_tip": "Kein Netzwerk oder Offline-Modus eingeschaltet: Was du heruntergeladen hast, wird abgespielt, Lokale Dateien und Aufnahmen funktionieren wie gewohnt, und nichts wird ins Internet gesendet.",
+  "offline_go_online": "Online gehen",
+  "offline_note_on": "Das Netzwerk ist weg – der Offline-Modus ist an",
+  "offline_note_hand": "Der Offline-Modus ist an",
+  "offline_note_off": "Wieder online",
+  "offline_tv": "Fernsehen braucht das Netzwerk. Was du heruntergeladen hast, findest du unter Filme, Serien und Heruntergeladen.",
+  "offline_radio": "Radio braucht das Netzwerk.",
+  "offline_needs_network": "Dafür wird das Netzwerk gebraucht – der Offline-Modus ist an.",
+  "offline_not_downloaded": "Nicht heruntergeladen",
+  "offline_not_downloaded_toast": "Diese Folge ist nicht heruntergeladen – sie läuft, sobald das Netzwerk wieder da ist.",
+  "offline_mark": "Offline",
+  "offline_none": "Von dieser Quelle ist nichts heruntergeladen",
+  "offline_search": "Offline – Suche im Heruntergeladenen",
+  "rec_reason_no_network": "Kein Netzwerk"
 }

@@ -99,8 +99,12 @@ class _SourceLabelMixin:
         menu.deleteLater()
 
     def _tv_source_name(self) -> str:
-        """The source's name for TV mode's header ("" without one)."""
-        return source_name(self._active_source())
+        """The source's name for TV mode's header ("" without one) - and
+        "Offline" while offline mode is on (mw_offline)."""
+        name = source_name(self._active_source())
+        if getattr(self, "_offline", lambda: False)():
+            return " · ".join(x for x in (name, tr("offline_mark")) if x)
+        return name
 
     # -- what plays -------------------------------------------------------------------
 
@@ -150,6 +154,10 @@ class _SourceLabelMixin:
             text = tr("status_playing_from", title=title, source=other)
         else:
             text = tr("status_playing", title=title)
+        # A downloaded title in offline mode: "Offline" by it (mw_offline).
+        mark = getattr(self, "_offline_mark", None)
+        if callable(mark):
+            text = mark(text)
         self._playing_shown = text
         return text
 

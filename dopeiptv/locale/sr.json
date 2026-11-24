@@ -3289,5 +3289,22 @@
   "dl_why_refused": "vodilo je tamo odakle aplikacija ne preuzima",
   "dl_why_other": "nešto je pošlo naopako",
   "notice_hist_copy_list": "Kopiraj listu",
-  "notice_hist_copy_tip": "Kopira ono što lista sada prikazuje, kao tekst, bez vaših podataka za prijavu. Desni klik na red kopira samo njega."
+  "notice_hist_copy_tip": "Kopira ono što lista sada prikazuje, kao tekst, bez vaših podataka za prijavu. Desni klik na red kopira samo njega.",
+  "dl_state_wait_offline": "Čeka mrežu",
+  "offline_menu": "Rad van mreže",
+  "offline_strip": "Van mreže – prikazuje se samo preuzeto",
+  "offline_strip_tip": "Nema mreže ili je uključen rad van mreže: ono što ste preuzeli se pušta, Lokalne datoteke i Snimci rade kao i obično i ništa se ne šalje na internet.",
+  "offline_go_online": "Poveži se",
+  "offline_note_on": "Mreže više nema – uključen je rad van mreže",
+  "offline_note_hand": "Uključen je rad van mreže",
+  "offline_note_off": "Ponovo na mreži",
+  "offline_tv": "TV-u je potrebna mreža. Ono što ste preuzeli je pod Filmovi, Serije i Preuzeto.",
+  "offline_radio": "Radiju je potrebna mreža.",
+  "offline_needs_network": "Za ovo je potrebna mreža – uključen je rad van mreže.",
+  "offline_not_downloaded": "Nije preuzeto",
+  "offline_not_downloaded_toast": "Ova epizoda nije preuzeta – pustiće se kada se mreža vrati.",
+  "offline_mark": "Van mreže",
+  "offline_none": "Ništa iz ovog izvora nije preuzeto",
+  "offline_search": "Van mreže – pretraga preuzetog",
+  "rec_reason_no_network": "Nema mreže"
 }

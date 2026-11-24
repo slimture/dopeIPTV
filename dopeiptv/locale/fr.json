@@ -3289,5 +3289,22 @@
   "dl_why_refused": "il menait là où l'appli ne télécharge pas",
   "dl_why_other": "quelque chose s'est mal passé",
   "notice_hist_copy_list": "Copier la liste",
-  "notice_hist_copy_tip": "Copie ce que la liste affiche, en texte, sans vos identifiants. Clic droit sur une ligne pour ne copier qu'elle."
+  "notice_hist_copy_tip": "Copie ce que la liste affiche, en texte, sans vos identifiants. Clic droit sur une ligne pour ne copier qu'elle.",
+  "dl_state_wait_offline": "Attend le réseau",
+  "offline_menu": "Travailler hors ligne",
+  "offline_strip": "Hors ligne – seul ce qui est téléchargé s'affiche",
+  "offline_strip_tip": "Pas de réseau, ou mode hors ligne activé : ce que vous avez téléchargé se lit, Fichiers locaux et Enregistrements fonctionnent comme d'habitude, et rien n'est envoyé sur internet.",
+  "offline_go_online": "Se reconnecter",
+  "offline_note_on": "Le réseau a disparu – le mode hors ligne est activé",
+  "offline_note_hand": "Le mode hors ligne est activé",
+  "offline_note_off": "De nouveau en ligne",
+  "offline_tv": "La TV a besoin du réseau. Ce que vous avez téléchargé se trouve dans Films, Séries et Téléchargé.",
+  "offline_radio": "La radio a besoin du réseau.",
+  "offline_needs_network": "Ceci a besoin du réseau – le mode hors ligne est activé.",
+  "offline_not_downloaded": "Non téléchargé",
+  "offline_not_downloaded_toast": "Cet épisode n'est pas téléchargé – il se lira quand le réseau sera revenu.",
+  "offline_mark": "Hors ligne",
+  "offline_none": "Rien de cette source n'est téléchargé",
+  "offline_search": "Hors ligne – recherche dans ce qui est téléchargé",
+  "rec_reason_no_network": "Pas de réseau"
 }

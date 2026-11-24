@@ -14,8 +14,9 @@ from ..core import connections
 from ..core.connections import Use
 from ..core.log import log
 from ..core.privacy import for_log
-from ..core.recording import (DISK_FULL, NO_BRIDGE, NO_PRIVATE_FILE, NOT_A_STREAM, SCRAMBLED,
-                              RecordingManager, format_size, free_path, safe_filename)
+from ..core.recording import (DISK_FULL, NO_BRIDGE, NO_NETWORK, NO_PRIVATE_FILE, NOT_A_STREAM,
+                              SCRAMBLED, RecordingManager, format_size, free_path,
+                              safe_filename)
 from .notices import hub_of
 from .theme import P
 from .widgets import confirm, plain_text
@@ -53,6 +54,7 @@ _REC_REASONS = {
     NOT_A_STREAM: "rec_reason_not_a_stream",
     NO_BRIDGE: "rec_reason_no_bridge",
     NO_PRIVATE_FILE: "rec_reason_no_private_file",
+    NO_NETWORK: "rec_reason_no_network",
 }
 
 

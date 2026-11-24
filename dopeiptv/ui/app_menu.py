@@ -23,6 +23,7 @@ from ..i18n import tr
 #: menu: (group, its menu, actions).
 GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("file", "file", ("open_video", "open_address", "refresh", "reminders", "calendar")),
+    ("offline", "file", ("offline",)),
     ("prefs", "file", ("settings",)),
     ("quit", "file", ("quit",)),
     ("view", "view", ("tv_mode", "teletext", "multiview", "cast", "together", "phone")),

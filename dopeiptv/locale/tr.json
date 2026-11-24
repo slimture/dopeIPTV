@@ -3289,5 +3289,22 @@
   "dl_why_refused": "uygulamanın indirmediği bir yere götürdü",
   "dl_why_other": "bir şeyler ters gitti",
   "notice_hist_copy_list": "Listeyi kopyala",
-  "notice_hist_copy_tip": "Listenin şu an gösterdiğini, giriş bilgileriniz olmadan metin olarak kopyalar. Yalnızca bir satırı kopyalamak için o satıra sağ tıklayın."
+  "notice_hist_copy_tip": "Listenin şu an gösterdiğini, giriş bilgileriniz olmadan metin olarak kopyalar. Yalnızca bir satırı kopyalamak için o satıra sağ tıklayın.",
+  "dl_state_wait_offline": "Ağı bekliyor",
+  "offline_menu": "Çevrimdışı çalış",
+  "offline_strip": "Çevrimdışı – yalnızca indirilenler gösteriliyor",
+  "offline_strip_tip": "Ağ yok ya da çevrimdışı mod açık: indirdikleriniz oynatılır, Yerel dosyalar ve Kayıtlar her zamanki gibi çalışır ve internete hiçbir şey gönderilmez.",
+  "offline_go_online": "Çevrimiçi ol",
+  "offline_note_on": "Ağ gitti – çevrimdışı mod açık",
+  "offline_note_hand": "Çevrimdışı mod açık",
+  "offline_note_off": "Yeniden çevrimiçi",
+  "offline_tv": "TV ağa ihtiyaç duyar. İndirdikleriniz Filmler, Diziler ve İndirilenler altında.",
+  "offline_radio": "Radyo ağa ihtiyaç duyar.",
+  "offline_needs_network": "Bunun için ağ gerekiyor – çevrimdışı mod açık.",
+  "offline_not_downloaded": "İndirilmedi",
+  "offline_not_downloaded_toast": "Bu bölüm indirilmedi – ağ geri geldiğinde oynatılır.",
+  "offline_mark": "Çevrimdışı",
+  "offline_none": "Bu kaynaktan hiçbir şey indirilmedi",
+  "offline_search": "Çevrimdışı – indirilenlerde aranıyor",
+  "rec_reason_no_network": "Ağ yok"
 }

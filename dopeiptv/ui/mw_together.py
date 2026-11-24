@@ -25,7 +25,7 @@ from typing import Any
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 
-from ..core import build_check, privacy, together
+from ..core import build_check, offline, privacy, together
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
@@ -205,6 +205,8 @@ class _TogetherMixin:
     def _together_enter(self, code: str, name: str, joining: bool) -> str | None:
         if privacy.private():
             return tr("together_private")
+        if offline.on():
+            return tr("offline_needs_network")
         if not build_check.allowed():
             return build_check.notice("together")
         clean = together.clean_name(name)

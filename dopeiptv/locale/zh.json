@@ -3289,5 +3289,22 @@
   "dl_why_refused": "它指向了应用不会从中下载的地方",
   "dl_why_other": "出了点问题",
   "notice_hist_copy_list": "复制列表",
-  "notice_hist_copy_tip": "以文本形式复制列表当前显示的内容，不含你的登录信息。右键单击某一行可只复制该行。"
+  "notice_hist_copy_tip": "以文本形式复制列表当前显示的内容，不含你的登录信息。右键单击某一行可只复制该行。",
+  "dl_state_wait_offline": "等待网络",
+  "offline_menu": "脱机工作",
+  "offline_strip": "离线 – 只显示已下载的内容",
+  "offline_strip_tip": "没有网络，或已开启离线模式：你下载的内容可以播放，本地文件和录制照常使用，不会向互联网发送任何内容。",
+  "offline_go_online": "上线",
+  "offline_note_on": "网络已断开 – 离线模式已开启",
+  "offline_note_hand": "离线模式已开启",
+  "offline_note_off": "已恢复在线",
+  "offline_tv": "电视需要网络。你下载的内容在电影、剧集和已下载中。",
+  "offline_radio": "电台需要网络。",
+  "offline_needs_network": "这需要网络 – 离线模式已开启。",
+  "offline_not_downloaded": "未下载",
+  "offline_not_downloaded_toast": "这一集尚未下载 – 网络恢复后即可播放。",
+  "offline_mark": "离线",
+  "offline_none": "此来源没有已下载的内容",
+  "offline_search": "离线 – 正在搜索已下载的内容",
+  "rec_reason_no_network": "没有网络"
 }

@@ -283,6 +283,11 @@ class _SeriesPageMixin:
         if isinstance(info_cache, dict) and sid is not None and client is self.client:
             info_cache.setdefault(("series", sid), extra)
         episodes = self._episode_rows(info, series)
+        # A series with a download: its episodes kept for its page offline
+        # (mw_offline) - those not downloaded then stand dimmed.
+        keep = getattr(self, "_offline_keep_episodes", None)
+        if callable(keep):
+            keep(series, episodes)
         # The same rows come back from the cache: what was new when the page
         # opened last has been seen since (_follow_entered marks it anew).
         for ep in episodes:
@@ -576,10 +581,13 @@ class _SeriesPageMixin:
                 states[key] = EpisodeState(watched, sv.Progress(pos, dur, at),
                                            bool(ep.get("_new")),
                                            downloaded=not local and bool(self._dl_pills(
-                                               "episode", ep)))
+                                               "episode", ep)),
+                                           missing=bool(ep.get("_dl_missing")))
         finally:
             self.series_ctx = saved
-        order = sv.flow(self._sp_seasons)
+        # The one to watch next is one that plays: never one offline mode
+        # has no file of.
+        order = [e for e in sv.flow(self._sp_seasons) if not e.get("_dl_missing")]
         pk = self._sp_marked()[0]
         nxt = sv.next_up(order, lambda e: bool(states[sv.episode_key(e)].watched),
                          lambda e: states[sv.episode_key(e)].progress,
@@ -891,6 +899,10 @@ class _SeriesPageMixin:
         Episodes view (mw_phone_browse). False when nothing could start."""
         if ep.get("id") is None:
             return False
+        if ep.get("_dl_missing"):
+            # Offline mode: an episode the app knows of but has no file of.
+            self._show_toast(tr("offline_not_downloaded_toast"), 4000)
+            return False
         if self._links_later(partial(self._sp_episode_url, ep),
                              partial(self._play_series_episode, series, seasons, ep, at)):
             return True
@@ -900,7 +912,9 @@ class _SeriesPageMixin:
             return False
         key = self._item_key(ep)
         season = next((s for s in seasons if any(e is ep for e in s.episodes)), None)
-        queue = sv.flow(seasons, specials=bool(season and season.specials))
+        # What plays on after it: never one offline mode has no file of.
+        queue = [e for e in sv.flow(seasons, specials=bool(season and season.specials))
+                 if not e.get("_dl_missing")]
         saved = self.series_ctx
         self.series_ctx = series
         try:

@@ -23,6 +23,7 @@ from functools import partial
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QListWidgetItem, QMenu
 
+from ..core import offline
 from ..core.log import log
 from ..core.privacy import for_log, playback_private
 from ..core.stores import FAV_DEFAULT_GROUP
@@ -114,6 +115,14 @@ class _RadioMixin:
         restoring, self._radio_restoring = self._radio_restoring, False
         self.back_btn.hide()
         self._sync_search_hint()       # radio-browser.info under Search
+        if offline.on():
+            # Offline mode: every station is on the internet - the place
+            # says Radio needs the network (mw_place_radio).
+            self._radio_loading = False
+            self._radio_error = True
+            self.all_items = []
+            self._apply_filter()
+            return
         if cat in GROUP_KINDS:
             grp = self._radio_group
             if restoring and grp and grp[0] == cat:
@@ -151,6 +160,12 @@ class _RadioMixin:
 
     def _radio_fetch(self, fn, gen: int, groups: bool = False,
                      empty: str | None = None, cache_as: str = "") -> None:
+        if offline.on():
+            # Offline mode: radio-browser.info is not asked; the place says
+            # Radio needs the network (mw_place_radio).
+            self._radio_loading = False
+            self._radio_error = True
+            return
         self._show_busy(tr("radio_loading"))
         self._radio_loading = True
         run_async(self.pool, fn,

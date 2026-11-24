@@ -116,6 +116,11 @@ class GuideScreen(TvScreen):
 
     def enter(self) -> None:
         w = self.w
+        if getattr(w, "_offline", lambda: False)():
+            # Offline mode: no channels, no guide - said, never a spinner.
+            self.note.setText(tr("offline_tv"))
+            self.note.show()
+            return
         chans = self.page.screens.get("channels")
         got = chans.lineup() if isinstance(chans, ChannelsScreen) else None
         if got is None:

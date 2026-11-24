@@ -3289,5 +3289,22 @@
   "dl_why_refused": "kiliongoza mahali programu haipakui kutoka",
   "dl_why_other": "kuna hitilafu imetokea",
   "notice_hist_copy_list": "Nakili orodha",
-  "notice_hist_copy_tip": "Inanakili kile orodha inachoonyesha sasa, kama maandishi, bila taarifa zako za kuingia. Bofya kulia mstari ili kunakili huo pekee."
+  "notice_hist_copy_tip": "Inanakili kile orodha inachoonyesha sasa, kama maandishi, bila taarifa zako za kuingia. Bofya kulia mstari ili kunakili huo pekee.",
+  "dl_state_wait_offline": "Inasubiri mtandao",
+  "offline_menu": "Fanya kazi nje ya mtandao",
+  "offline_strip": "Nje ya mtandao – vilivyopakuliwa pekee ndivyo vinavyoonyeshwa",
+  "offline_strip_tip": "Hakuna mtandao, au hali ya nje ya mtandao imewashwa: ulichopakua kinachezwa, Faili za ndani na Rekodi zinafanya kazi kama kawaida, na hakuna kinachotumwa kwenye intaneti.",
+  "offline_go_online": "Rudi mtandaoni",
+  "offline_note_on": "Mtandao umepotea – hali ya nje ya mtandao imewashwa",
+  "offline_note_hand": "Hali ya nje ya mtandao imewashwa",
+  "offline_note_off": "Mtandaoni tena",
+  "offline_tv": "TV inahitaji mtandao. Ulichopakua kiko kwenye Filamu, Misururu na Vilivyopakuliwa.",
+  "offline_radio": "Redio inahitaji mtandao.",
+  "offline_needs_network": "Hiki kinahitaji mtandao – hali ya nje ya mtandao imewashwa.",
+  "offline_not_downloaded": "Hakijapakuliwa",
+  "offline_not_downloaded_toast": "Kipindi hiki hakijapakuliwa – kitacheza mtandao utakaporudi.",
+  "offline_mark": "Nje ya mtandao",
+  "offline_none": "Hakuna kilichopakuliwa kutoka chanzo hiki",
+  "offline_search": "Nje ya mtandao – inatafuta katika vilivyopakuliwa",
+  "rec_reason_no_network": "Hakuna mtandao"
 }

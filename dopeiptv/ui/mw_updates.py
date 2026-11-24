@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import VERSION
-from ..core import build_check, macupdate, selfupdate, winupdate
+from ..core import build_check, macupdate, offline, selfupdate, winupdate
 from ..core.log import log
 from ..core.updates import GITHUB_REPO, fetch_update, is_nightly, leave_nightly, offered
 from ..core.xdg import link_ok, open_url
@@ -145,6 +145,8 @@ class _UpdatesMixin:
         'check for updates' setting."""
         if self.settings.value("check_updates", "true") != "true":
             return
+        if offline.on():
+            return                      # offline mode: nothing asked (core/offline.py)
         if not build_known(self._maybe_check_updates):
             return
         # A modified build asks nobody: updates come with the official app

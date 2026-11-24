@@ -296,6 +296,11 @@ class Restreamer:
         *url*): on its channel's connection when it has one, else on a new
         one - Busy when that would be one too many."""
         key = channel_key(source, stream)
+        # Offline mode: a channel on the internet is not opened at all - no
+        # connection tried and retried for every device that asks.
+        from . import offline
+        if offline.stream_refusal(url):
+            raise Busy(NO_DATA, "offline mode is on")
         for _attempt in range(3):
             with self._lock:
                 if self._closed:

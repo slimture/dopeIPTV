@@ -273,6 +273,9 @@ class _SearchAllMixin:
         who = self._sa_who()
         kids, locked = who[1], who[2]
         plans: list[ss.Plan] = []
+        # Offline mode: every source's downloads (providers/downloaded.py),
+        # no guide - nothing asked of a provider (mw_offline).
+        off = bool(getattr(self, "_offline", lambda: False)())
         if not any(str(p.get("id")) == active for p in playlists):
             # No source of the user's in use (the demo's channels).
             pl = {"id": active or "-", "name": getattr(self, "_base_title", "") or "dopeIPTV"}
@@ -293,11 +296,16 @@ class _SearchAllMixin:
                        else {})
             key = (ss.signature(pl), str(pl.get("name") or ""), who,
                    json.dumps(cats.data, sort_keys=True), json.dumps(chans.data, sort_keys=True),
-                   tuple(sorted((m, tuple(sorted(v))) for m, v in allowed.items() if v is not None)))
+                   tuple(sorted((m, tuple(sorted(v))) for m, v in allowed.items() if v is not None)),
+                   off)
+            if off:
+                client = self.client if here else self._offline_client(pid)
+                guide = None
+            else:
+                client = self.client if here else None
+                guide = getattr(self, "xmltv", None) if here else None
             plans.append(ss.Plan(ss.source_of(pl), pl, shown, kids, allowed,
-                                 client=self.client if here else None,
-                                 guide=getattr(self, "xmltv", None) if here else None,
-                                 key=key))
+                                 client=client, guide=guide, key=key))
         return plans
 
     def _sa_prepare(self, plans: list[ss.Plan] | None = None) -> None:
@@ -418,7 +426,8 @@ class _SearchAllMixin:
             return
         self._sa_made_for = made_for
         page.show_results(results, keep_place=keep_place)
-        page.set_partial(self._sa_partial_text(results))
+        page.set_partial(tr("offline_search") if getattr(self, "_offline", lambda: False)()
+                         else self._sa_partial_text(results))
         page.set_busy(bool(self._sa_loading))
 
     def _sa_search_failed(self, gen: int, err: Any = None) -> None:

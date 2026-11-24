@@ -3289,5 +3289,22 @@
   "dl_why_refused": "ele levava a um lugar de onde o app não baixa",
   "dl_why_other": "algo deu errado",
   "notice_hist_copy_list": "Copiar lista",
-  "notice_hist_copy_tip": "Copia o que a lista mostra agora, como texto, sem seus dados de login. Clique com o botão direito em uma linha para copiar só ela."
+  "notice_hist_copy_tip": "Copia o que a lista mostra agora, como texto, sem seus dados de login. Clique com o botão direito em uma linha para copiar só ela.",
+  "dl_state_wait_offline": "Aguardando a rede",
+  "offline_menu": "Trabalhar offline",
+  "offline_strip": "Offline – só o que foi baixado é mostrado",
+  "offline_strip_tip": "Sem rede, ou modo offline ativado: o que você baixou toca, Arquivos locais e Gravações funcionam normalmente e nada é enviado para a internet.",
+  "offline_go_online": "Ficar online",
+  "offline_note_on": "A rede caiu – o modo offline está ativado",
+  "offline_note_hand": "O modo offline está ativado",
+  "offline_note_off": "Online de novo",
+  "offline_tv": "A TV precisa da rede. O que você baixou está em Filmes, Séries e Baixados.",
+  "offline_radio": "O rádio precisa da rede.",
+  "offline_needs_network": "Isto precisa da rede – o modo offline está ativado.",
+  "offline_not_downloaded": "Não baixado",
+  "offline_not_downloaded_toast": "Este episódio não foi baixado – ele toca quando a rede voltar.",
+  "offline_mark": "Offline",
+  "offline_none": "Nada desta fonte foi baixado",
+  "offline_search": "Offline – buscando no que foi baixado",
+  "rec_reason_no_network": "Sem rede"
 }

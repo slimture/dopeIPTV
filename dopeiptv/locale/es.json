@@ -3289,5 +3289,22 @@
   "dl_why_refused": "llevaba a un sitio desde el que la app no descarga",
   "dl_why_other": "algo salió mal",
   "notice_hist_copy_list": "Copiar lista",
-  "notice_hist_copy_tip": "Copia lo que muestra la lista ahora, como texto, sin tus datos de acceso. Haz clic derecho en una fila para copiar solo esa."
+  "notice_hist_copy_tip": "Copia lo que muestra la lista ahora, como texto, sin tus datos de acceso. Haz clic derecho en una fila para copiar solo esa.",
+  "dl_state_wait_offline": "Espera a la red",
+  "offline_menu": "Trabajar sin conexión",
+  "offline_strip": "Sin conexión – solo se muestra lo descargado",
+  "offline_strip_tip": "Sin red, o con el modo sin conexión activado: lo que descargaste se reproduce, Archivos locales y Grabaciones funcionan como siempre y no se envía nada a internet.",
+  "offline_go_online": "Conectarse",
+  "offline_note_on": "No hay red – el modo sin conexión está activado",
+  "offline_note_hand": "El modo sin conexión está activado",
+  "offline_note_off": "Conectado de nuevo",
+  "offline_tv": "La TV necesita la red. Lo que descargaste está en Películas, Series y Descargado.",
+  "offline_radio": "La radio necesita la red.",
+  "offline_needs_network": "Esto necesita la red – el modo sin conexión está activado.",
+  "offline_not_downloaded": "No descargado",
+  "offline_not_downloaded_toast": "Este episodio no está descargado – se reproducirá cuando vuelva la red.",
+  "offline_mark": "Sin conexión",
+  "offline_none": "No hay nada descargado de esta fuente",
+  "offline_search": "Sin conexión – buscando en lo descargado",
+  "rec_reason_no_network": "Sin red"
 }

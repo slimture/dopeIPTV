@@ -135,6 +135,9 @@ class _Snap:
     titles: list
     kids: Any
     now: datetime
+    #: Offline mode (mw_offline): what is downloaded - (source, kind, stream
+    #: id) and (source, series id) - and only what plays shown; None online.
+    offline: tuple | None = None
 
 
 @dataclass
@@ -230,6 +233,13 @@ def _build(snap: _Snap) -> _Data:
         except Exception:
             return False
 
+    if snap.offline is not None:
+        # Offline mode: only what plays without the network (core/mitt).
+        files, shows = snap.offline
+        plain = allowed
+
+        def allowed(e: mitt.Entry) -> bool:       # noqa: F811 - narrowed offline
+            return mitt.offline_keeps(e, files, shows) and plain(e)
     data.cont = [e for e in mitt.merged(*cont) if allowed(e)][:mitt.ROW_MAX * 3]
     data.history = [e for e in mitt.merged(*hist) if allowed(e)]
     data.new = [e for e in mitt.merged(*new) if allowed(e)]
@@ -515,7 +525,20 @@ class _MittMixin:
             log_titles = []
         return _Snap(made_for, sources, radio, web, list(wl.movies), list(wl.shows),
                      mitt.parse_order(own.value(mitt.ORDER_KEY, "")), log_titles,
-                     getattr(self, "_kids_keep", lambda _m: None)("live"), datetime.now())
+                     getattr(self, "_kids_keep", lambda _m: None)("live"), datetime.now(),
+                     self._mitt_offline())
+
+    def _mitt_offline(self) -> tuple | None:
+        """Offline mode: what is downloaded, for the worker to keep only what
+        plays (None while it is off)."""
+        if not getattr(self, "_offline", lambda: False)():
+            return None
+        d = getattr(self, "downloads", None)
+        items = d.items() if d is not None else []
+        files = frozenset(i.ident for i in items)
+        shows = frozenset((i.source, i.series_id) for i in items
+                          if i.kind == "episode" and i.series_id)
+        return files, shows
 
     def _mitt_shut(self, pid: str, unlocked: bool) -> dict[str, frozenset[str]]:
         """Per mode, another source's categories locked while the lock is

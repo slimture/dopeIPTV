@@ -3289,5 +3289,22 @@
   "dl_why_refused": "portava dove l'app non scarica",
   "dl_why_other": "qualcosa è andato storto",
   "notice_hist_copy_list": "Copia elenco",
-  "notice_hist_copy_tip": "Copia ciò che l'elenco mostra ora, come testo, senza i tuoi dati di accesso. Clic destro su una riga per copiare solo quella."
+  "notice_hist_copy_tip": "Copia ciò che l'elenco mostra ora, come testo, senza i tuoi dati di accesso. Clic destro su una riga per copiare solo quella.",
+  "dl_state_wait_offline": "In attesa della rete",
+  "offline_menu": "Lavora offline",
+  "offline_strip": "Offline – si vede solo ciò che è scaricato",
+  "offline_strip_tip": "Nessuna rete, o modalità offline attiva: ciò che hai scaricato si riproduce, File locali e Registrazioni funzionano come sempre e nulla viene inviato a internet.",
+  "offline_go_online": "Torna online",
+  "offline_note_on": "La rete non c'è più – la modalità offline è attiva",
+  "offline_note_hand": "La modalità offline è attiva",
+  "offline_note_off": "Di nuovo online",
+  "offline_tv": "La TV ha bisogno della rete. Ciò che hai scaricato è in Film, Serie e Scaricati.",
+  "offline_radio": "La radio ha bisogno della rete.",
+  "offline_needs_network": "Serve la rete – la modalità offline è attiva.",
+  "offline_not_downloaded": "Non scaricato",
+  "offline_not_downloaded_toast": "Questo episodio non è scaricato – si riprodurrà quando tornerà la rete.",
+  "offline_mark": "Offline",
+  "offline_none": "Niente di questa sorgente è scaricato",
+  "offline_search": "Offline – ricerca in ciò che è scaricato",
+  "rec_reason_no_network": "Nessuna rete"
 }

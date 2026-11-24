@@ -3289,5 +3289,22 @@
   "dl_why_refused": "den ledde någonstans appen inte laddar ner från",
   "dl_why_other": "något gick fel",
   "notice_hist_copy_list": "Kopiera listan",
-  "notice_hist_copy_tip": "Kopierar det listan visar just nu, som text, utan dina inloggningar. Högerklicka på en rad för att kopiera bara den."
+  "notice_hist_copy_tip": "Kopierar det listan visar just nu, som text, utan dina inloggningar. Högerklicka på en rad för att kopiera bara den.",
+  "dl_state_wait_offline": "Väntar på nätverket",
+  "offline_menu": "Arbeta offline",
+  "offline_strip": "Offline – bara nedladdat visas",
+  "offline_strip_tip": "Inget nätverk, eller offlineläget påslaget: det du laddat ner spelas, Lokala filer och Inspelningar fungerar som vanligt, och inget skickas till internet.",
+  "offline_go_online": "Gå online",
+  "offline_note_on": "Nätverket är borta – offlineläget är på",
+  "offline_note_hand": "Offlineläget är på",
+  "offline_note_off": "Online igen",
+  "offline_tv": "TV behöver nätverket. Det du laddat ner finns under Filmer, Serier och Nedladdat.",
+  "offline_radio": "Radio behöver nätverket.",
+  "offline_needs_network": "Det här behöver nätverket – offlineläget är på.",
+  "offline_not_downloaded": "Inte nedladdat",
+  "offline_not_downloaded_toast": "Avsnittet är inte nedladdat – det spelas när nätverket är tillbaka.",
+  "offline_mark": "Offline",
+  "offline_none": "Inget från den här källan är nedladdat",
+  "offline_search": "Offline – söker i det nedladdade",
+  "rec_reason_no_network": "Inget nätverk"
 }

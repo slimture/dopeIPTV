@@ -162,6 +162,11 @@ class _MediaServerMixin:
         is left out; a kids profile sees none for adults (mw_profiles), and
         nobody one of a category locked while the lock is shut (mw_lists)."""
         rows = self._lock_filter(self._continue_rows_all())
+        if getattr(self, "_offline", lambda: False)():
+            # Offline mode: only what is downloaded goes on (mw_offline).
+            kind_of = {"vod": "movie", "movie": "movie", "episode": "episode"}
+            rows = [r for r in rows if kind_of.get(str(r.get("_kind") or "")) and
+                    self._dl_find(kind_of[str(r.get("_kind"))], r, self._item_key(r)) is not None]
         only = getattr(self, "_kids_only", None)
         return only(rows, "vod") if callable(only) else rows
 

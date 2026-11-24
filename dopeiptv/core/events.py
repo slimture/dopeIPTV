@@ -416,6 +416,13 @@ def post(url: str, message: dict[str, Any], header: tuple[str, str] | None,
 
 def _post(url: str, message: dict[str, Any], header: tuple[str, str] | None,
           timeout: float) -> tuple[int, str]:
+    # Offline mode: a webhook at home is POSTed, one on the internet not
+    # (core/offline.py) - urllib goes around the app's own adapter.
+    from . import offline
+    gone = offline.refusal(url)
+    if gone:
+        offline.note_refused((offline._host_port(url) or ("?", 0))[0], "a webhook")
+        return 0, f"offline mode: {gone}"
     data = json.dumps(message, ensure_ascii=False).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=data, method="POST")
@@ -469,6 +476,9 @@ class WebhookSink(_Sink):
             code, err = post(self.url, message, self.header, min(HTTP_TIMEOUT, left))
             if 200 <= code < 300:
                 self.sent += 1
+                return
+            if err.startswith("offline mode"):
+                self.failed += 1        # not sent, never tried again (said once)
                 return
             if not _retry(code) or self._closing:
                 break

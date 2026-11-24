@@ -222,6 +222,8 @@ class _PlaceRadioMixin:
 
     def _rap_note(self) -> str:
         place = self._rap_page
+        if place is not None and getattr(self, "_offline", lambda: False)():
+            return tr("offline_radio")     # offline mode: a calm word (mw_offline)
         if place is None or place.view.model_.rowCount() or self._radio_loading:
             return ""
         if self._radio_error:
@@ -253,6 +255,8 @@ class _PlaceRadioMixin:
         other than My stations itself, while nothing is typed."""
         if self._rap_cat() == FAVS or self._rap_groups() or self.search.text().strip():
             return []
+        if getattr(self, "_offline", lambda: False)():
+            return []                   # offline mode: none of them plays
         playing = self._rap_playing_key()
         out = []
         for it in self._radio_fav_rows():

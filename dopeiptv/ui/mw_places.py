@@ -126,6 +126,8 @@ class _PlacesMixin:
         never = getattr(self, "_kids_never_places", None)
         if name in (never() if callable(never) else ()):
             name = "tv"     # never a kids profile's (mw_profiles.KIDS_NEVER), by any way in
+        if name == "guide" and getattr(self, "_offline", lambda: False)():
+            name = "tv"     # offline mode: TV says what the guide needs (mw_offline)
         if name == "guide":
             self._open_epg_guide()
             return True

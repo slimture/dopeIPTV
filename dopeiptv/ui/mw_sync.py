@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import ORG
-from ..core import build_check, sync
+from ..core import build_check, offline, sync
 from ..core.log import log
 from ..core.workers import run_async
 from .notices import hub_of
@@ -282,6 +282,12 @@ class _SyncMixin:
         runs already, sync is off, or (unless *manual*) a stream has only
         just started."""
         if self._sync_busy or not self._sync_on():
+            return False
+        if offline.on():
+            # Offline mode: nothing goes to dopeiptv.org (core/offline.py) -
+            # the next round once the network is back.
+            if manual:
+                self._show_toast(tr("offline_needs_network"), 5000)
             return False
         if not manual and build_check.settled() is None:
             # The build's verdict is still being worked out: never waited

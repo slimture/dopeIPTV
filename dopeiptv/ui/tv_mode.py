@@ -408,6 +408,16 @@ class ChannelsScreen(TvScreen):
         self.chans.viewport().update()
 
     def enter(self) -> None:
+        if getattr(self.w, "_offline", lambda: False)():
+            # Offline mode: every channel needs the network - said, never a
+            # spinner; read again once it is back (rebuild).
+            self._loaded = False
+            self.cats.set_items([], "cat")
+            self.chans.set_items([], "live")
+            self.head.setText("")
+            self.note.setText(tr("offline_tv"))
+            self.note.show()
+            return
         if not self._loaded:
             self._loaded = True
             run_async(self.w.pool, self.w.client.live_categories,

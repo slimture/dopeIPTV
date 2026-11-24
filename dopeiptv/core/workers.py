@@ -468,6 +468,13 @@ def _ignore_result(_result: object) -> None:
     """on_done for work that is done for its side effect."""
 
 
+def _offline_skips(url: str) -> bool:
+    """Whether offline mode keeps *url* from being fetched (core/offline.py:
+    a picture at home still is)."""
+    from . import offline
+    return offline.on() and bool(offline.refusal(url))
+
+
 #: The image cache folders a loader has set out to prune this session.
 _PRUNED: set[str] = set()
 
@@ -702,7 +709,7 @@ class LogoLoader(QObject):
             return None
         if dp.is_file():
             return dp
-        if self.is_dead(url):
+        if self.is_dead(url) or _offline_skips(url):
             return None
         try:
             r = _image_get(url)(url, headers=_IMG_HEADERS, stream=True,
@@ -851,6 +858,11 @@ class LogoLoader(QObject):
             # round-trip or another strike.
             if self.is_dead(u):
                 _img_dbg(f"host cooldown skip {u}")
+                return u, None
+            # Offline mode: the disk's copy or nothing - never asked, and
+            # never marked dead, so it comes once the network is back.
+            if _offline_skips(u):
+                _img_dbg(f"offline skip {u}")
                 return u, None
             # Short connect timeout: a host that's down should cost a
             # worker ~3 s, not the full read timeout - with hundreds

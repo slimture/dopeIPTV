@@ -3289,5 +3289,22 @@
   "dl_why_refused": "het leidde naar waar de app niet van downloadt",
   "dl_why_other": "er ging iets mis",
   "notice_hist_copy_list": "Lijst kopiëren",
-  "notice_hist_copy_tip": "Kopieert wat de lijst nu toont als tekst, zonder je inloggegevens. Klik met rechts op een regel om alleen die te kopiëren."
+  "notice_hist_copy_tip": "Kopieert wat de lijst nu toont als tekst, zonder je inloggegevens. Klik met rechts op een regel om alleen die te kopiëren.",
+  "dl_state_wait_offline": "Wacht op het netwerk",
+  "offline_menu": "Offline werken",
+  "offline_strip": "Offline – alleen gedownloade inhoud wordt getoond",
+  "offline_strip_tip": "Geen netwerk, of offlinemodus aangezet: wat je hebt gedownload speelt af, Lokale bestanden en Opnames werken zoals altijd, en er wordt niets naar het internet gestuurd.",
+  "offline_go_online": "Online gaan",
+  "offline_note_on": "Het netwerk is weg – offlinemodus staat aan",
+  "offline_note_hand": "Offlinemodus staat aan",
+  "offline_note_off": "Weer online",
+  "offline_tv": "Tv heeft het netwerk nodig. Wat je hebt gedownload staat onder Films, Series en Gedownload.",
+  "offline_radio": "Radio heeft het netwerk nodig.",
+  "offline_needs_network": "Hiervoor is het netwerk nodig – offlinemodus staat aan.",
+  "offline_not_downloaded": "Niet gedownload",
+  "offline_not_downloaded_toast": "Deze aflevering is niet gedownload – hij speelt zodra het netwerk terug is.",
+  "offline_mark": "Offline",
+  "offline_none": "Niets van deze bron is gedownload",
+  "offline_search": "Offline – zoeken in wat is gedownload",
+  "rec_reason_no_network": "Geen netwerk"
 }

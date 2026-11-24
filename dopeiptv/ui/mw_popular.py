@@ -20,7 +20,7 @@ from typing import Callable
 
 from PyQt6.QtCore import QStandardPaths
 
-from ..core import places
+from ..core import offline, places
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import current_language
@@ -62,7 +62,7 @@ class _PopularMixin:
         "series", to *done* (on the window's thread; [] when there is no
         chart yet, no TMDB key, or it is switched off)."""
         limit = limit or self.POPULAR_MAX
-        if kind not in ("vod", "series") or not self.popular_on(kind):
+        if kind not in ("vod", "series") or not self.popular_on(kind) or offline.on():
             done([])
             return
         chart = self._popular_chart_now()

@@ -108,6 +108,25 @@ class Entry:
         return self.text
 
 
+def offline_keeps(e: Entry, downloaded: frozenset, series: frozenset) -> bool:
+    """Whether *e* plays while offline mode is on (core/offline.py): a film
+    or an episode whose file is downloaded (*downloaded*: (source, "movie" or
+    "episode", stream id)), a series with one (*series*: (source, series
+    id)), a file of this computer's - never what needs the network: a
+    channel, a station, a web stream, a file on a network address."""
+    if e.kind in (FILM, EPISODE):
+        kind = "movie" if e.kind == FILM else "episode"
+        own = e.row.get("stream_id" if e.kind == FILM else "id") if isinstance(e.row, dict) \
+            else None
+        return any((e.source, kind, str(i)) in downloaded
+                   for i in (e.ident, own) if i not in (None, ""))
+    if e.kind == SERIES:
+        return (e.source, str(e.ident)) in series
+    if e.kind == LOCAL:
+        return "://" not in str(e.ident)
+    return False
+
+
 def entry_key(source: str, kind: str, ident: Any) -> str:
     """A title's key on the page: its source, the player's group, its key."""
     return f"{source or ''}|{GROUP.get(kind, kind)}:{ident}"

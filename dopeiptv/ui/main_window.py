@@ -105,6 +105,7 @@ from .mw_place_films import _PlaceFilmsMixin
 from .mw_place_local import _PlaceLocalMixin
 from .mw_place_rec import _PlaceRecMixin
 from .mw_downloads import _DownloadsMixin
+from .mw_offline import _OfflineMixin
 from .mw_place_radio import _PlaceRadioMixin
 from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
@@ -135,7 +136,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ListsMixin,
                  _LocalFilesMixin, _PlaceLocalMixin, _LocalWatchMixin, _RadioMixin, _WebStreamsMixin,
                  _QueueMixin,
-                 _PlaceRecMixin, _PlaceRadioMixin, _DownloadsMixin,
+                 _PlaceRecMixin, _PlaceRadioMixin, _DownloadsMixin, _OfflineMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PlaceLookMixin, _PopularMixin,
                  _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _PlaceSeriesMixin, _SearchAllMixin,
@@ -279,6 +280,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # Films and episodes downloaded to watch without the network, one at
         # a time over one connection (mw_downloads, core/downloads.py).
         self._init_downloads()
+        # Offline mode (mw_offline, core/offline.py): the system's word on the
+        # network now, before the first list - with none, the source's lists
+        # are what is downloaded of it.
+        self._init_offline()
         self.wake = WakeLock()
         self._init_donate()
         # Settings sync between a person's computers (off until started).
@@ -1156,6 +1161,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
     }
 
     def _maybe_auto_refresh(self) -> None:
+        if self._offline():
+            return                      # offline mode: the lists are the downloads'
         pl = self.playlist_store.active() if self.playlist_store else None
         secs = self.REFRESH_SECONDS.get((pl or {}).get("refresh", ""))
         if secs and time.time() - self._last_playlist_refresh >= secs:
@@ -1225,7 +1232,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if not pl:
             return
         self._show_busy(tr("status_connecting", name=pl['name']))
-        candidate = make_client(pl)
+        # Offline mode: its downloads as its lists, nothing asked of it.
+        candidate = (self._offline_source_switched(pid) if self._offline()
+                     else make_client(pl))
 
         def done(_auth):
             self._hide_busy()
@@ -1266,6 +1275,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self.refresh_playlist(force=False)
             # Its account running out: said from this login's answer.
             self._expiry_check(pl, _auth)
+            # Only the local network is offline for a source on the internet.
+            self._offline_source_changed()
             if then is not None:
                 then()
 
@@ -2527,6 +2538,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # A kids profile plays only what its lists may show, however it was
         # asked (mw_profiles).
         if not self._kids_may_play(kind, item, key):
+            return False
+        # Offline mode: a file or a stream at home, nothing from the internet.
+        if not self._offline_may_play(url, kind):
             return False
         if not self._guard_stream_switch(url, title):
             return False
