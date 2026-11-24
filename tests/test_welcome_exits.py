@@ -144,13 +144,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings, Qt
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 app = QApplication.instance() or QApplication([])
 boxes = []
-for name in ("critical", "warning", "information", "question"):
-    setattr(QMessageBox, name, staticmethod(lambda *a, _n=name, **k: boxes.append((_n, a[2:3]))
-                                            or QMessageBox.StandardButton.Ok))
-QMessageBox.exec = lambda self: boxes.append(("exec", self.text())) or 0
+from dopeiptv.ui import message_box
+for name in ("error", "warning", "information"):
+    setattr(message_box, name, lambda *a, _n=name, **k: boxes.append((_n, a[2:3])))
+message_box.MessageDialog.exec = lambda self: boxes.append(("exec", self.text())) or 0
 
 from dopeiptv import i18n
 from dopeiptv.core import profiles as _prof

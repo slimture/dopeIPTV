@@ -479,9 +479,9 @@ class BoxRules(QObject):
             self._do(self.client.autotimer().set_enabled, rule, not rule.enabled)
 
     def remove(self, rule: at.Rule) -> None:
-        from .widgets import confirm
+        from .message_box import confirm
         if confirm(self.dialog, tr("ctx_delete"), tr("at_delete_q", name=rule.label),
-                   default_yes=False):
+                   default_yes=False, danger=True):
             self._do(self.client.autotimer().remove, rule)
 
     def preview(self) -> None:

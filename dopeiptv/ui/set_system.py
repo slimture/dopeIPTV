@@ -20,7 +20,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QColorDialog, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
+    QColorDialog, QLineEdit, QPushButton, QVBoxLayout,
     QWidget,
 )
 
@@ -30,6 +30,7 @@ from ..core.recording import format_size
 from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 from ..i18n import tr
+from . import message_box
 from .settings_ui import (
     Chip, ChipGroups, ChoicePicker, ColorDot, FoldedPicker, IconTile, ThemeTile, after_shown,
     hbox,
@@ -272,7 +273,7 @@ def build_privacy(ctx: SettingsContext) -> None:
     def back_up() -> None:
         password = backup_pw.text()
         if password != backup_again.text():
-            QMessageBox.warning(d, tr("backup_title"), tr("backup_pw_mismatch"))
+            message_box.warning(d, tr("backup_title"), tr("backup_pw_mismatch"))
             backup_again.setFocus()
             backup_again.selectAll()
             return

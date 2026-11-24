@@ -12,10 +12,11 @@ from ..core.every_source import CATEGORY as XS_CATEGORY
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
-from .widgets import confirm, plain_text
+from . import message_box
+from .message_box import confirm
 from PyQt6.QtCore import QItemSelectionModel, Qt
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMenu
 
 
 class _ContextMenuMixin:
@@ -358,7 +359,7 @@ class _ContextMenuMixin:
             return
         current = self.channel_ov.display_name(
             mode, key, it.get("name") or it.get("title") or "")
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("ctx_rename_channel"), tr("cm_new_name"), text=current)
         if ok:
             self.channel_ov.update(mode, key, name=name.strip())
@@ -520,7 +521,7 @@ class _ContextMenuMixin:
 
     def _restore_default_channels(self, mode: str) -> None:
         if confirm(self, tr("ctx_restore_defaults").rstrip("."),
-                   tr("msg_restore_defaults_body")):
+                   tr("msg_restore_defaults_body"), danger=True):
             self.channel_ov.reset_mode(mode)
             self._apply_filter()
 
@@ -607,9 +608,8 @@ class _ContextMenuMixin:
         must_wait = getattr(self, "_pin_must_wait", None)
         if callable(must_wait) and must_wait(["parental"], tr("parental_control")):
             return False
-        pin, ok = QInputDialog.getText(
-            self, tr("parental_control"), tr("parental_enter_pin"),
-            QLineEdit.EchoMode.Password)
+        pin, ok = message_box.get_text(
+            self, tr("parental_control"), tr("parental_enter_pin"), password=True)
         if not ok:
             return False
         pin = pin.strip()
@@ -623,7 +623,7 @@ class _ContextMenuMixin:
         if pin and callable(was_wrong):
             was_wrong(["parental"], tr("msg_parental_title"))
         else:
-            QMessageBox.warning(self, tr("msg_parental_title"),
+            message_box.warning(self, tr("msg_parental_title"),
                                 tr("msg_wrong_pin"))
         return False
 
@@ -640,14 +640,13 @@ class _ContextMenuMixin:
         """A new parental PIN asked for until it is long enough (or the
         person cancels: "")."""
         while True:
-            pin, ok = QInputDialog.getText(parent, tr("parental_control"), plain_text(prompt),
-                                           QLineEdit.EchoMode.Password)
+            pin, ok = message_box.get_text(parent, tr("parental_control"), prompt, password=True)
             pin = (pin or "").strip()
             if not ok or not pin:
                 return ""
             if len(pin) >= self.parental.SHORTEST:
                 return pin
-            QMessageBox.warning(parent, tr("parental_control"), plain_text(tr("pin_too_short")))
+            message_box.warning(parent, tr("parental_control"), tr("pin_too_short"))
 
     # -- category context menu -----------------------------------------------------
 
@@ -783,7 +782,7 @@ class _ContextMenuMixin:
                 if self.cat_list.currentItem() else None)
 
     def _new_fav_folder(self, store) -> None:
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("ctx_new_folder"), tr("prompt_folder_name"))
         name = (name or "").strip()
         if ok and name and name != FAV_DEFAULT_GROUP:
@@ -791,7 +790,7 @@ class _ContextMenuMixin:
             self._load_categories()
 
     def _rename_fav_folder(self, store, group: str) -> None:
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("ctx_rename_folder"), tr("prompt_folder_name"),
             text=group)
         name = (name or "").strip()
@@ -822,7 +821,7 @@ class _ContextMenuMixin:
             self.mode, cid,
             next((c.get("category_name", "") for c in self._raw_categories
                   if c.get("category_id") == cid), ""))
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("cm_rename_title"), tr("cm_new_name"), text=current)
         if ok:
             self.overrides.update(self.mode, cid, name=name.strip())
@@ -830,7 +829,7 @@ class _ContextMenuMixin:
 
     def _set_category_icon(self, cid) -> None:
         current = self.overrides.get(self.mode, cid).get("icon", "")
-        icon, ok = QInputDialog.getText(
+        icon, ok = message_box.get_text(
             self, tr("set_cat_icon_title"), tr("set_cat_icon_prompt"),
             text=current)
         if ok:

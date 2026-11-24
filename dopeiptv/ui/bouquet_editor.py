@@ -25,7 +25,7 @@ from PyQt6.QtCore import QItemSelectionModel, QObject, QPoint, Qt, QTimer, pyqtS
 from PyQt6.QtGui import QColor, QFont, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QComboBox, QDialog, QDialogButtonBox,
-    QFileDialog, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMenu, QPushButton, QSplitter, QVBoxLayout, QWidget,
 )
 
@@ -34,8 +34,8 @@ from ..core.palette_match import fold, words
 from ..core.workers import run_async
 from ..i18n import tr
 from ..providers import bouquets as bq
+from . import message_box
 from .theme import P
-from .widgets import plain_text
 
 #: The item data role a row keeps its index in.
 ROW_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -848,10 +848,10 @@ class BouquetEditorDialog(QDialog):
             self.save_backup()
 
     def go_on_without_backup(self, text: str) -> bool:
-        from .widgets import confirm
         if self._gone():
             return False
-        return confirm(self, tr("bq_backup"), tr("bq_backup_failed_q", why=text), default_yes=False)
+        return message_box.confirm(self, tr("bq_backup"), tr("bq_backup_failed_q", why=text),
+                                   default_yes=False)
 
     def show_bouquets(self) -> None:
         if self._gone():
@@ -987,7 +987,7 @@ class BouquetEditorDialog(QDialog):
             self.session.move_bouquet(row, row - 1 if step < 0 else row + 2)
 
     def _ask_text(self, title: str, label: str, text: str = "") -> str:
-        got, ok = QInputDialog.getText(self, title, plain_text(label), text=text)
+        got, ok = message_box.get_text(self, title, label, text=text)
         return " ".join((got or "").split()) if ok else ""
 
     def new_bouquet(self) -> None:
@@ -1007,12 +1007,12 @@ class BouquetEditorDialog(QDialog):
             self.session.rename_bouquet(row, name)
 
     def remove_bouquet(self) -> None:
-        from .widgets import confirm
         row = self.bq_list.currentRow()
         b = self.session._bouquet(row)
         if b is None:
             return
-        if confirm(self, tr("ctx_delete"), tr("bq_delete_q", name=b.name), default_yes=False):
+        if message_box.confirm(self, tr("ctx_delete"), tr("bq_delete_q", name=b.name),
+                               default_yes=False, danger=True):
             self.session.remove_bouquet(row)
 
     # -- the entries ------------------------------------------------------------------
@@ -1239,13 +1239,12 @@ class BouquetEditorDialog(QDialog):
         self.say(tr("box_grab_saved", path=path))
 
     def _restore(self, data: bytes, question: str) -> None:
-        from .widgets import confirm
         if not self.session.idle:
             return
         if not bq.is_backup(data):
             self.say(tr("bq_not_backup"))
             return
-        if confirm(self, tr("bq_backup"), question, default_yes=False):
+        if message_box.confirm(self, tr("bq_backup"), question, default_yes=False, danger=True):
             self.session.restore(data)
 
     def undo_session(self) -> None:

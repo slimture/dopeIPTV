@@ -78,8 +78,8 @@ def test_offline_an_external_player_is_never_handed_the_internet(player, monkeyp
     started, told, said = [], [], []
     monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/" + player)
     monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: started.append(cmd))
-    monkeypatch.setattr(players.QMessageBox, "information",
-                        staticmethod(lambda *a, **_k: told.append(a[-1])))
+    monkeypatch.setattr(players.message_box, "information",
+                        lambda *a, **_k: told.append(a[-1]))
 
     class Window:
         def _offline_refused(self, kind=""):
@@ -112,8 +112,8 @@ def test_no_handoff_file_no_player_never_the_address_instead(player, monkeypatch
     monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/" + player)
     monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: started.append(cmd))
     monkeypatch.setattr(players, "private_file", lambda *_a, **_k: "")
-    monkeypatch.setattr(players.QMessageBox, "warning",
-                        staticmethod(lambda *a, **_k: told.append(a[-1])))
+    monkeypatch.setattr(players.message_box, "warning",
+                        lambda *a, **_k: told.append(a[-1]))
     for url in ("http://h.invalid/live/u/p/1.ts", "rtsp://cam:pw@cam.invalid/live"):
         players.launch_player(player, url, "T")
     assert started == [] and len(told) == 2
@@ -195,8 +195,8 @@ def test_what_is_no_streams_address_never_reaches_a_player(player, url, monkeypa
     started, told = [], []
     monkeypatch.setattr(players, "find_player_executable", lambda _p: "/usr/bin/" + player)
     monkeypatch.setattr(players.subprocess, "Popen", lambda cmd, **_k: started.append(cmd))
-    monkeypatch.setattr(players.QMessageBox, "warning",
-                        staticmethod(lambda *a, **_k: told.append(a[-1])))
+    monkeypatch.setattr(players.message_box, "warning",
+                        lambda *a, **_k: told.append(a[-1]))
     players.launch_player(player, url, "T")
     assert started == [] and len(told) == 1
 

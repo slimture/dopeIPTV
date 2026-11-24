@@ -432,14 +432,12 @@ class _OfflineMixin:
             # A real credential rejection, said as the start says it (app.py).
             from ..providers.client import wrong_login
             if wrong_login(value):
-                from PyQt6.QtWidgets import QMessageBox
-
-                from .widgets import plain_text
+                from . import message_box
                 where = f"{tr('settings_title')} → {tr('set_page_sources')}"
-                QMessageBox.warning(
+                message_box.warning(
                     self, tr("msg_connection_failed"),
-                    plain_text(f"{pl.get('name') or ''}: {value}\n\n"
-                               + tr("msg_check_playlist_credentials", where=where)))
+                    f"{pl.get('name') or ''}: {value}\n\n"
+                    + tr("msg_check_playlist_credentials", where=where))
 
         run_async(self.pool, ask, done, lambda _m: None)
 

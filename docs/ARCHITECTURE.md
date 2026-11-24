@@ -632,6 +632,8 @@ dopeiptv/
                        form, connecting, settings from another computer
     channel_list.py    Virtualized list: model, view, painted delegate
     dialogs.py         Playlist editor, content manager
+    message_box.py     Every message and question in the app's own look
+                       (never QMessageBox / QInputDialog)
     feedback_dialogs.py Send feedback, the offer of a report, the answers to
                        feedback
     backup_dialogs.py  A backup put back: picked, its password asked, shown,
@@ -653,12 +655,14 @@ dopeiptv/
 Import direction is one-way: `ui` may use `services`, `media`, `core`
 and `providers`; `services` builds on `providers`/`core` but never
 imports `ui`; `media` and `providers` may use `core`; `core` depends on
-nothing above it.  (The one cross-edge is the player's overlays -
+nothing above it.  (The cross-edges are the player's overlays -
 `media.embedded`, `media.loading_overlay`, `media.audio_effects` (the
 visualiser) and `media.sleep_timer` (the number typed) - -> `ui.theme`
-for their colours, which is why
-`ui/__init__` exposes `MainWindow` lazily so touching `ui.theme` never
-drags in the window.)
+for their colours, and `media.players`, `media.sleep_timer` and
+`media.teletext_subs` -> `ui.message_box` for what they tell or ask (an
+external player not found, the sleep timer's minutes, a teletext page),
+which is why `ui/__init__` exposes `MainWindow` lazily so touching
+`ui.theme` or `ui.message_box` never drags in the window.)
 
 ## Data flow
 

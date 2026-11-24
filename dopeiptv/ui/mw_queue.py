@@ -26,7 +26,7 @@ from ..providers.client import OfflineClient, dropped_playlist
 from ..providers.demo import DemoClient
 from .dialogs import PlaylistDialog
 from .notices import hub_of
-from .widgets import confirm
+from .message_box import confirm
 
 
 def _drop_waits(window) -> bool:

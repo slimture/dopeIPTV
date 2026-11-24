@@ -8,10 +8,10 @@ MainWindow mixin; the single-row favorite actions stay in mw_context.
 from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, Qt, QTimer
-from PyQt6.QtWidgets import QInputDialog
 
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
+from . import message_box
 
 # The context-menu kind of a row -> the favorites section that stores it.
 _SECTION = {"live": "chan", "fav": "chan", "vod": "movie", "series": "series",
@@ -144,7 +144,7 @@ class _FavoritesMixin:
         return self._fav_view_group(section) or FAV_DEFAULT_GROUP
 
     def _ask_folder_name(self) -> str | None:
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("ctx_new_folder"), tr("prompt_folder_name"))
         name = (name or "").strip()
         if not ok or not name or name == FAV_DEFAULT_GROUP:

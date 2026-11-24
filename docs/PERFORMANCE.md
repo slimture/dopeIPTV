@@ -160,7 +160,7 @@ Fixed, each with a test that fails without it:
   84 objects, 53 widgets and a top-level window each time, restyled at
   every theme change. It goes once it is closed and no answer of its own is
   still on its way to it. (`tests/test_cast_dialog.py`, `tests/test_perf_long_use.py`)
-- **Every question stayed.** `widgets.confirm`, the window's
+- **Every question stayed.** `confirm` (now `ui/message_box.py`'s), the window's
   `_choice_dialog` and `profiles_ui.ask_pin` kept their dialog for the
   session - the PIN's with the PIN still in its field. Each lets it go once
   answered. (`tests/test_dialogs_freed.py`)

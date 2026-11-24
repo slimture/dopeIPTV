@@ -17,7 +17,7 @@ import time
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QLabel, QListWidget, QMessageBox, QPushButton,
+    QDialog, QDialogButtonBox, QLabel, QListWidget, QPushButton,
     QTabWidget, QVBoxLayout,
 )
 
@@ -28,6 +28,7 @@ from ..core.xdg import open_url
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
 from ..providers.simkl import scrobble_episode, scrobble_movie
+from . import message_box
 from .theme import P
 from .widgets import plain_text
 
@@ -140,7 +141,7 @@ class _SimklMixin:
 
     def _open_simkl_dialog(self, parent) -> None:
         if not self.simkl.is_connected():
-            QMessageBox.information(parent, "Simkl", tr("simkl_connect_first"))
+            message_box.information(parent, "Simkl", tr("simkl_connect_first"))
             return
         _SimklListsDialog(parent, self).exec()
 

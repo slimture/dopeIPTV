@@ -127,8 +127,8 @@ class SleepTimerMixin:
         b.move(g.right() - b.width() - 12, top)
 
     def _ask_sleep_minutes(self) -> None:
-        from PyQt6.QtWidgets import QInputDialog
-        mins, ok = QInputDialog.getInt(
+        from ..ui import message_box
+        mins, ok = message_box.get_int(
             self, tr("opt_sleep_timer"), tr("sleep_prompt"),
             60, 1, 1440, 5)
         if ok:

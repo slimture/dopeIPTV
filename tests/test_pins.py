@@ -245,11 +245,10 @@ def _window(tmp_path, monkeypatch, answers):
         asked.append(text)
         return typed.pop(0)
     monkeypatch.setattr(profiles_ui, "ask_pin", ask)
-    monkeypatch.setattr(mw_context.QInputDialog, "getText",
-                        staticmethod(lambda *a, **k: (asked.append("parental") or typed.pop(0), True)))
-    for box in (mw_profiles.QMessageBox, mw_context.QMessageBox):
-        for kind in ("information", "warning"):
-            monkeypatch.setattr(box, kind, staticmethod(lambda _p, _t, text, *a: said.append(text)))
+    monkeypatch.setattr(mw_context.message_box, "get_text",
+                        lambda *a, **k: (asked.append("parental") or typed.pop(0), True))
+    for kind in ("information", "warning"):
+        monkeypatch.setattr(mw_profiles.message_box, kind, lambda _p, _t, text, *a: said.append(text))
 
     class W(mw_profiles._ProfilesMixin, mw_context._ContextMenuMixin):
         def __init__(self):

@@ -144,6 +144,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   it has not answered for 3 seconds (the desktop's spinning pointer), and
   the cast window's search says how many Chromecasts it found, as it does
   for DLNA TVs and Kodi.
+- Every message and question - Reset all, a delete, a wrong PIN, a name or a
+  number asked for - is in the app's own look on every theme: the title as a
+  heading, a small mark drawn in the theme's colours, the button Enter
+  presses in the accent and a destructive one in red, mirrored right to left.
+  Qt's stock boxes, with the desktop's icons and a plain grey layout, are
+  gone (`ui/message_box.py`).
 
 ### Fixed
 

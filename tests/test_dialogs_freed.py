@@ -1,7 +1,7 @@
 """A question asked and answered leaves nothing behind: its window goes.
 
 Kept, each one stayed a child of the main window for the rest of the
-session - a QMessageBox or a QDialog for every Yes/No, every "stop the
+session - a message box or a QDialog for every Yes/No, every "stop the
 recording?", every PIN typed (with the PIN still in its field) - and every
 one was restyled at each theme change (docs/PERFORMANCE.md). Each helper
 reads what it needs before the window goes.
@@ -30,16 +30,17 @@ def _flush_deletes():
 
 
 def test_a_yes_or_no_leaves_no_window(monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox, QWidget
+    from PyQt6.QtWidgets import QDialog, QWidget
 
-    from dopeiptv.ui.widgets import confirm
-    answers = iter([QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No] * 3)
-    monkeypatch.setattr(QMessageBox, "exec", lambda self: next(answers))
+    from dopeiptv.ui.message_box import MessageDialog, confirm
+    # Yes (the default, Enter), then No (Escape) - three times over.
+    answers = iter([1, 0] * 3)
+    monkeypatch.setattr(MessageDialog, "exec", lambda self: next(answers))
     parent = QWidget()
     got = [confirm(parent, "Delete?", "It goes.") for _ in range(6)]
     assert got == [True, False] * 3
     _flush_deletes()
-    assert parent.findChildren(QMessageBox) == []
+    assert parent.findChildren(QDialog) == []
     parent.deleteLater()
 
 

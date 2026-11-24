@@ -33,8 +33,7 @@ from pathlib import Path
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QSettings, Qt, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton,
-    QVBoxLayout,
+    QApplication, QLabel, QPushButton, QVBoxLayout,
 )
 
 from .. import ORG
@@ -43,6 +42,7 @@ from ..core.log import log
 from ..core.workers import run_async
 from .notices import hub_of
 from ..i18n import tr
+from . import message_box
 from .theme import P
 
 START_DELAY = 20          # s after the window opens
@@ -417,7 +417,7 @@ class _SyncMixin:
         could hand back an earlier copy this one cannot tell. Asked in
         plain words, No the default: yes takes it, no leaves sync off. No
         round runs while it is asked."""
-        from .widgets import confirm
+        from .message_box import confirm
         days = sync.age_days(saved)
         try:
             asked = gen == self._sync_gen and self._sync_on()
@@ -865,12 +865,11 @@ class _SyncCard(QObject):
         self.refresh()
 
     def join(self) -> None:
-        text, ok = QInputDialog.getText(self.dlg, tr("sync_join_title"),
-                                        tr("sync_join_prompt"), QLineEdit.EchoMode.Normal)
+        text, ok = message_box.get_text(self.dlg, tr("sync_join_title"), tr("sync_join_prompt"))
         if not ok or not text.strip():
             return
         if not self.win._sync_join(text):
-            QMessageBox.warning(self.dlg, tr("sync_join_title"), tr("sync_code_bad"))
+            message_box.warning(self.dlg, tr("sync_join_title"), tr("sync_code_bad"))
         self.refresh()
 
     def cats_changed(self, _on: bool = False) -> None:
@@ -904,21 +903,21 @@ class _SyncCard(QObject):
         self.refresh()
 
     def renew(self) -> None:
-        from .widgets import confirm
+        from .message_box import confirm
         if not confirm(self.dlg, tr("sync_title"), tr("sync_renew_confirm"),
-                       default_yes=False):
+                       default_yes=False, danger=True):
             return
         if self.win._sync_new_code():
             self.revealed = True
         self.refresh()
 
     def stop(self) -> None:
-        from .widgets import confirm
+        from .message_box import confirm
         if not confirm(self.dlg, tr("sync_title"), tr("sync_stop_confirm"),
                        default_yes=False):
             return
         delete = confirm(self.dlg, tr("sync_title"), tr("sync_delete_ask"),
-                         default_yes=False)
+                         default_yes=False, danger=True)
         self.win._sync_stop(delete)
         self.revealed = False
         self.refresh()

@@ -24,10 +24,11 @@ faulthandler.dump_traceback_later(200, exit=True)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QEvent, QSettings, Qt
 from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 app = QApplication.instance() or QApplication([])
-QMessageBox.warning = staticmethod(lambda *a, **k: 0)
-QMessageBox.information = staticmethod(lambda *a, **k: 0)
+from dopeiptv.ui import message_box
+message_box.warning = lambda *a, **k: 0
+message_box.information = lambda *a, **k: 0
 tmp = tempfile.mkdtemp()
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
 

@@ -58,18 +58,22 @@ def test_the_players_overlay_and_number_badge_show_words():
 
 def test_the_certificate_question_shows_the_sources_name_as_words(monkeypatch):
     from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+    from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
-    from dopeiptv.ui import cert_trust
+    from dopeiptv.ui import cert_trust, message_box
 
     app = QApplication.instance() or QApplication([])
     assert app is not None
-    shown: list[str] = []
-    monkeypatch.setattr(QMessageBox, "exec", lambda box: shown.append(box.text()) or 0)
+    shown: list = []
+
+    def seen(box):
+        shown.append([(lbl.textFormat(), lbl.accessibleName()) for lbl in box.findChildren(QLabel)])
+        return 0
+    monkeypatch.setattr(message_box.MessageDialog, "exec", seen)
     window = QWidget()
     review = cert_trust._Review(window, None, {"name": HOSTILE, "options": {}}, None)
     review.ask("example.org", 443)
     assert len(shown) == 1
-    assert "example.org:443" in shown[0]
-    assert not Qt.mightBeRichText(shown[0]) or "<span" not in shown[0]
-    assert "<span" not in shown[0] and "<img" not in shown[0], shown[0]
+    body = next(words for _f, words in shown[0] if "example.org:443" in words)
+    assert HOSTILE in body                              # as written, never escaped
+    assert all(fmt == Qt.TextFormat.PlainText for fmt, _w in shown[0])

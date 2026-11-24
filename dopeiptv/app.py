@@ -7,7 +7,7 @@ import sys
 
 from PyQt6.QtCore import QSettings, Qt, QTimer
 from PyQt6.QtWidgets import (
-    QApplication, QMessageBox, QProxyStyle, QPushButton, QStyle,
+    QApplication, QProxyStyle, QPushButton, QStyle,
 )
 
 
@@ -880,12 +880,11 @@ def main() -> int:
             # recover by themselves (cooldown + caches).
             if wrong_login(e):
                 from .i18n import tr
-                from .ui.widgets import plain_text
+                from .ui import message_box
                 where = f"{tr('settings_title')} → {tr('set_page_sources')}"
-                QMessageBox.warning(
+                message_box.warning(
                     w, tr("msg_connection_failed"),
-                    plain_text(f"{pl['name']}: {e}\n\n"
-                               + tr("msg_check_playlist_credentials", where=where)))
+                    f"{pl['name']}: {e}\n\n" + tr("msg_check_playlist_credentials", where=where))
 
         QTimer.singleShot(500, _check_auth)
 

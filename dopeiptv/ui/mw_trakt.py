@@ -22,6 +22,7 @@ from ..providers.trakt import (
 )
 from .notices import hub_of
 from .theme import P
+from . import message_box
 from .widgets import plain_text
 from ..core.workers import run_async
 from ..core.xdg import open_url
@@ -29,7 +30,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QMessageBox, QPushButton, QTabWidget, QVBoxLayout)
+    QListWidget, QPushButton, QTabWidget, QVBoxLayout)
 from datetime import datetime
 
 
@@ -1132,7 +1133,7 @@ class _TraktMixin:
         Falls back to the device-code dialog for anyone who'd rather type a
         code."""
         if not self.trakt.client_id:
-            QMessageBox.information(parent, "Trakt", tr("msg_trakt_enter_creds"))
+            message_box.information(parent, "Trakt", tr("msg_trakt_enter_creds"))
             return
         # The account of the profile signing in, whoever is in use by the
         # time the browser hands the code back (a switch from the phone).
@@ -1295,7 +1296,7 @@ class _TraktMixin:
 
     def _open_trakt_dialog(self, parent) -> None:
         if not self.trakt.is_connected():
-            QMessageBox.information(
+            message_box.information(
                 parent, "Trakt", tr("msg_connect_trakt_first"))
             return
         d = QDialog(parent)

@@ -6,7 +6,6 @@ like the app's other surfaces, mirrored right to left, faded softly in and
 out unless the desktop asks for less motion."""
 from __future__ import annotations
 
-import re
 from functools import partial
 from typing import Any, Callable
 
@@ -22,6 +21,10 @@ from PyQt6.QtWidgets import (
 
 from ..core.log import log
 from ..i18n import tr
+# Places to break in a long run (an address, a path): a run Qt cannot break
+# is as wide as itself, and a row given the height of fewer lines than it
+# took was cut off at the top and the foot.
+from .message_box import breakable
 from .notices import Entry, HistoryItem, Message, NoticeHub
 from .theme import P, contrast, corner_radius, ink_on, tinted
 from .widgets import plain_text
@@ -333,25 +336,6 @@ def two_lines(text: str, font: QFont, width: int) -> str:
     if not words:
         return line1
     return line1 + "\n" + fm.elidedText(" ".join(words), Qt.TextElideMode.ElideRight, width)
-
-
-#: A run with no space long enough to need places to break.
-_LONG_RUN = re.compile(r"\S{25,}")
-#: Where such a run may break: after an address's or a path's punctuation.
-_BREAK_AFTER = re.compile(r"([/?&=._:@-])(?=\S)")
-#: What is left still long: a break every so many characters.
-_STILL_LONG = re.compile(r"[^\u200b]{20}(?=[^\u200b])")
-
-
-def breakable(text: str) -> str:
-    """*text* with places to break in its long runs - an address, a path -
-    so a wrapped line fits its width: a run Qt cannot break is as wide as
-    itself, and the row it is in was given the height of fewer lines than
-    it took, cut off at the top and the foot. The places are zero-width."""
-    def cut(m: re.Match[str]) -> str:
-        return _STILL_LONG.sub(lambda n: n.group(0) + "\u200b",
-                               _BREAK_AFTER.sub("\\1\u200b", m.group(0)))
-    return _LONG_RUN.sub(cut, str(text or ""))
 
 
 def one_line(text: str, fm: QFontMetrics, width: int) -> str:

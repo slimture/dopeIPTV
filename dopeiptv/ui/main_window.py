@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
     QColor, QGuiApplication, QIcon, QPainter, QPixmap,
 )
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QMainWindow, QMenu, QMessageBox, QWidget,
+    QAbstractItemView, QApplication, QMainWindow, QMenu, QWidget,
 )
 
 from .. import ORG
@@ -43,9 +43,8 @@ from ..core.stores import (
 )
 from .theme import P, rounded
 from ..core.wakelock import WakeLock
-from .widgets import (
-    file_dialog_options, plain_text,
-)
+from . import message_box
+from .widgets import file_dialog_options
 from .mw_settings import _SettingsMixin
 from .mw_trakt import _TraktMixin
 from .mw_recording import _RecordingMixin
@@ -1292,9 +1291,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             from .cert_trust import offer_review
             if offer_review(self, self.playlist_store, pl, self.switch_playlist):
                 return
-            QMessageBox.warning(
+            message_box.warning(
                 self, tr("playlist_msg_title"),
-                plain_text(tr("msg_could_not_connect", name=pl['name'], msg=msg)))
+                tr("msg_could_not_connect", name=pl['name'], msg=msg))
 
         run_async(self.pool, candidate.authenticate, done, fail)
 

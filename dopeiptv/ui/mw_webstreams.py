@@ -25,7 +25,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, QTimer
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QDialogButtonBox, QInputDialog, QLabel, QLineEdit,
+    QCheckBox, QDialog, QDialogButtonBox, QLabel, QLineEdit,
     QPushButton, QVBoxLayout,
 )
 
@@ -35,6 +35,7 @@ from ..core.log import log, redact_url
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..core.workers import run_async
 from ..i18n import tr
+from . import message_box
 from .notices import hub_of
 from .theme import P
 
@@ -383,7 +384,7 @@ class _WebStreamsMixin:
         url = it.get("url")
         if not url or not self.web_favs.is_favorite(url):
             return
-        name, ok = QInputDialog.getText(self, tr("web_rename"), tr("web_rename_prompt"),
+        name, ok = message_box.get_text(self, tr("web_rename"), tr("web_rename_prompt"),
                                         text=str(it.get("name") or ""))
         name = " ".join((name or "").split())
         if not ok or not name:

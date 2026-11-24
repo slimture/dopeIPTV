@@ -83,11 +83,10 @@ def test_the_line_says_which_address_is_in_use(nerd_on):
 
 
 def test_a_bad_line_keeps_the_page_open(nerd_on, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
-
+    from dopeiptv.ui import message_box
     from tests.test_source_page import source_page
     said: list[str] = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda _p, _t, text, *a, **k: said.append(text))
+    monkeypatch.setattr(message_box, "warning", lambda _p, _t, text, *a, **k: said.append(text))
     backs: list[int] = []
     d = source_page({"id": "pl1", "name": "IPTV", "kind": "xtream",
                      "server": "http://main.example.com", "username": "u", "password": "p",

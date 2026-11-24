@@ -11,12 +11,13 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from PyQt6.QtWidgets import QApplication, QInputDialog, QListWidget  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QListWidget  # noqa: E402
 
 from dopeiptv.core import profiles  # noqa: E402
 from dopeiptv.core import search_all as sa  # noqa: E402
 from dopeiptv.core.stores import CategoryOverrides, ParentalControl  # noqa: E402
 from dopeiptv.services import failover  # noqa: E402
+from dopeiptv.ui import message_box  # noqa: E402
 from dopeiptv.ui.dialogs import ContentManagerDialog  # noqa: E402
 from dopeiptv.ui.mw_context import _ContextMenuMixin  # noqa: E402
 from dopeiptv.ui.mw_profiles import KidsFilter, adult_ids  # noqa: E402
@@ -96,7 +97,7 @@ def test_a_rename_in_manage_categories_does_not_open_it(app, monkeypatch):
     dlg.window = win
     lw = dlg.findChildren(QListWidget)[0]
     lw.setCurrentRow(next(i for i in range(lw.count()) if "XXX" in lw.item(i).text()))
-    monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("Fun cartoons", True)))
+    monkeypatch.setattr(message_box, "get_text", lambda *a, **k: ("Fun cartoons", True))
     dlg._rename()
     assert win.overrides.display_name("live", "7", "") == "Fun cartoons"
     win._kids_fetch_cats()

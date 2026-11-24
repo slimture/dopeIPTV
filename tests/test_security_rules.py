@@ -280,52 +280,100 @@ def test_no_log_line_is_handed_a_password():
 
 # -- words from outside never read as markup (rule 5) ---------------------------------
 
-def _plain_words(node: ast.expr) -> bool:
-    """Words a Qt window shows as they are: a literal, the app's own words
-    with nothing put in them, or what ui/widgets.plain_text escaped."""
-    if isinstance(node, ast.Constant):
-        return True
-    if isinstance(node, ast.Call):
-        fn = node.func
-        called = fn.id if isinstance(fn, ast.Name) else getattr(fn, "attr", "")
-        return called == "plain_text" or (called == "tr" and not node.keywords)
-    return False
+#: Qt's stock message and input boxes: no plain mode (a provider's words in
+#: one were read as markup), and not the app's look.
+STOCK_BOXES = {"QMessageBox", "QInputDialog"}
+
+#: What ui/message_box.py offers to tell or ask with.
+MESSAGE_CALLS = {"information", "warning", "error", "confirm", "choose", "get_text",
+                 "get_item", "get_int", "MessageDialog"}
 
 
-#: Questions and messages whose words hold only the app's own or the
-#: person's: (file, the words as the code writes them) -> why.
-OWN_WORDS = {
-    ("media/players.py", "tr('status_player_not_found_msg', name=name)"): "mpv or VLC",
-    ("media/players.py", "tr('status_player_no_handoff', name=name)"): "mpv or VLC",
-    ("ui/mw_profiles.py", "tr('pin_wait', n=max(1, math.ceil(wait)))"): "a number",
-    ("ui/mw_profiles.py", "text"): "the wrong PIN's words and the wait, a number",
-    ("ui/mw_settings.py", "tr('pl_export_failed', error=exc)"): "the file the person picked",
-    ("ui/mw_settings.py", "done"): "backup_done's counts and the file the person picked",
-    ("ui/mw_settings.py", "tr('pl_import_done', n=added)"): "a number",
-    ("ui/mw_settings.py", "tr('backup_pw_short', n=backup.PASSWORD_MIN)"): "a number",
-}
-
-
-def test_a_question_or_message_shows_outside_words_as_words():
-    """A QMessageBox or a QInputDialog has no plain mode: a box's, a
-    provider's or a backup's words put in one are escaped first
-    (ui/widgets.plain_text) - an <img src="file:///..."> there loaded a
-    file from the disk, on Windows a UNC path sent the login's hash."""
+def test_no_stock_message_or_input_box_anywhere():
+    """A message or a question to the person goes through ui/message_box.py,
+    never QMessageBox or QInputDialog - the module itself included: named,
+    imported, subclassed or called, anywhere in the package."""
     found = []
-    for name, owner, at in (("warning", "QMessageBox", 2), ("information", "QMessageBox", 2),
-                            ("critical", "QMessageBox", 2), ("question", "QMessageBox", 2),
-                            ("getText", "QInputDialog", 2), ("getItem", "QInputDialog", 2),
-                            ("getInt", "QInputDialog", 2), ("getDouble", "QInputDialog", 2),
-                            ("getMultiLineText", "QInputDialog", 2)):
-        for rel, line, call in _calls(name):
-            fn = call.func
-            if not (isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name)
-                    and fn.value.id == owner and len(call.args) > at):
+    for rel, tree in _modules():
+        for node in ast.walk(tree):
+            named = (node.id if isinstance(node, ast.Name) else node.attr
+                     if isinstance(node, ast.Attribute) else "")
+            if named in STOCK_BOXES:
+                found.append(f"{rel}:{node.lineno} {named}")
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                found += [f"{rel}:{node.lineno} import {a.name}" for a in node.names
+                          if a.name.rsplit(".", 1)[-1] in STOCK_BOXES]
+    assert not found, "a stock box: " + ", ".join(found)
+
+
+def _message_call(name: str) -> bool:
+    """A call of ui/message_box.py's: message_box.<call>, or confirm by name."""
+    parts = name.split(".")
+    if parts[-1] not in MESSAGE_CALLS:
+        return False
+    return parts[-2] == "message_box" if len(parts) > 1 else parts[0] == "confirm"
+
+
+def test_no_words_are_escaped_for_a_message_box():
+    """ui/message_box.py shows every word as plain text by itself: words
+    escaped for markup first (ui/widgets.plain_text) would show "&lt;" and
+    "<p>" to the person."""
+    found = []
+    for rel, tree in _modules():
+        for name, _fn, call in _calls_in(tree):
+            if not _message_call(name):
                 continue
-            words = call.args[at]
-            if not _plain_words(words) and (rel, ast.unparse(words)) not in OWN_WORDS:
-                found.append(f"{rel}:{line} {ast.unparse(words)}")
-    assert not found, "outside words that Qt may read as markup: " + ", ".join(found)
+            for arg in [*call.args, *(k.value for k in call.keywords)]:
+                if any(isinstance(n, ast.Call) and _dotted(n.func).endswith("plain_text")
+                       for n in ast.walk(arg)):
+                    found.append(f"{rel}:{call.lineno}")
+    assert not found, "escaped for a message box: " + ", ".join(found)
+    assert sum(1 for rel, tree in _modules() for name, _f, _c in _calls_in(tree)
+               if _message_call(name)) > 60       # the rule still sees them
+
+
+def test_a_question_or_message_shows_outside_words_as_words(monkeypatch):
+    """Every word a message box shows - its title, its words, a value's
+    label, a button's - is plain text and shown as written: an <img
+    src="file:///..."> in a provider's, a box's or a backup's words loaded a
+    file from the disk in a stock box, on Windows a UNC path sent the
+    login's hash."""
+    import os
+
+    import pytest
+    pytest.importorskip("PyQt6.QtWidgets")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QAbstractButton, QApplication, QLabel
+
+    from dopeiptv.ui import message_box
+    app = QApplication.instance() or QApplication([])
+    assert app is not None
+    hostile = 'Pirat <img src="file:///etc/passwd"><b>News</b> &amp; \\\\host\\share'
+    seen: list = []
+
+    def look(box) -> int:
+        labels = box.findChildren(QLabel)
+        seen.append(box.title())
+        assert labels, "a message box with no words"
+        for lbl in labels:
+            assert lbl.textFormat() == Qt.TextFormat.PlainText, lbl.objectName()
+            assert lbl.text().replace("​", "") == lbl.accessibleName()
+        assert hostile in {lbl.accessibleName() for lbl in labels}     # as written
+        assert box.windowTitle() == box.title()
+        assert all(b.text() in (hostile, "<b>Yes</b>") or "<" not in b.text()
+                   for b in box.findChildren(QAbstractButton))
+        return 0
+    monkeypatch.setattr(message_box.MessageDialog, "exec", look)
+    message_box.information(None, hostile, hostile)
+    message_box.warning(None, "T", hostile)
+    message_box.error(None, "T", hostile)
+    message_box.confirm(None, hostile, hostile, yes="<b>Yes</b>")
+    message_box.choose(None, "T", hostile, [(hostile, message_box.DANGER)])
+    message_box.get_text(None, "T", hostile)
+    message_box.get_item(None, "T", hostile, [hostile])
+    message_box.get_int(None, "T", hostile)
+    assert seen == [hostile, "T", "T", hostile, "T", "T", "T", "T"]
 
 
 #: Labels that show a provider's, a guide's, a box's or a device's words,

@@ -25,13 +25,12 @@ from __future__ import annotations
 from functools import partial
 
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import (
-    QCheckBox, QDialogButtonBox, QLabel, QMenu, QMessageBox, QVBoxLayout,
-)
+from PyQt6.QtWidgets import QMenu
 
 from ..core.log import log
 from ..i18n import tr
 from ..media import players
+from . import message_box
 # The cell and the grid's window live in modules of their own; both stay
 # importable from here.
 from .multiview_cell import _MultiviewCell, _as_int  # noqa: F401
@@ -167,16 +166,11 @@ class _MultiviewMixin:
         self._close_multiview(hand_back=True)
 
     def _confirm_close_multiview(self) -> bool:
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.NoIcon)
-        box.setWindowTitle(tr("mv_toggle_title"))
-        box.setText(tr("mv_toggle_body"))
-        close = box.addButton(tr("mv_close"),
-                              QMessageBox.ButtonRole.AcceptRole)
-        box.addButton(tr("mv_keep"), QMessageBox.ButtonRole.RejectRole)
-        box.setDefaultButton(close)
-        box.exec()
-        return box.clickedButton() is close
+        # Close the default (Enter), Keep for Escape and the window's close.
+        return message_box.choose(
+            self, tr("mv_toggle_title"), tr("mv_toggle_body"),
+            [(tr("mv_keep"), message_box.NORMAL), (tr("mv_close"), message_box.PRIMARY)],
+            default=1, escape=0) == 1
 
     def _docked_context_menu(self, global_pos) -> None:
         """Right-click on the docked video: a complete menu - pause/stop,
@@ -261,38 +255,14 @@ class _MultiviewMixin:
 
     def _maybe_show_multiview_info(self) -> None:
         """One-time notice that multiview needs enough provider connections,
-        with a 'don't show again' opt-out. A themed QDialog (not QMessageBox,
-        whose checkbox rendered invisible against the dark message box)."""
+        with a 'don't show again' opt-out (ui/message_box.py, in the theme's
+        colours - a box drawn dark by hand read black on a light theme)."""
         if self.settings.value("mv_info_seen", "false") == "true":
             return
-        from PyQt6.QtWidgets import QDialog
-        d = QDialog(self)
-        d.setWindowTitle(tr("mv_info_title"))
-        lay = QVBoxLayout(d)
-        lay.setContentsMargins(20, 18, 20, 16)
-        lay.setSpacing(14)
-        d.setStyleSheet("QDialog { background:#1b1b20; }")
-        msg = QLabel(tr("mv_info_body"))
-        msg.setWordWrap(True)
-        msg.setMinimumWidth(420)
-        msg.setStyleSheet("color:#ECECF1; font-size:13px;")
-        lay.addWidget(msg)
-        cb = QCheckBox(tr("dont_show_again"))
-        # Force a fully self-drawn indicator: on macOS the native check box
-        # renders as an invisible same-colour square against the dark dialog.
-        # An explicit bordered box that fills with the accent when checked is
-        # visible regardless of platform/native styling.
-        cb.setStyleSheet(
-            "QCheckBox { color:#ECECF1; font-size:13px; spacing:8px; }"
-            "QCheckBox::indicator { width:18px; height:18px;"
-            " border:1px solid #6A6A75; border-radius:3px; background:#2A2A32; }"
-            "QCheckBox::indicator:checked {"
-            " background:#e5354b; border:1px solid #e5354b; }")
-        lay.addWidget(cb)
-        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
-        bb.accepted.connect(d.accept)
-        lay.addWidget(bb)
-        d.exec()
+        d = message_box.MessageDialog(self, tr("mv_info_title"), tr("mv_info_body"),
+                                      kind=message_box.INFO)
+        cb = d.add_check(tr("dont_show_again"))
+        message_box.run(d)
         if cb.isChecked():
             self.settings.setValue("mv_info_seen", "true")
 
@@ -316,26 +286,12 @@ class _MultiviewMixin:
             return
         if getattr(win, "_conflict_kept", False):
             return
-        from PyQt6.QtWidgets import QDialog
-        d = QDialog(self)
-        d.setWindowTitle(tr("mv_conflict_title"))
-        d.setStyleSheet("QDialog { background:#1b1b20; }")
-        lay = QVBoxLayout(d)
-        lay.setContentsMargins(20, 18, 20, 16)
-        lay.setSpacing(14)
-        msg = QLabel(tr("mv_conflict_body"))
-        msg.setWordWrap(True)
-        msg.setMinimumWidth(400)
-        msg.setStyleSheet("color:#ECECF1; font-size:13px;")
-        lay.addWidget(msg)
-        bb = QDialogButtonBox()
-        bb.addButton(tr("mv_close"), QDialogButtonBox.ButtonRole.AcceptRole)
-        bb.addButton(tr("mv_keep"), QDialogButtonBox.ButtonRole.RejectRole)
-        bb.accepted.connect(d.accept)
-        bb.rejected.connect(d.reject)
-        lay.addWidget(bb)
-        d.exec()
-        if d.result() == QDialog.DialogCode.Accepted:
+        # Close the default (Enter), Keep for Escape and the window's close.
+        got = message_box.choose(
+            self, tr("mv_conflict_title"), tr("mv_conflict_body"),
+            [(tr("mv_keep"), message_box.NORMAL), (tr("mv_close"), message_box.PRIMARY)],
+            default=1, escape=0)
+        if got == 1:
             self._close_multiview()
         else:
             win._conflict_kept = True

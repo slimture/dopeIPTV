@@ -19,12 +19,13 @@ from ..core.recording import (DISK_FULL, NO_BRIDGE, NO_NETWORK, NO_PRIVATE_FILE,
                               safe_filename)
 from .notices import hub_of
 from .theme import P
-from .widgets import confirm, plain_text
+from . import message_box
+from .message_box import confirm
 from .qt_i18n import format_when
 from .mw_timeshift import _TimeshiftMixin
 from PyQt6.QtCore import QDateTime, Qt, QTimer
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton, QVBoxLayout
+from PyQt6.QtWidgets import QComboBox, QDateTimeEdit, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QPushButton, QVBoxLayout
 from datetime import datetime
 
 
@@ -231,10 +232,10 @@ class _RecordingMixin(_TimeshiftMixin):
     def _choice_dialog(self, title: str, message: str,
                        options: list[tuple[str, str]],
                        dont_ask_setting: str | None = None) -> int | None:
-        """A compact, themed confirmation dialog. *options* is a list of
-        (label, kind) where kind is "primary"/"normal"/"danger"; returns the
-        index of the clicked option, or None if dismissed. Replaces the
-        oversized multi-button QMessageBox with clean stacked buttons. When
+        """A compact, themed confirmation dialog (ui/message_box.py). *options*
+        is a list of (label, kind) where kind is "primary"/"normal"/"danger";
+        returns the index of the clicked option, or None if dismissed. The
+        first option is what Enter answers as it opens. When
         *dont_ask_setting* is given, a "Don't show this again" checkbox is
         added; ticking it and choosing an option stores "true" under that key
         (so a caller can suppress the prompt next time; it's resettable in
@@ -250,43 +251,15 @@ class _RecordingMixin(_TimeshiftMixin):
         tv_ask = getattr(self, "_tv_ask", None)
         if getattr(self, "_tv_on", False) and callable(tv_ask):
             return tv_ask(title, message, options, dont_ask_setting)
-        from PyQt6.QtWidgets import QCheckBox
-        d = QDialog(self)
-        d.setWindowTitle(title)
-        d.setModal(True)
-        d.setMinimumWidth(420)
-        lay = QVBoxLayout(d)
-        lay.setContentsMargins(22, 20, 22, 18)
-        lay.setSpacing(16)
-        lbl = QLabel(message)
-        lbl.setTextFormat(Qt.TextFormat.PlainText)      # it names a title or a channel
-        lbl.setWordWrap(True)
-        lbl.setStyleSheet(f"font-size:13px; color:{P['text2']};")
-        lay.addWidget(lbl)
-        btns = QVBoxLayout()
-        btns.setSpacing(8)
-        chosen: dict[str, int | None] = {"idx": None}
-        for i, (label, kind) in enumerate(options):
-            b = QPushButton(label)
-            if kind == "primary":
-                b.setObjectName("Primary")
-            elif kind == "danger":
-                b.setStyleSheet(
-                    f"color:{P['rec']}; font-weight:600;")
-            b.clicked.connect(
-                lambda _c=False, i=i: (chosen.update(idx=i), d.accept()))
-            btns.addWidget(b)
-        lay.addLayout(btns)
-        dont = None
-        if dont_ask_setting:
-            dont = QCheckBox(tr("dont_show_again"))
-            dont.setStyleSheet(f"font-size:12px; color:{P['muted']};")
-            lay.addWidget(dont)
-        d.exec()
-        if dont is not None and dont.isChecked() and chosen["idx"] is not None:
+        kind = (message_box.WARNING if any(k == message_box.DANGER for _l, k in options)
+                else message_box.QUESTION)
+        d = message_box.MessageDialog(self, title, message, kind=kind,
+                                      options=options, default=0, escape=None)
+        dont = d.add_check(tr("dont_show_again")) if dont_ask_setting else None
+        idx = message_box.run(d)
+        if dont is not None and dont.isChecked() and idx is not None:
             self.settings.setValue(dont_ask_setting, "true")
-        d.deleteLater()     # answered: not kept for the session (docs/PERFORMANCE.md)
-        return chosen["idx"]
+        return idx
 
     def _guard_stream_switch(self, url: str, title: str) -> bool:
         """The docked player about to play *url*, from any way in (a zap,
@@ -392,7 +365,7 @@ class _RecordingMixin(_TimeshiftMixin):
             QTimer.singleShot(
                 500, lambda: self._watch_recording_file(j, _tries + 1))
             return
-        QMessageBox.information(
+        message_box.information(
             self, tr("rec_status_recording"),
             tr("msg_rec_file_not_ready"))
 
@@ -453,7 +426,7 @@ class _RecordingMixin(_TimeshiftMixin):
         if getattr(self, "_tv_on", False) and callable(tell):
             tell(title, text)
             return
-        QMessageBox.warning(self, title, plain_text(text))
+        message_box.warning(self, title, text)
 
     def _recorder_ready(self) -> bool:
         if self.rec.recorder()[1]:
@@ -1015,7 +988,7 @@ class _RecordingMixin(_TimeshiftMixin):
         try:
             path = self.rec.build_path(title, channel=self.channel_display_name(it))
         except OSError as e:
-            QMessageBox.warning(self, tr("rec_status_recording"), plain_text(str(e)))
+            message_box.warning(self, tr("rec_status_recording"), str(e))
             return
         self.play_live_channel(it)
         if self.player and self.player.start_stream_record(path):
@@ -1081,7 +1054,7 @@ class _RecordingMixin(_TimeshiftMixin):
         start_ts = start_edit.dateTime().toSecsSinceEpoch()
         stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
         if stop_ts <= start_ts or stop_ts <= time.time():
-            QMessageBox.warning(
+            message_box.warning(
                 self, tr("rec_schedule_recording").rstrip("."),
                 tr("msg_stop_time_future"))
             return
@@ -1133,7 +1106,7 @@ class _RecordingMixin(_TimeshiftMixin):
         start_ts = start_edit.dateTime().toSecsSinceEpoch()
         stop_ts = stop_edit.dateTime().toSecsSinceEpoch()
         if stop_ts <= start_ts:
-            QMessageBox.warning(
+            message_box.warning(
                 self, tr("msg_edit_time_title"),
                 tr("msg_stop_after_start"))
             return
@@ -1236,7 +1209,7 @@ class _RecordingMixin(_TimeshiftMixin):
                 return
             if confirm(d, tr("rec_scheduled_title"),
                        tr("rec_cancel_scheduled") + f"\n\n{job['title']}",
-                       default_yes=False):
+                       default_yes=False, danger=True):
                 self.rec.cancel(job["id"])
 
         lst.currentItemChanged.connect(lambda *_: _sync_buttons())
@@ -1268,7 +1241,7 @@ class _RecordingMixin(_TimeshiftMixin):
         what = (tr("rec_n_recordings", n=len(items)) if len(items) > 1
                 else f"'{items[0]['name']}'")
         if not confirm(self, tr("msg_delete_rec_title"),
-                       tr("msg_delete_rec_body", what=what)):
+                       tr("msg_delete_rec_body", what=what), danger=True):
             return
         for it in items:
             try:
@@ -1297,7 +1270,7 @@ class _RecordingMixin(_TimeshiftMixin):
             return
         if not confirm(self, tr("msg_delete_rec_title"),
                        tr("msg_delete_rec_body",
-                          what=tr("rec_n_recordings", n=len(items)))):
+                          what=tr("rec_n_recordings", n=len(items))), danger=True):
             return
         for it in items:
             try:
@@ -1314,7 +1287,7 @@ class _RecordingMixin(_TimeshiftMixin):
         path = it.get("_path")
         if not path:
             return
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("msg_rename_rec_title"), tr("cm_new_name"),
             text=it.get("name", ""))
         name = (safe_filename(name.strip())
@@ -1329,7 +1302,7 @@ class _RecordingMixin(_TimeshiftMixin):
             self.rec.move_info(path, new_path)   # keep the info sidecar attached
             self._rec_watched().moved(path, new_path)
         except OSError as e:
-            QMessageBox.warning(self, tr("msg_rename_rec_title"), plain_text(str(e)))
+            message_box.warning(self, tr("msg_rename_rec_title"), str(e))
         cur = self.cat_list.currentItem()
         self._load_items(
             cur.data(Qt.ItemDataRole.UserRole) if cur else None)
@@ -1385,11 +1358,11 @@ class _RecordingMixin(_TimeshiftMixin):
                 self.rec.move_info(it["_path"], dest)
                 self._rec_watched().moved(it["_path"], dest)
         except OSError as e:
-            QMessageBox.warning(self, tr("msg_move_rec_title"), plain_text(str(e)))
+            message_box.warning(self, tr("msg_move_rec_title"), str(e))
         self._load_categories()
 
     def _new_rec_folder(self, items=None) -> None:
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("msg_new_folder_title"), tr("msg_folder_name"))
         name = (safe_filename(name.strip())
                 if ok and name.strip() else "")
@@ -1400,7 +1373,7 @@ class _RecordingMixin(_TimeshiftMixin):
                 os.path.join(self.rec.directory(), name),
                 exist_ok=True)
         except OSError as e:
-            QMessageBox.warning(self, tr("msg_new_folder_title"), plain_text(str(e)))
+            message_box.warning(self, tr("msg_new_folder_title"), str(e))
             return
         if items:
             self._move_recordings(items, name)

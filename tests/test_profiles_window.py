@@ -20,11 +20,12 @@ faulthandler.dump_traceback_later(200, exit=True)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QEvent, QSettings, Qt
 from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtWidgets import QApplication, QDialog, QInputDialog, QMenu, QMessageBox
+from PyQt6.QtWidgets import QApplication, QDialog, QMenu
 app = QApplication.instance() or QApplication([])
 told = []
-QMessageBox.warning = staticmethod(lambda *a, **k: told.append(a[2] if len(a) > 2 else "") or 0)
-QMessageBox.information = staticmethod(lambda *a, **k: 0)
+from dopeiptv.ui import message_box
+message_box.warning = lambda *a, **k: told.append(a[2] if len(a) > 2 else "") or 0
+message_box.information = lambda *a, **k: 0
 tmp = tempfile.mkdtemp()
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
 
@@ -174,7 +175,7 @@ pump(20)
 names = [w.cat_list.item(i).text() for i in range(w.cat_list.count())]
 assert not any("Late night" in n or "XXX" in n for n in names), names
 assert any("News" in n for n in names), names
-QInputDialog.getText = lambda *a, **k: (_ for _ in ()).throw(AssertionError("asked for a PIN"))
+message_box.get_text = lambda *a, **k: (_ for _ in ()).throw(AssertionError("asked for a PIN"))
 assert w._request_unlock() is False
 # Settings only with a grown-up's PIN.
 opened = []

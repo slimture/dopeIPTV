@@ -29,7 +29,8 @@ from PyQt6.QtWidgets import QApplication, QMenu
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
-from .widgets import confirm, plain_text
+from . import message_box
+from .message_box import confirm
 
 BOX_SIGNAL_MS = 2000
 # How much of a recorded file is read to tell whether it is encrypted.
@@ -79,8 +80,6 @@ class _BoxMixin:
     def _map_guide_channel(self, it: dict) -> None:
         """Nerd: which of the guide's channels this channel's programmes come
         from, chosen by hand (or back to the automatic match)."""
-        from PyQt6.QtWidgets import QInputDialog
-
         from ..core import nerd_lists
         pl = self.playlist_store.active() if self.playlist_store else None
         pid = (pl or {}).get("id")
@@ -91,9 +90,8 @@ class _BoxMixin:
         current = str(it.get("epg_channel_id") or "")
         items = [auto, *ids]
         at = items.index(current) if current in items else 0
-        choice, ok = QInputDialog.getItem(
-            self, tr("nerd_epg_map"),
-            plain_text(tr("nerd_epg_map_hint", name=it.get("name") or "")),
+        choice, ok = message_box.get_item(
+            self, tr("nerd_epg_map"), tr("nerd_epg_map_hint", name=it.get("name") or ""),
             items, at, True)
         if not ok:
             return
@@ -307,17 +305,15 @@ class _BoxMixin:
     def _box_rec_delete(self, it: dict) -> None:
         title = str(it.get("name") or "")
         if not confirm(self, tr("box_rec_delete"), tr("box_rec_delete_q", title=title),
-                       default_yes=False):
+                       default_yes=False, danger=True):
             return
         self._box_run(self.client.movie_delete, self._box_rec_done(
             tr("box_rec_deleted", title=title)), it["stream_id"])
 
     def _box_rec_rename(self, it: dict) -> None:
-        from PyQt6.QtWidgets import QInputDialog
         title = str(it.get("name") or "")
-        name, ok = QInputDialog.getText(
-            self, tr("ctx_rename"), plain_text(tr("box_rec_rename_q", title=title)),
-            text=title)
+        name, ok = message_box.get_text(
+            self, tr("ctx_rename"), tr("box_rec_rename_q", title=title), text=title)
         name = (name or "").strip()
         if not ok or not name or name == title:
             return
@@ -333,14 +329,12 @@ class _BoxMixin:
         client = self.client
 
         def chosen(folders: Any) -> None:
-            from PyQt6.QtWidgets import QInputDialog
             if client is not self.client:
                 return
             title = str(it.get("name") or "")
             items = [f for f in (folders or []) if isinstance(f, str)] or ["/media/hdd/movie/"]
-            folder, ok = QInputDialog.getItem(
-                self, tr("box_rec_move"), plain_text(tr("box_rec_move_q", title=title)),
-                items, 0, True)
+            folder, ok = message_box.get_item(
+                self, tr("box_rec_move"), tr("box_rec_move_q", title=title), items, 0, True)
             folder = (folder or "").strip()
             if not ok or not folder.startswith("/"):
                 return

@@ -680,10 +680,10 @@ def _build_lists(ctx: _Ctx) -> Callable[[], dict[str, str]]:
         numbers("all", chno_keep.isChecked(), chno_said)
 
     def chno_clear_all() -> None:
-        from .widgets import confirm
+        from .message_box import confirm
         if numbers is None or not confirm(parent, tr("nerd_chno_clear"),
                                           tr("nerd_chno_clear_ask", source=chno_source()),
-                                          default_yes=False):
+                                          default_yes=False, danger=True):
             return
         numbers("clear", False, chno_said)
     chno_all.clicked.connect(lambda _c=False: chno_number_all())
