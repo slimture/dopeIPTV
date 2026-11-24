@@ -187,6 +187,10 @@ def connect_keyboard_only(link, rows):
     key(Qt.Key.Key_Return)
     settle(lambda: ov._stack.currentIndex() == PAGE_CHOOSE, what="what to watch")
     assert QApplication.focusWidget() is ov._cards[IPTV]
+    # The start's own place shown under the guide (100 ms in - on a slow
+    # computer as Get started is pressed) leaves the keys with the guide.
+    w._show_place("tv")
+    assert QApplication.focusWidget() is ov._cards[IPTV], a11y.describe(QApplication.focusWidget())
     key(Qt.Key.Key_Return)
     settle(lambda: ov._stack.currentIndex() == PAGE_FORM, what="the form")
     assert QApplication.focusWidget() is ov._server, a11y.describe(QApplication.focusWidget())

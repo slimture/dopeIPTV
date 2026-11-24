@@ -140,6 +140,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- The first-run guide could lose the keyboard to the channel list behind it
+  when the app's own start showed the TV place a moment after Get started
+  was pressed (on a slower computer): Enter then went to the list. A place
+  shown under the guide or "Who's watching?" leaves the keys with them.
 - With server mode on in the window, a scheduled recording could take the
   connection of a channel a device (a TV, Plex, VLC) was watching through
   it and cut that device off. It now does as `dopeiptv --server` does: a

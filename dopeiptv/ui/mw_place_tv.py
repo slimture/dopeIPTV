@@ -122,7 +122,11 @@ class _PlaceTvMixin:
                 self._close_series_page()
                 self._close_search_page()
         self._place_tv_sync()
-        self.listw.setFocus(Qt.FocusReason.OtherFocusReason)
+        focus = getattr(self, "_focus_list", None)
+        if callable(focus):
+            focus()                     # never from the first-run guide over it
+        else:
+            self.listw.setFocus(Qt.FocusReason.OtherFocusReason)
         entered = getattr(self, "_place_entered", None)
         if callable(entered):
             entered("tv")

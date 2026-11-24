@@ -18,7 +18,7 @@ person left off, or always on Mine (``start_place`` on Settings > General).
 from __future__ import annotations
 
 from PyQt6 import sip
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from ..core import places
@@ -155,9 +155,7 @@ class _PlacesMixin:
         if same and not reload:
             self._pages_give_way()
             self._place_entered(name)
-            lw = getattr(self, "listw", None)
-            if lw is not None:
-                lw.setFocus()
+            self._focus_list()
             return True
         self.switch_mode(self.mode if (same and name == "mitt") else mode)
         return True
@@ -201,9 +199,23 @@ class _PlacesMixin:
         if mid is not None and mid.currentIndex() != 0:
             mid.setCurrentIndex(0)
         self._place_entered(place)
+        self._focus_list()
+
+    def _focus_list(self) -> None:
+        """The middle pane's list takes the keys - never from a cover over
+        the window that holds them: the first-run guide, "Who's watching?".
+        A place shown under one (the start's own, 100 ms in, as the guide's
+        Get started is pressed) leaves the keys where they are."""
+        for name in ("_welcome", "_profile_picker"):
+            cover = getattr(self, name, None)
+            try:
+                if cover is not None and not sip.isdeleted(cover) and cover.isVisible():
+                    return
+            except RuntimeError:
+                continue
         lw = getattr(self, "listw", None)
         if lw is not None:
-            lw.setFocus()
+            lw.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def _place_entered(self, name: str) -> None:
         """*name* is the place shown now: its entry lit, its header said,
