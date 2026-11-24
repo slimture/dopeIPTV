@@ -36,7 +36,7 @@ OUT = ROOT / "tests" / "upgrade"
 #: The releases whose settings today's app must start on: the last of each
 #: line, and those around a change of how settings are kept (profiles in
 #: 1.6.0, the PIN's PBKDF2 in 1.6.11).
-RELEASES = ("v1.2.18", "v1.4.5", "v1.5.0", "v1.6.0", "v1.6.5", "v1.6.8", "v1.6.11", "v1.6.12")
+RELEASES = ("v1.2.18", "v1.4.5", "v1.5.0", "v1.6.0", "v1.6.5", "v1.6.8", "v1.6.11", "v1.6.12", "v1.7.0")
 
 #: What the release is told, and the test then looks for.
 EXPECT = {
