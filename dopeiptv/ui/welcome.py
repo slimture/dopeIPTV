@@ -104,7 +104,10 @@ class _Link(QPushButton):
         self.setFlat(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Not Fixed: a layout holds a Fixed widget to its size hint's one
+        # line, its height for a width cut to that - a second line was drawn
+        # half out of sight ("Bring your settings" on a 9 pt desktop font).
+        sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
         self._hot = False

@@ -346,6 +346,31 @@ def test_the_links_are_buttons_and_the_greeting_goes_round_once(app, monkeypatch
     got["_win"].close()
 
 
+def test_a_link_that_wraps_gets_every_line_it_needs(app):
+    """A link's words on two lines get two lines' height: a Fixed policy
+    held it to its one-line size hint, the second line drawn half out of
+    sight ("Bring your settings" on a 9 pt desktop font)."""
+    ov, got = _overlay()
+    _up(app, ov, got)
+    from dopeiptv.ui.welcome import PAGE_WELCOME
+    link = ov._w_bring
+    link.set_plain(tr("onb_bring_offer") + " " + tr("onb_bring_offer"))
+    ov._fit_card(PAGE_WELCOME)
+    for _ in range(10):
+        app.processEvents()
+    one_line = link.minimumSizeHint().height()
+    needs = link.heightForWidth(link.width())
+    assert needs > one_line                       # it wraps at the card's width
+    assert link.height() >= needs, (link.height(), needs)
+    # Its words put back: one line again, no room left over.
+    link.set_plain(tr("onb_bring_offer"))
+    ov._fit_card(PAGE_WELCOME)
+    for _ in range(10):
+        app.processEvents()
+    assert link.height() == link.heightForWidth(link.width())
+    got["_win"].close()
+
+
 def test_the_demo_is_offered_on_the_choice_too(app):
     ov, got = _overlay()
     _up(app, ov, got)
