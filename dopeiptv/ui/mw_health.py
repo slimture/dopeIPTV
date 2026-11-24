@@ -21,6 +21,10 @@ class _HealthMixin:
     # -- the channel ------------------------------------------------------------
 
     def _health_source_id(self) -> str:
+        # The demo's channels under no stored source's id (mw_onboarding).
+        own = getattr(self, "_own_source_id", None)
+        if callable(own):
+            return str(own() or "")
         store = getattr(self, "playlist_store", None)
         return str(getattr(store, "active_id", "") or "")
 

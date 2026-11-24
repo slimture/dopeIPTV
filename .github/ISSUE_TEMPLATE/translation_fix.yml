@@ -28,7 +28,7 @@ body:
         `python tools/i18n_status.py <code>` or look in
         `dopeiptv/locale/<code>.json`), the current text, and your suggestion.
       placeholder: |
-        key: onb_xtream_link_hint
+        key: onb_get_started
         current: <the wording you see now>
         suggested: <your improved wording>
 

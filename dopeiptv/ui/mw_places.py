@@ -214,10 +214,13 @@ class _PlacesMixin:
             self._list_place = name
         if hasattr(self, "nav_btns"):
             self._check_nav(places.NAV_OF[name])
-        try:
-            places.note(self.settings, name, self._list_place)
-        except Exception as e:
-            log.debug("places: not kept: %s", e)
+        # Where the app opens next: not a place of the demo's, which keeps
+        # nothing (mw_onboarding).
+        if getattr(self, "_demo_kept", None) is None:
+            try:
+                places.note(self.settings, name, self._list_place)
+            except Exception as e:
+                log.debug("places: not kept: %s", e)
         self._sync_place_header()
 
     def _mode_place(self, mode: str) -> None:

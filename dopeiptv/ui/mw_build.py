@@ -714,6 +714,10 @@ class _BuildMixin(_BuildDetailMixin):
         # empty, so the label only ever added a way to get stuck.
 
     def _build_status_row(self, lp: QVBoxLayout) -> None:
+        # No source of one's own yet (explore, the demo): a calm strip that
+        # says so under the middle pane's pages - every place's, in the
+        # layout, never over a row (mw_onboarding).
+        self._build_source_strip(self._mid_stack.parentWidget().layout())
         self.count_lbl = QLabel("")
         self.count_lbl.setTextFormat(Qt.TextFormat.PlainText)   # a channel's, a device's name
         self.count_lbl.setStyleSheet(f"color:{P['muted3']}; font-size:11px;")
@@ -776,10 +780,6 @@ class _BuildMixin(_BuildDetailMixin):
         # The middle pane's width also changes with divider drags, not just
         # window resizes, so keep its control strip's compact mode in sync.
         root.splitterMoved.connect(self._update_mid_compact)
-        # The "+ Add provider" hint is absolutely positioned over the middle
-        # pane, so it has to follow divider drags too - otherwise it drifts off
-        # centre (or off-pane) whenever the columns are resized.
-        root.splitterMoved.connect(self._position_provider_hint)
         # When collapsed the rail's width is pinned (so it can't stretch), which
         # freezes its divider handle - so watch the handle for a rightward drag
         # to re-expand it without reaching for the ☰ button.

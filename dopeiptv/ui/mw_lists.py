@@ -45,6 +45,8 @@ _COUNT_KEYS = {
     "watched": "count_watched", "local": "count_files",
     "radio": "count_stations",
 }
+# The kinds whose count has a word of its own for one (`<key>_one`).
+_ONE_KEYS = frozenset({"live", "vod", "series"})
 
 
 class _ListsMixin:
@@ -83,6 +85,9 @@ class _ListsMixin:
             self._history_filter = "watched" if mode == "watched" else "all"
         self._sync_history_chips()
         self._refresh_nav_status()
+        hint = getattr(self, "_update_provider_hint", None)
+        if callable(hint):
+            hint()          # no source of one's own: said on its places
         if hasattr(self, "local_view_btn"):
             self.local_view_btn.setVisible(mode == "local")
             self.local_rescan_btn.setVisible(mode == "local")
@@ -389,8 +394,10 @@ class _ListsMixin:
                 cw.setData(Qt.ItemDataRole.UserRole, "__continue__")
                 self.cat_list.addItem(cw)
             # "Recently added" for TV, Movies and Series - the latest the
-            # provider has published, newest first.
-            if self.mode in ("vod", "series", "live"):
+            # provider has published, newest first (not the demo's: nothing
+            # of it was added by anyone).
+            if self.mode in ("vod", "series", "live") \
+                    and getattr(self.client, "lists_recent", True):
                 rc = QListWidgetItem("🆕  " + tr("cat_recent"))
                 rc.setData(Qt.ItemDataRole.UserRole, "__recent__")
                 self.cat_list.addItem(rc)
@@ -985,7 +992,11 @@ class _ListsMixin:
         if kind == "rec" and getattr(self, "mode", "") == "local":
             kind = "local"          # Local files' rows ride the recordings' kind
         key = _COUNT_KEYS.get(kind)
-        return tr(key, n=n) if key else str(n)
+        if not key:
+            return str(n)
+        if n == 1 and kind in _ONE_KEYS:
+            return tr(f"{key}_one", n=n)    # "1 channel", not "1 channels"
+        return tr(key, n=n)
 
     # History left-category -> the stored _kind values it covers, for the
     # grouped view and the per-category delete.

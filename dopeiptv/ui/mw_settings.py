@@ -300,13 +300,24 @@ class _SettingsSources:
         if dlg.exec():
             pl = self.store.add(dlg.values())
             self.changed(pl["id"])
+            self._use_if_none(pl["id"])
             self.edit(pl["id"], self.shell.current_key())
+
+    def _use_if_none(self, pid) -> None:
+        """A source added while the window has none of its own in use
+        (explore, the demo): used at once - else it sat there, the lists
+        empty and Use greyed (it is the one marked active)."""
+        win = self.win
+        if pid and getattr(win, "_no_own_source", lambda: False)():
+            self.store.set_active(pid)
+            win.switch_playlist(pid)
 
     def export(self, password: str = "") -> bool:
         return self.win._backup_save(self.dialog, password)
 
     def added(self) -> None:
         self.changed(self.store.active_id)
+        self._use_if_none(self.store.active_id)
 
     def import_(self):
         self.win._backup_restore(self.dialog, self.added)

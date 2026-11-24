@@ -25,9 +25,8 @@ from ..core.log import log
 from ..i18n import tr
 from ..providers.casting import CastHub
 from ..providers.kodi import KodiManager
-from ..providers.client import (
-    DemoClient, XtreamClient, make_client,
-)
+from ..providers.client import XtreamClient, make_client
+from ..providers.demo import DemoClient
 from ..media.video_thread import WindowChanges
 from ..providers.epg import XmltvGuide, epg_cache_path, prune_epg_caches
 from ..services.coverart import CoverArtService
@@ -164,7 +163,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._welcome = None  # first-run onboarding overlay; created on demand
         self._local_ctx = None  # current subdirectory in the Local files view
         self._local_series = None  # drilled-into series in the library view
-        self._add_provider_btn = None  # "+ Add provider" hint when offline
         self.client = client
         self.settings = settings
         self.playlist_store = playlists
@@ -231,6 +229,11 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # fallback logic isn't inconsistent between list and detail
         # panel for the same movie.
         self.poster_art.dead = self.logos.dead
+        # The pictures the app draws itself (the demo's logos and posters,
+        # core/drawn_art.py) in the theme's accents.
+        from ..core import drawn_art
+        from .theme import ACCENTS, ink_on
+        drawn_art.use_palette({k: v[1] for k, v in ACCENTS.items()}, ink_on)
         # Where covers of the person's own are, for the loaders above.
         self._local_trust_pictures()
         self.epg_progress.connect(self._on_epg_progress)
@@ -501,7 +504,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._search_sources_changed()
         self._xs_sources_changed()
         store = self.playlist_store
-        pl = store.get(store.active_id) if (store and store.active_id) else None
+        # The demo is no source of one's own: no stored source's name on it.
+        pid = self._own_source_id()
+        pl = store.get(pid) if (store and pid) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
         prof = self._profile() if self._profile_many() else None
         if prof is not None:
@@ -958,7 +963,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._set_det_fs_style(True)
             self.menuBar().hide()
             self.player.set_fullscreen_ui(True)
-            self._update_provider_hint()   # tuck the '+ Add provider' hint away
+            self._update_provider_hint()   # the strip under the lists away
             self._was_fullscreen = self.isFullScreen()
             # Remember if the window was maximized/zoomed and its exact
             # geometry, so leaving video-fullscreen restores that state instead
@@ -981,7 +986,13 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
     def _on_escape(self) -> None:
         """Single Escape handler so the key is never ambiguous: dismiss the
         onboarding wizard if it's up, else leave the Guide page if it shows,
-        otherwise leave fullscreen."""
+        otherwise leave fullscreen. The notices' panel open closes first,
+        and alone; the command palette open over the guide is the guide's
+        (it is not opened over it)."""
+        panel = getattr(self, "_notice_panel", None)
+        if panel is not None and not panel.isHidden():
+            panel.close_panel()
+            return
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.dismiss()
             return
@@ -1209,20 +1220,41 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._load_guide(force=force, label=tr("status_refreshing_playlist"))
 
     def start_demo(self) -> None:
-        """Switch to the built-in demo provider (a few free public test
-        streams) so the app can be tried without any credentials. Reuses the
-        normal live path - the demo client just answers with a fixed channel
-        list."""
+        """The demo as the source (providers/demo.py): its channels with a
+        guide, its films under Movies, all through the window's own paths.
+        It keeps nothing: its stores live in memory (mw_onboarding's
+        _demo_stores) and what it plays is kept nowhere (core/privacy.py) -
+        a source of one's own taking its place leaves nothing of it behind
+        (_leave_demo)."""
+        self._leave_demo()
         self.client = DemoClient()
+        self._demo_stores()
         self._base_title = tr("demo_title")
         self.setWindowTitle(self._base_title)
-        # Rebuild the (empty) guide against the demo client, then load the
-        # Live channels through the usual mode switch.
+        # Another source's category ids and lists say nothing about this one;
+        # TV opens on All - every channel at a first look, the guide with
+        # all of them.
+        self._last_cat = {"live": None}
+        self._recent_cache = {}
+        self._full_catalog = None
+        self._search_index_cache = {}
+        # Its own guide, made here: nothing downloaded, nothing on disk.
         self.xmltv = XmltvGuide(self.client, None, cache_path=None,
                                 progress_cb=self._guide_progress(0))
+        self._guide_source_changed()
+        self._sp_source_changed()
+        self._pf_source_changed()
+        self._place_series_source_changed()
+        self._popular_changed()
+        self._update_playlist_btn()
+        self._refresh_places("source")
+        self._refresh_mode_availability()
         self.switch_mode("live")
-        self._update_provider_hint()   # hides the '+ Add provider' hint
-        self._show_toast(tr("demo_notice"), 8000)
+        entered = getattr(self, "_place_entered", None)
+        if callable(entered):
+            entered("tv")
+        self._load_guide(force=False)
+        self._update_provider_hint()
 
     def switch_playlist(self, pid: str, then=None) -> None:
         """Use source *pid* from now on, once it answers; *then* runs after
@@ -1235,45 +1267,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
 
         def done(_auth):
             self._hide_busy()
-            self.playlist_store.set_active(pid)
-            self.client = candidate
-            from ..core import nerd
-            nerd.set_source(pl)
-            # Another provider's category ids say nothing about this one's.
-            self._last_cat = {}
-            # The profile's own for this source: favorites, history, resume
-            # points, reminders, followed series.
-            self._build_source_stores(pid)
-            self._watch_favorites()
-            self.series_rules = SeriesRuleStore(self.settings, pid)
-            # Hide/rename/lock rules are per playlist too: kept, the old
-            # provider's locks applied here and edits saved under its key.
-            self.overrides = CategoryOverrides(
-                self.settings, f"category_overrides_{pid}")
-            self.channel_ov = ChannelOverrides(
-                self.settings, f"channel_overrides_{pid}")
-            self._base_title = pl["name"]
-            self.setWindowTitle(self._base_title)
-            self._update_playlist_btn()
-            self._update_provider_hint()
-            self._refresh_nav_status()      # this playlist's followed series
-            # Drop what was read of the previous (or empty offline) provider -
-            # it means nothing for this one.
-            self._recent_cache = {}
-            self._guide_source_changed()    # the old source's guide goes
-            self._sp_source_changed()       # and a series' page of it
-            self._pf_source_changed()       # the Movies place and a film's page
-            self._place_series_source_changed()   # the Series place's rows
-            self._popular_changed()         # popular right now: this source's
-            self._refresh_places("source")  # the places' own pages
-            # Switching rebuilds the list but loads the guide from cache when
-            # fresh - no forced network reload. A manual Refresh or the auto-
-            # refresh time setting still drives a real re-fetch.
-            self.refresh_playlist(force=False)
-            # Its account running out: said from this login's answer.
-            self._expiry_check(pl, _auth)
-            if then is not None:
-                then()
+            self._use_source(pid, candidate, _auth, then)
 
         def fail(msg):
             self._hide_busy()
@@ -1288,6 +1282,54 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 plain_text(tr("msg_could_not_connect", name=pl['name'], msg=msg)))
 
         run_async(self.pool, candidate.authenticate, done, fail)
+
+    def _use_source(self, pid: str, candidate, auth=None, then=None) -> None:
+        """Source *pid* in use from now on, with *candidate*, its client that
+        has logged in already (*auth*: what the login answered) - after
+        switch_playlist's login, or the welcome's connect step's."""
+        pl = self.playlist_store.get(pid) if self.playlist_store else None
+        if not pl:
+            return
+        self._leave_demo()
+        self.playlist_store.set_active(pid)
+        self.client = candidate
+        from ..core import nerd
+        nerd.set_source(pl)
+        # Another provider's category ids say nothing about this one.
+        self._last_cat = {}
+        # The profile's own for this source: favorites, history, resume
+        # points, reminders, followed series.
+        self._build_source_stores(pid)
+        self._watch_favorites()
+        self.series_rules = SeriesRuleStore(self.settings, pid)
+        # Hide/rename/lock rules are per playlist too: kept, the old
+        # provider's locks applied here and edits saved under its key.
+        self.overrides = CategoryOverrides(
+            self.settings, f"category_overrides_{pid}")
+        self.channel_ov = ChannelOverrides(
+            self.settings, f"channel_overrides_{pid}")
+        self._base_title = pl["name"]
+        self.setWindowTitle(self._base_title)
+        self._update_playlist_btn()
+        self._update_provider_hint()
+        self._refresh_nav_status()      # this playlist's followed series
+        # Drop what was read of the previous (or empty offline) provider -
+        # it means nothing for this one.
+        self._recent_cache = {}
+        self._guide_source_changed()    # the old source's guide goes
+        self._sp_source_changed()       # and a series' page of it
+        self._pf_source_changed()       # the Movies place and a film's page
+        self._place_series_source_changed()   # the Series place's rows
+        self._popular_changed()         # popular right now: this source's
+        self._refresh_places("source")  # the places' own pages
+        # Switching rebuilds the list but loads the guide from cache when
+        # fresh - no forced network reload. A manual Refresh or the auto-
+        # refresh time setting still drives a real re-fetch.
+        self.refresh_playlist(force=False)
+        # Its account running out: said from this login's answer.
+        self._expiry_check(pl, auth)
+        if then is not None:
+            then()
 
     # -- metadata (TMDB artwork) -----------------------------------------------------
 
@@ -1947,6 +1989,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self._apply_audio_visuals(url)
         self._arm_loading(it.get("stream_icon"))
         self.player.refusal = ""
+        self._loop_arm("live", it)
         if self.player.play(url, title, local_buffer=True,
                             buffer_key=f"live:{self._item_key(it)}"):
             self.wake.acquire(wake_reason(title))
@@ -2800,6 +2843,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # and where it is decides its way out (core/net_bridge.py).
         outside = kind == "radio" or (not own_buffer and self._from_outside(url))
         self.player.refusal = ""
+        if not catchup:
+            self._loop_arm(kind, item)
         if self.player.play(url, title, start=resume_at,
                             local_buffer=kind == "live" and not catchup,
                             buffer_key=f"{kind}:{key}" if key else None,
@@ -2833,6 +2878,21 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                         "external mpv window", url_for_log(url))
             self.player.hide()
             launch_player("mpv", url, title, self)
+
+    def _loop_arm(self, kind: str, item) -> None:
+        """A channel the source plays as a film on a loop (the demo's,
+        DemoClient.loops): the player told to loop that file - never any
+        other stream's way."""
+        loops = getattr(self.client, "loops", None)
+        if kind != "live" or not callable(loops) or not isinstance(item, dict):
+            return
+        try:
+            on = bool(loops(item.get("stream_id")))
+        except Exception:
+            on = False
+        arm = getattr(self.player, "loop_next", None) if on else None
+        if callable(arm):
+            arm()
 
     def _arm_loading(self, icon_url, reconnect: bool = False) -> None:
         """What the player's loading indicator shows while the next stream
@@ -3707,7 +3767,6 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.cover()
         self._profile_picker_fit()
-        self._position_provider_hint()
         self._reposition_update_banner()
         if getattr(self, "_focus_mode", False):
             self._position_reopen()

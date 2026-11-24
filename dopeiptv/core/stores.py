@@ -18,7 +18,41 @@ from PyQt6.QtCore import QSettings
 
 from . import pins, privacy, site_out
 from .log import register_secrets
-from .names import collapse_repeats
+from .names import collapse_repeats, source_name
+
+
+class PassingSettings:
+    """Settings that live in memory and go with the object: what the demo's
+    stores write to (ui/main_window.start_demo) - its favorites, history and
+    the rest are gone the moment it is left, and never reach a file. The
+    part of QSettings the stores use."""
+
+    def __init__(self) -> None:
+        self._values: dict[str, Any] = {}
+
+    def value(self, key: str, default: Any = None, type: Any = None) -> Any:  # noqa: A002 - QSettings' name
+        got = self._values.get(key, default)
+        if type is not None and got is not None:
+            try:
+                return type(got)
+            except (TypeError, ValueError):
+                return default
+        return got
+
+    def setValue(self, key: str, value: Any) -> None:  # noqa: N802 - QSettings' name
+        self._values[key] = value
+
+    def remove(self, key: str) -> None:
+        self._values.pop(key, None)
+
+    def contains(self, key: str) -> bool:
+        return key in self._values
+
+    def allKeys(self) -> list[str]:  # noqa: N802 - QSettings' name
+        return list(self._values)
+
+    def sync(self) -> None:
+        return None
 
 
 class _Kept:
@@ -918,8 +952,7 @@ class PlaylistStore:
                    and (p.get("mac") or "").upper() == mac
                    for p in self.items):
                 continue
-            row: dict[str, Any] = {"name": field("name")
-                   or server.split("//")[-1].split("/")[0],
+            row: dict[str, Any] = {"name": field("name") or source_name(server),
                    "kind": kind, "server": server, "username": user,
                    "password": pw, "epg_url": field("epg_url"),
                    "refresh": field("refresh") or "never"}

@@ -141,7 +141,10 @@ def build_sources(ctx: SettingsContext) -> None:
         has = pl is not None
         for b in (edit_btn, remove_btn):
             b.setEnabled(has)
-        use_btn.setEnabled(has and pid != store.active_id)
+        # Use: another source - or the one marked active while the window
+        # has none of its own in use (explore, the demo).
+        none = getattr(win, "_no_own_source", lambda: False)()
+        use_btn.setEnabled(has and (pid != store.active_id or none))
         refresh_pl_btn.setEnabled(has and pid == store.active_id)
         if not pl:
             account_lbl.setText(tr("account_unavailable"))

@@ -39,7 +39,7 @@ def test_a_refused_login_is_no_category_list(tmp_path):
     c, _ = _client(tmp_path, [REFUSED])
     with pytest.raises(NoList) as e:
         c.live_categories()
-    assert str(e.value) == "Wrong username or password."
+    assert str(e.value) == "Wrong user name or password."
 
 
 def test_nothing_is_stored_and_the_last_good_copy_is_served(tmp_path):

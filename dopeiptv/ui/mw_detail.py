@@ -12,7 +12,7 @@ from ..i18n import tr
 from .theme import ACCENT, P
 from .widgets import _ClickableWidget, plain_text
 from ..core import film_view as fv
-from ..core import tagless
+from ..core import drawn_art, tagless
 from ..core.log import log, redact_url
 from ..core.privacy import for_log
 from ..core.workers import run_async, tmdb_url_from_provider
@@ -394,7 +394,9 @@ class _DetailMixin:
             if key == self._current_key and pm is not None and not pm.isNull():
                 self._set_detail_logo(pm)
 
-        if not (is_media and self.tmdb):
+        # A poster the app draws (the demo's films, core/drawn_art.py) is
+        # the title's own: TMDB is not asked about it.
+        if not (is_media and self.tmdb) or drawn_art.is_drawn(raw_cover):
             if fallback_url:
                 self.poster_art.get(fallback_url, logo)
             return

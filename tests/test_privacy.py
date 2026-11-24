@@ -140,6 +140,39 @@ def test_a_private_playback_going_on_after_private_viewing_ends_keeps_nothing(se
     assert [e["name"] for e in h.items()] == ["SVT1 HD", "TV4"]
 
 
+def test_the_demos_playbacks_are_kept_nowhere_but_ones_own_files(settings):
+    """While the demo is the source (keep_nothing), what it plays is kept
+    nowhere as a private playback is - but one's own files are kept, and
+    nothing of it counts as private viewing (no buffer in memory, no cast
+    refused). Off, the next playback is kept as ever."""
+    h = HistoryStore(settings, "history_a")
+    try:
+        privacy.keep_nothing(True, {"local", "radio"})
+        assert privacy.keeping_nothing()
+        # History is written as a playback starts, before it is marked.
+        h.add("drawn", "Sintel 24/7", None, 4, "live")
+        assert h.items() == []
+        privacy.playback_started("live", 3)
+        h.add("drawn", "Big Buck Bunny 24/7", None, 3, "live")
+        assert h.items() == []
+        h.add("/m/f.mkv", "f.mkv", None, "/m/f.mkv", "local")
+        assert [e["name"] for e in h.items()] == ["f.mkv"]
+        settings.remove("history_a")
+        h = HistoryStore(settings, "history_a")
+        assert privacy.playback_private("live", 3) and privacy.private_key(3)
+        assert not privacy.playing_private() and not privacy.private()
+        privacy.playback_started("local", "/m/f.mkv")
+        assert not privacy.playback_private("local", "/m/f.mkv")
+        privacy.keep_nothing(False)
+        assert not privacy.keeping_nothing()
+        privacy.playback_started("live", 3)
+        h.add("http://h/3.ts", "SVT1 HD", None, 3, "live")
+        assert [e["name"] for e in h.items()] == ["SVT1 HD"]
+    finally:
+        privacy.keep_nothing(False)
+        privacy.playback_stopped()
+
+
 def test_a_private_film_keeps_no_resume_point_or_watched_mark_after_private_ends():
     """The film played privately; private viewing went off before it ended:
     where it stopped is not kept, and no watched mark goes to the media

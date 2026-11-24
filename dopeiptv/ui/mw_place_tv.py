@@ -281,7 +281,9 @@ class _PlaceTvMixin:
         if density not in DENSITIES:
             return
         pick = getattr(self, "_place_view_pick", None)
-        if callable(pick):
+        if getattr(self, "_demo_kept", None) is not None:
+            pass                                # the demo keeps nothing (mw_onboarding)
+        elif callable(pick):
             pick("tv", density, DENSITY_KEY)    # not over the own while Just the list
         else:
             self.settings.setValue(DENSITY_KEY, density)

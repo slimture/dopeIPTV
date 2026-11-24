@@ -63,6 +63,32 @@ def private() -> bool:
 # (Discord, the media servers, Watch together, the statistics, the events).
 _private_playback: tuple[str, str] | None = None
 _private_titles: frozenset[str] = frozenset()
+# A playback kept nowhere though private viewing is off: the demo's
+# (providers/demo.py, while keep_nothing is on). Every reporter that
+# asks playback_private or private_key keeps and sends nothing of it, as of
+# a private one; nothing else changes for it - playing_private() does not
+# count it, so no buffer is held in memory and no cast is refused for it.
+_passing_playback: tuple[str, str] | None = None
+# While the demo is the source (keep_nothing): every playback started is a
+# passing one but of the kinds spared - one's own files, radio, web streams.
+_passing_on = False
+_passing_spared: frozenset[str] = frozenset()
+
+
+def keep_nothing(on: bool, spared: Any = ()) -> None:
+    """The demo is the source (*on*, ui/mw_onboarding.py): every playback
+    started from now on is kept nowhere, as playback_private says, but of
+    the kinds *spared*; off, what starts next is kept as ever."""
+    global _passing_on, _passing_spared, _passing_playback
+    _passing_on = bool(on)
+    _passing_spared = frozenset(str(k) for k in spared) if on else frozenset()
+    if not on:
+        _passing_playback = None
+
+
+def keeping_nothing() -> bool:
+    """Whether keep_nothing is on."""
+    return _passing_on
 
 
 def _key(key: Any) -> str:
@@ -74,8 +100,10 @@ def _key(key: Any) -> str:
 def playback_started(kind: str, key: Any) -> None:
     """The window's player took a stream (or private viewing was turned on
     while one plays): marked private while private viewing is on; anything
-    else chosen after it ended is not."""
-    global _private_playback, _private_titles
+    else chosen after it ended is not. While keep_nothing is on, kept
+    nowhere whatever private viewing says (the demo's), but of a kind
+    spared."""
+    global _private_playback, _private_titles, _passing_playback
     ident = (str(kind or ""), _key(key))
     if _private_playback != ident:
         _private_titles = frozenset()
@@ -83,26 +111,34 @@ def playback_started(kind: str, key: Any) -> None:
         _private_playback = ident
     elif _private_playback != ident:
         _private_playback = None
+    _passing_playback = ident if _passing_on and ident[0] not in _passing_spared else None
 
 
 def playback_stopped() -> None:
     """Stop: what is played next is a new playback."""
-    global _private_playback, _private_titles
+    global _private_playback, _private_titles, _passing_playback
+    _passing_playback = None
     if not private():
         _private_playback = None
         _private_titles = frozenset()
 
 
 def playback_private(kind: str, key: Any) -> bool:
-    """Whether the playback (*kind*, *key*) is to be kept to this computer."""
-    return private() or _private_playback == (str(kind or ""), _key(key))
+    """Whether the playback (*kind*, *key*) is to be kept to this computer -
+    or, the demo's, kept nowhere: also before playback_started has marked
+    it (History is written as a playback starts), whatever of a kind not
+    spared starts while keep_nothing is on."""
+    ident = (str(kind or ""), _key(key))
+    return (private() or _private_playback == ident or _passing_playback == ident
+            or (_passing_on and ident[0] not in _passing_spared))
 
 
 def private_key(key: Any) -> bool:
     """Whether a store keeping something of the title *key* - a resume
     point - is to keep nothing: private viewing on, or that title the
     private playback still going on (whatever kind the store calls it)."""
-    return private() or (_private_playback is not None and _private_playback[1] == _key(key))
+    return private() or any(p is not None and p[1] == _key(key)
+                            for p in (_private_playback, _passing_playback))
 
 
 def playing_private() -> bool:
@@ -122,7 +158,8 @@ def playback_titles(*names: Any) -> None:
     title_private()."""
     global _private_titles
     _private_titles = (frozenset(f for f in map(_fold, names) if f)
-                       if _private_playback is not None else frozenset())
+                       if _private_playback is not None or _passing_playback is not None
+                       else frozenset())
 
 
 def title_private(title: Any) -> bool:
@@ -136,15 +173,15 @@ def for_log(text: Any) -> Any:
     """What a log line may say of what is played: its title or name, or
     "<private>" while private viewing is on or a playback that began
     private still goes on after it - the log is kept on disk and goes with
-    a report."""
-    return "<private>" if playing_private() else text
+    a report. The demo's playbacks are named so too (keep_nothing)."""
+    return "<private>" if playing_private() or _passing_playback is not None else text
 
 
 def url_for_log(url: Any) -> str:
     """A stream's address as a log line may carry it: its account taken out
     (core/log.redact_url) - and, for what plays privately, nothing at all:
     not the server's name either, which says whose service it is."""
-    if not playing_private():
+    if not playing_private() and _passing_playback is None:
         return redact_url(url)
     return "<private>"
 

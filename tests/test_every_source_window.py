@@ -270,9 +270,9 @@ QToolTip.hideText()
 # -- the filter, across every source -------------------------------------------------------
 w.search.setText("vegas")
 settle(lambda: len(shown()) == 4, what="the filter")
-assert shown() == [tr("status_list_source", source="Pirat", text=tr("count_channels", n=1)),
+assert shown() == [tr("status_list_source", source="Pirat", text=tr("count_channels_one", n=1)),
                    "Vegas Sport",
-                   tr("status_list_source", source="Nordic", text=tr("count_channels", n=1)),
+                   tr("status_list_source", source="Nordic", text=tr("count_channels_one", n=1)),
                    "Vegas Nordic"], shown()
 w.search.setText("")
 settle(lambda: len(shown()) == 9, what="the filter emptied")

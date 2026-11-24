@@ -43,7 +43,38 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   only while dopeIPTV is open - "Keep dopeIPTV open" (the default, and what
   Escape does) or "Quit anyway". Not asked when the app closes itself (Reset
   all, a restore, an update's restart, Ctrl+C in the terminal).
-
+- A new first-run guide: one Get started (and the language, applied at
+  once), then "What do you want to watch?" - an IPTV provider, a media
+  server, a box at home or just your own files and radio - and the form for
+  that kind, with a heading of its own. Connect tries the source off the
+  window's thread and says what it is doing, then "Done!" with how many
+  channels, movies and series came, or why not in plain words with what to
+  do (a wrong login, an account expired or full, a server that does not
+  answer, a web page or an empty list where a playlist should be, a
+  certificate that does not check out). Back keeps what you typed; nothing
+  is saved until it worked, and closing the guide meanwhile keeps nothing.
+  It works with the keyboard alone (Enter on its buttons, Tab round its own
+  controls), and no window shortcut, TV mode or the command palette opens
+  under it. "Who's watching?" comes first: the guide waits behind it. A kids
+  profile adds no source, brings no settings and turns no Nerd on without a
+  grown-up's PIN. Nothing you typed stays in the guide once the source is
+  kept. The Trakt step and the red "+ Add provider" button are gone: a calm
+  strip under the list says when there is no source of your own yet - put
+  away with its ✕ for the session - and a source added in Settings
+  meanwhile is used at once.
+- A new demo: Akamai's and Unified Streaming's live test streams, the
+  Blender Foundation's open films on a loop and under Movies, and Apple's
+  test pattern, with logos, posters and a guide made by the app. The films
+  on a loop play over and over without a reconnect, their guide in blocks
+  of the films' own length. Nothing of it is kept or named in the log, and
+  leaving it - for your own source, or with Leave the demo for none -
+  leaves nothing behind; your own History, resume points and files stay
+  yours meanwhile.
+  `tools/check_demo.py` asks every demo stream before a release.
+- Playlists sent or saved gzipped, and lists of bare stream addresses, are
+  read; an empty list, a web page and a list with no entries are told
+  apart. A playlist file's path or `file:` address pasted where the server
+  goes switches the form to M3U.
 - The notices at the sidebar's foot fold away to a small bell beside
   Settings when nothing is happening, the unread messages counted on it;
   the line comes back only while something runs or is said. The bell
@@ -95,8 +126,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   ("name 'sys' is not defined"): a module imported for the first time on
   two threads at once. The import machinery is now made whole on the main
   thread before any other starts.
+- A source added without a name was named after its address with the login
+  written into it ("user:password@host" - the quick form, a list of
+  sources imported): it is named by the server's host and port now, or by a
+  playlist file's own name.
+- The status line said "1 channels", "1 movies": one is said in the
+  singular, in every language.
 - A kids profile can play a channel of another source found by the search
   across sources: it was shown, but refused when played.
+- An Xtream link pasted in its path form (`/live/user/pass/1.ts`) with a
+  space or another character percent-encoded in the login kept the
+  encoding, and the login failed.
+- With the activity panel open, Esc closed the welcome or left full screen
+  and left the panel open; it closes the panel first, and only that.
 - While the welcome shows, the notices wait behind it: a question, a
   message or the activity panel no longer drew over the welcome (with the
   sidebar folded to its icons); they show as it closes.

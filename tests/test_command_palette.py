@@ -455,7 +455,7 @@ now = time.time()
 
 def airings(items, start, stop):
     # The guide in memory, as it answers: one programme on Sintel in an hour.
-    ch = next(c for c in items if c.get("name") == "Sintel")
+    ch = next(c for c in items if c.get("name") == "Sintel 24/7")
     return [(ch, {"title": "Nattsändning: Musikvideor", "description": "Videos all night",
                   "start_timestamp": now + 3600, "stop_timestamp": now + 7200})]
 
@@ -580,11 +580,11 @@ s.setValue("nerd_enabled", "false")
 played = []
 w.tune_from_guide = lambda ch: played.append(ch.get("name"))
 chans = [e for e in ask("SINTEL") if e.group == "channels"]
-assert [(e.kind, e.text) for e in chans[:-1]] == [(tr("pal_kind_channel"), "Sintel")], chans
+assert [(e.kind, e.text) for e in chans[:-1]] == [(tr("pal_kind_channel"), "Sintel 24/7")], chans
 # The last row: the Search page with what was typed, every source's.
 assert chans[-1].payload == ("search_all", "SINTEL"), chans[-1]
 assert chans[-1].text == tr("pal_search_all", query="SINTEL")
-assert [e.text for e in ask("3") if e.group == "channels" and e.payload[0] == "channel"][:1] == ["Sintel"]
+assert [e.text for e in ask("4") if e.group == "channels" and e.payload[0] == "channel"][:1] == ["Sintel 24/7"]
 prog = next(e for e in ask("nattsandning musik") if e.group == "channels")
 assert prog.payload[0] == "programme" and prog.kind == tr("pal_kind_programme")
 assert "Sintel" in prog.where and tr("pal_record_remind") in prog.where
@@ -594,7 +594,7 @@ assert words[:2] == [tr("epg_play_channel"), tr("rec_record_programme")], words
 assert len(words) == 2 or words[2] in (tr("reminder_add"), tr("reminder_remove")), words
 ask("sintel")
 choose(palette(), lambda e: e.payload[0] == "channel")
-assert wait(lambda: played == ["Sintel"]), played
+assert wait(lambda: played == ["Sintel 24/7"]), played
 
 # -- Private viewing: what was searched is not kept.
 QTest.keyClick(w, Qt.Key.Key_K, CTRL)

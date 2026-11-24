@@ -305,6 +305,16 @@ def _watch_link_events(app, window) -> None:
     app.installEventFilter(window._link_filter)
 
 
+def _wrong_login(e: BaseException) -> bool:
+    """Whether the start's login *e* was the account's login refused - by
+    its key (i18n.LocalizedError), else by its English words, which were
+    "username" before they were "user name"."""
+    if getattr(e, "key", "") == "err_wrong_login":
+        return True
+    words = str(e).lower()
+    return "user name or password" in words or "username or password" in words
+
+
 def _finish_reset() -> None:
     """The second half of Settings -> Reset all (core/reset.finish): the
     cache, the logs and the app's yt-dlp emptied again before anything opens
@@ -770,7 +780,10 @@ def main() -> int:
     if command is not None:
         # After the window and its source are up: a channel needs its list.
         QTimer.singleShot(1500, lambda: w.handle_command(command))
-    if welcome:
+    if welcome and settings.value("welcome_files_only", "") != "true":
+        # The guide - unless the person chose their own files and radio
+        # alone there (ui/mw_onboarding.FILES_ONLY_KEY): Settings > Sources
+        # and the strip over the lists still add a source.
         w.show_welcome()
     if "--updated" in sys.argv:
         # Opened by the installer at the end of an update (Windows,
@@ -809,7 +822,7 @@ def main() -> int:
             # Only a real credential rejection deserves a dialog; network
             # failures already surface through the list-load error paths and
             # recover by themselves (cooldown + caches).
-            if isinstance(e, RuntimeError) and "username or password" in str(e):
+            if isinstance(e, RuntimeError) and _wrong_login(e):
                 from .i18n import tr
                 from .ui.widgets import plain_text
                 where = f"{tr('settings_title')} → {tr('set_page_sources')}"

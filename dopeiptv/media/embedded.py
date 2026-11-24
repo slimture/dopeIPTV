@@ -231,6 +231,11 @@ WEB_FILE_OPTIONS = {"demuxer-lavf-o": "", "demuxer-lavf-analyzeduration": "0",
                     "network-timeout": "60"}
 
 
+#: A file played over and over (the demo's open films on a loop,
+#: providers/demo.py): for that file alone - the next stream plays as ever.
+LOOP_FILE_OPTIONS = {"loop-file": "inf"}
+
+
 def rtsp_file_options(url: str | None) -> dict[str, str]:
     """A SAT>IP source's RTSP transport for *url* alone (core/rtsp.py): TCP
     or UDP as the playing source says. {} for every other address, which
@@ -454,6 +459,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # The file on the core was loaded with options of its own (a web
         # page): play() ends it before it sets the next stream's.
         self._own_file_options = False
+        # loop_next(): the next play() a file played over and over.
+        self._loop_armed = False
+        self._loop_this = False
         # Night mode for the sound (core/night_mode.py): whether it is
         # wanted, and what the core was last given (its weakref, on/off) -
         # so a play() that changes nothing writes nothing to mpv, and a core
@@ -1599,6 +1607,13 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         title = meta.get("icy-title") or meta.get("title") or ""
         return " ".join(str(title).split())[:200]
 
+    def loop_next(self) -> None:
+        """Arm the next play() as a file played over and over - a channel
+        that is a film on a loop (the demo's, providers/demo.py): no rewind
+        buffer, mpv's loop-file for that file alone, so it starts again at
+        its end with no reconnect. Consumed by play(), whatever it opens."""
+        self._loop_armed = True
+
     def play(self, url: str, title: str, start: float = 0.0,
              *, local_buffer: bool = False,
              buffer_key: str | None = None, web: bool = False,
@@ -1622,6 +1637,11 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # such a stream to another player (main_window._start_playback,
         # which empties it before each play()).
         self.refusal = ""
+        # A file played over and over (loop_next, one-shot): never through
+        # the rewind buffer - mpv loops the file itself.
+        self._loop_this, self._loop_armed = self._loop_armed, False
+        if self._loop_this:
+            local_buffer = False
         # What a fallback of the video surface plays again (_video_fallback).
         self._play_args = (url, title, start, {"local_buffer": local_buffer,
                                                "buffer_key": buffer_key, "web": web,
@@ -1975,6 +1995,8 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             self._own_file_options = load_with_options(m, url, WEB_FILE_OPTIONS)
         elif rtsp_opts:
             self._own_file_options = load_with_options(m, url, rtsp_opts)
+        elif self._loop_this and not source:
+            self._own_file_options = load_with_options(m, url, LOOP_FILE_OPTIONS)
         else:
             m.play(source or url)
         self.current_url = url

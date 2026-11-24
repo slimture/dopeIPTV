@@ -187,15 +187,17 @@ def test_the_add_form_keeps_what_each_kind_was_given(app):
 
 def test_the_welcome_keeps_an_xtream_login_to_xtream(app, tmp_path):
     s = QSettings(str(tmp_path / "w.ini"), QSettings.Format.IniFormat)
-    for k, v in (("server", "http://xt.invalid:8080"), ("username", "xtuser"), ("password", "xtpw")):
-        s.setValue(k, v)
     parent = QWidget()
     w = WelcomeOverlay(parent, settings=s, on_connect=lambda *a: None, on_explore=lambda: None,
-                       on_connect_trakt=lambda: None, on_language_change=lambda c: None,
-                       on_demo=lambda: None)
-    assert (w._server.text(), w._user.text()) == ("http://xt.invalid:8080", "xtuser")
-    _pick(w._conn_kind, "jellyfin")
+                       on_language_change=lambda c: None, on_demo=lambda: None)
+    # Nothing put in from the settings (tests/test_welcome_review.py): typed.
+    w._set_kind("xtream")
+    w._server.setText("http://xt.invalid:8080")
+    w._user.setText("xtuser")
+    w._pw.setText("xtpw")
+    w._set_kind("jellyfin")             # the media server card's kind
+    assert w._conn_kind.currentData() == "jellyfin"
     assert (w._server.text(), w._user.text(), w._pw.text()) == ("", "", "")
-    _pick(w._conn_kind, "xtream")
+    w._set_kind("xtream")
     assert (w._server.text(), w._user.text(), w._pw.text()) == (
         "http://xt.invalid:8080", "xtuser", "xtpw")

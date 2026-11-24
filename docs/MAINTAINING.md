@@ -180,6 +180,16 @@ Platform notes that are easy to forget:
      paragraph and list item on one line: GitHub shows a release's every
      line break (`tests/test_tidy_release_notes.py` checks it)
 2. Push `testing`; wait for CI to be green (and ideally try the test build).
+   Run `python3 tools/check_demo.py` (standard library only): it asks every
+   stream of the demo - its playlist, first variant and first segment, over
+   https with the certificate checked - and exits 1 if one does not answer.
+   A stream gone for good is replaced in
+   `dopeiptv/providers/demo_streams.py` by another free, legal test stream,
+   and a new host is added to `docs/FEATURES.md` and the transparency page
+   (`tools/transparency.py` `HOSTS` on the `website` branch) in the same
+   change. CI does not run it: the suite never waits on someone else's
+   server being up (`tests/test_check_demo.py` tries the tool on a server
+   of its own).
    Then the security review (AGENTS.md, rule 13): on the `website` branch,
    `python3 tools/review_kit.py --app <checkout of testing> --ref testing
    --out review-kit` makes every question of the transparency page with

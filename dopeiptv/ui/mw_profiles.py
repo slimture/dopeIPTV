@@ -399,7 +399,14 @@ class _ProfilesMixin:
         points, reminders, followed series - each pinned to the profile."""
         from ..services.reminders import ReminderStore
         from ..services.resume import ResumeStore
-        s = self._own(self.settings)
+        # The demo's own - its favourites, reminders, followed series - are
+        # in memory, gone as it is left (mw_onboarding). History and where
+        # a title stopped are the person's as ever: one's own files played
+        # meanwhile are kept, and nothing of the demo's goes in
+        # (core/privacy.keep_nothing).
+        passing = self._passing_settings()
+        own = self._own(self.settings)
+        s = passing or own
         self.favs = FavoriteStore(s, f"favorites_{pid}" if pid else "favorites")
         self.favs.on_change = self._favorites_changed
         # Flat, single-group favourites for movies and series - the split
@@ -409,10 +416,10 @@ class _ProfilesMixin:
             s, f"movie_favorites_{pid}" if pid else "movie_favorites", id_key="stream_id")
         self.series_favs = FavoriteStore(
             s, f"series_favorites_{pid}" if pid else "series_favorites", id_key="series_id")
-        self.history = HistoryStore(s, f"history_{pid}" if pid else "history")
+        self.history = HistoryStore(own, f"history_{pid}" if pid else "history")
         self.resume = ResumeStore(self._own(self._resume_settings), pid)
         self.reminders = ReminderStore(s, pid)
-        self.followed = FollowedSeriesStore(self._own(self._follow_settings), pid)
+        self.followed = FollowedSeriesStore(passing or self._own(self._follow_settings), pid)
 
     def _build_radio_web_favs(self) -> None:
         s = self._own(self.settings)
@@ -427,7 +434,7 @@ class _ProfilesMixin:
         s = self._own(self.settings)
         self.trakt = TraktClient(s)
         self.simkl = SimklClient(s)
-        cache = self._own(self._cache_settings)
+        cache = self._passing_settings() or self._own(self._cache_settings)
         self.watched = WatchedStore(cache)
         self.watchlist = WatchlistStore(cache)
 
@@ -754,6 +761,11 @@ class _ProfilesMixin:
         picker.picked.connect(self._profile_picked)
         picker.manage.connect(self._profile_manage_from_picker)
         picker.destroyed.connect(self._profile_picker_gone)
+        # The first-run guide waits behind no picker: hidden until a profile
+        # is picked - its keys, Esc and its actions come after the PIN.
+        hold = getattr(self, "_welcome_hold", None)
+        if callable(hold):
+            hold()
         self._profile_picker = picker
         # The menus wait for who is watching.
         self.menuBar().setEnabled(False)
@@ -771,6 +783,7 @@ class _ProfilesMixin:
         self._profile_picker = None
         if not sip.isdeleted(self):
             self.menuBar().setEnabled(True)
+            self._profile_after_picker()
 
     def _profile_close_picker(self) -> None:
         picker, self._profile_picker = self._profile_picker, None
@@ -778,6 +791,15 @@ class _ProfilesMixin:
             picker.hide()
             picker.deleteLater()
         self.menuBar().setEnabled(True)
+        self._profile_after_picker()
+
+    def _profile_after_picker(self) -> None:
+        """The picker gone: the first-run guide that waited for it, a
+        moment later - unless another picker took its place meanwhile or
+        who is watching is still to be said (mw_onboarding)."""
+        after = getattr(self, "_welcome_after_pick", None)
+        if callable(after):
+            QTimer.singleShot(0, after)
 
     def _profile_locked(self) -> bool:
         """Whether nothing but picking a profile may be done now (TV mode
