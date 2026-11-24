@@ -1412,6 +1412,16 @@ def test_the_devices_let_in_are_home_addresses_only():
         == hs.OPEN_HOSTS_MAX
 
 
+def test_an_ipv4_address_written_as_ipv6_is_itself_on_every_python():
+    """Python 3.12.3 and older write ::ffff:192.168.1.7 as ::ffff:c0a8:107
+    and call every such address private: read by ipv4_mapped instead."""
+    good, bad = hs.parse_open_hosts("::ffff:192.168.1.30 ::ffff:8.8.8.8")
+    assert good == ["192.168.1.30"] and bad == ["::ffff:8.8.8.8"]
+    assert hs._plain_address("::ffff:c0a8:107") == "192.168.1.7"
+    assert hs._plain_address("fe80::1%eth0") == "fe80::1"
+    assert hs._plain_address("kodi.lan") is None
+
+
 def test_server_mode_set_up_before_keeps_its_open_tuner_and_a_new_one_is_shut():
     class S(dict):
         def value(self, k, d=None):
