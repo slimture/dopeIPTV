@@ -68,7 +68,7 @@ CODE: dict[str, list[dict]] = {
          "names": ["SERVICE_HOST", "HOSTS", "LONG", "ADDRESS_LEAST", "OWN_HEADERS",
                    "SEALED_FOR_S", "SEALED_MAX", "_FIELDS", "_ADDRESSES", "_ADDRESS_OPTIONS",
                    "LoginRefused", "_address_logins", "_header_logins", "logins_of", "_rebuild",
-                   "learn", "never", "account_logins", "_fresh", "sealed", "_without_sealed",
+                   "learn", "never", "account_logins", "UNCHECKED", "_fresh", "sealed", "_without_sealed",
                    "_json_values", "_service", "refusal", "check"],
          "with": [{"repo": "app", "path": "dopeiptv/core/_lazy_requests.py",
                    "from": r"^            def send\(self, request",
@@ -181,7 +181,7 @@ CODE: dict[str, list[dict]] = {
          "with": [{"repo": "app", "path": "dopeiptv/core/build_check.py", "names": ["HEADER", "OFFICIAL", "headers"]}]},
         {"id": "signed", "repo": "app", "path": "dopeiptv/core/selfupdate.py",
          "names": ["signed_asset", "_expected_sha256", "download", "_HOPS", "DOWNLOAD_MAX",
-                   "_get_https", "_VERIFIED", "verify_again", "shared_folder"]},
+                   "_get_https", "_VERIFIED", "verify_again", "_others_in_group", "shared_folder"]},
     ],
     "hosts": [
         {"id": "route", "repo": "app", "path": "dopeiptv/providers/cast_bridge.py", "names": ["lan_address"]},
@@ -224,7 +224,8 @@ TESTS: dict[str, list[tuple[str, str]]] = {
         "test_the_adapter_sends_nothing_that_holds_a_login",
         "test_a_report_with_a_login_the_scrub_missed_is_not_sent",
         "test_the_adapter_asks_before_every_request",
-        "test_only_the_sealing_modules_mark_anything_sealed")],
+        "test_only_the_sealing_modules_mark_anything_sealed",
+        "test_settings_that_cannot_be_read_send_nothing_to_the_site")],
     "reports": [("tests/test_report.py", n) for n in (
         "test_nothing_that_identifies_a_stream_or_a_person_is_left",
         "test_the_window_offers_scrubs_and_sends_only_on_send",
