@@ -4,9 +4,11 @@ rules looked through the guide when it loads and with the guide's own
 rule that reminds ("Remind me" in the same dialog), set as reminders, which
 fire as every reminder does (mw_reminders).
 
-The matching, the padding and the no-duplicates rules are core/series_rules.py;
-this is the glue: the dialog, the work on the pool, the jobs and reminders
-added on the window's thread.
+The matching, the padding and the no-duplicates rules are core/series_rules.py,
+the look through the guide and the scheduling core/series_plan.py - which
+``dopeiptv --server`` runs too while no window does (services/server_recorder.py):
+this is the glue: the dialog, the work on the pool, the reminders, and the
+jobs added on the window's thread.
 
 An Enigma2 box with the AutoTimer plugin records series by itself, even
 while the computer is off: "Record series…" offers a rule on the box

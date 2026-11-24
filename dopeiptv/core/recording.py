@@ -569,13 +569,13 @@ class RecordingManager(QObject):
         return {k: v for k, v in j.items() if k not in _TRANSIENT}
 
     def _save(self) -> None:
-        if self.claims is not None:
+        if self.claims is not None and not self._no_claims:
             try:
                 with self.claims.jobs_lock():
                     self._merge(write=True)
                 return
-            except OSError as e:
-                log.debug("record: the jobs not merged with the other recorder's: %s", e)
+            except Exception as e:      # never in a recording's way: written as before
+                log.warning("record: the jobs not merged with the other recorder's: %s", e)
         keep = [self._saved(j) for j in self.jobs
                 if j.get("status") == "scheduled" and not j.get("_elsewhere")]
         self.settings.setValue("recording_jobs", json.dumps(keep))
@@ -645,24 +645,26 @@ class RecordingManager(QObject):
         """Scheduled job *j* left the list the other wrote: it started
         there (its claim held), it ended there, or it was cancelled there."""
         from . import rec_claims
-        c = None
-        mine = False
         try:
             mine = self.claims.mine(j["id"])
             c = None if mine else self.claims.read(j["id"])
-        except OSError as e:
+        except Exception as e:
             log.debug("record: a claim not read: %s", e)
+            return                      # not known: never taken for a cancel
         if c is not None and c.live:
             self._mark_elsewhere(j, c)
             return
         if c is not None and c.final:
             self._ended_elsewhere(j, c)
             return
+        stop = j.get("stop")
+        if isinstance(stop, (int, float)) and stop <= time.time():
+            return                      # over: its tick says so
         j["status"] = "cancelled"
         if mine:
             try:
                 self.claims.finish(j["id"], rec_claims.CANCELLED, self._claim_info(j))
-            except OSError as e:
+            except Exception as e:
                 log.debug("record: a claim not finished: %s", e)
         log.info("record: %s cancelled by the other recorder", for_log(j.get("title")))
 
@@ -755,7 +757,7 @@ class RecordingManager(QObject):
             self._swept = time.monotonic()
             self._stamp = self.claims.jobs_stamp()
             self._share_look()
-        except OSError as e:
+        except Exception as e:
             self._claims_off(e)
 
     def _share_tick(self) -> bool:
@@ -779,6 +781,8 @@ class RecordingManager(QObject):
                 self.claims.sweep()
         except OSError as e:
             log.debug("record: the claims not looked at: %s", e)
+        except Exception:               # never out of the tick
+            log.warning("record: the claims not looked at", exc_info=True)
         return changed
 
     def check_stops(self) -> bool:
@@ -859,7 +863,7 @@ class RecordingManager(QObject):
             if self.claims.mine(j["id"]):
                 return True
             got, c = self.claims.take(j["id"], self._claim_info(j), rec_claims.HELD)
-        except OSError as e:
+        except Exception as e:          # the window records as before; the server not
             self._claims_off(e)
             return self.who != "server"
         if got == rec_claims.TAKEN:
@@ -907,7 +911,7 @@ class RecordingManager(QObject):
                 else:
                     self.claims.write(j["id"], want, info)
                 j["_claim_state"], j["_claim_info"] = want, info
-            except OSError as e:
+            except Exception as e:      # never out of the tick
                 log.debug("record: a claim not written: %s", e)
 
     def refresh_shared(self) -> bool:
@@ -920,7 +924,7 @@ class RecordingManager(QObject):
                 changed = self._merge(write=False)
             self._stamp = self.claims.jobs_stamp()
             changed = self._share_look() or changed
-        except OSError as e:
+        except Exception as e:
             log.debug("record: the jobs not read again: %s", e)
             return False
         if changed:
@@ -1112,7 +1116,7 @@ class RecordingManager(QObject):
             self.claims.ask_stop(j["id"])
             log.info("record: %s - the %s asked to stop it", for_log(j.get("title")),
                      (j.get("_elsewhere") or {}).get("who") or "other recorder")
-        except OSError as e:
+        except Exception as e:
             log.warning("record: the other recorder could not be asked to stop %s: %s",
                         for_log(j.get("title")), e)
 
@@ -1127,7 +1131,7 @@ class RecordingManager(QObject):
             got = self.claims.finish(j["id"], rec_claims.CANCELLED, self._claim_info(j))
             if got == rec_claims.OTHER:
                 self._stop_elsewhere(j)
-        except OSError as e:
+        except Exception as e:
             log.debug("record: a cancel not kept in its claim: %s", e)
 
     def remove_job(self, job_id: str) -> None:
@@ -1343,7 +1347,7 @@ class RecordingManager(QObject):
         from . import rec_claims
         try:
             got, _c = self.claims.take("mp4:" + path, {"path": path}, rec_claims.HELD)
-        except OSError as e:
+        except Exception as e:
             log.debug("record: the MP4's claim not taken: %s", e)
             return True
         if got != rec_claims.TAKEN:
@@ -1355,7 +1359,7 @@ class RecordingManager(QObject):
         if self.claims is not None and not self._no_claims:
             try:
                 self.claims.free("mp4:" + path)
-            except OSError as e:
+            except Exception as e:
                 log.debug("record: the MP4's claim not let go: %s", e)
 
     def _remux_done(self, src: str, final: str, why: str) -> None:
@@ -2030,12 +2034,12 @@ class RecordingManager(QObject):
             if j.get("status") == "scheduled" and "_claim_state" in j:
                 try:
                     self.claims.free(j["id"])
-                except OSError as e:
+                except Exception as e:
                     log.debug("record: a claim not let go: %s", e)
                 j.pop("_claim_state", None)
         try:
             self.claims.let_go_all()
-        except OSError as e:
+        except Exception as e:
             log.debug("record: the claims not let go: %s", e)
 
     #: How long the app's closing waits, in all, for the rewind buffer's
