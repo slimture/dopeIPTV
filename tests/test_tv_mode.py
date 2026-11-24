@@ -404,6 +404,8 @@ key(Qt.Key.Key_Return)
 assert until(lambda: not w._tv_on)
 assert not w.isFullScreen() and w.menuBar().isVisible()
 assert w._center_stack.currentIndex() == 0
+# Its clock is TV mode's alone: the page stays made, its timer does not run.
+assert not page._clock_timer.isActive()
 # Off, the keys are the app's own again.
 ov = QKeyEvent(QEvent.Type.ShortcutOverride, Qt.Key.Key_Up, Qt.KeyboardModifier.NoModifier)
 QApplication.sendEvent(w, ov)
@@ -415,7 +417,9 @@ for a in ("ok", "up", "left", "red", "digit_3", "back", "menu"):
 assert len(played) == n and not w._tv_on and w._phone_state()["tv_mode"] is False
 # On and off again from the phone.
 assert w.tv_command("tv", "toggle")["tv_mode"] and w._tv_on and w.isFullScreen()
+assert until(lambda: page._clock_timer.isActive())     # shown again: its clock again
 assert not w.tv_command("tv", "off")["tv_mode"] and not w._tv_on and w.menuBar().isVisible()
+assert until(lambda: not page._clock_timer.isActive())
 print("TV_OK", flush=True)
 os._exit(0)
 """
