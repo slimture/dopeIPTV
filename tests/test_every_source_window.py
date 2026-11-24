@@ -243,6 +243,16 @@ assert epgmod.epg_cache_path("b") not in downloads, downloads
 pick("Vegas Nordic")
 pump()
 assert w.now_title.text() == "Nordic Show", w.now_title.text()
+# Its tooltip says where it is from.
+from PyQt6.QtCore import QEvent
+from PyQt6.QtGui import QHelpEvent
+from PyQt6.QtWidgets import QStyleOptionViewItem, QToolTip
+idx = w.list_model.index(row_of("Vegas Nordic"))
+at = w.listw.visualRect(idx).center()
+w.delegate.helpEvent(QHelpEvent(QEvent.Type.ToolTip, at, w.listw.viewport().mapToGlobal(at)),
+                     w.listw, QStyleOptionViewItem(), idx)
+assert QToolTip.text() == "Vegas Nordic\n" + tr("sa_from_source", source="Nordic"), QToolTip.text()
+QToolTip.hideText()
 
 # -- the filter, across every source -------------------------------------------------------
 w.search.setText("vegas")
@@ -357,12 +367,22 @@ assert w._kids_may_play("live", None, es.play_key("b", 13)) is True
 assert w._kids_may_play("live", None, "failover:b:99") is False      # not what plays
 assert w.switch_profile(MAIN_ID)
 
-# -- the second source gone: not offered any more ------------------------------------------
+# -- the second source gone: not offered any more - the list it showed gives way to All ----
 w.switch_mode("live")
 settle(lambda: es.CATEGORY in cat_rows(), what="back as a grown-up")
+pick_every_source()
+settle(lambda: "Vegas Nordic" in shown(), what="every source again")
 store.remove("b")
 w._update_playlist_btn()
-settle(lambda: len(cat_rows()) > 1 and es.CATEGORY not in cat_rows(), what="the entry gone")
+settle(lambda: es.CATEGORY not in cat_rows() and not w._xs_showing()
+       and w.list_model.rowCount() == 3, what="the entry gone")
+assert w.cat_list.currentRow() == 0 and not any(r.get("_xs") for r in w.list_model.items())
+# Offered again with a second source, in place - the list shown stays as it is.
+rows_before = list(w.list_model.items())
+store.add({"id": "c", "name": "Third", "kind": "m3u", "server": "http://third.invalid/l.m3u"})
+w._update_playlist_btn()
+assert cat_rows()[1] == es.CATEGORY and w.cat_list.currentRow() == 0
+assert w.list_model.items() == rows_before
 print("EVERY SOURCE OK", flush=True)
 os._exit(0)
 """

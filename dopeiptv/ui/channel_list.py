@@ -703,6 +703,9 @@ class ChannelDelegate(QStyledItemDelegate):
             if isinstance(it, dict) and not it.get("_tip") and not it.get("_header"):
                 name = name_of(it) if callable(name_of) else str(it.get("name") or "")
                 if name and heading_of(name) is None:
+                    if it.get("_xs"):
+                        # Another source's channel (Every source): which one.
+                        name += "\n" + tr("sa_from_source", source=str(it.get("_xs_name") or ""))
                     QToolTip.showText(event.globalPos(), plain_text(name), view)
                     return True
         return super().helpEvent(event, view, option, index)

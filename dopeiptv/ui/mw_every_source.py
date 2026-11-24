@@ -204,8 +204,8 @@ class _EverySourceMixin:
             self._xs_listings(cur)
         self._xs_prepare(self._xs_plans())
 
-    def _xs_read_failed(self, pid: str, key: tuple, err: Any = None) -> None:
-        log.info("every source: a source was not read: %s", err)
+    def _xs_read_failed(self, pid: str, key: tuple, _err: Any = None) -> None:
+        log.info("every source: a source was not read")
         self.__dict__.setdefault("_xs_gave_up", set()).add((pid, key))
         self._xs_lists_in(pid)
 
@@ -471,10 +471,27 @@ class _EverySourceMixin:
         if cats is None or getattr(self, "mode", "") != "live" or not cats.count():
             return
         try:
-            has = any(cats.item(i).data(Qt.ItemDataRole.UserRole) == es.CATEGORY
-                      for i in range(cats.count()))
-            if has != self._xs_offered():
-                self._load_categories()
+            at = next((i for i in range(cats.count())
+                       if cats.item(i).data(Qt.ItemDataRole.UserRole) == es.CATEGORY), -1)
+            offered = self._xs_offered()
+            first = cats.item(0)
+            if offered and at < 0:
+                # Under TV's All - the column as its categories are, not a
+                # category search's results; nothing else moves.
+                if (first is not None and first.data(Qt.ItemDataRole.UserRole) is None
+                        and first.text() == tr("cat_all")):
+                    item = self._xs_category_item()
+                    if item is not None:
+                        cats.blockSignals(True)
+                        cats.insertItem(1, item)
+                        cats.blockSignals(False)
+            elif not offered and at >= 0:
+                showing = self._xs_showing()
+                cats.blockSignals(True)
+                cats.takeItem(at)
+                cats.blockSignals(False)
+                if showing:
+                    cats.setCurrentRow(0)       # its list gives way to All's
             elif self._xs_showing() and self._xs_sources_sig() != self._xs_laid_for:
                 # (The avatar is drawn again for a theme or a language too:
                 # only a change of the sources lays the list out anew.)
