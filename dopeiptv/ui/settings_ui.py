@@ -48,6 +48,7 @@ from .theme import (
     P, THEMES, _luminance, _mix, corner_radius,
     resolve_accent, rounded,
 )
+from .widgets import as_label
 
 #: Widest a page's content gets. A form stretched over a large window puts
 #: the label and its control a screen apart.
@@ -273,7 +274,8 @@ class SettingsCard(QFrame):
         one setting has one place, and the page beside it says where - or to
         a window of its own (About). *search* as for row()."""
         rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
-        btn = QPushButton(f"{target}  {'←' if rtl else '→'}")
+        btn = QPushButton(as_label(f"{target}  {'←' if rtl else '→'}"))
+        btn.setAccessibleName(target)
         btn.setObjectName("SettingsLink")
         btn.setFlat(True)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -405,7 +407,7 @@ class SettingsPage(QScrollArea):
         """A way back above the title ("Nerd ›" on Nerd's own pages), in
         the colour of the group the page belongs to."""
         rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
-        btn = QPushButton(f"{text}  {'‹' if rtl else '›'}")
+        btn = QPushButton(as_label(f"{text}  {'‹' if rtl else '›'}"))
         btn.setAccessibleName(text)
         btn.setObjectName("SettingsCrumb")
         btn.setFlat(True)

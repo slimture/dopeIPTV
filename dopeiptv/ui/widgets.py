@@ -165,6 +165,13 @@ def plain_text(text: str) -> str:
             if Qt.mightBeRichText(text) else text)
 
 
+def as_label(text: str) -> str:
+    """*text* as a menu entry's or a button's words: Qt reads "&" there as
+    the mark of a shortcut letter, and "Picture & sound" showed as
+    "Picture_sound" (the space underlined)."""
+    return str(text or "").replace("&", "&&")
+
+
 def confirm(parent, title: str, text: str, *, default_yes: bool = True) -> bool:
     """A Yes/No confirmation with no icon - the stock QMessageBox.question
     stamps a large question-mark glyph into the dialog that reads as clutter

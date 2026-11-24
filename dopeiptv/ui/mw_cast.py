@@ -1113,12 +1113,18 @@ class _CastMixin(_CastMomentMixin):
                 if sctx.get(k) is not None}
         sname = sctx.get("name") or sctx.get("title")
         extra = {"_series_ctx": slim, "_series_title": sname}
-        # Store the row as "Series · S1 * E2 - ..." so History and the Home
-        # shelf say WHICH show the episode belongs to - a bare "S01 E01" told
-        # the user nothing. Skip when the title already carries it (a
-        # continue-watching replay).
-        if sname and not title.startswith(sname):
-            extra["name"] = f"{sname} · {title}"
+        # Store the row as "Series · S1 E2 · Title" so History and Mine say
+        # WHICH show the episode belongs to - a bare "S01 E01" told the user
+        # nothing - and the series once: the episode's words as the window's
+        # title has them (_episode_words), never the provider's "Show -
+        # S01E02" or a Continue watching row's "Show · " again after it.
+        if sname:
+            try:
+                _series, label = self._episode_words(title, item, sctx)
+            except Exception:
+                from ..core.series_view import without_series
+                label = without_series(title, str(sname))
+            extra["name"] = f"{sname} · {label}" if label else str(sname)
         return extra
 
     def _record_cast_history(self) -> None:

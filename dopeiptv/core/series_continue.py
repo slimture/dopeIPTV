@@ -97,10 +97,8 @@ def own_episode(row: dict) -> dict:
     ep = dict(row)
     ctx = row.get("_series_ctx") or {}
     sname = str(ctx.get("name") or ctx.get("title") or "")
-    name = str(ep.get("name") or "")
-    lead = f"{sname} · "
-    if sname and name.startswith(lead):
-        ep["name"] = name[len(lead):]
+    if sname and ep.get("name"):
+        ep["name"] = sv.without_series(str(ep["name"]), sname) or ep["name"]
     return ep
 
 

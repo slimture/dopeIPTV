@@ -358,17 +358,20 @@ class _PlaceSeriesMixin:
         return se
 
     def _place_series_pills(self, it: dict) -> tuple:
-        """A followed series with episodes it had not before: New episode."""
+        """A followed series with episodes it had not before: New episode;
+        one with episodes downloaded: Downloaded (mw_downloads)."""
         sid = it.get("series_id")
         if sid is None or it.get("_kind") == "episode":
             return ()
+        has = getattr(self, "_dl_series_has", None)
+        dl = (("dl", ""),) if callable(has) and has(it) else ()
         store = getattr(self, "followed", None)
         try:
             if store is not None and store.is_followed(sid) and store.new_ids(sid):
-                return (("new", tr("pill_new_episode")),)
+                return (("new", tr("pill_new_episode")),) + dl
         except Exception:
-            return ()
-        return ()
+            return dl
+        return dl
 
     def _place_series_art_changed(self, *_a) -> None:
         """The list's rows drawn again (posters found, a colour set): the

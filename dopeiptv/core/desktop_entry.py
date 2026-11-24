@@ -41,6 +41,14 @@ ICON_NAME = "dopeiptv"
 # The menu entry says it opens these links (Exec ... %u).
 LINK_MIME = "x-scheme-handler/dopeiptv"
 
+#: The AppImage an update's restart came from (core/selfupdate.restart_into):
+#: a tool's entry still naming that file is the one the dock has pinned.
+RESTARTED_FROM = "DOPEIPTV_RESTARTED_FROM"
+#: A look for this file's own entry reads no more entries than this, and no
+#: more of each than ENTRY_MAX bytes.
+ENTRIES_MAX = 2000
+ENTRY_MAX = 64 * 1024
+
 
 def _exec_program(text: str) -> str | None:
     """The program an entry's Exec= line starts (past an ``env VAR=x``
@@ -77,23 +85,87 @@ def launched_app_id(env: dict[str, str] | None = None) -> str | None:
     inherits it, so the window can take that entry's name both times.
 
     Only an entry whose Exec starts dopeIPTV: the variable is inherited by
-    everything below the launch - from a terminal, it names the terminal."""
+    everything below the launch - from a terminal, it names the terminal.
+    Without it (KDE, a start from the file manager, the entry it named gone
+    with the file it started), the entry that starts this very AppImage -
+    or the one an update's restart came from - does (``entry_for_files``)."""
+    return launch_choice(env)[0]
+
+
+def launch_choice(env: dict[str, str] | None = None) -> tuple[str | None, str]:
+    """``launched_app_id`` and how it was chosen, for the log: "launcher"
+    (the entry that started this run), "file" (an entry that starts this
+    AppImage) or "default"."""
     if not sys.platform.startswith("linux") or _in_flatpak():
-        return None
+        return None, "default"
     env = os.environ if env is None else env
     raw = env.get("GIO_LAUNCHED_DESKTOP_FILE") or ""
     path = Path(raw)
-    if (not raw or path.suffix != ".desktop" or path.name == ENTRY_NAME
-            or path.parent.name != "applications"):
-        return None
+    if raw and path.suffix == ".desktop" and path.parent.name == "applications":
+        if path.name == ENTRY_NAME:
+            return None, "launcher"
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+        program = _exec_program(text)
+        if program and Path(program).name.lower().startswith("dopeiptv"):
+            return path.stem, "launcher"
+    found = entry_for_files((env.get("APPIMAGE"), env.get(RESTARTED_FROM)), env)
+    return (found, "file") if found else (None, "default")
+
+
+def _app_dirs(env: dict[str, str]) -> list[Path]:
+    home = env.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    dirs = (env.get("XDG_DATA_DIRS")
+            or os.pathsep.join(("/usr/local/share", "/usr/share"))).split(os.pathsep)
+    return [Path(d) / "applications" for d in [home, *dirs] if d]
+
+
+def _same_file(a: str, b: Path) -> bool:
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+        return Path(a).resolve() == b
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def entry_for_files(files, env: dict[str, str] | None = None) -> str | None:
+    """The desktop id of an entry, not ours, whose Exec starts one of
+    *files* (absolute paths; None and empty skipped): the user's own
+    applications folder first, then the system's, each in name order. Ours
+    (dopeiptv.desktop) found first, or none at all: None - the window keeps
+    "dopeiptv". Bounded: ENTRIES_MAX entries, ENTRY_MAX bytes of each."""
+    env = os.environ if env is None else env
+    wanted = []
+    for f in files:
+        if f and os.path.isabs(f):
+            try:
+                wanted.append(Path(f).resolve())
+            except (OSError, RuntimeError, ValueError):
+                continue
+    if not wanted:
         return None
-    program = _exec_program(text)
-    if not program or not Path(program).name.lower().startswith("dopeiptv"):
-        return None
-    return path.stem
+    read = 0
+    for folder in _app_dirs(env):
+        try:
+            names = sorted(e for e in os.listdir(folder) if e.endswith(".desktop"))
+        except OSError:
+            continue
+        for name in names:
+            read += 1
+            if read > ENTRIES_MAX:
+                return None
+            try:
+                with open(folder / name, "rb") as fh:
+                    text = fh.read(ENTRY_MAX).decode("utf-8", "replace")
+            except OSError:
+                continue
+            program = _exec_program(text)
+            if not program or not os.path.isabs(program):
+                continue
+            if any(_same_file(program, w) for w in wanted):
+                return None if name == ENTRY_NAME else name[:-len(".desktop")]
+    return None
 
 
 def _data_home() -> Path:

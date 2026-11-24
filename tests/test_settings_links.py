@@ -39,7 +39,11 @@ QDialog.exec = pages
 w.open_settings()
 for key, title_key in mw_settings.PAGE_TITLES.items():
     assert seen.get(key) == tr(title_key), (key, seen.get(key), tr(title_key))
-assert w.settings_link_text("audio") == tr("settings_title") + " › " + tr("set_page_av") + "…"
+# "&" doubled: in a menu or on a button Qt reads it as a shortcut's mark,
+# and "Picture & sound" showed as "Picture_sound".
+assert w.settings_link_text("audio") == (
+    tr("settings_title") + " › " + tr("set_page_av") + "…").replace("&", "&&")
+assert "&&" in w.settings_link_text("audio") and "&&" not in tr("set_page_av")
 
 # A link opens Settings on its page once the menu is gone.
 opened = []

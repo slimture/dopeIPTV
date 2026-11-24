@@ -1000,3 +1000,13 @@ def test_the_bridges_are_installed_and_bundled_on_their_own_system_only():
     for module in _NEEDS["win32"]:
         assert f'"{module}"' in win_spec, module
     assert "winrt" not in (_REPO / "dopeiptv.spec").read_text(encoding="utf-8")
+
+
+def test_the_session_looks_less_often_while_nothing_plays():
+    """A look a second while nothing plays kept a laptop awake (CI, with a
+    session bus, measured it: tests/test_perf_idle.py); the window says at
+    once when a stream starts, so every few seconds is enough then."""
+    from dopeiptv.services import media_session as ms
+    assert ms.poll_ms({"status": "Stopped"}) == ms.IDLE_POLL_MS > ms.POLL_MS
+    assert ms.poll_ms({"status": "Playing"}) == ms.POLL_MS
+    assert ms.poll_ms({"status": "Paused"}) == ms.POLL_MS

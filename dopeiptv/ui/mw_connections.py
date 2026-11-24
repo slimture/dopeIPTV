@@ -45,7 +45,7 @@ from .mw_source_label import NO_SOURCE_KINDS
 SEEN_FRESH_SECS = 15.0
 KIND_WORDS = {"player": "conn_k_player", "buffer": "conn_k_buffer",
               "recording": "conn_k_recording", "multiview": "conn_k_multiview",
-              "cast": "conn_k_cast"}
+              "cast": "conn_k_cast", "download": "conn_k_download"}
 #: How often a box that is the source is asked what its tuners do.
 TUNER_TICK_MS = 20000
 #: The hold server mode puts on a buffer it reads (core/restream.SERVER).
@@ -227,6 +227,11 @@ class _ConnectionsMixin:
             ctx = getattr(self, "_cast_ctx", None) or {}
             uses.append(Use("cast", self._conn_cast_source(),
                             str(ctx.get("row_source") or ctx.get("row_url") or "")))
+        # A download the person let run beside the rest (mw_downloads); one
+        # that gives way to everything else holds none of theirs.
+        dl_uses = getattr(self, "_dl_uses", None)
+        if callable(dl_uses):
+            uses.extend(dl_uses())
         return uses
 
     def _conn_cast_source(self) -> str:
@@ -388,6 +393,10 @@ class _ConnectionsMixin:
         room = getattr(self, "_server_make_room", None)
         if callable(room):
             room(uses, source)
+        # ...and a download there gives way (mw_downloads).
+        dl_room = getattr(self, "_dl_make_room", None)
+        if callable(dl_room):
+            dl_room(source)
 
     def _conn_ok_multiview(self, cell: int | None, url: str = "", source: str = "") -> bool:
         """*url* into multiview cell *cell* (None: the first free one): the

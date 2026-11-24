@@ -168,7 +168,7 @@ pump(10)
 
 # -- the order: the places, a hairline, the lower places, the foot ------------
 upper = ["mitt", "live", "vod", "series", "guide", "search"]
-lower = ["local", "radio", "rec"]
+lower = ["local", "radio", "rec", "dl"]
 assert list(w.nav_btns) == upper + lower, list(w.nav_btns)
 assert not ({"home", "fav", "watchlist", "history", "watched"} & set(w.nav_btns))
 content = w._side      # the part that scrolls and the foot under it
@@ -266,6 +266,15 @@ for key, place, mode in (("live", "tv", "live"), ("vod", "films", "vod"),
     pump()
     assert w.mode == mode and w._place == place and w.nav_btns[key].isChecked(), key
     assert [k for k, b in w.nav_btns.items() if b.isChecked()] == [key]
+# Downloaded: its own page in the middle pane, its entry lit; a list mode
+# switched to gives it way.
+w.nav_btns["dl"].click()
+pump()
+assert w._place == "dl" and w._dl_showing() and w.nav_btns["dl"].isChecked()
+assert [k for k, b in w.nav_btns.items() if b.isChecked()] == ["dl"]
+w.switch_mode("live")
+pump()
+assert not w._dl_showing()
 w.switch_mode("live")
 pump()
 

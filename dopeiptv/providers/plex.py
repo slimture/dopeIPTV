@@ -223,20 +223,30 @@ def _major(number: Any) -> int:
         return 0
 
 
+#: Most nodes of a tune answer looked through for its session.
+SESSION_NODES = 100_000
+
+
 def _find_session(node: Any) -> str:
-    """The live session's key somewhere in a tune answer."""
-    if isinstance(node, dict):
-        for k, v in node.items():
-            if k == "key" and isinstance(v, str) and v.startswith("/livetv/sessions/"):
-                return v
-            got = _find_session(v)
-            if got:
-                return got
-    elif isinstance(node, list):
-        for v in node:
-            got = _find_session(v)
-            if got:
-                return got
+    """The live session's key somewhere in a tune answer: depth first in
+    the answer's own order, as before, but without recursion (a document
+    nested thousands deep, which Python 3.12's json reads, went over the
+    recursion limit) and through at most SESSION_NODES nodes."""
+    stack: list[Any] = [node]
+    seen = 0
+    while stack and seen < SESSION_NODES:
+        cur = stack.pop()
+        seen += 1
+        if isinstance(cur, dict):
+            later: list[Any] = []
+            for k, v in cur.items():
+                if k == "key" and isinstance(v, str) and v.startswith("/livetv/sessions/"):
+                    return v
+                if isinstance(v, (dict, list)):
+                    later.append(v)
+            stack.extend(reversed(later))
+        elif isinstance(cur, list):
+            stack.extend(reversed([v for v in cur if isinstance(v, (dict, list))]))
     return ""
 
 

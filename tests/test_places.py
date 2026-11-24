@@ -41,7 +41,7 @@ class S(dict):
 
 def test_the_places_their_entries_and_modes():
     assert places.PLACES == ("mitt", "tv", "films", "series", "guide", "search",
-                             "local", "radio", "rec")
+                             "local", "radio", "rec", "dl")
     assert places.UPPER + places.LOWER == places.PLACES
     assert "home" not in places.PLACES and "home" not in places.NAV_OF.values()
     for place in places.PLACES:
@@ -52,7 +52,9 @@ def test_the_places_their_entries_and_modes():
         assert places.place_of_mode(mode) == place
     assert places.place_of_mode("bogus") == places.DEFAULT_PLACE
     assert set(places.SHOW_HOOKS) == set(places.REFRESH_HOOKS) == {"mitt", "tv", "films", "series",
-                                                                  "local", "radio", "rec"}
+                                                                  "local", "radio", "rec", "dl"}
+    # Downloaded is a page of its own, of no list mode (ui/mw_downloads.py).
+    assert "dl" not in places.MODE_OF and "dl" in places.LIST_PLACES
 
 
 def test_where_the_app_opens():

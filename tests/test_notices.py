@@ -411,7 +411,117 @@ def test_the_panel_lists_the_work_and_the_messages_and_marks_them_read(app):
     panel.clear_btn.click()
     assert hub.messages() == []
     hub.finish(b)
-    assert _spin(app, lambda: panel.isHidden())                      # empty: it closes
+    # Now empty: it goes over to History, where what was said stays.
+    assert _spin(app, lambda: panel.tab == "history" and panel.history.isVisibleTo(panel))
+    assert panel.isVisible() and panel.tab_history.isChecked()
+    shown = [h.text for h in hub.history()]
+    assert "dopeIPTV answered your feedback" in shown and "Could not delete" in shown
+    assert hub.history()[-1].level in ("error", "cancelled", "info", "done")
+    host.close()
+
+
+def test_the_history_keeps_what_was_said_and_the_persons_work_that_ended(app, monkeypatch):
+    """Everything said since the start - notes too, and while the video
+    fills the screen - and the person's work done or cancelled; in memory
+    alone, at most HISTORY_MAX, nothing while private viewing is on."""
+    from dopeiptv.core import privacy
+    hub = _hub()
+    hub.note("Copied")
+    hub.post("Guide is old", level="warning")                 # a note: still kept
+    hub.post("Could not save", level="error")
+    hub.hold(True)                                           # full screen
+    hub.note("Saved while you watched")
+    hub.hold(False)
+    mine = hub.start("Searching in Music…", kind="search", mine=True)
+    hub._jobs[mine].shown_at = 1.0                           # it was on screen
+    hub.finish(mine)
+    quiet = hub.start("Loading channels…", kind="list")      # not the person's: no news
+    hub._jobs[quiet].shown_at = 1.0
+    hub.finish(quiet)
+    stop = hub.start("Downloading Film…", kind="download", cancel=lambda: None)
+    hub.request_cancel([stop])
+    got = [(h.level, h.text) for h in hub.history()]
+    assert got == [("cancelled", "Downloading Film…"), ("done", "Searching in Music…"),
+                   ("info", "Saved while you watched"), ("error", "Could not save"),
+                   ("warning", "Guide is old"), ("info", "Copied")]
+    assert [h.text for h in hub.history(("error",))] == ["Could not save"]
+    assert [h.level for h in hub.history(("done", "cancelled"))] == ["cancelled", "done"]
+    # Private viewing: nothing kept meanwhile.
+    monkeypatch.setattr(privacy, "private", lambda: True)
+    hub.post("Something private failed", level="error")
+    monkeypatch.setattr(privacy, "private", lambda: False)
+    assert len(hub.history()) == 6
+    # Bounded, the oldest first out; Copy's text and Clear.
+    for i in range(hub.HISTORY_MAX + 5):
+        hub.note(f"note {i}")
+    assert len(hub.history()) == hub.HISTORY_MAX
+    assert hub.history()[0].text == f"note {hub.HISTORY_MAX + 4}"
+    text = hub.history_text(("info",), {"info": "Note"})
+    assert text.splitlines()[-1].endswith(f"Note  note {hub.HISTORY_MAX + 4}")
+    hub.clear_history()
+    assert hub.history() == []
+
+
+def test_the_history_never_shows_a_login_and_copies_scrubbed(app):
+    hub = _hub()
+    hub.post("Failed http://alice:s3cret@example.com/live/alice/s3cret/1.ts", level="error")
+    [h] = hub.history()
+    assert "s3cret" not in h.text and "alice" not in h.text
+    assert "s3cret" not in hub.history_text(personal=["s3cret"])
+
+
+def test_the_history_tab_lists_filters_copies_and_clears(app):
+    host = _host(app)
+    hub = _hub()
+    panel = ActivityPanel(hub, host)
+    anchor = QWidget(host)
+    anchor.setGeometry(16, 540, 240, 30)
+    anchor.show()
+    # Nothing going on: it opens on History, which says it is empty.
+    panel.open_at(anchor)
+    assert panel.isVisible() and panel.tab == "history"
+    assert panel.history.empty.isVisible() and not panel.history.clear_btn.isEnabled()
+    assert panel.history.empty.text() == tr("notice_hist_empty")
+    hub.post("Could not save", level="error")
+    hub.note("Copied")
+    assert _spin(app, lambda: panel.history._rows.count() == 3)    # two rows and the stretch
+    rows = [panel.history._rows.itemAt(i).widget() for i in range(2)]
+    assert rows[0].text == "Copied" and rows[1].text == "Could not save"
+    assert rows[1].accessibleName().startswith(tr("notice_error") + ": Could not save")
+    panel.history.chips["error"].click()
+    assert panel.history._rows.count() == 2
+    panel.history.chips["done"].click()
+    assert panel.history.empty.text() == tr("notice_hist_none")
+    panel.history.chips["all"].click()
+    # Copy list: what the list shows, its words saying so; a row's own Copy.
+    assert panel.history.copy_btn.text() == tr("notice_hist_copy_list")
+    assert panel.history.copy_btn.toolTip() == tr("notice_hist_copy_tip")
+    panel.history.copy_btn.click()
+    got = QApplication.clipboard().text()
+    assert "Could not save" in got and "Copied" in got
+    assert panel.history.copy_btn.text() == tr("problem_copied")
+    rows = [panel.history._rows.itemAt(i).widget() for i in range(2)]
+    assert rows[1].contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
+    panel.history.copy_one(rows[1].item_id)
+    one = QApplication.clipboard().text()
+    assert "Could not save" in one and "Copied" not in one and one.count("\n") == 0
+    # Filtered to errors, Copy list copies the errors alone.
+    panel.history.chips["error"].click()
+    panel.history.copy_btn.click()
+    assert "Copied" not in QApplication.clipboard().text()
+    panel.history.chips["all"].click()
+    panel.history.clear_btn.click()
+    assert hub.history() == [] and panel.history.empty.isVisible()
+    # Work going on: it opens on Now; the tab goes back and forth.
+    panel.close_panel()
+    hub.start("Searching…", kind="search", mine=True)
+    hub._jobs[max(hub._jobs)].shown_at = 1.0
+    panel.open_at(anchor)
+    assert panel.tab == "now" and not panel.history.isVisibleTo(panel)
+    panel.tab_history.click()
+    assert panel.tab == "history" and panel.width() == ActivityPanel.W_HISTORY
+    panel.tab_now.click()
+    assert panel.tab == "now" and panel.width() == ActivityPanel.W
     host.close()
 
 
@@ -687,7 +797,7 @@ def rect(widget):
 pump(40)
 w.switch_mode("live")
 pump(30)
-hub, line, card = w.notices, w._activity_line, w._decision_card
+hub, line, card, bell = w.notices, w._activity_line, w._decision_card, w._notice_bell
 hub.SHOW_AFTER_MS = hub.MIN_SHOWN_MS = 0
 for j in hub.jobs():
     hub.cancel(j.token)
@@ -702,6 +812,10 @@ win = w.rect()
 assert w._side_foot.parentWidget() is w._side and area.widget().isAncestorOf(cats)
 assert not area.widget().isAncestorOf(line) and not area.widget().isAncestorOf(w._playlist_btn)
 assert win.contains(avatar) and side.contains(avatar), (avatar, side)
+# Nothing happens: no line, only the bell beside the source and Settings.
+assert line.isHidden() and bell.isVisible() and bell.badge() == 0
+assert rect(bell).top() == avatar.top() and side.contains(rect(bell)), (rect(bell), avatar)
+assert bell.accessibleName() == bell.name() and bell.toolTip() == bell.name()
 
 # The activity: in the foot, just above the source avatar.
 w._show_busy(tr("status_loading_channels"))
@@ -718,23 +832,43 @@ assert line.text() == tr("epg_cache_cleared") and hub.messages() == []
 hub._note_over()
 pump(3)
 assert line.isHidden()
-# An error: only a count on the line; the status line keeps the list's words.
+# An error: only a count on the bell, no line; the status line keeps the list's words.
 line_words = w.count_lbl.text()
 w._error("boom")
 w._show_action_toast(tr("fbr_new"), 9000, lambda: None)
 pump(3)
-assert line.isVisible() and line.badge() == 2 and line.text() == tr("notice_unread", n=2)
+assert line.isHidden() and line.badge() == 0 and bell.badge() == 2
+assert tr("notice_unread", n=2) in bell.toolTip() and tr("notice_unread", n=2) in bell.accessibleName()
+# The bell opens the panel on the messages, lined up with the foot; again closes it.
+bell.click()
+pump(10)
+panel = w._notice_panel
+assert panel.isVisible() and panel.tab == "now" and rect(panel).bottom() < rect(bell).top()
+assert abs(rect(panel).left() - rect(w._side_foot).left()) <= 8 and win.contains(rect(panel))
+assert hub.unread() == 0 and bell.badge() == 0
+bell.click()
+pump(5)
+assert panel.isHidden()
+# The ✕ in its corner closes it too, the focus back on the bell.
+bell.click()
+pump(5)
+assert panel.isVisible() and panel.close_btn.isVisible()
+assert panel.close_btn.accessibleName() == tr("common_close")
+cb = rect(panel.close_btn)
+assert cb.right() <= rect(panel).right() and cb.top() - rect(panel).top() < 40, (cb, rect(panel))
+panel.close_btn.click()
+pump(5)
+assert panel.isHidden()
 assert w.count_lbl.text() == line_words and card.isHidden()
 # A stream error is said on the video, never as a message.
 w._show_stream_error("HTTP 404")
 pump(3)
-assert hub.unread() == 2 and not any("HTTP 404" in t for t in hub.texts())
+assert len(hub.messages()) == 2 and not any("HTTP 404" in t for t in hub.texts())
 # The panel opens upward from the line, inside the window; reading clears the count.
 w._show_busy(tr("status_loading_channels"))
 pump(3)
 line.open_panel.emit()
 pump(10)
-panel = w._notice_panel
 assert panel.isVisible() and rect(panel).bottom() < rect(line).top()
 assert win.contains(rect(panel)) and hub.unread() == 0 and line.badge() == 0
 panel.close_panel()
@@ -829,12 +963,18 @@ w._set_sidebar_collapsed(True)
 pump(15)
 side = rect(w._side)
 fc = w._decision_float
-assert line.isVisible() and line.sizeHint().width() == line.H and line.badge() == 1
+assert line.isHidden() and bell.isVisible() and bell.badge() == 1     # nothing runs: no ring
 assert card.isHidden() and fc.isVisible() and fc.text() == "Port 3673 is taken"
 assert rect(fc).left() >= side.right() and win.contains(rect(fc)), (rect(fc), side)
 assert not rect(fc).intersects(rect(w._playlist_btn)) and not rect(fc).intersects(side)
+assert side.contains(rect(bell)) and rect(bell).top() > rect(w._playlist_btn).top()
+hub.start(tr("notice_searching_in", name="Movies"), key="search", kind="search", mine=True)
+pump(5)
+assert line.isVisible() and line.sizeHint().width() == line.H and line.badge() == 0
 assert side.contains(rect(line)) and rect(line).bottom() < rect(w._playlist_btn).top()
-line.open_panel.emit()
+hub.end_key("search")
+pump(5)
+bell.click()
 pump(5)
 assert panel.isVisible() and rect(panel).left() >= side.right() and win.contains(rect(panel))
 panel.close_panel()

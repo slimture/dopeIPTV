@@ -7,8 +7,52 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ## [Unreleased]
 
+### Added
+
+- The notices at the sidebar's foot fold away to a small bell beside
+  Settings when nothing is happening, the unread messages counted on it;
+  the line comes back only while something runs or is said. The bell
+  (or View → Activity and messages…) opens the panel, now with a
+  History tab: everything the app said and the work you started that
+  finished or was cancelled since it started, filtered by errors,
+  warnings, notes and done, with Copy (scrubbed of your logins) and
+  Clear. Kept in memory only, and nothing while viewing privately. A ✕ in
+  the panel's corner closes it, beside Esc and a click elsewhere.
+  History's Copy list copies what the list shows (its filter too), its
+  tooltip saying so; a right click on a row copies that one.
+
 ### Fixed
 
+- Watching a series, the window's title said the series' name over and
+  over ("Show · Show · Show · S2 * E3 - Show - S02E03"): Continue watching
+  put the series in front of the episode, and each time it was played from
+  there and kept, one more came. An episode is now "Show · S2 E3 · Title"
+  in the window's title, over the picture, in the status line, the media
+  controls and History; names are kept once, and a title whose parts
+  repeat - a channel's, a film's, a local file's, an older History row's -
+  is said once everywhere.
+- With Python 3.12 (what the released builds run) an answer nested
+  thousands deep came through to the readers - 3.11's own json had stopped
+  it - and a Plex tune answer's reader could go over Python's recursion
+  limit. Every answer is now held to one depth (200) whatever Python
+  reads, and that reader walks without recursion. An XML document's
+  declared encoding is judged by the app itself, the same on every expat.
+- Idle, the app woke less: the media controls look at what plays every
+  4 s while nothing does (the window tells them at once when a stream
+  starts), and the downloads' beat runs only while something is queued.
+- Muting a video made the picture stall for a moment: the player swapped
+  its sound output there and then and reloaded it, and the picture, kept
+  in time by the sound, waited. Muting now only mutes; the quiet output
+  that keeps another program's sound (Spotify) from crackling at every
+  channel change is used from the next stream on, as before.
+- "Settings › Picture & sound…" in the player's right-click menu (and
+  every such link) showed as "Picture_sound": Qt read the "&" as a
+  shortcut's mark.
+- After an AppImage update the restarted window could come up beside
+  its pinned dock icon, and the icon then started a second copy. The
+  window now also finds the menu entry that starts the AppImage (or the
+  one the update came from) when the desktop did not say which entry
+  launched it, and the log says at every start which entry it took.
 - An error from the provider (a 502 Bad Gateway while it was having
   trouble) showed in Messages with the whole address it failed on - the
   user name and password in it - and its row was cut off at the top and the

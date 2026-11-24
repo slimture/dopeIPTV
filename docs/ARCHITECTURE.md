@@ -131,6 +131,11 @@ dopeiptv/
                        a frame and the length found once, watched marks
     rec_extras.py      Nerd for recordings: the file name template, the command
                        after a recording
+    downloads.py       Downloads to watch without the network: the queue (one
+                       at a time, kept by source + stream id + kind, never its
+                       address), Range to carry on, an HLS film through the
+                       bridge into MP4, the files and their sidecars, the
+                       space; as_row for offline mode
     series_rules.py    Series recordings: rules, airings found, the plan, padding;
                        a rule that reminds instead, its reminders' plan
     series_plan.py     From the guide to the recorder's jobs: the look through
@@ -261,8 +266,9 @@ dopeiptv/
     mitt.py            Mine's content: entries out of the stores, the filter,
                        favourites by habit, the queue's order, History by day
     places.py          The app's places (Mine, TV, Movies, Series, Guide,
-                       Search, Local files, Radio, Recordings): entries, modes,
-                       where the app opens, Home's settings retired
+                       Search, Local files, Radio, Recordings, Downloaded):
+                       entries, modes, where the app opens, Home's settings
+                       retired
     guide_rows.py      The guide's rows read from channel names: a heading
                        "channel", a name's short form
     palette_match.py   The command palette's matching: folded text, word
@@ -434,6 +440,11 @@ dopeiptv/
     mw_place_rec.py    The Recordings place where the list was: header, ⋯,
                        recording now and next, the recordings as rows or cards
     rec_place.py       The Recordings place itself, dressed as it paints
+    mw_downloads.py    Downloads in the window: Download on the menus, the
+                       connection asked and given way, the notices, the
+                       Downloaded pill, the detail column's row, a download
+                       played as its own title, the Downloaded place
+    downloads_place.py The Downloaded place itself, dressed as it paints
     mw_series.py       Series recordings: "Record series…", the rules' check
     autotimer_ui.py    A box's AutoTimer in the window: the rule editor, the
                        preview, the box's rules beside the app's

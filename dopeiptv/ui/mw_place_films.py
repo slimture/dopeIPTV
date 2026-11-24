@@ -445,6 +445,7 @@ class _PlaceFilmsMixin:
             pills.append("new")
         if self.watched_source(row, "vod"):
             pills.append("seen")
+        pills.extend(self._dl_pills("movie", row))     # its file downloaded
         card.pills = tuple(pills)
         prog = sv.Progress(float(pos or 0), float(dur or 0))
         card.progress = prog.fraction if prog.started else None
@@ -778,9 +779,11 @@ class _PlaceFilmsMixin:
         if at is not None:
             self._sp_start_once = (key, float(at))
         try:
-            self._start_playback(url, row.get("name") or row.get("title") or "dopeIPTV",
-                                 row.get("stream_icon") or row.get("cover"), key, "movie",
-                                 record=True, item=row)
+            # A downloaded film plays its file, as this film (mw_downloads).
+            start = getattr(self, "_dl_start", self._start_playback)
+            start(url, row.get("name") or row.get("title") or "dopeIPTV",
+                  row.get("stream_icon") or row.get("cover"), key, "movie",
+                  record=True, item=row)
         finally:
             self._sp_start_once = None
         return True

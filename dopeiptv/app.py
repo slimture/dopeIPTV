@@ -663,13 +663,17 @@ def main() -> int:
     # The window's app_id: "dopeiptv", or the name of the entry this run was
     # started from when that is a copy of ours (see launched_app_id).
     try:
-        from .core.desktop_entry import launched_app_id
-        app_id = launched_app_id() or "dopeiptv"
+        from .core.desktop_entry import launch_choice
+        found, why = launch_choice()
+        app_id = found or "dopeiptv"
     except Exception:
-        app_id = "dopeiptv"
+        app_id, why = "dopeiptv", "default"
     app.setDesktopFileName(app_id)
-    if app_id != "dopeiptv":
-        log.info("window app_id %s (the entry it was started from)", app_id)
+    if sys.platform.startswith("linux"):
+        # Which entry the dock ties the window to, and why: the first thing
+        # to know when a window comes up beside its pinned icon.
+        log.info("window app_id %s (%s; %s session)", app_id, why,
+                 os.environ.get("XDG_SESSION_TYPE") or "unknown")
     # Roomier global pixmap cache: the list/grid delegates memoise their
     # smooth-scaled logos and posters here (see ChannelDelegate._scaled_logo),
     # and the default 10 MB evicts them constantly with thousands of channels.

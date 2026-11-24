@@ -5,8 +5,8 @@ An Xtream account allows so many streams at once (``max_connections``) and
 says how many are open (``active_cons``). The app opens connections of its
 own - the player, the rewind buffer's (core/dvr_*.py), a recording made
 over its own connection, each multiview cell, a cast (the TV, Kodi or the
-converter here fetches the stream) - and counts them as they are
-now (``Use``). What the provider counted besides them (another device on
+converter here fetches the stream), a download let run beside them
+(core/downloads.py) - and counts them as they are now (``Use``). What the provider counted besides them (another device on
 the account) is taken from its last answer while it is fresh, less the
 app's own at the time it was given.
 
@@ -29,7 +29,7 @@ from urllib.parse import parse_qs, urlsplit
 from .num import whole
 
 #: The app's own kinds of connection, in the order a sentence names them.
-KINDS = ("player", "buffer", "recording", "multiview", "cast")
+KINDS = ("player", "buffer", "recording", "multiview", "cast", "download")
 #: How long what the provider said of other devices stands (its count
 #: changes as soon as they stop or start).
 FRESH_SECS = 180.0

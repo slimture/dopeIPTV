@@ -146,7 +146,7 @@ def _classes() -> dict[str, Any]:
             def __getattr__(self, name: str) -> Any:
                 return getattr(self._raw, name)
 
-        from . import safe_xml
+        from . import safe_json, safe_xml
 
         class Response(real.Response):
             @property
@@ -176,10 +176,16 @@ def _classes() -> dict[str, Any]:
                     # every answer that was not UTF-8 (tests/test_fuzz_stalker.py).
                     self.encoding = real.utils.guess_json_utf(self.content) or "utf-8"
                 try:
-                    return super().json(**kwargs)
+                    doc = super().json(**kwargs)
                 except RecursionError:
                     raise real.exceptions.JSONDecodeError(
                         "nested deeper than any answer is", "", 0) from None
+                # Held to one depth whatever Python reads (core/safe_json:
+                # 3.12's json reads far deeper than 3.11's did).
+                if safe_json.deeper_than(doc):
+                    raise real.exceptions.JSONDecodeError(
+                        "nested deeper than any answer is", "", 0)
+                return doc
 
         class CappedAdapter(HTTPAdapter):
             """requests' own adapter, counting what is read of an answer

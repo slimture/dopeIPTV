@@ -57,6 +57,8 @@ class _BuildMixin(_BuildDetailMixin):
         cast_action = action(tr("ctx_cast_to_chromecast"), self.cast_playing)
         together_action = action(tr("together_title") + "…", self.open_together)
         phone_action = action(tr("phone_menu"), self.open_phone_remote)
+        # What the app said and did since it started (the notices' History).
+        activity_action = action(tr("menu_activity"), self._notices_open_history)
         tv_action = action(tr("tv_mode"), self.toggle_tv_mode)
         # Checked while TV mode is on (mw_tv): on macOS the menu bar stays
         # in reach over it, and it says so in the window's own terms.
@@ -81,6 +83,7 @@ class _BuildMixin(_BuildDetailMixin):
             "refresh": refresh_action, "reminders": reminders_action, "calendar": calendar_action,
             "multiview": multiview_action, "cast": cast_action,
             "together": together_action, "phone": phone_action,
+            "activity": activity_action,
             "tv_mode": tv_action, "teletext": teletext_action,
             "private": private_action, "clear": clear_action,
             "stats": stats_action,
@@ -98,6 +101,7 @@ class _BuildMixin(_BuildDetailMixin):
         # Kept for live language switching (see retranslate_ui).
         self._i18n_actions = {
             settings_action: lambda: tr("btn_settings") + "…",
+            activity_action: lambda: tr("menu_activity"),
             refresh_action: lambda: tr("menu_refresh_playlist"),
             open_video_action: lambda: tr("menu_open_video"),
             teletext_action: lambda: tr("ttx_menu"),
@@ -216,6 +220,7 @@ class _BuildMixin(_BuildDetailMixin):
         self._rail_glyphs = {
             "mitt": "star", "search": "search", "live": "tv", "guide": "guide", "vod": "movie",
             "series": "series", "rec": "rec", "local": "folder_o", "radio": "radio",
+            "dl": "download",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, NavButton] = {}
@@ -268,7 +273,7 @@ class _BuildMixin(_BuildDetailMixin):
                  ("vod", tr("nav_movies")), ("series", tr("nav_series")),
                  ("guide", tr("nav_guide")), ("search", tr("nav_search")))
         lower = (("local", tr("nav_local")), ("radio", tr("nav_radio")),
-                 ("rec", tr("nav_recordings")))
+                 ("rec", tr("nav_recordings")), ("dl", tr("nav_downloads")))
         for key, text in upper:
             _make_nav(key, text, self._places_lay, primary=True)
         # Between the two groups, on the rail too: a hairline and its gap.

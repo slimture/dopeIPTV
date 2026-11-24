@@ -52,20 +52,39 @@ def test_muted_before_a_load_no_output_and_no_reload():
     assert m.commands == []
 
 
-def test_mute_and_unmute_while_playing_reload_the_output():
+def test_muting_what_plays_only_mutes_it():
+    """Muting a video swapped its sound output and reloaded it; the sound
+    restarted and the picture, kept in time by it, stalled for a moment.
+    Muting what plays leaves the output it has; unmuting it then has
+    nothing to undo."""
     player = SimpleNamespace(_muted=True)
     m = FakeMpv()
     quiet(player, m)
-    assert m.opts["ao"] == QUIET_AO and m.commands == [("ao-reload",)]
+    assert m.opts["ao"] == [] and m.commands == []            # no swap, no reload
     player._muted = False
     quiet(player, m)
-    assert m.opts["ao"] == "" and m.commands == [("ao-reload",), ("ao-reload",)]
+    assert m.opts["ao"] == [] and m.commands == []
+    # Still muted at the next stream: it starts with no output of its own.
+    player._muted = True
+    quiet(player, m, reload=False)
+    assert m.opts["ao"] == QUIET_AO and m.commands == []
+
+
+def test_unmuting_a_stream_that_started_muted_reloads_its_output():
+    player = SimpleNamespace(_muted=True)
+    m = FakeMpv(path=None)
+    quiet(player, m, reload=False)                             # before its load
+    m.path = "http://x/1.ts"
+    player._muted = False
+    quiet(player, m)
+    assert m.opts["ao"] == "" and m.commands == [("ao-reload",)]
 
 
 def test_the_persons_own_output_comes_back():
     player = SimpleNamespace(_muted=True)
-    m = FakeMpv(ao=[{"name": "pulse"}])
-    quiet(player, m)
+    m = FakeMpv(ao=[{"name": "pulse"}], path=None)
+    quiet(player, m, reload=False)
+    m.path = "http://x/1.ts"
     player._muted = False
     quiet(player, m)
     assert m.opts["ao"] == "pulse"
@@ -73,8 +92,9 @@ def test_the_persons_own_output_comes_back():
 
 def test_a_device_that_dropped_the_track_gets_the_picked_one_back():
     player = SimpleNamespace(_muted=True)
-    m = FakeMpv(aid=2)
-    quiet(player, m)
+    m = FakeMpv(aid=2, path=None)
+    quiet(player, m, reload=False)
+    m.path = "http://x/1.ts"
     m.drop_track = True
     player._muted = False
     quiet(player, m)
@@ -87,5 +107,5 @@ def test_a_broken_core_is_only_logged(monkeypatch):
             raise RuntimeError("gone")
     said = []
     monkeypatch.setattr(embedded.log, "debug", lambda *a, **k: said.append(a))
-    quiet(SimpleNamespace(_muted=True), Broken())
+    quiet(SimpleNamespace(_muted=True), Broken(path=None), reload=False)
     assert said

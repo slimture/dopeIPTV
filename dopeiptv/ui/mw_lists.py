@@ -65,6 +65,7 @@ class _ListsMixin:
             self._close_guide_page()
         self._close_series_page()       # a series' page gives way to the list
         getattr(self, "_close_mitt_page", lambda: None)()    # ...and Mine's page
+        getattr(self, "_close_dl_page", lambda: None)()      # ...and Downloaded's
         # ...and the Search page, unless the window moves on by itself (a
         # source switched to from it has no list of the mode shown).
         if not getattr(self, "_search_hold", False):

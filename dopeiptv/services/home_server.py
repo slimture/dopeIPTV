@@ -186,6 +186,20 @@ def read_flag(value: Any) -> bool:
     return value is True or str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _plain_address(text: str) -> str | None:
+    """*text* as an address is written in K_OPEN_HOSTS: an IPv4 address
+    written as IPv6 (::ffff:192.168.1.7) as itself, a zone left out; None
+    for no address. By ipv4_mapped, never by its string: Python 3.12.3 and
+    older write that one ::ffff:c0a8:107."""
+    try:
+        ip = ipaddress.ip_address(str(text).split("%")[0])
+    except ValueError:
+        return None
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return str(ip.ipv4_mapped)
+    return str(ip)
+
+
 def parse_open_hosts(text: Any) -> tuple[list[str], list[str]]:
     """The devices let in by address (K_OPEN_HOSTS): one IPv4 or IPv6
     address per line or separated by commas or spaces - a home address, or
@@ -202,6 +216,8 @@ def parse_open_hosts(text: Any) -> tuple[list[str], list[str]]:
         except ValueError:
             bad.append(part[:64])
             continue
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped             # judged as itself: an older Python calls every one private
         if not (ip.is_private or ip.is_link_local or ip.is_loopback) or ip.is_unspecified \
                 or ip.is_multicast:
             bad.append(part[:64])
@@ -771,24 +787,16 @@ class HomeServer:
         if mode == OPEN_HOME:
             return self.local.allows(ip, own)
         if mode == OPEN_DEVICES:
-            try:
-                norm = str(ipaddress.ip_address(ip.split("%")[0]))
-            except ValueError:
-                return False
-            if norm.startswith("::ffff:"):
-                norm = norm[7:]
-            return norm in self.config.open_hosts
+            norm = _plain_address(ip)
+            return norm is not None and norm in self.config.open_hosts
         return False
 
     def note_open_use(self, ip: str) -> None:
         """*ip* used the tuner without its token (it was let in): kept for
         this run, at most OPEN_HOSTS_MAX, as K_OPEN_HOSTS would hold it."""
-        try:
-            norm = str(ipaddress.ip_address(ip.split("%")[0]))
-        except ValueError:
+        norm = _plain_address(ip)
+        if norm is None:
             return
-        if norm.startswith("::ffff:"):
-            norm = norm[7:]
         with self._refused_lock:
             if norm not in self._open_seen and len(self._open_seen) < OPEN_HOSTS_MAX:
                 self._open_seen[norm] = None

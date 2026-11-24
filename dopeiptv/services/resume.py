@@ -14,6 +14,8 @@ import time
 from typing import Any
 
 from ..core import privacy
+from ..core.names import collapse_repeats
+from ..core.series_view import without_series
 
 # Fields worth keeping in a resume snapshot so the "Continue watching" list
 # can render a row (and replay it) without re-fetching the provider.
@@ -77,6 +79,13 @@ class ResumeStore:
             if group in ("vod", "episode") and item:
                 snap = {k: item[k] for k in _SNAP_FIELDS
                         if item.get(k) is not None}
+                sname = (series_ctx or {}).get("name") or (series_ctx or {}).get("title")
+                if isinstance(snap.get("name"), str):
+                    snap["name"] = collapse_repeats(snap["name"])
+                if group == "episode" and sname and snap.get("name"):
+                    # The episode's own name: a Continue watching row has the
+                    # series' in front, and kept so it would say it twice.
+                    snap["name"] = without_series(str(snap["name"]), str(sname)) or snap["name"]
                 if snap:
                     entry["item"] = snap
                 if group == "episode" and series_ctx:
@@ -136,6 +145,10 @@ class ResumeStore:
                 sname = ctx.get("name") or ctx.get("title")
                 ep = row.get("name") or ""
                 if sname:
+                    # Once: the episode's own name without the series' in
+                    # front - a row played from here was kept again with it,
+                    # and the name grew a "Show · " every time.
+                    ep = without_series(collapse_repeats(str(ep)), str(sname))
                     row["name"] = f"{sname} · {ep}" if ep else sname
                     # The cover pipeline resolves an episode's poster from the
                     # SERIES title (searching TMDB for "Show · S1 * E2 - ..."

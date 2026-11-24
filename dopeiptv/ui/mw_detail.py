@@ -49,6 +49,7 @@ class _DetailMixin:
     def _show_detail(self, it) -> None:
         self._detail_episode = None
         self._detail_film_continue(None)
+        self._dl_detail_show(None)
         self.now_card.hide()
         self.media_info.hide()
         self.media_rating_lbl.hide()
@@ -213,6 +214,8 @@ class _DetailMixin:
             info = (it.get("info")
                     if isinstance(it.get("info"), dict) else {})
             self._show_media_info(info, self._current_key)
+            if it.get("id") is not None:
+                self._dl_detail_show(it, "episode", self.series_ctx)
         elif ckind in ("live", "fav"):
             if it.get("stream_id") is not None:
                 self._request_epg(it)
@@ -238,6 +241,8 @@ class _DetailMixin:
                 self._request_media_info("vod", sid, self._current_key)
             if ckind == "vod":
                 self._detail_film_continue(it)
+            if sid is not None:
+                self._dl_detail_show({**it, "stream_id": sid}, "movie")
         elif (ckind == "series"
               or (self.mode in ("watchlist", "history", "watched")
                   and snap_kind == "series")):
@@ -327,6 +332,8 @@ class _DetailMixin:
         sid = ctx.get("series_id")
         if sid is not None and not it.get("_info_later"):
             self._request_media_info("series", sid, self._current_key)
+        if it.get("id") is not None:
+            self._dl_detail_show(it, "episode", ctx)
 
     @property
     def PLACEHOLDER_LOGO_STYLE(self) -> str:
