@@ -229,8 +229,14 @@ class _MprisMixin:
                 prog = None
             artist = (prog or {}).get("title") or ""
         elif kind == "episode":
-            sctx = last.get("series_ctx") or {}
-            artist = sctx.get("name") or sctx.get("title") or ""
+            # The series as the artist, the episode's own words as the
+            # title - never the series' name again in front of them.
+            try:
+                artist, label = self._episode_words(title, item)
+            except Exception:
+                sctx = last.get("series_ctx") or {}
+                artist, label = sctx.get("name") or sctx.get("title") or "", ""
+            title = label or title
         elif kind == "local":
             artist = item.get("_artist") or ""
             album = item.get("_album") or ""

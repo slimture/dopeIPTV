@@ -99,6 +99,29 @@ def test_continue_watching_includes_episodes_with_context():
     assert ep["name"] == "Severance · S1 E2"
 
 
+def test_an_episode_played_from_continue_watching_names_its_series_once():
+    """A Continue watching row says "Show · S1 E2"; played from there and
+    kept again, the row's name went into the store with its "Show · ", and
+    the next row said it twice - then three times (the window's title read
+    "Show · Show · Show · S2 * E3 - ..."). Kept and shown, the series once;
+    a store an older app wrote that way is shown once too."""
+    r = ResumeStore(FakeSettings(), "p")
+    ctx = {"series_id": 88, "name": "Jorden runt på 6 steg"}
+    r.record("episode", 5, pos=600, dur=1800,
+             item={"name": "S2 * E3 - Jorden runt på 6 steg - S02E03", "id": 5}, series_ctx=ctx)
+    for _ in range(3):
+        row = r.continue_watching()[0]
+        r.record("episode", 5, pos=700, dur=1800, item=row, series_ctx=ctx)
+    assert r.continue_watching()[0]["name"] == "Jorden runt på 6 steg · S2 * E3 - Jorden runt på 6 steg - S02E03"
+    stored = json.loads(r._settings.value(r._key))
+    assert stored["episode:5"]["item"]["name"] == "S2 * E3 - Jorden runt på 6 steg - S02E03"
+    # What an older app kept, "Show · " three times in front: shown once.
+    stored["episode:5"]["item"]["name"] = "Jorden runt på 6 steg · " * 3 + "S2 * E3"
+    r._settings.setValue(r._key, json.dumps(stored))
+    r2 = ResumeStore(r._settings, "p")
+    assert r2.continue_watching()[0]["name"] == "Jorden runt på 6 steg · S2 * E3"
+
+
 def test_continue_watching_drops_near_start():
     r = ResumeStore(FakeSettings(), "p")
     r.record("vod", 9, pos=30, dur=3600,

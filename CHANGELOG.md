@@ -20,6 +20,14 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- Watching a series, the window's title said the series' name over and
+  over ("Show · Show · Show · S2 * E3 - Show - S02E03"): Continue watching
+  put the series in front of the episode, and each time it was played from
+  there and kept, one more came. An episode is now "Show · S2 E3 · Title"
+  in the window's title, over the picture, in the status line, the media
+  controls and History; names are kept once, and a title whose parts
+  repeat - a channel's, a film's, a local file's, an older History row's -
+  is said once everywhere.
 - "Settings › Picture & sound…" in the player's right-click menu (and
   every such link) showed as "Picture_sound": Qt read the "&" as a
   shortcut's mark.

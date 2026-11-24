@@ -35,6 +35,7 @@ from ..core.series_rules import SeriesRuleStore
 from ..media.players import launch_player
 from ..core.contest import ContestWatch
 from ..core import privacy
+from ..core.names import collapse_repeats
 from ..core.privacy import for_log, url_for_log
 from ..core.health import StreamHealth
 from ..core.recording import RecordingManager
@@ -2461,6 +2462,10 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # The app's reconnect (_retry_last_stream) of this very stream says
         # "Reconnecting…" over the picture while it opens; anything else is
         # a fresh start.
+        # A title whose parts repeat ("Show · Show · S2 E3", what a row
+        # kept by an older app can say) said once, for everything told of
+        # it below - the window, History, the media controls (core/names).
+        title = collapse_repeats(title)
         reconnect = key is not None and getattr(self, "_reconnect_key", None) == key
         self._reconnect_key = None
         # The same title again (a reconnect, a backup address, the archive):
@@ -2671,8 +2676,41 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         if played is not None:
             played()
         self.listw.viewport().update()
-        self.setWindowTitle(title or self._base_title)
-        self._set_status(self._status_playing(title))
+        shown = self._shown_title(title, kind, item)
+        self.setWindowTitle(shown or self._base_title)
+        self._set_status(self._status_playing(shown))
+
+    def _episode_words(self, title: str, item, ctx: dict | None = None) -> tuple[str, str]:
+        """A playing episode's series and its own words ("S2 E3 · Title"):
+        the series' name once, whatever the row's name put in front of it -
+        a provider's "Show - S02E03", an older Continue watching row's
+        "Show · " saved again each time. *ctx*: its series (else the one
+        what plays has, else the one being played under)."""
+        from ..core import series_view as sv
+        if ctx is None:
+            ctx = (self._last_playback or {}).get("series_ctx") or self.series_ctx or {}
+        series = str(ctx.get("name") or ctx.get("title") or "")
+        ep = item if isinstance(item, dict) else {}
+        s, e = sv.season_of(ep.get("season")), sv.episode_number(ep)
+        se = (tr("sp_se", s=s, e=e) if s is not None and e is not None
+              else tr("sp_episode_short", n=e) if e is not None else "")
+        own = sv.episode_title(ep, series) if ep.get("title") else ""
+        if not own and not se:
+            own = sv.without_series(title, series)
+        return series, " · ".join(x for x in (se, own) if x)
+
+    def _shown_title(self, title: str, kind: str, item) -> str:
+        """What the window's title, the picture's overlay and the status line
+        say of what plays: an episode as "Show · S2 E3 · Title", anything
+        else as its title."""
+        if kind != "episode":
+            return collapse_repeats(title)
+        try:
+            series, label = self._episode_words(title, item)
+        except Exception:
+            log.debug("an episode's heading failed", exc_info=True)
+            return title
+        return " · ".join(x for x in (series, label) if x) or title
 
     def _play_prepare(self, url: str, title: str, key, kind: str, item) -> None:
         """The docked player made ready: a recording of the stream before let
@@ -2680,7 +2718,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         subtitles kept for this title, a channel's own settings."""
         self.rec.finish_all_inplayer("channel changed")
         self.player.show()
-        self.player.set_overlay_info(title)
+        self.player.set_overlay_info(self._shown_title(title, kind, item))
         # A radio station is music too: the visualiser and equaliser.
         self._apply_audio_visuals(url, audio=kind == "radio")
         # Music bookkeeping - the detail panel and the play queue. Only with

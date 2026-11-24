@@ -18,6 +18,7 @@ from PyQt6.QtCore import QSettings
 
 from . import pins, privacy, site_out
 from .log import register_secrets
+from .names import collapse_repeats
 
 
 class _Kept:
@@ -460,6 +461,11 @@ class HistoryStore:
         # (and the healing pass below) calls e.get(...), so one junk row would
         # crash History at startup.
         self.entries: list[dict] = [e for e in raw if isinstance(e, dict)]
+        # A name that repeats itself ("Show · Show · S2 E3"), kept by an
+        # older app: said once (core/names.py). Saved with the next add.
+        for e in self.entries:
+            if isinstance(e.get("name"), str):
+                e["name"] = collapse_repeats(e["name"])
         # Heal entries mis-recorded as 'live' by the old favorites bug (a
         # movie played from Favorites was filed as a TV channel). The stored
         # URL knows the truth: Xtream VOD urls contain /movie/, series
@@ -496,7 +502,7 @@ class HistoryStore:
                         if not (str(e.get("_key")) == str(key)
                                 and e.get("_kind") == kind)]
         entry = {
-            "name": title, "stream_icon": icon_url,
+            "name": collapse_repeats(title), "stream_icon": icon_url,
             "_url": url, "_key": key, "_kind": kind,
             "_watched_at": datetime.now().isoformat(),
         }

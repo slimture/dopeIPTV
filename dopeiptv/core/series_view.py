@@ -36,7 +36,7 @@ SPECIALS = 0
 REMEMBER_MAX = 400
 
 _DIGITS = re.compile(r"\d+")
-_SXXEYY = re.compile(r"\bS\d{1,3}\s*[ .x_-]?\s*E\d{1,4}\b", re.IGNORECASE)
+_SXXEYY = re.compile(r"\bS\d{1,3}\s*[ .x_*-]?\s*E\d{1,4}\b", re.IGNORECASE)
 #: What is left over around an episode's own title once the series' name
 #: and "S01E02" are gone (and whitespace).
 _SEP = "-–—:|·*"
@@ -273,15 +273,41 @@ def opening_season(all_seasons: list[Season], nxt: NextUp,
 
 # -- the words on a card ------------------------------------------------------------
 
+#: At most this many copies of a series' name are taken off the front of a
+#: title (without_series): each look is linear, the bound keeps it so.
+PREFIXES_MAX = 32
+
+
+def without_series(text: str, series_name: str) -> str:
+    """*text* without the series' name in front of it, however many times
+    it is there - a provider's "Show - S02E03 - Show - Title", or an older
+    app's Continue watching row saved again with its "Show · " each time
+    ("Show · Show · Show · S2 * E3 - ..."). Only the name as a word of its
+    own, followed by a space or a separator ("Showtime" stays)."""
+    text = str(text or "").strip()
+    name = str(series_name or "").strip()
+    if not name:
+        return text
+    low = name.lower()
+    for _ in range(PREFIXES_MAX):
+        if not text.lower().startswith(low):
+            break
+        rest = text[len(name):]
+        if not rest or not (rest[0].isspace() or rest[0] in _SEP):
+            break
+        text = _trim(rest)
+    return text
+
+
 def episode_title(ep: dict, series_name: str = "") -> str:
     """The episode's own title: without the series' name a provider puts
-    in front, an "S01E02" in it, or the separators left over."""
-    title = str(ep.get("title") or "").strip()
-    name = series_name.strip()
-    if name and title.lower().startswith(name.lower()):
-        title = title[len(name):]
+    in front (once or more), an "S01E02" or "S2 * E3" in it, or the
+    separators left over."""
+    title = without_series(str(ep.get("title") or ""), series_name)
     title = _SXXEYY.sub(" ", title)
-    title = _trim(" ".join(title.split()))
+    title = without_series(_trim(" ".join(title.split())), series_name)
+    if series_name and title.lower() == series_name.strip().lower():
+        return ""                    # the series' name and nothing of its own
     if episode_number(ep) is not None and digits(title) == episode_number(ep):
         return ""
     return title
