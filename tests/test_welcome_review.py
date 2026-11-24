@@ -474,6 +474,66 @@ def test_on_a_narrow_pane_the_strips_buttons_are_whole_and_it_is_no_taller_than_
     app.setStyleSheet("")
 
 
+@pytest.mark.parametrize("code", ["en", "sv", "ar"])
+@pytest.mark.parametrize("demo", [True, False])
+def test_under_its_words_the_strips_buttons_follow_them_at_once(app, code, demo):
+    """At the list's narrowest the strip stood up to half the pane, the room
+    between its words and its buttons: in an upright box the words' stretch
+    and the buttons' own (turned upright as they stacked) made it grow
+    beside the list. In the pane as the window has it - the list beside it
+    taking the room, the pane narrowed from a wide one - its buttons begin
+    the layout's gap under its words' last line, and it is no taller than it
+    needs; wide, the words beside the buttons take the row as before."""
+    from PyQt6.QtWidgets import QBoxLayout, QListView, QVBoxLayout
+
+    from dopeiptv.ui import theme
+    from dopeiptv.ui.mw_onboarding import _SourceStrip
+    i18n.set_language(code)
+    app.setStyleSheet(theme.build_style())
+    host = QWidget()
+    host.setLayoutDirection(app.layoutDirection())
+    lay = QVBoxLayout(host)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(0)
+    lay.addWidget(QListView())                    # the list: it takes what room there is
+    strip = _SourceStrip()
+    lay.addWidget(strip)
+    if demo:
+        _strip_says_demo(strip)
+    else:
+        strip.say(tr("onb_strip_none"), tr("onb_add_own_source"))
+
+    def settle():
+        for _ in range(8):
+            app.processEvents()
+
+    def tops():
+        text = strip.text
+        top = text.mapTo(strip, QPoint(0, 0)).y()
+        shown = [b for b in (strip.add, strip.leave) if b.isVisibleTo(strip)]
+        return top, text.heightForWidth(text.width()), min(b.mapTo(strip, QPoint(0, 0)).y()
+                                                            for b in shown)
+
+    host.resize(900, 700)
+    host.show()
+    settle()
+    assert strip._box.direction() == QBoxLayout.Direction.LeftToRight
+    wide = strip.height()
+    assert wide == strip.heightForWidth(strip.width()) and strip._box.stretch(0) == 1
+    host.resize(240, 700)                         # the middle pane's floor (mw_build)
+    settle()
+    assert strip._box.direction() == QBoxLayout.Direction.TopToBottom
+    top, words, buttons = tops()
+    assert buttons == top + words + strip._GAP, (code, demo, top, words, buttons)
+    assert strip.height() == strip.heightForWidth(strip.width()), (code, demo, strip.height())
+    assert strip.text.height() == words
+    host.resize(900, 700)                         # and back: the wide form as it was
+    settle()
+    assert strip._box.direction() == QBoxLayout.Direction.LeftToRight and strip.height() == wide
+    host.deleteLater()
+    app.setStyleSheet("")
+
+
 # -- words ---------------------------------------------------------------------------------
 
 def _locales():

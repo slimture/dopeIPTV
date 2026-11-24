@@ -80,6 +80,8 @@ dopeiptv/
     plex.py            PlexClient - PIN sign-in, servers, libraries, DVR, GDM
     epg.py             XmltvGuide - XMLTV parser with disk cache + index
     epg_index.py       The guide parser as a process of its own (--epg-index)
+    epg_texts.py       A guide's programmes with their descriptions on disk a
+                       channel at a time (Every source's row picked)
     metadata.py        TMDB client, PosterResolver (cover art)
     trakt.py           Trakt.tv sync (watched, watchlist)
     simkl.py           Simkl sync (scrobbles, watched, Plan to watch)

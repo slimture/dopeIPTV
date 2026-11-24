@@ -21,7 +21,9 @@ source for its live lists alone (a full catalogue made since, or before,
 takes them from what was read), and ``now_table`` another source's guide
 around now from its copy on disk - never a download. The row picked there
 has its programmes read with their descriptions on their own (``texts``):
-that row's alone, the last few kept.
+that row's alone, the last few kept - from the source's guide written down
+a channel at a time beside its copy on disk (providers/epg_texts.py), once
+per copy: the guide is read whole once, not for every row.
 """
 
 from __future__ import annotations
@@ -43,6 +45,12 @@ from .failover import Shown
 
 #: A guide's week is read again after this long (the week moves on).
 GUIDE_FRESH_SECS = 3 * 3600
+#: The moments (in a source's own guide time) its texts on disk cover: from
+#: an hour before the first asked for (its guide shift made that much
+#: longer meanwhile) to a day after it; outside that they are written again.
+#: What ended before is never shown, so none of it is kept.
+TEXTS_BEFORE = 3600
+TEXTS_AHEAD = 86_400
 
 #: The kinds of row, what lists them and their categories, and their id.
 _LISTS = (("channels", "live", "live_streams", "live_categories", "stream_id"),
@@ -172,6 +180,20 @@ def _guide_path(pid: str) -> str:
     return epg_cache_path(pid)
 
 
+class _Writing:
+    """A source's guide read to have its texts written down
+    (providers/epg_texts.py): *guide* in memory while they are - None while
+    it loads -, *ready* set once it is in, or there is none."""
+
+    def __init__(self) -> None:
+        self.guide: Any = None
+        self.ready = threading.Event()
+
+
+#: A source's texts on disk not looked for yet (``Sources._tx``).
+_UNREAD = object()
+
+
 def play_address(client: Any, row: Mapping[str, Any], fmt: str = "ts") -> str:
     """(worker) A live channel's address from *client*, to play: what a
     box that transcodes gives, else its live_url - only now, as it plays."""
@@ -217,6 +239,12 @@ class Sources:
         # programmes with descriptions by row key - ((the copy on disk's key,
         # the guide offset), the listings, when) - the last es.TEXTS_KEPT.
         self._texts: dict[str, OrderedDict[str, tuple[tuple, list[dict], float]]] = {}
+        # A source's texts on disk (providers/epg_texts.py), under the key
+        # of the copy they are of: a GuideTexts, a _Writing while its guide
+        # is read and they are written, None where they cannot be (a guide
+        # without its tables, too many channels, a folder not written to:
+        # read whole for each row, as before).
+        self._tx: dict[str, tuple[tuple, Any]] = {}
         # A source's lists as read, per kind, while it is as it was: a
         # catalogue made for another key (a profile, the lock) filters
         # these again instead of asking the source once more.
@@ -443,9 +471,10 @@ class Sources:
         *key* -: its programmes from the one on now in that source's own
         time (*delay_minutes* its guide offset) with their descriptions, for
         the detail column. From the copy this computer has on disk - never a
-        download -, one guide read at a time and let go once this row's are
-        taken; only this row's kept, for the last es.TEXTS_KEPT rows of the
-        source. [] without one."""
+        download -: its texts written down a channel at a time (``_texts_of``),
+        else the guide read whole, one at a time and let go once this row's
+        are taken; only this row's kept, for the last es.TEXTS_KEPT rows of
+        the source. [] without one."""
         now = time.time() if now is None else now
         disk = self._disk_key(pid)
         made = (disk, int(delay_minutes))
@@ -458,11 +487,7 @@ class Sources:
         out: list[dict] = []
         try:
             if disk is not None:
-                with self._guide_lock:
-                    g = self._open_guide(str(disk[1]))
-                    if g.load_cached():
-                        out = es.listings_of(g.schedule(dict(row)), now - int(delay_minutes) * 60)
-                    del g
+                out = self._texts_of(pid, disk, gen, dict(row), now - int(delay_minutes) * 60)
         except Exception as e:
             log.info("every source: a programme's words could not be read (%s)",
                      type(e).__name__)
@@ -477,6 +502,130 @@ class Sources:
                 kept.popitem(last=False)
         return out
 
+    def _texts_of(self, pid: str, disk: tuple, gen: int, row: dict, at: float) -> list[dict]:
+        """(worker) Row *row*'s programmes from *at* (its guide's own time)
+        with their descriptions: from the source's texts on disk
+        (providers/epg_texts.py) - that channel's block alone; while they are
+        being written, from the guide read for them; else the guide is read
+        now, this row's taken from it, and its texts written from it on a
+        thread of their own (``_texts_write``). A guide whose texts cannot be
+        written is read whole for each row, as before (``_texts_whole``)."""
+        from ..providers import epg_texts
+        for _ in range(4):
+            with self._lock:
+                have = self._tx.get(pid)
+                got = have[1] if have is not None and have[0] == disk else _UNREAD
+            if isinstance(got, _Writing):
+                got.ready.wait()
+                guide = got.guide
+                if guide is not None:
+                    return es.listings_of(guide.schedule(row), at)
+                continue                    # written by now, or none can be
+            if got is None:
+                return self._texts_whole(disk, row, at)
+            if got is _UNREAD:
+                got = epg_texts.read(epg_texts.path_for(str(disk[1])), (disk[3], disk[2]))
+                with self._lock:
+                    have = self._tx.get(pid)
+                    if (got is not None and gen == self._gen.get(pid, 0)
+                            and (have is None or have[0] != disk)):
+                        self._tx[pid] = (disk, got)
+            if isinstance(got, epg_texts.GuideTexts) and got.covers(at):
+                try:
+                    return es.listings_of(got.schedule(row), at)
+                except (ValueError, OSError) as e:
+                    # Made again by another copy of the app (read it again),
+                    # or a block that cannot be read: written anew.
+                    stale = isinstance(e, epg_texts.Stale)
+                    log.info("every source: a guide's words on disk %s (%s)",
+                             "changed" if stale else "could not be read", type(e).__name__)
+                    with self._lock:
+                        if self._tx.get(pid, (None, None))[1] is got:
+                            del self._tx[pid]
+                    if not stale:
+                        self._texts_drop(got.path)
+                    continue
+            mine = self._texts_write(pid, disk, row, at)
+            if mine is not None:
+                return mine
+        return self._texts_whole(disk, row, at)
+
+    def _texts_whole(self, disk: tuple, row: dict, at: float) -> list[dict]:
+        """(worker) Row *row*'s programmes from the source's guide read whole
+        from disk, one guide at a time, let go once they are taken."""
+        out: list[dict] = []
+        with self._guide_lock:
+            g = self._open_guide(str(disk[1]))
+            if g.load_cached():
+                out = es.listings_of(g.schedule(row), at)
+            del g
+        return out
+
+    def _texts_write(self, pid: str, disk: tuple, row: dict, at: float) -> list[dict] | None:
+        """(worker) The source's guide read whole now - this row's taken
+        from it - and handed to a thread of its own that writes its texts
+        down (``_texts_writer``), the one-guide lock held until that is done:
+        rows picked meanwhile are read from it. None when another worker
+        took this on first (look again)."""
+        job = _Writing()
+        with self._lock:
+            have = self._tx.get(pid)
+            if have is not None and have[0] == disk and isinstance(have[1], _Writing):
+                return None
+            self._tx[pid] = (disk, job)
+        handed = False
+        self._guide_lock.acquire()
+        try:
+            g = self._open_guide(str(disk[1]))
+            if not g.load_cached():
+                return []
+            out = es.listings_of(g.schedule(row), at)
+            if callable(getattr(g, "tables", None)):
+                job.guide = g
+                try:
+                    threading.Thread(target=self._texts_writer, args=(pid, disk, job, int(at)),
+                                     name="dopeiptv-guide-texts", daemon=True).start()
+                    handed = True
+                except RuntimeError:
+                    log.info("every source: no thread to write a guide's words down")
+            return out
+        finally:
+            if not handed:
+                with self._lock:
+                    if self._tx.get(pid, (None, None))[1] is job:
+                        self._tx[pid] = (disk, None)
+                job.guide = None
+                self._guide_lock.release()
+            job.ready.set()
+
+    def _texts_writer(self, pid: str, disk: tuple, job: _Writing, at: int) -> None:
+        """(its own thread) The texts of the guide *job* holds written down
+        beside its copy on disk; the guide let go and the one-guide lock
+        released after, whatever happens."""
+        from ..providers import epg_texts
+        made: Any = None
+        try:
+            made = epg_texts.write(job.guide, epg_texts.path_for(str(disk[1])), (disk[3], disk[2]),
+                                   at - TEXTS_BEFORE, at + TEXTS_AHEAD, es.LISTINGS, es.TEXT_MAX)
+        except Exception as e:
+            log.info("every source: a guide's words could not be written down (%s)",
+                     type(e).__name__)
+        finally:
+            with self._lock:
+                if self._tx.get(pid, (None, None))[1] is job:
+                    self._tx[pid] = (disk, made)
+            job.guide = None
+            self._guide_lock.release()
+        if made is not None:
+            log.info("every source: a guide's words written down - %d channels", len(made))
+
+    @staticmethod
+    def _texts_drop(path: str) -> None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
     # -- guides ---------------------------------------------------------------------
 
     def _guide_key(self, plan: Plan) -> tuple | None:
@@ -489,12 +638,14 @@ class Sources:
         return self._disk_key(plan.source.id)
 
     def _disk_key(self, pid: str) -> tuple | None:
-        """The source's guide on disk and when it was written; None without."""
+        """The source's guide on disk, when it was written (ns) and how large
+        it is; None without."""
         path = self._guide_path(pid)
         try:
-            return ("disk", path, os.stat(path).st_mtime)
+            st = os.stat(path)
         except OSError:
             return None
+        return ("disk", path, st.st_mtime_ns, st.st_size)
 
     def _guide_entry(self, plan: Plan, now: float, key: tuple | None
                      ) -> tuple[tuple, sa.GuideTable | None, float] | None:
@@ -569,7 +720,7 @@ class Sources:
     def _stores(self) -> tuple[dict, ...]:
         """Everything kept per source."""
         return (self._clients, self._cats, self._chans, self._guides, self._now,
-                self._rows, self._sigs, self._texts)
+                self._rows, self._sigs, self._texts, self._tx)
 
     def forget(self, keep: Iterable[str] = ()) -> None:
         """Everything of the sources not in *keep* let go (removed ones)."""
@@ -588,7 +739,7 @@ class Sources:
             gone = set()
             for pid in (set(self._busy) | set(self._clients) | set(self._cats)
                         | set(self._guides) | set(self._rows) | set(self._chans)
-                        | set(self._now) | set(self._texts)):
+                        | set(self._now) | set(self._texts) | set(self._tx)):
                 sig = signatures.get(pid)
                 had = [self._sigs.get(pid)] + [h[0] for h in (self._clients.get(pid),
                                                               self._rows.get(pid)) if h]

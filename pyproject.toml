@@ -96,6 +96,7 @@ files = [
     "dopeiptv/providers/client.py",
     "dopeiptv/providers/epg.py",
     "dopeiptv/providers/epg_index.py",
+    "dopeiptv/providers/epg_texts.py",
     "dopeiptv/providers/metadata.py",
     "dopeiptv/providers/diagnostics.py",
     "dopeiptv/providers/oauth_loopback.py",

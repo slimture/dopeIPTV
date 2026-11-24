@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import gzip
 import random
+import struct
 import xml.etree.ElementTree as ET
 import zlib
+from array import array
 
 import pytest
 
@@ -118,6 +120,88 @@ def test_fuzz_index_blob():
         assert got is None or (isinstance(got, tuple) and len(got) == 2)
         return got
     fz.fuzz("xmltv-index", target, make, seeds=blobs)
+
+
+class _Tables:
+    def __init__(self, by_id: dict, by_name: dict) -> None:
+        self._t = (by_id, by_name)
+
+    def tables(self) -> tuple:
+        return self._t
+
+
+def test_fuzz_guide_texts(tmp_path):
+    """A guide's texts on disk (providers/epg_texts.py) whatever their bytes:
+    no texts (None), or a table whose every channel's block is read as its
+    programmes or refused (ValueError) - never another exception, never the
+    memory a header or a block asks for."""
+    from dopeiptv.providers import epg_texts
+    path = str(tmp_path / "g.texts")
+    seeds = []
+    for k in (7, 8):
+        by_id, by_name = epg.parse_xmltv(guide(random.Random(k)), 400)
+        epg_texts.write(_Tables(by_id, by_name), path, (1, 2), 1_700_000_000, 1_900_000_000,
+                        24, 1000)
+        seeds.append(open(path, "rb").read())
+    epg_texts.write(_Tables({}, {}), path, (1, 2), 0, 1, 24, 1000)
+    seeds.append(open(path, "rb").read())
+
+    def target(data: bytes) -> object:
+        with open(path, "wb") as f:
+            f.write(data)
+        got = epg_texts.read(path, (1, 2))
+        if got is None:
+            return None
+        # Every name is of a channel of the table; each channel's block read once.
+        assert all(c in got._ids for c in got._names.values())
+        out = []
+        for cid in got._ids:
+            try:
+                sched = got.schedule({"epg_channel_id": cid})
+            except ValueError:
+                continue
+            assert sched is None or len(sched[0]) == len(sched[1]) == len(sched[2]) == len(sched[3])
+            out.append(sched)
+        return out
+
+    def make(rng: random.Random) -> bytes:
+        data = rng.choice(seeds)
+        if rng.random() < 0.3:
+            return fz.mutate_bytes(rng, data, others=seeds)
+        # Past zlib: a block's or the table's own bytes changed, packed again
+        # and laid out as the file is - or the header's numbers.
+        head = list(epg_texts._HEAD.unpack(data[:epg_texts._HEAD.size]))
+        at, length, channels = head[-2], head[-1], head[7]
+        table = zlib.decompress(data[at:at + length])
+        offsets = array("Q", table[:8 * channels])
+        lengths = array("I", table[8 * channels:12 * channels])
+        blocks = [data[o:o + n] for o, n in zip(offsets, lengths, strict=True)]
+        k = rng.random()
+        if k < 0.45 and any(blocks):
+            i = rng.choice([i for i, b in enumerate(blocks) if b])
+            blocks[i] = zlib.compress(fz.mutate_bytes(rng, zlib.decompress(blocks[i])))
+        elif k < 0.85:
+            table = fz.mutate_bytes(rng, table)
+        else:
+            j = rng.choice((6, 7, 8))
+            head[j] = rng.choice((0, 1, head[j] + 1, max(0, head[j] - 1), 2 ** 31, 2 ** 32 - 1))
+        pos, out = epg_texts._HEAD.size, []
+        for i, b in enumerate(blocks):
+            if i < len(offsets) and k < 0.45:
+                offsets[i], lengths[i] = (pos if b else 0), len(b)
+            out.append(b)
+            pos += len(b)
+        if k < 0.45:
+            table = offsets.tobytes() + lengths.tobytes() + table[12 * channels:]
+        packed = zlib.compress(table)
+        head[-2], head[-1] = pos, len(packed)
+        try:
+            front = epg_texts._HEAD.pack(*head)
+        except struct.error:
+            front = data[:epg_texts._HEAD.size]
+        return front + b"".join(out) + packed
+    # No more than zlib itself unpacks from so many bytes (about 1032 to 1).
+    fz.fuzz("guide-texts", target, make, seeds=seeds, check=fz.bounded(1100, 100_000))
 
 
 def test_fuzz_gunzip_gently():

@@ -154,9 +154,22 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   recording?", another channel while one records and "Delete download?" it
   answers the safe choice (keep recording, keep watching, Cancel), the one
   TV mode's question opens on too. Stop and Delete take a click.
+- Every source: moving from row to row of another source is quick on a
+  very large guide. Each row picked read that source's whole guide from
+  disk again for its descriptions - about a second a row with tens of
+  thousands of channels. The guide is now read once per copy on disk and
+  its programmes kept beside it a channel at a time (`<guide>.texts`,
+  providers/epg_texts.py): a row reads its own channel's alone, in well
+  under a millisecond, and a later session finds them there.
 
 ### Fixed
 
+- The strip under the list while there is no source of one's own (the
+  demo's word) stood up to half the pane tall on the narrowest middle pane,
+  where its buttons go under its words: the room between its words and its
+  buttons, the list beside it squeezed. Its words' stretch, and the buttons'
+  own turned upright as they stacked, made it grow with the pane; it is as
+  tall as its words and buttons now, the wide form as it was.
 - The first-run guide could lose the keyboard to the channel list behind it
   when the app's own start showed the TV place a moment after Get started
   was pressed (on a slower computer): Enter then went to the list. A place
