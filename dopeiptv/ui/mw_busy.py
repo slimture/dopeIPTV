@@ -41,6 +41,7 @@ from ..i18n import tr
 from .notice_widgets import ActivityLine, ActivityPanel, DecisionCard, Follow
 from .notices import NoticeHub, hub_of
 from .theme import P
+from .widgets import WhileShown
 
 
 def _guide_group(n: int) -> str:
@@ -313,6 +314,10 @@ class _BusyMixin:
             t.setInterval(110)
             t.timeout.connect(self._tick_busy_overlay)
             self._busy_spin_timer = t
+            # It turns only while it can be seen: the list's work goes on
+            # behind Mine, Local files or a series' page, and the spinner
+            # had ticked nine times a second there (docs/PERFORMANCE.md).
+            WhileShown(ov, t)
         return self._busy_overlay
 
     def _tick_busy_overlay(self) -> None:
@@ -332,7 +337,8 @@ class _BusyMixin:
             self._tick_busy_overlay()
             ov.show()
             ov.raise_()
-            self._busy_spin_timer.start()
+            if ov.isVisible():
+                self._busy_spin_timer.start()
         else:
             ov.hide()
             self._busy_spin_timer.stop()

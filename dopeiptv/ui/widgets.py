@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import (
-    QEvent, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal,
+    QEvent, QObject, QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QFont, QIcon, QImage, QImageReader, QPainter, QPainterPath,
@@ -19,6 +19,34 @@ from PyQt6.QtWidgets import (
 from .. import APP_NAME
 from . import theme as _theme
 from .theme import HEART, P, on_accent
+
+
+class WhileShown(QObject):
+    """*timer* runs only while *widget* is on screen: started as it is shown
+    (and *on_show* called once, at once), stopped as it is hidden - its own
+    hide() or a parent's. A ticker for something on screen woke the app
+    for nothing the rest of the time (docs/PERFORMANCE.md). Starting the
+    timer while the widget is hidden is the caller's mistake; this only
+    follows the widget from here on."""
+
+    def __init__(self, widget: QWidget, timer: QTimer, on_show=None) -> None:
+        super().__init__(widget)
+        self._timer = timer
+        self._on_show = on_show
+        widget.installEventFilter(self)
+        if widget.isVisible():
+            timer.start()
+
+    def eventFilter(self, obj, ev) -> bool:  # noqa: N802 - Qt hook
+        kind = ev.type()
+        if kind == QEvent.Type.Show:
+            if not self._timer.isActive():
+                self._timer.start()
+                if self._on_show is not None:
+                    QTimer.singleShot(0, self._on_show)
+        elif kind == QEvent.Type.Hide:
+            self._timer.stop()
+        return False
 
 
 def popup_menu_over_video(menu, global_pos) -> None:
