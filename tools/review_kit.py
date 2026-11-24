@@ -204,6 +204,23 @@ def _lines(a: int, b: int) -> str:
     return str(a) if a == b else f"{a}-{b}"
 
 
+#: What a host is to the page (transparency.HOSTS), in words for the list.
+_KINDS = {"talks": "the app connects to it", "link": "only shown or opened in your browser",
+          "name": "named in the code, not a place the app goes"}
+
+
+def _host_list(app: str, ref: str) -> str:
+    """Part 4's list itself - every host the app's code names at *ref*, what
+    it is and its first places - which the page shows as a table the kit
+    did not carry (an outside review of 1.7.0 found the part without it)."""
+    lines = ["The list (every host named in the app's code at this commit, what it is, and where):"]
+    for h in transparency.hosts_of(app, ref):
+        where = ", ".join(f"{w['path']}:{w['line']}" for w in h["where"])
+        more = f" (+{h['count'] - len(h['where'])} more)" if h["count"] > len(h["where"]) else ""
+        lines.append(f"- {h['host']} - {_KINDS.get(h['kind'], h['kind'])} ({h['group']}): {where}{more}")
+    return "\n".join(lines)
+
+
 def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
     site = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     site_ref = _git(site, "rev-parse", "HEAD")
@@ -269,6 +286,8 @@ def kit(app: str, ref: str, lang: str) -> list[tuple[str, str]]:
                 for c in blk["parts"]:
                     chunks.append(f"--- {c['path']}:{_lines(c['start'], c['end'])} (dopeIPTV {shown}) "
                                   f"{c['url']} ---\n{c['code']}")
+        if part == "hosts":
+            chunks.insert(1, _host_list(app, ref))
         out.append((part, f"## {titles.get(part, part)}\n\n" + "\n\n".join(chunks)))
     base = f"{transparency.REPO}/blob/{ref}/"
     for part, what, ask, files in WHOLE:
