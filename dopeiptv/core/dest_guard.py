@@ -29,6 +29,9 @@ should not go:
 Stream addresses the player and recorder open themselves (mpv, FFmpeg) are
 judged as written by core/stream_address.py; their own DNS lookups and
 redirects are theirs - docs/SECURITY.md says so.
+
+While offline mode is on (core/offline.py) a third rule comes first: no
+connection reaches the internet (``check_peer``).
 """
 from __future__ import annotations
 
@@ -210,12 +213,26 @@ def check_peer(conn: Any, sock: socket.socket) -> socket.socket:
     """urllib3's new connection *sock* for *conn*: returned when it may be
     used (``peer_refusal``), else closed and refused with urllib3's
     NewConnectionError - a failed connection to every caller. One through
-    a proxy is the proxy's, and passes."""
-    if getattr(conn, "_tunnel_host", None) or getattr(conn, "proxy", None):
-        return sock
+    a proxy is the proxy's, and passes - but while offline mode is on
+    (core/offline.py) no connection, the proxy's either, reaches the
+    internet: one whose peer cannot be read goes nowhere then."""
+    from . import offline
+    proxied = bool(getattr(conn, "_tunnel_host", None) or getattr(conn, "proxy", None))
     try:
         peer = sock.getpeername()[0]
     except (OSError, IndexError, TypeError):
+        peer = None
+    if offline.on():
+        gone = offline.peer_refusal(str(peer)) if peer is not None else offline.INTERNET
+        if gone:
+            try:
+                sock.close()
+            except OSError:
+                pass
+            offline.note_refused(str(getattr(conn, "host", "") or ""), "a connection")
+            from urllib3.exceptions import NewConnectionError
+            raise NewConnectionError(conn, f"offline mode: {gone} - not connected")
+    if proxied or peer is None:
         return sock
     why = peer_refusal(str(getattr(conn, "host", "") or ""), str(peer))
     if not why:
@@ -283,6 +300,10 @@ def redirect_refusal(origin: str, target: str, resolve: bool = True) -> str:
     into the home network (but to the same host again); to this computer or
     a link-local host only from an address that was that very kind. By the
     name as written and - with *resolve* - by what it resolves to now."""
+    from . import offline
+    gone = offline.refusal(target)
+    if gone:
+        return gone                     # offline mode: not even looked up
     try:
         t = urlsplit(target)
         o = urlsplit(origin)

@@ -45,6 +45,13 @@ it is made (``check_peer``), every redirect before it is followed
 (``redirect_refusal``, ``RedirectRefused``), and a request that goes
 through a proxy - whose connection is the proxy's - has its name looked up
 here first (``proxied_refusal``, ``DestinationRefused``: a ConnectionError).
+
+**Offline mode** (core/offline.py): while it is on, a request - a
+redirect's hop too - goes only to this computer or the home network, and
+through a proxy only one there: anything else is not sent
+(``OfflineRefused``, a ConnectionError every caller handles as a network
+that is not there). Its connection is judged again on its socket
+(dest_guard.check_peer).
 """
 from __future__ import annotations
 
@@ -90,10 +97,14 @@ def _classes() -> dict[str, Any]:
             """A request to dopeiptv.org that held a login of a source
             (core/site_out.py): not sent."""
 
+        class OfflineRefused(real.exceptions.ConnectionError):
+            """A request offline mode does not let out (core/offline.py):
+            not sent - to its caller, a network that is not there."""
+
         from urllib3.connection import HTTPConnection, HTTPSConnection
         from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
-        from . import dest_guard, site_out
+        from . import dest_guard, offline, site_out
 
         class _Http(HTTPConnection):
             def _new_conn(self) -> Any:
@@ -201,14 +212,25 @@ def _classes() -> dict[str, Any]:
                 self.poolmanager.pool_classes_by_scheme = {"http": _HttpPool, "https": _HttpsPool}
 
             def send(self, request: Any, stream: bool = False, *args: Any, **kwargs: Any) -> Any:
+                # requests' own order: timeout, verify, cert, proxies.
+                proxies = kwargs.get("proxies", args[3] if len(args) > 3 else None)
+                # Offline mode: only this computer and the home network,
+                # whoever asks - a redirect's hop too (core/offline.py).
+                if offline.on():
+                    through = real.utils.select_proxy(request.url, proxies) if proxies else None
+                    for address in (str(request.url or ""), str(through or "")):
+                        why = offline.refusal(address) if address else ""
+                        if why:
+                            host = (offline._host_port(address) or ("?", 0))[0]
+                            offline.note_refused(host)
+                            raise OfflineRefused(f"offline mode: not sent to {host}",
+                                                 request=request)
                 # Nothing for dopeiptv.org that holds a login of a source,
                 # whoever asks (core/site_out.py) - a redirect's hop too.
                 try:
                     site_out.check(request.url, request.headers, request.body)
                 except site_out.LoginRefused as e:
                     raise LoginHeld(str(e), request=request) from None
-                # requests' own order: timeout, verify, cert, proxies.
-                proxies = kwargs.get("proxies", args[3] if len(args) > 3 else None)
                 if proxies and real.utils.select_proxy(request.url, proxies):
                     # Through a proxy the proxy connects (check_peer sees
                     # only it): the name is looked up here first - best
@@ -286,7 +308,8 @@ def _classes() -> dict[str, Any]:
         _made.update(Session=Session, session=Session, request=request,
                      CappedAdapter=CappedAdapter, ResponseTooLarge=ResponseTooLarge,
                      RedirectRefused=RedirectRefused, DestinationRefused=DestinationRefused,
-                     LoginHeld=LoginHeld, Response=Response, **{m: _verb(m) for m in verbs})
+                     LoginHeld=LoginHeld, OfflineRefused=OfflineRefused, Response=Response,
+                     **{m: _verb(m) for m in verbs})
         # requests' own, as they were when it was imported: one replaced
         # since (a test's stand-in for the network) is the one to call.
         _made["_real"] = real
@@ -298,7 +321,7 @@ _POSITIONAL = {"get": ("params",), "post": ("data", "json"), "put": ("data",), "
 #: What this stand-in answers itself; every other name is requests' own.
 _OWN = frozenset(("Session", "session", "request", "get", "post", "put", "patch", "delete",
                   "head", "options", "ResponseTooLarge", "RedirectRefused", "DestinationRefused",
-                  "LoginHeld"))
+                  "LoginHeld", "OfflineRefused"))
 
 
 def capped_adapter() -> Any:

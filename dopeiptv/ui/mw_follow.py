@@ -13,6 +13,7 @@ from typing import Any
 
 from PyQt6.QtCore import QTimer, QUrl
 
+from ..core import offline
 from ..core.log import log
 from ..core.stores import episode_rows
 from ..core.workers import run_async
@@ -110,7 +111,7 @@ class _FollowMixin:
 
     def _check_followed(self) -> None:
         store, client = self.followed, self.client
-        if self._follow_running or not store.ids():
+        if self._follow_running or not store.ids() or offline.on():
             return
         due = store.due(time.time(), MIN_AGE_S)[:MAX_PER_RUN]
         if not due:

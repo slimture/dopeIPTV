@@ -188,6 +188,9 @@ class _FavSnap:
     kids: Any = None
     shut: dict = field(default_factory=dict)
     found: dict = field(default_factory=dict)
+    #: Offline mode: what is downloaded (as _Snap.offline) - the folders
+    #: then hold only what plays; None online.
+    offline: tuple | None = None
 
 
 @dataclass
@@ -261,6 +264,7 @@ def _build_folders(snap: _FavSnap, lock: _LockTest | None = None
 
     def keep(e: mitt.Entry) -> bool:
         return (_kids_ok(snap.kids, e)
+                and (snap.offline is None or mitt.offline_keeps(e, *snap.offline))
                 and lock(e.source, mitt.SECTION_MODE.get(str(e.row.get("_section"))), e.row))
 
     loose, named = mitt.fav_folders(stores, keep, FAV_DEFAULT_GROUP)
@@ -286,6 +290,9 @@ class _Snap:
     kids: Any
     now: datetime
     favs: _FavSnap | None = None
+    #: Offline mode (mw_offline): what is downloaded - (source, kind, stream
+    #: id) and (source, series id) - and only what plays shown; None online.
+    offline: tuple | None = None
 
 
 @dataclass
@@ -392,6 +399,13 @@ def _build(snap: _Snap) -> _Data:
         (live if row.get("_live") else favs).append(e)
 
     allowed = partial(_kids_ok, kids)
+    if snap.offline is not None:
+        # Offline mode: only what plays without the network (core/mitt).
+        files, shows = snap.offline
+        plain = allowed
+
+        def allowed(e: mitt.Entry) -> bool:       # noqa: F811 - narrowed offline
+            return mitt.offline_keeps(e, files, shows) and plain(e)
     data.cont = [e for e in mitt.merged(*cont) if allowed(e)][:mitt.ROW_MAX * 3]
     data.history = [e for e in mitt.merged(*hist) if allowed(e)]
     data.new = [e for e in mitt.merged(*new) if allowed(e)]
@@ -688,7 +702,8 @@ class _MittMixin:
                      mitt.parse_order(own.value(mitt.ORDER_KEY, "")), log_titles,
                      kids_test, datetime.now(),
                      self._mitt_fav_snapshot(made_for, kids_test,
-                                             {s.pid: s.shut for s in sources}))
+                                             {s.pid: s.shut for s in sources}),
+                     self._mitt_offline())
 
     # -- the favourites' stores, for the folders ---------------------------------------
 
@@ -766,7 +781,20 @@ class _MittMixin:
         self._mitt_fgen += 1
         stamp = self._mitt_fav_stamp()
         self._mitt_fstamp_asked = stamp
-        return _FavSnap(made_for, self._mitt_fgen, stamp, copies, active, kids, shut, found)
+        return _FavSnap(made_for, self._mitt_fgen, stamp, copies, active, kids, shut, found,
+                        self._mitt_offline())
+
+    def _mitt_offline(self) -> tuple | None:
+        """Offline mode: what is downloaded, for the worker to keep only what
+        plays (None while it is off)."""
+        if not getattr(self, "_offline", lambda: False)():
+            return None
+        d = getattr(self, "downloads", None)
+        items = d.items() if d is not None else []
+        files = frozenset(i.ident for i in items)
+        shows = frozenset((i.source, i.series_id) for i in items
+                          if i.kind == "episode" and i.series_id)
+        return files, shows
 
     def _mitt_shut(self, pid: str, unlocked: bool) -> dict[str, frozenset[str]]:
         """Per mode, another source's categories locked while the lock is

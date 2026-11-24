@@ -12,7 +12,7 @@ import html
 import secrets
 import threading
 import time
-from ..core import profiles
+from ..core import offline, profiles
 from ..core.log import log
 from ..i18n import tr
 from ..providers.metadata import PosterResolver
@@ -87,7 +87,7 @@ class _TraktMixin:
         late answer), else the profile in use's."""
         if accounts is None:
             accounts = self._watch_accounts()
-        if not accounts:
+        if not accounts or offline.on():
             return
 
         def job() -> None:
@@ -104,8 +104,8 @@ class _TraktMixin:
         untold when its stream starts again after the switch went off (a
         reconnect, the same title once more)."""
         from ..core import privacy
-        if privacy.playback_private(kind, key):
-            return
+        if privacy.playback_private(kind, key) or offline.on():
+            return                      # offline mode: nothing told (core/offline.py)
         # The playback it is, for Trakt's start: its answer to the lookup
         # comes later, and private viewing turned on meanwhile made this
         # playback private.
@@ -182,6 +182,8 @@ class _TraktMixin:
             return
         active = self._trakt_active
         self._trakt_active = None
+        if offline.on():
+            return                      # offline mode: let go, never sent
         progress = self.player.progress_percent() if self.player else 0.0
         trakt = active.get("client") or self.trakt
 
@@ -198,6 +200,8 @@ class _TraktMixin:
     _WATCHED_SYNC_TTL: int = 3600
 
     def _maybe_sync_watched(self, force: bool = False) -> None:
+        if offline.on():
+            return                      # offline mode: nothing asked (core/offline.py)
         accounts = self._watch_accounts()
         # One sync per profile at a time: _watched_sync_running is the
         # profile in use's (a switch sets it from the profiles' runs), so
@@ -283,6 +287,8 @@ class _TraktMixin:
         account (of the profile the sync is for); True when at least one
         took it."""
         took = False
+        if offline.on():
+            return False
         for acc in (self._watch_accounts() if accounts is None else accounts):
             try:
                 getattr(acc, method)(*args)
@@ -675,6 +681,9 @@ class _TraktMixin:
     def _trakt_push(fn) -> None:
         """Fire a Trakt mutation on a daemon thread (killed instantly on
         quit, so a mid-flight request never crashes teardown)."""
+        if offline.on():
+            return                      # offline mode: nothing sent (core/offline.py)
+
         def job():
             try:
                 fn()

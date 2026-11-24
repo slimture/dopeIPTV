@@ -53,7 +53,11 @@ def discover_servers(
         reverse: Callable[[str], Any] = socket.gethostbyaddr) -> list[str]:
     """The directory's servers by name, from its DNS round robin: each
     address resolved back to the server it belongs to (IPv4 and IPv6 name
-    the same server once). Empty when the lookup fails."""
+    the same server once). Empty when the lookup fails - and while
+    offline mode is on, with no lookup (core/offline.py)."""
+    from ..core import offline
+    if offline.host_refusal(DNS_NAME, 443):
+        return []
     try:
         infos = resolve(DNS_NAME, 443, 0, socket.SOCK_STREAM)
     except (OSError, UnicodeError) as e:

@@ -604,6 +604,7 @@ class _SettingsMixin:
         # The notices keep a style sheet of their own: the decision card and
         # the panel of messages stayed in the old theme's colours.
         getattr(self, "_notices_restyle", lambda: None)()
+        getattr(self, "_offline_restyle", lambda: None)()    # offline mode's strip
         if getattr(self, "_tv_page", None) is not None:
             self._tv_page.restyle()  # TV mode's page (its tiles paint from P)
 
@@ -818,6 +819,7 @@ class _SettingsMixin:
         their own and don't need touching here."""
         for action, getter in getattr(self, "_i18n_actions", {}).items():
             action.setText(getter())
+        getattr(self, "_offline_retranslate", lambda: None)()   # Work offline, its strip
         nav_labels = {
             "mitt": "nav_mine", "search": "nav_search", "live": "nav_tv", "guide": "nav_guide",
             "vod": "nav_movies", "series": "nav_series",

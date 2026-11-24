@@ -25,7 +25,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QGuiApplication
 
-from ..core import build_check, report
+from ..core import build_check, offline, report
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
@@ -201,7 +201,8 @@ class _ReportMixin:
         """Ask the site for answers to the reports still asked about - off
         the window's thread, one request at a time."""
         settings = getattr(self, "settings", None)
-        if settings is None or self._answers_busy or not build_check.allowed():
+        if (settings is None or self._answers_busy or not build_check.allowed()
+                or offline.on()):
             return
         now = time.time()
         codes = report.open_codes(report.tickets(settings), now)

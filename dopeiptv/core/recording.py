@@ -164,6 +164,9 @@ NO_PRIVATE_FILE = "its address may hold a login and no private file for it could
 #: Why one stopped while less than DISK_FLOOR was left where it is written:
 #: a stream with no end and no size cap never fills the disk.
 DISK_FULL = "the disk the recordings are saved on is nearly full"
+#: Why one that came due was not started while offline mode is on
+#: (core/offline.py): its source is on the internet.
+NO_NETWORK = "no network (offline mode)"
 DISK_FLOOR = 1024 ** 3
 _LIST_PREFIX = "dopeiptv-rec-"
 
@@ -1479,6 +1482,12 @@ class RecordingManager(QObject):
         """(window's thread) A recording that asks for its address now it
         starts: asked off this thread, started when it is in
         (_address_came), given up after ADDRESS_TIMEOUT_S (tick)."""
+        from . import offline
+        if offline.on():
+            # Its address is the source's to give: not asked while offline
+            # mode is on (a box at home's is asked once offline mode ends).
+            self._offline_failed(j)
+            return
         fetch = None
         try:
             fetch = self.address_for(dict(j)) if self.address_for else None
@@ -1529,8 +1538,19 @@ class RecordingManager(QObject):
         log.info("record: %s not started - %s (%s)", for_log(j.get("title")),
                  self.NO_ADDRESS, why)
 
+    def _offline_failed(self, j: dict) -> None:
+        j.pop("_asking", None)
+        j["status"] = "failed"
+        j["error"] = NO_NETWORK
+        log.info("record: %s not started - %s", for_log(j.get("title")), NO_NETWORK)
+
     def _spawn(self, j: dict) -> None:
-        from . import nerd
+        from . import nerd, offline
+        if offline.stream_refusal(str(j.get("url") or "")):
+            # Offline mode (core/offline.py): no connection to the internet
+            # - a recording of a source there fails, saying why.
+            self._offline_failed(j)
+            return
         if nerd.blocks_stream(str(j.get("url") or ""), j.get("source_kind")):
             # Nerd's VPN guard: no VPN up, nothing streams - recordings too.
             j["status"] = "failed"

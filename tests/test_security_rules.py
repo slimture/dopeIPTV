@@ -377,3 +377,91 @@ def test_no_program_is_handed_a_proxy_or_a_secret_header_in_its_arguments():
             if rel not in HEADER_ARGUMENTS or "split_headers" not in calls:
                 found.append(f"{rel}: -headers")
     assert not found, "in a program's arguments: " + ", ".join(found)
+
+
+# -- offline mode: nothing out but where its guard lets it (core/offline.py) ------------
+
+#: What opens a connection, looks a name up or sends a packet of its own.
+WAYS_OUT = {"create_connection", "getaddrinfo", "gethostbyname", "urlopen", "build_opener",
+            "HTTPConnection", "HTTPSConnection", "sendto"}
+#: Every module with a way out of its own (beside the one adapter every
+#: request takes, core/_lazy_requests.py): the guard it asks itself, or None
+#: and why it reaches only this computer or the home network.
+OWN_WAYS_OUT = {
+    "core/conn_test.py": ("host_refusal", "Test connection: the source's host asked first"),
+    "core/dest_guard.py": ("refusal", "a redirect's target looked up only once offline mode "
+                                      "let it on; check_peer judges every connection"),
+    "core/discord_rpc.py": (None, "Discord's own socket on this computer"),
+    "core/events.py": ("refusal", "a webhook through urllib"),
+    "core/hdhr.py": (None, "server mode's answer to a discover on the home network"),
+    "core/home_net.py": (None, "a UDP socket's route asked of the system: no packet sent"),
+    "core/mqtt.py": ("host_refusal", "the broker by its name, then by where it landed"),
+    "core/nerd_check.py": ("host_refusal", "a Nerd setting tried by the person"),
+    "core/net_bridge.py": ("host_refusal", "every connection a program the app starts makes"),
+    "core/net_route.py": (None, "the connection the adapter and the bridge open - each asks "
+                                "first and judges where it landed"),
+    "core/offline.py": (None, "the guard's own look at a name the person gave"),
+    "core/remote_api.py": ("stream_refusal", "an address a device at home asks to play; its "
+                                             "own test on this computer"),
+    "core/rtsp.py": ("host_refusal", "RTSP OPTIONS to a SAT>IP server"),
+    "core/tv_input.py": (None, "lircd's socket on this computer"),
+    "providers/cast_bridge.py": (None, "this computer's address on the home network"),
+    "providers/cast_devices.py": (None, "a device at home added by its address"),
+    "providers/dlna.py": (None, "SSDP and a TV on the home network"),
+    "providers/hdhomerun.py": (None, "the tuners' broadcast on the home network"),
+    "providers/jellyfin.py": (None, "UDP 7359 discovery on the home network"),
+    "providers/lan_scan.py": (None, "Find on my network: the home network's addresses alone"),
+    "providers/mdns.py": (None, "mDNS on the home network"),
+    "providers/plex.py": (None, "GDM on the home network"),
+    "providers/radio_browser.py": ("host_refusal", "radio-browser.info's servers by DNS"),
+    "services/home_server.py": (None, "its own port on this computer (port_holder)"),
+}
+
+
+def _offline_calls(tree: ast.AST) -> set[str]:
+    return {d.split(".", 1)[1] for d, _f, _c in _calls_in(tree) if d.startswith("offline.")}
+
+
+def test_every_way_out_of_its_own_asks_offline_mode_or_stays_at_home():
+    """Rule 1, offline mode: nothing goes to the internet while it is on.
+    The one adapter every request takes asks it; any other way out of the
+    app's own is listed here - asking the guard, or at home by design."""
+    found: dict[str, set[str]] = {}
+    for rel, tree in _modules():
+        for name, _fn, _call in _calls_in(tree):
+            if name.rsplit(".", 1)[-1] in WAYS_OUT:
+                found.setdefault(rel, set()).add(name)
+    unlisted = sorted(set(found) - set(OWN_WAYS_OUT))
+    assert not unlisted, f"a way out offline mode does not know: {unlisted}"
+    trees = dict(_modules())
+    for rel, (guard, _why) in OWN_WAYS_OUT.items():
+        if guard is not None:
+            assert guard in _offline_calls(trees[rel]), f"{rel} does not ask offline.{guard}"
+
+
+def _function(rel: str, name: str) -> ast.AST:
+    tree = ast.parse((PKG / rel).read_text(encoding="utf-8"))
+    return next(n for n in ast.walk(tree)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name)
+
+
+def test_the_guard_stands_where_every_request_and_stream_passes():
+    """The adapter (every request, a route's too), the connection's own
+    check, the bridge's connections, the player's door, a recording and
+    server mode's restream each ask offline mode."""
+    def asks(rel: str, fn: str, *names: str) -> bool:
+        called = {d for d, _f, _c in _calls_in(_function(rel, fn))}
+        return all(n in called for n in names)
+    assert asks("core/_lazy_requests.py", "send", "offline.on", "offline.refusal")
+    assert asks("core/dest_guard.py", "check_peer", "offline.on", "offline.peer_refusal")
+    assert asks("core/net_bridge.py", "_open", "self._offline", "offline.peer_refusal")
+    assert asks("core/net_bridge.py", "_open_plain", "self._offline", "self._to_proxy")
+    assert asks("core/net_bridge.py", "_to_proxy", "offline.peer_refusal")
+    assert asks("core/net_bridge.py", "_tunnel", "self._to_proxy")
+    assert asks("ui/main_window.py", "_play_may_start", "self._offline_may_play")
+    assert asks("ui/mw_offline.py", "_offline_may_play", "offline.stream_refusal")
+    assert asks("core/recording.py", "_spawn", "offline.stream_refusal")
+    assert asks("core/restream.py", "watch", "offline.stream_refusal")
+    # A route's adapter is the capped one's: the same send.
+    text = (PKG / "core/net_adapter.py").read_text(encoding="utf-8")
+    assert "capped_adapter()" in text and "def send" not in text

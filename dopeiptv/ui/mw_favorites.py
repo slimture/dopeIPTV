@@ -41,6 +41,8 @@ class _FavoritesMixin:
         for a PIN at start."""
         if getattr(self, "_profile_locked", lambda: False)():
             return []
+        if getattr(self, "_offline", lambda: False)():
+            return []                   # offline mode: every channel needs the network
         store = self.favs
         locked = set() if self.parental.session_unlocked else store.locked_groups()
         seen: set[str] = set()

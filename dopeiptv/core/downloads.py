@@ -199,6 +199,10 @@ SIDECAR_FIELDS: dict[str, type | tuple[type, ...]] = {
     "genre": str, "series_id": str, "series_title": str, "series_plot": str,
     "series_category_id": str, "series_year": str, "season": (int, str),
     "episode": (int, str), "episode_title": str, "source_name": str,
+    # The category's name as the provider gives it: a kids profile's lists
+    # judge it offline (core/profiles.adult_category); without it, a title
+    # is of no category a kids profile may see (providers/downloaded.py).
+    "category_name": str, "series_category_name": str,
 }
 _URL = re.compile(r"\S+://\S*")
 
@@ -673,6 +677,108 @@ def read_sidecar(path: str) -> dict | None:
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             info[k] = v
     return info
+
+
+# -- a series' episodes, known without asking -----------------------------------------
+
+#: The most one series' list keeps, and the most its file may be.
+EPISODES_MAX = 3000
+EPISODES_FILE_MAX = 512 * 1024
+
+
+def episodes_file(folder: str, source: Any, series_id: Any) -> str:
+    """Where the episodes of a series are kept in *folder* (the app's cache):
+    named by a hash of its source and id, never by either as it came."""
+    import hashlib
+    key = f"{source}\x1f{series_id}".encode("utf-8", "replace")
+    return os.path.join(folder, hashlib.sha256(key).hexdigest()[:32] + ".json")
+
+
+def _episode_row(row: Any) -> dict | None:
+    if not isinstance(row, dict):
+        return None
+    eid = row.get("id")
+    if eid in (None, "") or isinstance(eid, bool) or not isinstance(eid, (int, str)):
+        return None
+    eid = str(eid).strip()[:200]
+    if not eid:
+        return None
+    out: dict[str, Any] = {"id": eid}
+    season = _whole(row.get("season"))
+    number = _whole(row.get("episode_num") if "episode_num" in row else row.get("episode"))
+    if season is not None:
+        out["season"] = season
+    if number is not None:
+        out["episode"] = number
+    title = _clean_text(row.get("title"), 300) if isinstance(row.get("title"), str) else ""
+    if title:
+        out["title"] = title
+    return out
+
+
+def keep_episodes(folder: str, source: Any, series_id: Any, rows: Iterable[Any]) -> bool:
+    """The episodes of a series (the lists' rows of them: id, season,
+    number, title - nothing else) kept in *folder*, for a series' page
+    offline to show those not downloaded. Never while viewing privately.
+    True once written."""
+    if privacy.private() or not str(source or "") or series_id in (None, ""):
+        return False
+    kept: list[dict] = []
+    for row in rows:
+        clean = _episode_row(row)
+        if clean is not None:
+            kept.append(clean)
+        if len(kept) >= EPISODES_MAX:
+            break
+    if not kept:
+        return False
+    data = json.dumps({"format": FORMAT, "source": str(source)[:200],
+                       "series_id": str(series_id)[:200], "episodes": kept},
+                      ensure_ascii=False).encode("utf-8")
+    if len(data) > EPISODES_FILE_MAX:
+        return False
+    path = episodes_file(folder, source, series_id)
+    try:
+        os.makedirs(folder, exist_ok=True)
+        tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.part"
+        _write_file(tmp, data)
+        os.replace(tmp, path)
+    except OSError as e:
+        log.debug("downloads: a series' episodes not kept: %s", e)
+        return False
+    return True
+
+
+def known_episodes(folder: str, source: Any, series_id: Any) -> list[dict]:
+    """The episodes kept of a series (``keep_episodes``) - [] for none, or
+    for a file that is not one this app wrote (too large, not JSON, of
+    another series). Bounded, no link followed."""
+    path = episodes_file(folder, source, series_id)
+    try:
+        fd = os.open(path, os.O_RDONLY | _nofollow())
+    except OSError:
+        return []
+    try:
+        with os.fdopen(fd, "rb") as fh:
+            raw = fh.read(EPISODES_FILE_MAX + 1)
+    except OSError:
+        return []
+    if len(raw) > EPISODES_FILE_MAX:
+        return []
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        return []
+    if not isinstance(data, dict) or data.get("source") != str(source)[:200] \
+            or data.get("series_id") != str(series_id)[:200]:
+        return []
+    eps = data.get("episodes")
+    out = []
+    for row in eps[:EPISODES_MAX] if isinstance(eps, list) else []:
+        clean = _episode_row(row)
+        if clean is not None:
+            out.append(clean)
+    return out
 
 
 # -- the manager ------------------------------------------------------------------------

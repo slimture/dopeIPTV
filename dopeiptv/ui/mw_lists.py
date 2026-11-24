@@ -113,6 +113,8 @@ class _ListsMixin:
         sync = getattr(self, "_place_tv_sync", None)
         if sync is not None:
             sync()
+        # Offline mode: TV says it needs the network (mw_offline).
+        getattr(self, "_off_note_sync", lambda: None)()
         self._update_sync_btn()
         # Its place is the one shown now (mw_places) - under a page that
         # stays over it, the place it goes back to.
@@ -136,6 +138,12 @@ class _ListsMixin:
         self._avail_gen += 1
         gen = self._avail_gen
         self._mode_avail = {}
+        if getattr(self.client, "offline", False):
+            # Offline mode: every place stays where it is - TV saying it
+            # needs the network, Movies and Series what is downloaded.
+            self._nav_avail = {}
+            self._apply_nav_visibility()
+            return
         # Start from all-visible so a mode hidden for the previous provider
         # doesn't linger while the new provider's probes are in flight (an
         # entry the person took out of the sidebar stays out: mw_place_look).

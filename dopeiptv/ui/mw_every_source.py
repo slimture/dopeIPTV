@@ -97,6 +97,8 @@ class _EverySourceMixin:
     # -- where it is ------------------------------------------------------------------
 
     def _xs_offered(self) -> bool:
+        if getattr(getattr(self, "client", None), "offline", False):
+            return False                # offline mode: no channels, no source's lists
         store = getattr(self, "playlist_store", None)
         return store is not None and es.offered(store.playlists())
 

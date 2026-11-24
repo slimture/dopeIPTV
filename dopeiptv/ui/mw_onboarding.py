@@ -231,6 +231,15 @@ class _OnboardingMixin:
         worked. One try at a time."""
         if self._wtry is not None:
             return
+        from ..core import offline
+        if offline.stream_refusal(server):
+            # Offline mode (no network, or turned on): nothing tried - said
+            # plainly at once, never a wait (mw_offline).
+            log.info("welcome: no try - offline mode is on")
+            ov = self._wizard_view()
+            if ov is not None:
+                ov.connect_failed(tr("onb_err_no_network"))
+            return
         # The name typed; else the server's host, or a playlist file's
         # name - never a login the address carries (core/names.py).
         from ..core.names import source_name

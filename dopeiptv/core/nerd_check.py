@@ -178,6 +178,9 @@ def check_proxy_listens(proxy: str, timeout: float = 4.0) -> Check:
     u = urlsplit(proxy if "://" in proxy else "http://" + proxy)
     host, port = u.hostname or "", u.port or (443 if u.scheme == "https" else 8080)
     lines = [f"TCP {host}:{port}"]
+    from . import offline
+    if offline.host_refusal(host, port):
+        return Check(FAIL, "offline_needs_network", {}, "\n".join([*lines, "offline mode"]))
     t0 = time.monotonic()
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -196,6 +199,9 @@ def check_ip_family(url: str, family: str, timeout: float = 4.0) -> Check:
     u = urlsplit(url if "://" in url else "http://" + url)
     host = u.hostname or ""
     port = u.port or (443 if u.scheme == "https" else 80)
+    from . import offline
+    if offline.host_refusal(host, port):
+        return Check(FAIL, "offline_needs_network", {}, f"{host}: offline mode")
 
     def one(fam: int) -> tuple[bool, str, str]:
         name = "IPv6" if fam == socket.AF_INET6 else "IPv4"

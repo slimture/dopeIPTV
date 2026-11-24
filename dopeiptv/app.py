@@ -792,7 +792,13 @@ def main() -> int:
     for _ in range(5):
         app.processEvents()
 
-    if not welcome:
+    # Offline mode at the start (the system says there is no network): the
+    # window shows what is downloaded, and nothing is asked of the source
+    # until the network is back (ui/mw_offline.py logs in then, as here).
+    from .core import offline
+    if not welcome and offline.on():
+        log.info("offline mode: the source is not asked at the start")
+    if not welcome and not offline.on():
         import threading
         auth_err: list = [None]
         auth_ok: list = [None]
@@ -814,6 +820,10 @@ def main() -> int:
             if e is None:
                 # Its account running out: said from this login's answer.
                 w._expiry_check(pl, auth_ok[0])
+            elif w._offline_unreached(e):
+                # No network after all (the system did not say so): offline
+                # mode, the downloads shown - never an error to click away.
+                return
             # Nerd: the source's pinned server showed another certificate.
             if e is not None:
                 from .ui.cert_trust import offer_review

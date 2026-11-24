@@ -36,6 +36,8 @@ dopeiptv/
   providers/           Data sources (the network / provider edge)
     __init__.py        The providers layer (no code)
     client.py          XtreamClient, OfflineClient/M3UClient
+    downloaded.py      DownloadedClient - a source's lists as offline mode shows
+                       them: its downloads from their sidecars, nothing asked
     demo.py            DemoClient - the demo: its channels, guide made here,
                        the Blender Foundation's films, logos and posters drawn
     demo_streams.py    The demo's streams in one table (tools/check_demo.py)
@@ -136,6 +138,9 @@ dopeiptv/
                        address), Range to carry on, an HLS film through the
                        bridge into MP4, the files and their sidecars, the
                        space; as_row for offline mode
+    offline.py         Offline mode: off / by hand / by itself, the system's
+                       word settled, the guard every request, connection and
+                       stream asks (only this computer and the home network)
     series_rules.py    Series recordings: rules, airings found, the plan, padding;
                        a rule that reminds instead, its reminders' plan
     series_plan.py     From the guide to the recorder's jobs: the look through
@@ -450,6 +455,9 @@ dopeiptv/
                        Downloaded pill, the detail column's row, a download
                        played as its own title, the Downloaded place
     downloads_place.py The Downloaded place itself, dressed as it paints
+    mw_offline.py      Offline mode in the window: Qt's network information,
+                       Work offline, the strip, the lists as the downloads,
+                       going offline and coming back
     mw_series.py       Series recordings: "Record series…", the rules' check
     autotimer_ui.py    A box's AutoTimer in the window: the rule editor, the
                        preview, the box's rules beside the app's

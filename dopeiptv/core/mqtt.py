@@ -159,7 +159,21 @@ class Client:
         """Connect and log in; returns how long it took (seconds). Raises
         OSError (no broker, TLS), MqttRefused or MqttError."""
         t0 = time.monotonic()
+        # Offline mode: a broker at home, never one on the internet
+        # (core/offline.py) - by its name, then by where it landed.
+        from . import offline
+        gone = offline.host_refusal(self.host, self.port)
+        if gone:
+            offline.note_refused(self.host, "MQTT")
+            raise OSError(f"offline mode: {gone}")
         sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        try:
+            gone = offline.peer_refusal(str(sock.getpeername()[0])) if offline.on() else ""
+        except OSError:
+            gone = offline.INTERNET
+        if gone:
+            sock.close()
+            raise OSError(f"offline mode: {gone}")
         try:
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             if self.tls:

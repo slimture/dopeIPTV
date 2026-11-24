@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QVBoxLayout,
 )
 
-from ..core import privacy
+from ..core import offline, privacy
 from ..core.log import log
 from ..core.workers import run_async
 from ..core.xdg import open_url
@@ -80,6 +80,8 @@ class _SimklMixin:
         self._simkl_send("scrobble_start", payload, 0.0)
 
     def _simkl_send(self, method: str, payload: dict, progress: float) -> None:
+        if offline.on():
+            return                      # offline mode: nothing sent (core/offline.py)
         simkl = self.simkl
 
         def job() -> None:

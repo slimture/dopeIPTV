@@ -1105,9 +1105,10 @@ class _TvMixin:
         if not url:
             return
         self._current_key = self._item_key(it)
-        self._start_playback(url, it.get("name") or it.get("title") or "dopeIPTV",
-                             it.get("stream_icon") or it.get("cover"),
-                             self._item_key(it), "movie", item=it)
+        # A downloaded film plays its file, as this film (mw_downloads).
+        start = getattr(self, "_dl_start", self._start_playback)
+        start(url, it.get("name") or it.get("title") or "dopeIPTV",
+              it.get("stream_icon") or it.get("cover"), self._item_key(it), "movie", item=it)
 
     def _tv_play_continue(self, it: dict) -> None:
         if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
@@ -1131,9 +1132,9 @@ class _TvMixin:
         try:
             self._ep_queue_override = list(queue)
             self._ep_index_override = next((i for i, e in enumerate(queue) if e is ep), -1)
-            self._start_playback(url, ep.get("name") or ep.get("title") or "dopeIPTV",
-                                 ep.get("stream_icon"), self._item_key(ep), "episode",
-                                 item=ep)
+            start = getattr(self, "_dl_start", self._start_playback)
+            start(url, ep.get("name") or ep.get("title") or "dopeIPTV",
+                  ep.get("stream_icon"), self._item_key(ep), "episode", item=ep)
         finally:
             self.series_ctx = saved
             # Taken by _start_playback, unless it turned back: never left

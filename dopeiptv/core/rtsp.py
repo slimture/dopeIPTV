@@ -43,6 +43,9 @@ def options(host: str, port: int = PORT, timeout: float = 2.0,
     ask = (f"OPTIONS rtsp://{h}:{port}/ RTSP/1.0\r\nCSeq: 1\r\n"
            f"User-Agent: {user_agent}\r\n\r\n").encode()
     data = b""
+    from . import offline
+    if offline.host_refusal(host, port):
+        return None                     # offline mode: one on the internet is not asked
     try:
         with socket.create_connection((host, port), timeout=timeout) as s:
             s.settimeout(timeout)

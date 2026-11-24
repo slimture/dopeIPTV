@@ -54,7 +54,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMenu, QPushButton, QWidget
 
-from ..core import connections, picture_files, places, privacy
+from ..core import connections, offline, picture_files, places, privacy
 from ..core import downloads as dl
 from ..core.connections import Use
 from ..core.log import log
@@ -91,7 +91,7 @@ WHY_KEYS = {dl.WHY_SOURCE: "dl_why_source", dl.WHY_ADDRESS: "dl_why_address",
             dl.WHY_OTHER: "dl_why_other"}
 #: How a waiting job's hold is said.
 HOLD_KEYS = {"connection": "dl_state_wait_conn", "private": "dl_state_wait_private",
-             "starting": "dl_state_waiting"}
+             "starting": "dl_state_waiting", "offline": "dl_state_wait_offline"}
 
 
 def left_text(secs: float) -> str:
@@ -258,6 +258,8 @@ class _DownloadsMixin:
         limit full or not known - most accounts allow one connection."""
         if privacy.private():
             return "private"
+        if offline.on():
+            return "offline"            # offline mode: it waits for the network
         if time.monotonic() - self._dl_born < START_GRACE_S:
             return "starting"
         if job.go_ahead:
@@ -506,6 +508,10 @@ class _DownloadsMixin:
                 self._dl_render_running()
         if files:
             self._dl_pills_changed()
+            # Offline mode's lists are the downloads: read again.
+            again = getattr(self, "_offline_downloads_changed", None)
+            if callable(again):
+                again()
         running = any(j.state == dl.RUNNING for j in jobs)
         if files or listed or running:
             shown = self._dl_detail_of
@@ -621,7 +627,8 @@ class _DownloadsMixin:
                         or "")
             meta.update(year=fv.year_of(row), plot=fv.plot_of(row),
                         length=fv.minutes_of(row) * 60 or None, rating=fv.rating_of(row),
-                        category_id=row.get("category_id"), genre=row.get("genre"))
+                        category_id=row.get("category_id"), genre=row.get("genre"),
+                        category_name=self._dl_category_name("vod", row.get("category_id")))
             try:
                 poster = str(self.cover.cover_url(row, "vod") or "")
             except Exception:
@@ -638,7 +645,8 @@ class _DownloadsMixin:
                     series_year=sv.year_of(s.get("releaseDate"), s.get("year")),
                     season=season, episode=number, episode_title=ep_title,
                     plot=sv.plot_of(row), length=secs or None,
-                    category_id=s.get("category_id"))
+                    category_id=s.get("category_id"),
+                    series_category_name=self._dl_category_name("series", s.get("category_id")))
         se = tr("sp_se", s=season, e=number) if season is not None and number is not None else ""
         title = " · ".join(x for x in (stitle, se, ep_title) if x) or str(row.get("name") or "")
         try:
@@ -647,6 +655,27 @@ class _DownloadsMixin:
             series_poster = ""
         series_poster = series_poster or str(s.get("cover") or s.get("stream_icon") or "")
         return meta, title, sv.still_of(row), series_poster
+
+    def _dl_category_name(self, mode: str, cid: Any) -> str:
+        """The provider's own name of the category *cid* of *mode* ("vod",
+        "series"), as the window or its client holds it - never a request;
+        "" when not known (a kids profile then does not see the download
+        offline: providers/downloaded.py)."""
+        if cid in (None, ""):
+            return ""
+        cats = getattr(self, "_raw_categories", None) if getattr(self, "mode", "") == mode else None
+        if not cats:
+            held = getattr(getattr(self, "client", None), "held", None)
+            key = {"vod": ("get_vod_categories",), "series": ("get_series_categories",)}.get(mode)
+            try:
+                from ..providers.client import list_rows
+                cats = list_rows(held(key)) if callable(held) and key else None
+            except Exception:
+                cats = None
+        for c in cats or []:
+            if isinstance(c, dict) and str(c.get("category_id")) == str(cid):
+                return str(c.get("category_name") or "")
+        return ""
 
     def _dl_title(self, kind: str, row: dict, series: dict | None = None) -> None:
         """One film or episode into the downloads."""
@@ -681,6 +710,11 @@ class _DownloadsMixin:
                 self._show_toast(tr("profile_kids_not_here"), 4000)
             return []
         self._dl_ask_room(made)
+        if kind == "episode":
+            # The series' episodes kept for its page offline (mw_offline).
+            keep = getattr(self, "_offline_keep_page_episodes", None)
+            if callable(keep):
+                keep(series)
         self._dl_tick()                 # the beat back to every second
         if len(made) == 1:
             self._show_toast(tr("dl_queued", title=made[0].title), 3000)
@@ -853,6 +887,10 @@ class _DownloadsMixin:
         record = given.pop("record", True)
         given["record"] = False
         log.info("play: %s from its download", for_log(title))
+        if not connections.is_network(url):
+            # Offline mode's lists hand out the file's path (providers/
+            # downloaded.py): History keeps the source's address, never it.
+            url = self._dl_address_now(kind, item) if isinstance(item, dict) else ""
         self._start_playback(hit.path, title, icon_url, key, kind, **given)
         lp = getattr(self, "_last_playback", None) or {}
         if record and url and lp.get("url") == hit.path \
@@ -864,6 +902,14 @@ class _DownloadsMixin:
         """The source's address of a title when the client has it at once
         (History keeps it); "" for one that would wait on the network."""
         client = self.client
+        if getattr(client, "offline", False):
+            # Offline mode: the source's own client, held aside, makes it -
+            # an Xtream address is words alone; one that would ask the
+            # network is "" (_link_waits), and nothing is sent.
+            held = getattr(self, "_off_held", None)
+            if held is None:
+                return ""
+            self.client = held
 
         def plan() -> str:
             if kind == "movie":
@@ -872,7 +918,8 @@ class _DownloadsMixin:
         try:
             if self._link_waits(plan) is not None:
                 return ""
-            return str(plan() or "")
+            got = str(plan() or "")
+            return got if connections.is_network(got) else ""
         except Exception:
             return ""
         finally:
@@ -951,7 +998,10 @@ class _DownloadsMixin:
         hit = self._dl_find(kind, row)
         job = None if hit is not None else self._dl_job_for(kind, row)
         if hit is not None:
-            self.d_dl_label.setText(tr("dl_downloaded_size", size=size_text(hit.size)))
+            text = tr("dl_downloaded_size", size=size_text(hit.size))
+            if offline.on():
+                text = f"{tr('offline_mark')} · {text}"     # offline mode: said by it
+            self.d_dl_label.setText(text)
             self.d_dl_btn.setText(tr("dl_delete"))
         elif job is not None:
             self.d_dl_label.setText(self._dl_state_text(job))

@@ -17,7 +17,7 @@ from typing import Any
 
 from PyQt6.QtCore import QObject
 
-from ..core import discord_rpc, privacy
+from ..core import discord_rpc, offline, privacy
 from ..core.log import log
 from ..i18n import tr
 
@@ -57,7 +57,9 @@ class _DiscordMixin:
         try:
             if privacy.private():
                 self._discord_now = None
-            if not self._discord_on():
+            if not self._discord_on() or offline.on():
+                # Offline mode too: Discord sends what it is told on to
+                # its servers (core/offline.py).
                 if self._discord is not None:
                     self._discord.show(None)
                 return

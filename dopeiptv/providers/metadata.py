@@ -15,7 +15,7 @@ from ..core._lazy_requests import requests
 from PyQt6.QtCore import QObject, QSettings, QThreadPool, QTimer
 
 
-from ..core import privacy
+from ..core import offline, privacy
 from ..core.log import log
 from ..core.workers import run_async
 
@@ -741,7 +741,7 @@ class PosterResolver(QObject):
             # Asked again on the worker, just before the request: a title
             # that began to play privately while this one waited in the
             # pool is not sent (privacy.title_private).
-            if privacy.title_private(raw):
+            if privacy.title_private(raw) or offline.on():
                 return _PRIVATE
             return self.client.fetch_details(t, k, y)
 
@@ -864,7 +864,7 @@ class PosterResolver(QObject):
         tid = entry.get("tmdb_id") if isinstance(entry, dict) else None
         if (not isinstance(entry, dict) or not isinstance(tid, int)
                 or "backdrop_url" in entry or key in self._backdrop_asked
-                or privacy.title_private(title)):
+                or privacy.title_private(title) or offline.on()):
             return False
         self._backdrop_asked.add(key)
         # Bound after the test: a default is typed where it is written.
@@ -936,7 +936,7 @@ class PosterResolver(QObject):
             return True
         key = self._key(title, kind)
         return (key in self._cache or key in self._failed
-                or privacy.title_private(title))
+                or privacy.title_private(title) or offline.on())
 
     def get_full(self, title: str, kind: str,
                  callback: Callable[[dict], None]) -> dict | None:
@@ -949,9 +949,10 @@ class PosterResolver(QObject):
             return self._cache[key]
         if key in self._failed:
             return {}
-        if privacy.title_private(title):
+        if privacy.title_private(title) or offline.on():
             # What plays privately: TMDB is not asked about it (what it
-            # answered before is above). No match, for now.
+            # answered before is above). No match, for now. Nor anything
+            # while offline mode is on (core/offline.py).
             return {}
         self._waiting.setdefault(key, []).append(callback)
         self._ensure_fetch(title, kind, key)
@@ -966,6 +967,8 @@ class PosterResolver(QObject):
         key = str(person_id)
         if key in self._person_cache:
             return self._person_cache[key]
+        if offline.on():
+            return None
         self._person_waiting.setdefault(key, []).append(callback)
         if key in self._person_pending:
             return None

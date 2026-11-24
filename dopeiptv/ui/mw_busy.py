@@ -164,6 +164,8 @@ class _BusyMixin:
             return
         held = self._notices_held()
         self.notices.hold(held)
+        # Offline mode's strip is held as they are (mw_offline).
+        getattr(self, "_off_strip_sync", lambda: None)()
         line, floater = self._activity_line, self._activity_float
         float_card = self._decision_float
         rail = bool(getattr(self, "_sidebar_collapsed", False))

@@ -18,7 +18,7 @@ from dopeiptv.ui import app_menu
 
 #: Every entry the window makes (main_window's _menu_actions).
 NAMES = ("about", "settings", "open_video", "open_address", "refresh", "reminders", "calendar",
-         "multiview", "cast", "together", "phone", "tv_mode", "teletext", "private", "clear",
+         "offline", "multiview", "cast", "together", "phone", "tv_mode", "teletext", "private", "clear",
          "stats", "feedback", "answers", "report_wait", "website", "donate", "quit")
 TITLES = [tr("menu_file"), tr("menu_view"), tr("nav_history"), tr("menu_help")]
 ROLE = QAction.MenuRole
@@ -46,7 +46,7 @@ def test_four_menus_with_settings_and_quit_in_file_and_about_last_in_help(monkey
     assert [a.text() for a in bar.actions()] == TITLES
     assert [menus[k].menuAction() for k in ("file", "view", "history", "help")] == bar.actions()
     assert _seq(menus["file"]) == ["open_video", "open_address", "refresh", "reminders", "calendar",
-                                   "|", "settings", "|", "quit"]
+                                   "|", "offline", "|", "settings", "|", "quit"]
     assert _seq(menus["view"]) == ["tv_mode", "teletext", "multiview", "cast", "together", "phone"]
     assert _seq(menus["history"]) == ["stats", "private", "clear"]
     assert _seq(menus["help"]) == ["feedback", "answers", "report_wait", "website",
@@ -67,7 +67,7 @@ def test_a_missing_entry_leaves_no_stray_separator_or_empty_menu(monkeypatch):
     assert [a.text() for a in bar.actions()] == [tr("menu_file"), tr("menu_view"), tr("menu_help")]
     assert "history" not in menus
     assert _seq(menus["file"]) == ["open_video", "open_address", "refresh", "reminders", "calendar",
-                                   "|", "quit"]
+                                   "|", "offline", "|", "quit"]
     assert _seq(menus["help"]) == ["feedback", "answers", "report_wait", "website", "|", "about"]
 
 
@@ -96,7 +96,8 @@ def test_on_a_mac_the_roles_keep_it_as_it_was(monkeypatch):
 
     def stays(menu):
         return [a.text() for a in menu.actions() if a.menuRole() not in MOVED]
-    assert stays(menus["file"]) == ["open_video", "open_address", "refresh", "reminders", "calendar"]
+    assert stays(menus["file"]) == ["open_video", "open_address", "refresh", "reminders", "calendar",
+                                    "", "offline"]
     assert stays(menus["view"]) == ["tv_mode", "teletext", "multiview", "cast", "together", "phone"]
     assert stays(menus["history"]) == ["stats", "private", "clear"]
     assert stays(menus["help"]) == ["feedback", "answers", "report_wait", "website"]

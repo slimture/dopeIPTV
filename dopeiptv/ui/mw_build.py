@@ -67,6 +67,8 @@ class _BuildMixin(_BuildDetailMixin):
         self._teletext_action = teletext_action
         calendar_action = action(tr("cal_menu"), self.open_calendar_export)
         private_action, clear_action = self._build_privacy_actions()
+        # Work offline (mw_offline): checked while offline mode is on.
+        offline_action = self._build_offline_action()
         self._donate_action = action(tr("donate_support") + "…", lambda: self.open_donate("app-menu"))
         report_actions = self._build_report_actions()
         self._feedback_action = report_actions["feedback"]
@@ -81,6 +83,7 @@ class _BuildMixin(_BuildDetailMixin):
             "about": about_action, "settings": settings_action,
             "open_video": open_video_action, "open_address": open_address_action,
             "refresh": refresh_action, "reminders": reminders_action, "calendar": calendar_action,
+            "offline": offline_action,
             "multiview": multiview_action, "cast": cast_action,
             "together": together_action, "phone": phone_action,
             "activity": activity_action,
@@ -474,6 +477,9 @@ class _BuildMixin(_BuildDetailMixin):
         _mid_l = QVBoxLayout(mid)
         _mid_l.setContentsMargins(0, 0, 0, 0)
         _mid_l.setSpacing(0)
+        # Offline mode's strip over the pane's pages (mw_offline): shown
+        # only while it is on.
+        self._build_offline_strip(_mid_l)
         self._mid_stack = QStackedWidget()
         _mid_l.addWidget(self._mid_stack)
         self._list_page = QWidget(objectName="ListPage")

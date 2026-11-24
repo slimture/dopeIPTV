@@ -427,7 +427,10 @@ class _PlaceSeriesMixin:
                     place.grid.layout_kind)
         place.filter.setPlaceholderText(self.search.placeholderText()
                                         or tr("list_filter_placeholder"))
-        place.set_note(str(self._busy_main) if busy and not n else "")
+        note = str(self._busy_main) if busy and not n else ""
+        if not n and not busy and getattr(self, "_offline", lambda: False)():
+            note = tr("offline_none")   # offline mode: nothing downloaded of this source
+        place.set_note(note)
 
     def _place_series_sorts(self) -> list[tuple[str, str]]:
         """The sort menu: what every category follows, named with the order

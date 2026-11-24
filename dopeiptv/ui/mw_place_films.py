@@ -505,7 +505,10 @@ class _PlaceFilmsMixin:
         n = self._pf_view.model_.rowCount() if self._pf_view is not None else 0
         box = self.sort_box
         # The count alone: the sort's button names the order.
-        h.set_count(tr("count_movies", n=n) if n else "")
+        if not n and getattr(self, "_offline", lambda: False)():
+            h.set_count(tr("offline_none"))     # offline mode: none of this source's
+        else:
+            h.set_count(tr("count_movies", n=n) if n else "")
         opts = [(str(box.itemData(i)), box.itemText(i)) for i in range(box.count())]
         # The menu made again only when its words changed: an order picked
         # in it refills the list, and with it this header.

@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 from PyQt6.QtCore import QThreadPool
 
-from ..core import drawn_art, picture_files
+from ..core import drawn_art, offline, picture_files
 from ..core.log import log
 from ..core.workers import choose_cover_url, is_tmdb_image_url
 from ..providers.metadata import PosterResolver, TmdbClient, bundled_tmdb_key
@@ -118,7 +118,7 @@ class CoverArtService:
     # -- artwork decisions ---------------------------------------------------
 
     def poster_for(self, it: dict, kind: str) -> str | None:
-        if not self.resolver or kind not in ("vod", "series"):
+        if not self.resolver or kind not in ("vod", "series") or offline.on():
             return None
         # Episodes carry the show's name in "_series_title" (stamped when the
         # series is opened), so they resolve the series' TMDB poster instead of
@@ -138,7 +138,7 @@ class CoverArtService:
         it's safe to load the provider fallback cover: while TMDB is
         mid-fetch, painting the fallback would just be a wasted network
         round-trip that gets replaced 150 ms later when TMDB resolves."""
-        if not self.resolver or kind not in ("vod", "series"):
+        if not self.resolver or kind not in ("vod", "series") or offline.on():
             return True
         title = it.get("_series_title") or it.get("name") or it.get("title") \
             or ""
@@ -202,6 +202,11 @@ class CoverArtService:
         candidate and let the provider image (or its embedded-TMDB
         rewrite) win."""
         eff = self._cover_kind(it, kind)
+        if offline.on():
+            # Offline mode: the row's own picture - a download's poster
+            # beside its file - and nothing asked of TMDB (core/offline.py).
+            return choose_cover_url(None, self._provider_cover(it), eff,
+                                    self._logos.is_dead, rewrite=False)
         # A Trakt-only row already carries a real TMDB poster URL as its
         # stream_icon, so skip the title search (it would be a wasted
         # round-trip that could even mismatch) and use that directly.

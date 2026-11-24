@@ -211,6 +211,9 @@ class EpisodeState:
     progress: sv.Progress = field(default_factory=sv.Progress)
     new: bool = False
     downloaded: bool = False
+    #: Offline mode: an episode the app knows of without its file - dimmed,
+    #: "Not downloaded", never played (providers/downloaded.py).
+    missing: bool = False
 
 
 # -- the episodes --------------------------------------------------------------------
@@ -343,6 +346,11 @@ class EpisodeDelegate(QStyledItemDelegate):
             p.drawRoundedRect(rail, 1.5, 1.5)
         self._paint_still(p, ep, still, state, playing, rtl)
         self._paint_text(p, ep, text, state, playing, nxt, rtl)
+        if state.missing:
+            # Not downloaded (offline mode): the card dimmed, as one not there.
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(_c("bg", 0.55))
+            p.drawRoundedRect(QRectF(card), radius, radius)
         p.restore()
 
     def _paint_still(self, p: QPainter, ep: dict, r: QRect, state: EpisodeState,
@@ -500,6 +508,8 @@ class EpisodeDelegate(QStyledItemDelegate):
     @staticmethod
     def _meta(ep: dict, state: EpisodeState) -> str:
         parts = []
+        if state.missing:
+            parts.append(tr("offline_not_downloaded"))
         mins = sv.minutes_of(ep)
         if mins:
             parts.append(minutes_text(mins))

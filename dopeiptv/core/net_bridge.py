@@ -117,6 +117,11 @@ and nothing else: no lookup, no connection. ffmpeg (and so mpv) sends a
 proxy's login only once the proxy has asked for it, so each of its
 connections is asked once - a round trip on this computer - before it goes
 through.
+
+While offline mode is on (core/offline.py) no connection the bridge opens
+reaches the internet - the stream's own server, a segment, a redirect's
+hop, the person's proxy: judged as written and again by the socket's peer
+before a byte is sent (``_offline``, ``_to_proxy``), a refusal a 502.
 """
 
 from __future__ import annotations
@@ -135,7 +140,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote, unquote, urlsplit
 
-from . import cert_pin, dest_guard, doh, net_route, player_exec, stream_address
+from . import cert_pin, dest_guard, doh, net_route, offline, player_exec, stream_address
 from .log import log
 from .net_route import Route
 
@@ -912,7 +917,8 @@ class Bridge:
         policy lets it land: judged as written, then by the socket's peer
         before a byte is sent (Guarded otherwise) - or, through the person's
         proxy, a tunnel it opens there."""
-        why = self.policy.written(host, port) or self._proxied(host, port)
+        why = (self._offline(host, port) or self.policy.written(host, port)
+               or self._proxied(host, port))
         if why:
             raise Guarded(host, port, why, self.policy.internet)
         if self._up is not None:
@@ -920,7 +926,7 @@ class Bridge:
         sock = net_route.open_connection(self.route, host, port, CONNECT_TIMEOUT)
         try:
             peer = str(sock.getpeername()[0])
-            why = self.policy.landed(host, port, peer)
+            why = offline.peer_refusal(peer) or self.policy.landed(host, port, peer)
         except OSError as e:
             sock.close()
             raise Refused(f"no peer to judge ({e})") from e
@@ -935,10 +941,36 @@ class Bridge:
         absolute form, ``_via``)."""
         if self._up is None:
             return self._open(host, port), False
-        why = self.policy.written(host, port) or self._proxied(host, port)
+        why = (self._offline(host, port) or self.policy.written(host, port)
+               or self._proxied(host, port))
         if why:
             raise Guarded(host, port, why, self.policy.internet)
-        return socket.create_connection((self._up.host, self._up.port), CONNECT_TIMEOUT), True
+        return self._to_proxy(self._up), True
+
+    def _offline(self, host: str, port: int) -> str:
+        """Why *host*:*port* - and the person's proxy, through which it
+        would go - is not to be connected to while offline mode is on
+        (core/offline.py): one on the internet. Said once per host."""
+        why = offline.host_refusal(host, port)
+        if not why and self._up is not None:
+            why = offline.host_refusal(self._up.host, self._up.port)
+        if why:
+            offline.note_refused(host, "a stream's connection")
+        return why
+
+    @staticmethod
+    def _to_proxy(up: Upstream) -> socket.socket:
+        """A connection to the person's proxy - never one on the internet
+        while offline mode is on (its peer judged before a byte is sent)."""
+        sock = socket.create_connection((up.host, up.port), CONNECT_TIMEOUT)
+        try:
+            gone = offline.peer_refusal(str(sock.getpeername()[0])) if offline.on() else ""
+        except OSError:
+            gone = offline.INTERNET
+        if gone:
+            sock.close()
+            raise Guarded(up.host, up.port, gone, True)
+        return sock
 
     def _proxied(self, host: str, port: int) -> str:
         """Why *host*:*port* is not to be asked of the person's proxy, by
@@ -973,7 +1005,7 @@ class Bridge:
         up = self._up
         if up is None:
             raise Refused("no proxy to go through")
-        sock = socket.create_connection((up.host, up.port), CONNECT_TIMEOUT)
+        sock = self._to_proxy(up)
         name = host if host.isascii() else host.encode("idna").decode("ascii")
         target = f"{_shown(name)}:{port}"
         try:
