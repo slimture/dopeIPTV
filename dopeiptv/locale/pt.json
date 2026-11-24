@@ -3299,5 +3299,6 @@
   "dl_why_refused": "ele levava a um lugar de onde o app não baixa",
   "dl_why_other": "algo deu errado",
   "notice_hist_copy_list": "Copiar lista",
-  "notice_hist_copy_tip": "Copia o que a lista mostra agora, como texto, sem seus dados de login. Clique com o botão direito em uma linha para copiar só ela."
+  "notice_hist_copy_tip": "Copia o que a lista mostra agora, como texto, sem seus dados de login. Clique com o botão direito em uma linha para copiar só ela.",
+  "conn_k_server": "um dispositivo assistindo pelo modo servidor"
 }

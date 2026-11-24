@@ -2731,6 +2731,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "pill_downloaded": {"en": "Downloaded"},
     "set_card_downloads": {"en": "Downloads"},
     "conn_k_download": {"en": "a download"},
+    "conn_k_server": {"en": "a device watching through server mode"},
     "dl_download": {"en": "Download"},
     "dl_season": {"en": "Download this season"},
     "dl_all_episodes": {"en": "Download all episodes"},

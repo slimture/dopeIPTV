@@ -293,3 +293,98 @@ def test_without_a_window_to_ask_it_opens_as_before(app, tmp_path):
     rec.may_open = None
     _start_now(rec, _due(rec, "Film", A8, 8))
     assert spawned == ["Film"]
+
+
+# -- server mode in the window: a device watching is never cut off --------------------------
+
+class Restream:
+    """Server mode's channels on a (the restream as the window asks it): each
+    one's stream id and how many devices watch it; *limit* the account's."""
+
+    def __init__(self, limit, channels):
+        self.limit = limit
+        self.channels = [{"sid": sid, "viewers": n} for sid, n in channels]
+        self.idle_only: list[bool] = []
+        self.sessions: dict = {}
+
+    def in_use(self, source=None):
+        return len(self.channels) if source in (None, "a") else 0
+
+    def make_room(self, source, own, keep=None, idle_only=False):
+        self.idle_only.append(idle_only)
+        over = own + len(self.channels) - self.limit
+        gone = 0
+        for ch in sorted(self.channels, key=lambda c: c["viewers"]):
+            if over <= 0:
+                break
+            if idle_only and ch["viewers"]:
+                continue
+            self.channels.remove(ch)
+            over -= 1
+            gone += 1
+        return gone
+
+    def session_of(self, source, stream):
+        return self.sessions.get((source, stream))
+
+    def watched(self):
+        return sorted(ch["sid"] for ch in self.channels)
+
+
+def _with_server(tmp_path, limit, channels):
+    from dopeiptv.ui.mw_server import _ServerMixin
+
+    class Served(Window, _ServerMixin):
+        pass
+
+    w, rec, spawned = _setup(tmp_path)
+    w.__class__ = Served
+    w._home = SimpleNamespace(restream=Restream(limit, channels))
+    w.client.max_connections = limit
+    return w, rec, spawned
+
+
+def test_room_made_from_a_channel_nobody_watches_never_from_one_a_device_watches(app, tmp_path):
+    w, rec, spawned = _with_server(tmp_path, 2, [("9", 1), ("10", 0)])
+    _start_now(rec, _due(rec, "Film", A8, 8))
+    assert spawned == ["Film"] and not w.toasts
+    assert w._home.restream.watched() == ["9"], "the idle channel let go, the watched kept"
+    assert all(w._home.restream.idle_only)
+
+
+def test_a_full_account_with_a_device_watching_holds_the_recording_until_it_stops(app, tmp_path):
+    w, rec, spawned = _with_server(tmp_path, 1, [("9", 1)])
+    job = _due(rec, "Film", A8, 8)
+    _start_now(rec, job)
+    assert not spawned and job["_held"] and len(w.toasts) == 1
+    assert w._home.restream.watched() == ["9"], "the device goes on watching"
+    w._rec_go_ahead(job["id"])                      # Record anyway: asked, with the device named
+    assert tr("conn_k_server") in w.asked[-1]
+    w.asked.clear()
+    w._home.restream.channels[0]["viewers"] = 0     # the device stopped
+    w.answer = 1
+    rec.tick()
+    assert spawned == ["Film"] and not w.asked
+    assert w._home.restream.watched() == []
+
+
+def test_record_anyway_and_the_recorders_last_step_never_cut_off_a_device(app, tmp_path):
+    w, rec, spawned = _with_server(tmp_path, 1, [("9", 1)])
+    job = _due(rec, "Film", A8, 8)
+    _start_now(rec, job)
+    w.answer = 0                                    # Go ahead anyway
+    w._rec_go_ahead(job["id"])
+    assert spawned == ["Film"]
+    w._server_rec_room(job)                         # what the recorder asks before its spawn
+    assert w._home.restream.watched() == ["9"] and w._home.restream.idle_only[-1] is True
+
+
+def test_its_channel_streamed_to_a_device_is_recorded_from_that_buffer(app, tmp_path):
+    w, rec, spawned = _with_server(tmp_path, 1, [("8", 1)])
+    buf = Buffer(A8)
+    w._home.restream.sessions[("a", "8")] = buf
+    job = _due(rec, "Film", A8, 8)
+    _start_now(rec, job)
+    assert not spawned and job["status"] == "recording" and job.get("background")
+    assert job["recorder"] is not None and buf.asked and buf.asked[0][0] == job["path"]
+    assert w._home.restream.watched() == ["8"] and not w.toasts

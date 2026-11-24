@@ -40,6 +40,7 @@ from PyQt6.QtCore import QTimer
 
 from ..core import connections
 from ..core.log import log
+from ..core.privacy import for_log
 from ..core.restream import channel_key
 from ..i18n import tr
 from .mw_remote import _Bridge
@@ -464,10 +465,12 @@ class _ServerMixin:
         self._server_make_room(self._conn_uses(free_player=True), src)
         return None
 
-    def _server_make_room(self, uses: list | None = None, source: str | None = None) -> None:
+    def _server_make_room(self, uses: list | None = None, source: str | None = None,
+                          idle_only: bool = False) -> None:
         """One connection of the app's own is about to open to *source*
         (the active source when None), next to *uses* (as they are now when
-        None): the server lets go of what leaves no room for it."""
+        None): the server lets go of what leaves no room for it. *idle_only*:
+        only channels nobody watches (a scheduled recording's)."""
         srv = self._home
         if srv is None:
             return
@@ -475,14 +478,62 @@ class _ServerMixin:
             src = self._conn_source() if source is None else source
             listed, key = self._conn_by_account(self._conn_uses() if uses is None else uses, src)
             own = connections.own_count(listed, key) + self._conn_ledger().others(key) + 1
-            gone = srv.restream.make_room(src, own)
+            gone = srv.restream.make_room(src, own, idle_only=idle_only)
             if gone:
-                log.info("server: %d channel(s) let go for the app's own viewing", gone)
+                log.info("server: %d channel(s) let go for the app's own %s", gone,
+                         "recording" if idle_only else "viewing")
         except Exception as e:      # never in the way of the person's own viewing
             log.debug("server: no room made: %s", e)
 
     def _server_rec_room(self, job: dict) -> None:
-        self._server_make_room(None, str(job.get("source") or "") or None)
+        """A scheduled recording about to open its own connection (the
+        recorder's before_spawn): the server lets go of the channels nobody
+        watches that leave no room for it - never one a device watches. Such
+        a recording waited for room instead (_rec_held_why counts what
+        devices watch, _server_watched_uses), as dopeiptv --server's own
+        recorder does."""
+        self._server_make_room(None, str(job.get("source") or "") or None, idle_only=True)
+
+    def _server_watched_uses(self, uses: list, source: str) -> list:
+        """What the server holds to *source*'s account as connections a
+        scheduled recording must count as taken - after the channels nobody
+        watches that leave no room are let go: one Use per channel left
+        (every one a device watches, or one within the limit)."""
+        if self._home is None:
+            return []
+        self._server_make_room(list(uses), source, idle_only=True)
+        n = self._conn_served(source)
+        return [connections.Use("server", source)] * max(0, int(n))
+
+    def _rec_ride_server(self, j: dict) -> bool:
+        """Scheduled recording *j*, due now, recorded from the buffer the
+        server streams its channel from to a device - no connection of its
+        own (as dopeiptv --server's recorder rides it). True when it does."""
+        srv = self._home
+        if srv is None:
+            return False
+        from ..core.recording import RecordingManager
+        pid = str(j.get("source") or "")
+        sid = j.get("stream_key") or (j.get(RecordingManager.LATER) or {}).get("stream_id")
+        if not pid or sid in (None, ""):
+            return False
+        s = srv.restream.session_of(pid, str(sid))
+        if s is None or not getattr(s, "streaming", False):
+            return False
+        try:
+            path = self.rec.build_path(str(j.get("title") or ""), str(j.get("folder") or ""),
+                                       str(j.get("channel") or ""))
+            span = s.span()
+            lead = float(getattr(s, "KEY_LEAD", 0.0))
+            carried = RecordingManager.carried_from(j)
+            begin = carried if carried is not None else float(j.get("start") or 0.0)
+            since = max(begin, float(span[0]) + lead) if span else None
+            recorder = s.record(path, since)
+        except Exception as e:
+            log.info("record: %s not from the server's buffer (%s)", for_log(j.get("title")), e)
+            return False
+        self.rec.ride_player(j, path, recorder, player=False)
+        return True
 
     def _server_in_use_lines(self) -> list[tuple[str, str]]:
         """Nerd > Diagnostics' In use now: what the server holds."""

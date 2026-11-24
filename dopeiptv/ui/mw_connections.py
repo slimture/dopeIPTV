@@ -45,7 +45,8 @@ from .mw_source_label import NO_SOURCE_KINDS
 SEEN_FRESH_SECS = 15.0
 KIND_WORDS = {"player": "conn_k_player", "buffer": "conn_k_buffer",
               "recording": "conn_k_recording", "multiview": "conn_k_multiview",
-              "cast": "conn_k_cast", "download": "conn_k_download"}
+              "cast": "conn_k_cast", "download": "conn_k_download",
+              "server": "conn_k_server"}
 #: How often a box that is the source is asked what its tuners do.
 TUNER_TICK_MS = 20000
 #: The hold server mode puts on a buffer it reads (core/restream.SERVER).

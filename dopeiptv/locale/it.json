@@ -3299,5 +3299,6 @@
   "dl_why_refused": "portava dove l'app non scarica",
   "dl_why_other": "qualcosa è andato storto",
   "notice_hist_copy_list": "Copia elenco",
-  "notice_hist_copy_tip": "Copia ciò che l'elenco mostra ora, come testo, senza i tuoi dati di accesso. Clic destro su una riga per copiare solo quella."
+  "notice_hist_copy_tip": "Copia ciò che l'elenco mostra ora, come testo, senza i tuoi dati di accesso. Clic destro su una riga per copiare solo quella.",
+  "conn_k_server": "un dispositivo che guarda tramite la modalità server"
 }

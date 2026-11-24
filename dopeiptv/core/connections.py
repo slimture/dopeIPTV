@@ -28,8 +28,9 @@ from urllib.parse import parse_qs, urlsplit
 
 from .num import whole
 
-#: The app's own kinds of connection, in the order a sentence names them.
-KINDS = ("player", "buffer", "recording", "multiview", "cast", "download")
+#: The app's kinds of connection, in the order a sentence names them ("server":
+#: one server mode holds for a device watching through it).
+KINDS = ("player", "buffer", "recording", "multiview", "cast", "download", "server")
 #: How long what the provider said of other devices stands (its count
 #: changes as soon as they stop or start).
 FRESH_SECS = 180.0

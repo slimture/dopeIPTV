@@ -55,6 +55,17 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- With server mode on in the window, a scheduled recording could take the
+  connection of a channel a device (a TV, Plex, VLC) was watching through
+  it and cut that device off. It now does as `dopeiptv --server` does: a
+  channel nobody watches gives way, one a device watches is counted as
+  taken and the recording waits for room (with Record anyway) - and a
+  recording of the very channel a device watches is made from that
+  channel's buffer, with no connection of its own.
+- `dopeiptv --server` on Python 3.12.3 could fail to start a recording
+  ("name 'sys' is not defined"): a module imported for the first time on
+  two threads at once. The import machinery is now made whole on the main
+  thread before any other starts.
 - A kids profile can play a channel of another source found by the search
   across sources: it was shown, but refused when played.
 - While the welcome shows, the notices wait behind it: a question, a

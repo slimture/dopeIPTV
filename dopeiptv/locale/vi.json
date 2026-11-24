@@ -3299,5 +3299,6 @@
   "dl_why_refused": "nó dẫn tới nơi ứng dụng không tải từ đó",
   "dl_why_other": "đã có lỗi xảy ra",
   "notice_hist_copy_list": "Sao chép danh sách",
-  "notice_hist_copy_tip": "Sao chép những gì danh sách đang hiển thị dưới dạng văn bản, không kèm thông tin đăng nhập của bạn. Nhấp chuột phải vào một dòng để chỉ sao chép dòng đó."
+  "notice_hist_copy_tip": "Sao chép những gì danh sách đang hiển thị dưới dạng văn bản, không kèm thông tin đăng nhập của bạn. Nhấp chuột phải vào một dòng để chỉ sao chép dòng đó.",
+  "conn_k_server": "một thiết bị đang xem qua chế độ máy chủ"
 }

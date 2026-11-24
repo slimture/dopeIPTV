@@ -3299,5 +3299,6 @@
   "dl_why_refused": "den ledde någonstans appen inte laddar ner från",
   "dl_why_other": "något gick fel",
   "notice_hist_copy_list": "Kopiera listan",
-  "notice_hist_copy_tip": "Kopierar det listan visar just nu, som text, utan dina inloggningar. Högerklicka på en rad för att kopiera bara den."
+  "notice_hist_copy_tip": "Kopierar det listan visar just nu, som text, utan dina inloggningar. Högerklicka på en rad för att kopiera bara den.",
+  "conn_k_server": "en enhet som tittar via servern"
 }

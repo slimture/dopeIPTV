@@ -3299,5 +3299,6 @@
   "dl_why_refused": "il menait là où l'appli ne télécharge pas",
   "dl_why_other": "quelque chose s'est mal passé",
   "notice_hist_copy_list": "Copier la liste",
-  "notice_hist_copy_tip": "Copie ce que la liste affiche, en texte, sans vos identifiants. Clic droit sur une ligne pour ne copier qu'elle."
+  "notice_hist_copy_tip": "Copie ce que la liste affiche, en texte, sans vos identifiants. Clic droit sur une ligne pour ne copier qu'elle.",
+  "conn_k_server": "un appareil qui regarde via le mode serveur"
 }

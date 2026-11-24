@@ -3299,5 +3299,6 @@
   "dl_why_refused": "es führte dorthin, wovon die App nicht herunterlädt",
   "dl_why_other": "etwas ist schiefgelaufen",
   "notice_hist_copy_list": "Liste kopieren",
-  "notice_hist_copy_tip": "Kopiert, was die Liste gerade zeigt, als Text – ohne deine Zugangsdaten. Rechtsklick auf eine Zeile kopiert nur diese."
+  "notice_hist_copy_tip": "Kopiert, was die Liste gerade zeigt, als Text – ohne deine Zugangsdaten. Rechtsklick auf eine Zeile kopiert nur diese.",
+  "conn_k_server": "ein Gerät, das über den Servermodus schaut"
 }

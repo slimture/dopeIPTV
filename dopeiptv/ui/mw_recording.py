@@ -703,6 +703,9 @@ class _RecordingMixin(_TimeshiftMixin):
         waits for room, and a note says so, with Record anyway."""
         if self._rec_plays(j) and self._rec_ride(j):
             return RecordingManager.RIDE
+        ride_server = getattr(self, "_rec_ride_server", None)
+        if callable(ride_server) and ride_server(j):
+            return RecordingManager.RIDE    # what a device watches through server mode
         if j.get("_go_ahead"):
             self._rec_dl_room(j)
             return RecordingManager.OPEN
@@ -814,6 +817,11 @@ class _RecordingMixin(_TimeshiftMixin):
             uses += [Use("recording", str(k.get("source") or ""))
                      for k in self.rec.jobs if k is not j
                      and k.get("status") == "scheduled" and k.get("_asking") is not None]
+            # Server mode's channels: those nobody watches give way, those a
+            # device watches are taken - it waits rather than cut one off.
+            watched = getattr(self, "_server_watched_uses", None)
+            if callable(watched):
+                uses += watched(uses, src)
             listed, key = by_account(uses, src)
             own = connections.own_count(listed, key)
             cap = self._conn_cap(key)

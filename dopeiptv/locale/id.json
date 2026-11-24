@@ -3299,5 +3299,6 @@
   "dl_why_refused": "mengarah ke tempat yang tidak diunduh oleh aplikasi",
   "dl_why_other": "ada yang salah",
   "notice_hist_copy_list": "Salin daftar",
-  "notice_hist_copy_tip": "Menyalin apa yang ditampilkan daftar sekarang sebagai teks, tanpa data login Anda. Klik kanan sebuah baris untuk menyalin baris itu saja."
+  "notice_hist_copy_tip": "Menyalin apa yang ditampilkan daftar sekarang sebagai teks, tanpa data login Anda. Klik kanan sebuah baris untuk menyalin baris itu saja.",
+  "conn_k_server": "perangkat yang menonton melalui mode server"
 }
