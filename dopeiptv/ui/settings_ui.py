@@ -2299,39 +2299,56 @@ class FoldButton(QAbstractButton):
 
 
 class FoldedPicker(QWidget):
-    """A ChoicePicker of many tiles kept folded (the themes): folded, the
-    tile chosen stands alone beside a button that folds every one out;
-    out, they are the picker itself - one choice among all of them - under
-    the button that folds them in again. A search for one of the tiles'
-    names folds them out (``searched``) and in again once it is gone."""
+    """A ChoicePicker of many tiles kept folded (the themes): folded, a few
+    of them in a row - the one chosen first, then those *showcase* names -
+    to pick from as they are, with a button under them that folds every one
+    out; out, they are the picker itself - one choice among all of them -
+    with the button under it that folds them in again. A search for one of
+    the tiles' names folds them out (``searched``) and in again once it is
+    gone."""
 
-    def __init__(self, picker: ChoicePicker, chosen: _Choice, more: str, less: str) -> None:
+    def __init__(self, picker: ChoicePicker, make_tile: Callable[[str], _Choice],
+                 more: str, less: str, count: int = 5,
+                 showcase: tuple[str, ...] = ()) -> None:
         super().__init__()
-        self.picker, self.chosen = picker, chosen
+        self.picker = picker
         self._more, self._less = more, less
         self._by_search = False
+        keys = [t.key for t in picker.tiles]
+        self._showcase = [k for k in showcase if k in keys] + \
+            [k for k in keys if k not in showcase]
+        self._count = max(1, min(count, len(keys)))
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(10)
-        top = QHBoxLayout()
-        top.setContentsMargins(0, 0, 0, 0)
-        top.setSpacing(14)
-        chosen.setCheckable(True)
-        chosen.setChecked(True)
-        chosen.clicked.connect(self._chosen_clicked)
-        top.addWidget(chosen, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.row = _Flow(10, False)
+        self.quick: list[_Choice] = []
+        self._quick_group = QButtonGroup(self)
+        self._quick_group.setExclusive(True)
+        for key in self._row_keys(picker.value()):
+            tile = make_tile(key)
+            tile.setCheckable(True)
+            self._quick_group.addButton(tile)
+            tile.clicked.connect(lambda _c=False, t=tile: self._quick_clicked(t))
+            self.row.flow.addWidget(tile)
+            self.quick.append(tile)
+        v.addWidget(self.row)
+        v.addWidget(picker)
         self.button = FoldButton()
         self.button.toggled.connect(lambda on: self.set_open(on))
-        top.addWidget(self.button, 0, Qt.AlignmentFlag.AlignVCenter)
-        top.addStretch(1)
-        v.addLayout(top)
-        v.addWidget(picker)
+        v.addWidget(self.button, 0, Qt.AlignmentFlag.AlignLeading)
         picker.picked.connect(self._picked)
-        self._show_chosen(picker.value())
+        self._show_row(picker.value())
         self.set_open(False)
         sp = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sp.setHeightForWidth(True)
         self.setSizePolicy(sp)
+
+    def _row_keys(self, current: str) -> list[str]:
+        """The tiles shown folded: the one chosen, then the showcase's."""
+        keys = [current] if current else []
+        keys += [k for k in self._showcase if k != current]
+        return keys[:self._count]
 
     def is_open(self) -> bool:
         return self.button.isChecked()
@@ -2344,7 +2361,7 @@ class FoldedPicker(QWidget):
             self.button.blockSignals(False)
         self.button.setText(self._less if on else self._more)
         set_shown(self.picker, on)
-        set_shown(self.chosen, not on)
+        set_shown(self.row, not on)
         self.updateGeometry()
 
     def searched(self, needle: str) -> None:
@@ -2359,36 +2376,47 @@ class FoldedPicker(QWidget):
             self.set_open(False)
 
     def refresh(self) -> None:
-        """The chosen tile drawn as its twin in the picker is (the accent)."""
-        twin = next((t for t in self.picker.tiles if t.key == self.chosen.key), None)
-        if twin is not None and hasattr(twin, "accent"):
-            self.chosen.accent = twin.accent      # type: ignore[attr-defined]
-        self.chosen.update()
+        """The row's tiles drawn as their twins in the picker are (the
+        accent)."""
+        twins = {t.key: t for t in self.picker.tiles}
+        for tile in self.quick:
+            twin = twins.get(tile.key)
+            if twin is not None and hasattr(twin, "accent"):
+                tile.accent = twin.accent         # type: ignore[attr-defined]
+            tile.update()
 
-    def _chosen_clicked(self) -> None:
-        self.chosen.setChecked(True)
-        self.set_open(True)
+    def _quick_clicked(self, tile: _Choice) -> None:
+        """A tile of the row picked: picked in the picker, as a click there
+        would have."""
+        if self.picker.value() != tile.key:
+            self.picker.set_value(tile.key)
+            self.picker.picked.emit(tile.key)
+        tile.setChecked(True)
 
     def _picked(self, key: str) -> None:
-        self._show_chosen(key)
+        self._show_row(key)
         self._by_search = False         # a pick keeps them out as they are
 
-    def _show_chosen(self, key: str) -> None:
-        twin = next((t for t in self.picker.tiles if t.key == key), None)
-        if twin is None:
-            return
-        self.chosen.key = key
-        self.chosen.setText(twin.text())
-        self.chosen.setToolTip(twin.text())
-        self.chosen.setAccessibleName(twin.text())
+    def _show_row(self, key: str) -> None:
+        """*key* checked in the row - put in its first place when it is not
+        there, the others moving along (a pick from the row moves nothing)."""
+        twins = {t.key: t for t in self.picker.tiles}
+        if key in twins and key not in [t.key for t in self.quick]:
+            keys = [key] + [t.key for t in self.quick][:len(self.quick) - 1]
+            for tile, k in zip(self.quick, keys, strict=False):
+                tile.key = k
+                name = twins[k].text()
+                tile.setText(name)
+                tile.setToolTip(name)
+                tile.setAccessibleName(name)
+        for tile in self.quick:
+            tile.setChecked(tile.key == key)
         self.refresh()
 
     def hasHeightForWidth(self) -> bool:
-        return self.is_open()
+        return True
 
     def heightForWidth(self, width: int) -> int:
-        # Folded, nothing in it wraps: its height is its size hint's (the
-        # layout says -1 with the picker hidden, which read as no room).
         h = self.layout().heightForWidth(width)
         return h if h > 0 else self.sizeHint().height()
 

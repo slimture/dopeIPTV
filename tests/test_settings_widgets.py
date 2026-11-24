@@ -120,39 +120,50 @@ def test_themes_in_groups_are_still_one_choice():
 def _folded(current="nord"):
     tiles = [ThemeTile(k, k.title()) for k in THEME_ORDER]
     picker = ChoicePicker(tiles, current, groups=[("Dark", list(THEME_ORDER))], fill=True)
-    return FoldedPicker(picker, ThemeTile(picker.value(), ""), f"All themes ({len(tiles)})",
-                        "Fewer themes"), tiles
+    picked = []
+    picker.picked.connect(picked.append)
+    folded = FoldedPicker(picker, lambda k: ThemeTile(k, k.title()), f"All themes ({len(tiles)})",
+                          "Fewer themes", count=5,
+                          showcase=("graphite", "light", "nord", "oled", "latte", "dracula"))
+    return folded, tiles, picked
 
 
-def test_the_themes_are_folded_with_the_one_chosen_beside_the_button():
-    folded, tiles = _folded()
+def test_folded_five_themes_show_the_one_chosen_first():
+    folded, tiles, picked = _folded()
     folded.resize(700, 400)
     folded.show()
     app.processEvents()
-    # Folded: the chosen theme alone, under its own name, and the button.
-    assert not folded.is_open() and folded.picker.isHidden()
-    assert folded.chosen.isVisible() and folded.chosen.key == "nord"
-    assert folded.chosen.text() == "Nord" and folded.chosen.isChecked()
+    # Folded: five in a row, the chosen one first and checked, the
+    # showcase's after it (the chosen one not twice); the button under them.
+    assert not folded.is_open() and folded.picker.isHidden() and folded.row.isVisible()
+    assert [q.key for q in folded.quick] == ["nord", "graphite", "light", "oled", "latte"]
+    assert [q.text() for q in folded.quick][:2] == ["Nord", "Graphite"]
+    assert [q.isChecked() for q in folded.quick] == [True, False, False, False, False]
     assert folded.button.text() == f"All themes ({len(tiles)})"
+    assert folded.button.y() > folded.row.y()
     assert folded.heightForWidth(700) >= ThemeTile.H, "a folded row is no row at all"
-    # Out: every tile, the chosen one checked; the button folds them in.
+    # A theme of the row picked there is picked - and the row stays put.
+    folded.quick[2].click()
+    assert folded.picker.value() == "light" and picked == ["light"]
+    assert [q.key for q in folded.quick] == ["nord", "graphite", "light", "oled", "latte"]
+    assert [q.isChecked() for q in folded.quick] == [False, False, True, False, False]
+    # Out: every tile, the chosen one checked; one picked there that the row
+    # does not have comes first in it, the rest moving along.
     folded.button.click()
-    assert folded.is_open() and folded.picker.isVisible() and folded.chosen.isHidden()
+    assert folded.is_open() and folded.picker.isVisible() and folded.row.isHidden()
     assert folded.button.text() == "Fewer themes"
     assert folded.heightForWidth(700) > 2 * ThemeTile.H
-    [t for t in tiles if t.key == "latte"][0].click()
-    assert folded.picker.value() == "latte"
-    assert folded.chosen.key == "latte" and folded.chosen.text() == "Latte"
+    [t for t in tiles if t.key == "dracula"][0].click()
+    assert folded.picker.value() == "dracula" and picked[-1] == "dracula"
     folded.button.click()
-    assert not folded.is_open() and folded.chosen.isVisible()
-    # The chosen tile clicked folds them out (and stays chosen).
-    folded.chosen.click()
-    assert folded.is_open() and folded.chosen.isChecked()
+    assert not folded.is_open() and folded.row.isVisible()
+    assert [q.key for q in folded.quick] == ["dracula", "nord", "graphite", "light", "oled"]
+    assert folded.quick[0].isChecked() and folded.quick[0].text() == "Dracula"
     folded.hide()
 
 
 def test_a_search_for_a_theme_by_name_folds_them_out_and_in_again():
-    folded, _tiles = _folded()
+    folded, _tiles, _picked = _folded()
     folded.searched("drac")
     assert folded.is_open()
     folded.searched("")

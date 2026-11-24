@@ -374,7 +374,8 @@ def drag_side(self):
     built(self)
     folded = self.findChild(FoldedPicker)
     assert folded is not None and not folded.is_open()
-    assert folded.chosen.key == s.value("theme")
+    assert len(folded.quick) == 5 and folded.quick[0].key == s.value("theme")
+    assert folded.quick[0].isChecked()
     self.hide()
     return 0
 QDialog.exec = drag_side

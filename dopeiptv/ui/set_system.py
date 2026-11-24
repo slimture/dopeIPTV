@@ -287,6 +287,11 @@ def build_privacy(ctx: SettingsContext) -> None:
            search="sync synchronise computers")
 
 
+#: The themes shown beside the one chosen while they are folded: dark and
+#: light, each a different look.
+THEME_SHOWCASE = ("graphite", "light", "nord", "oled", "latte", "dracula", "midnight")
+
+
 def build_appearance(ctx: SettingsContext) -> None:
     """Appearance: the theme and its accent, the lists, and what the places
     show."""
@@ -302,11 +307,12 @@ def build_appearance(ctx: SettingsContext) -> None:
                 (tr("set_themes_light"),
                  [k for k in THEME_ORDER if is_light(k)])],
         fill=True)
-    # Folded: the theme chosen on its own, and a button that folds all of
-    # them out - more than two dozen tiles otherwise fill the page.
-    folded = FoldedPicker(themes, ThemeTile(themes.value(), ""),
+    # Folded: five of them - the one chosen first, then dark and light ones
+    # to try - and a button that folds all of them out: more than two dozen
+    # tiles otherwise fill the page.
+    folded = FoldedPicker(themes, lambda key: ThemeTile(key, tr(f"theme_{key}")),
                           tr("set_themes_all", n=len(themes.tiles)),
-                          tr("set_themes_fewer"))
+                          tr("set_themes_fewer"), count=5, showcase=THEME_SHOWCASE)
     accent_keys = [ACCENT_THEME, *ACCENTS, ACCENT_CUSTOM]
     accents = ChoicePicker(
         [ColorDot(key, tr(f"accent_{key}"),

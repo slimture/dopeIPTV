@@ -206,7 +206,7 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
   `theme_light` (these four this profile's), `corner_style`, `ui_scale`
-  (the theme tiles folded: the one chosen beside "All themes (N)")
+  (the theme tiles folded: five in a row, the one chosen first, "All themes (N)" under them)
 - App icon: `app_icon` (one of `ui/app_icon.LOOKS`; the household's, the
   blue one when never picked)
 - Lists: `view_density`, `sort_order`, `list_channel_numbers` (Show channel numbers, off by default)
