@@ -368,6 +368,9 @@ class RecordingManager(QObject):
         self._swept = 0.0
         #: The server records nothing without its claims; the window as before.
         self._no_claims = ""
+        #: A save that waited for the other recorder's lock: done at the
+        #: next tick (_save).
+        self._save_due = False
         self._load()
         self._timer = QTimer(self)
         self._timer.setInterval(5000)
@@ -598,14 +601,27 @@ class RecordingManager(QObject):
     def _saved(j: dict) -> dict:
         return {k: v for k, v in j.items() if k not in _TRANSIENT}
 
-    def _save(self) -> None:
+    def _save(self, final: bool = False) -> None:
+        """The jobs into the settings - with the claims, merged with the
+        other recorder's list under its lock. While the other keeps that
+        lock (core/rec_claims.jobs_lock: a moment at most on the window's
+        thread), the write waits for the next tick (_save_due): the jobs
+        here are ahead of the list meanwhile, and the merge then takes both
+        in - nothing lost, nothing written twice. *final*: the app closes,
+        no tick comes - waited for as long as the other may keep it."""
         if self.claims is not None and not self._no_claims:
             try:
-                with self.claims.jobs_lock():
-                    self._merge(write=True)
+                from . import rec_claims
+                closed = final or getattr(self, "_shut", False)
+                wait = rec_claims.JOBS_PATIENCE_S if closed else None
+                with self.claims.jobs_lock(wait) as go:
+                    if go:
+                        self._merge(write=True)
+                    self._save_due = not go
                 return
             except Exception as e:      # never in a recording's way: written as before
                 log.warning("record: the jobs not merged with the other recorder's: %s", e)
+        self._save_due = False
         keep = [self._saved(j) for j in self.jobs
                 if j.get("status") == "scheduled" and not j.get("_elsewhere")]
         self.settings.setValue("recording_jobs", json.dumps(keep))
@@ -819,15 +835,21 @@ class RecordingManager(QObject):
         the other wrote it, a stop the other asked of a recording here, and
         what the other records. Whether the jobs changed."""
         if self.claims is None or self._no_claims:
+            if self._save_due:
+                self._save()            # the claims went off meanwhile: as before
             return False
         changed = False
         try:
             self.claims.beat()
+            if self._save_due:
+                self._save()            # it waited for the other's lock
             stamp = self.claims.jobs_stamp()
             if stamp != self._stamp:
-                with self.claims.jobs_lock():
-                    changed = self._merge(write=False)
-                self._stamp = stamp
+                with self.claims.jobs_lock() as go:
+                    if go:
+                        changed = self._merge(write=False)
+                        self._stamp = stamp
+                    # else read at the next tick: the stamp still differs
             changed = self.check_stops() or changed
             changed = self._share_look() or changed
             if time.monotonic() - self._swept > self.SWEEP_S:
@@ -974,9 +996,12 @@ class RecordingManager(QObject):
         if self.claims is None or self._no_claims:
             return False
         try:
-            with self.claims.jobs_lock():
-                changed = self._merge(write=False)
-            self._stamp = self.claims.jobs_stamp()
+            changed = False
+            with self.claims.jobs_lock() as go:
+                if go:
+                    changed = self._merge(write=False)
+            if go:
+                self._stamp = self.claims.jobs_stamp()
             changed = self._share_look() or changed
         except Exception as e:
             log.debug("record: the jobs not read again: %s", e)
@@ -2106,7 +2131,7 @@ class RecordingManager(QObject):
                 self._stop_proc(j)
                 j["status"] = "done"
         self._claims_settle()
-        self._save()
+        self._save(final=True)          # no tick comes after it
         self._share_end()
 
     def _share_end(self) -> None:

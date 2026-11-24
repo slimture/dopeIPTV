@@ -17,8 +17,8 @@ from typing import Any
 from PyQt6.QtCore import QSettings
 
 from . import pins, privacy, site_out
-from .log import register_secrets
-from .names import collapse_repeats, source_name
+from .log import log, register_secrets
+from .names import collapse_repeats, renamed, source_name
 
 
 class PassingSettings:
@@ -861,6 +861,28 @@ class PlaylistStore:
         self.settings.setValue("active_playlist", self.active_id)
         site_out.learn(self.items)
 
+    def rename_login_names(self) -> int:
+        """(the start) A source the person gave no name was named by an
+        older release (up to 1.6.12) from its address with the login in it -
+        "user:password@host:8080": named by its host and port now
+        (core/names.renamed), so the status line, a list's heading, a
+        download's sidecar never show it. Saved once; how many."""
+        changed = 0
+        for p in self.items:
+            new = renamed(str(p.get("name") or ""), str(p.get("server") or ""))
+            if new is None:
+                continue
+            if not new:
+                from ..i18n import tr
+                new = tr("playlist_default_name")
+            p["name"] = new
+            changed += 1
+        if changed:
+            self._save()
+            log.info("sources: %d named by an address with its login - named by its host now",
+                     changed)
+        return changed
+
     def playlists(self) -> list[dict]:
         return list(self.items)
 
@@ -952,7 +974,12 @@ class PlaylistStore:
                    and (p.get("mac") or "").upper() == mac
                    for p in self.items):
                 continue
-            row: dict[str, Any] = {"name": field("name") or source_name(server),
+            # An older release's export names an unnamed source by its
+            # address with the login in it: by its host here.
+            name = field("name")
+            fixed = renamed(name, server)
+            name = (fixed if fixed is not None else name) or source_name(server)
+            row: dict[str, Any] = {"name": name,
                    "kind": kind, "server": server, "username": user,
                    "password": pw, "epg_url": field("epg_url"),
                    "refresh": field("refresh") or "never"}

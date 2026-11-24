@@ -245,11 +245,18 @@ def main(argv: list[str] | None = None) -> int:
     set_language(str(settings.value("language", "en") or "en"))
     nerd.install(settings)
     try:
-        # M3U sources onto stable channel ids, as the window's start does.
+        # As the window's start does: a source an older release named by
+        # its address with the login in it named by its host, and M3U
+        # sources onto stable channel ids.
         from .core import m3u_ids
         from .core.stores import PlaylistStore
         from .providers.epg import _epg_cache_dir
-        m3u_ids.start(settings, PlaylistStore(settings).playlists(), str(_epg_cache_dir()))
+        store = PlaylistStore(settings)
+        try:
+            store.rename_login_names()
+        except Exception as e:
+            log.warning("sources: not renamed: %s", e)
+        m3u_ids.start(settings, store.playlists(), str(_epg_cache_dir()))
     except Exception as e:
         log.warning("m3u ids: not moved: %s", e)
     from .services.home_server import (

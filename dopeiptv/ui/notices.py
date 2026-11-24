@@ -32,7 +32,8 @@ categories or the video.
   tab, the newest first, with its time (``history``, ``clear_history``,
   ``history_text`` for Copy). Kept in memory only, at most
   ``HISTORY_MAX``, never written anywhere; nothing is kept while private
-  viewing is on (core/privacy.private).
+  viewing is on, nor while a playback that began in it plays on after
+  (core/privacy.playing_private).
 
 While the video fills the screen, TV mode shows or the picture is popped
 out, nothing is drawn and no note is kept; messages and decisions wait.
@@ -577,11 +578,14 @@ class NoticeHub(QObject):
     # -- history -------------------------------------------------------------
 
     def _record(self, level: str, text: str, kind: str = "") -> None:
-        """*text* into the history - never while private viewing is on,
-        never anything that failed to be kept in the way of what said it."""
+        """*text* into the history - never while private viewing is on, nor
+        while a playback that began in it still goes on (its reconnect, a
+        recording of it name it: privacy.playing_private, never the switch
+        alone); never anything that failed to be kept in the way of what
+        said it."""
         try:
             from ..core import privacy
-            if privacy.private():
+            if privacy.private() or privacy.playing_private():
                 return
             words = str(text or "").strip()
             if not words:

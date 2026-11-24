@@ -29,7 +29,9 @@ and ``server.alive``, locked while a server records: a window that closes
 carries on what it records to it (core/rec_close.py), holding those
 claims a moment longer than the rest (``let_go_all``'s *keep*);
 ``jobs.lock``, held for the moment a recorder reads and writes the list of
-scheduled jobs (``jobs_lock``); ``jobs.stamp``, changed after each write, so
+scheduled jobs (``jobs_lock``: the window waits a moment for it at most and
+does its part at its next look; each goes on without it once the other has
+kept it ``JOBS_PATIENCE_S``); ``jobs.stamp``, changed after each write, so
 the other reads the list again only then (``touch_jobs``, ``jobs_stamp``).
 
 Nothing here is sent anywhere, and nothing in a claim is a login: a stream's
@@ -87,8 +89,16 @@ _WIN_LOCK_AT = 1 << 30
 #: How long a lock is tried for before it counts as another's (the other
 #: side looking at it holds it for a moment).
 _TRY_S = 0.06
-#: How long jobs_lock waits for the other recorder.
-_JOBS_WAIT_S = 5.0
+#: How long the other recorder may keep the jobs' list locked before a
+#: recorder goes on without it (jobs_lock): never held up longer by it.
+JOBS_PATIENCE_S = 5.0
+#: How long jobs_lock waits at once: the server, with no window to draw,
+#: its whole patience; the window, on the thread that draws it, a moment -
+#: then it does its part at its next tick (a stuck or slow other recorder
+#: never freezes the window).
+JOBS_WAIT_S = {WINDOW: 0.2, SERVER: JOBS_PATIENCE_S}
+#: Misses this far apart are a new wait, not the same one going on.
+_JOBS_MISS_GAP_S = 3 * JOBS_PATIENCE_S
 
 
 class ClaimsUnavailable(OSError):
@@ -286,18 +296,25 @@ def parse(key: str, data: bytes, beat: float = 0.0) -> Claim:
     c = Claim(key, beat=beat)
     try:
         raw = json.loads(data.decode("utf-8")) if data else None
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        # RecursionError: nesting deeper than Python reads - a claim's size
+        # (MAX_FILE) holds far more than that.
         return c
     if not isinstance(raw, dict) or raw.get("v") != 1:
         return c
+    def text(k: str) -> str:
+        v = raw.get(k)
+        return v[:64] if isinstance(v, str) else ""
+
     who = raw.get("who")
     state = raw.get("state")
-    c.job = str(raw.get("job") or "")[:64]
+    c.job = text("job")
     c.who = who if who in WHO else ""
     c.state = state if state in LIVE + FINAL else ""
-    c.pid = whole(raw.get("pid"), 0) or 0
-    c.host = str(raw.get("host") or "")[:64]
-    c.started = str(raw.get("started") or "")[:64]
+    pid = raw.get("pid")
+    c.pid = whole(pid, 0, lo=0, hi=2 ** 31) if isinstance(pid, (int, float, str)) else 0
+    c.host = text("host")
+    c.started = text("started")
     c.info = _clean_info(raw.get("info"))
     return c
 
@@ -328,6 +345,11 @@ class Claims:
         self._presence: int | None = None
         self._jobs_fd: int | None = None
         self._jobs_depth = 0
+        #: What the outermost jobs_lock said (the nested ones say the same).
+        self._jobs_go = True
+        #: (first, last) monotonic times the other kept the jobs' list from
+        #: this one in a row; None while it gets it.
+        self._jobs_missed: tuple[float, float] | None = None
         self._ready = False
 
     # -- the folder --------------------------------------------------------------------------
@@ -659,31 +681,60 @@ class Claims:
 
     # -- the scheduled jobs' list ------------------------------------------------------------
     @contextlib.contextmanager
-    def jobs_lock(self) -> Iterator[None]:
+    def jobs_lock(self, wait: float | None = None) -> Iterator[bool]:
         """The list of scheduled jobs read and written by one recorder at a
-        time (re-entrant here). Waits a few seconds at most for the other,
-        then goes on - a recording is never held up by it."""
+        time (re-entrant here). Yields whether to go on: True with the list
+        locked - or without the lock once the other has kept it
+        JOBS_PATIENCE_S in a row (a recording is never held up by it); False
+        while that has not passed: the caller does its part at its next look.
+
+        *wait*: how long to wait at once (JOBS_WAIT_S by who this is - the
+        window a moment, never its whole patience on the thread that draws
+        it); a wait that goes on from the last miss is one short try."""
         with self._lock:
             self._jobs_depth += 1
             try:
                 if self._jobs_depth == 1:
-                    try:
-                        self.ensure()
-                        fd = _open(self._path(JOBS_LOCK))
-                        if _lock_soon(fd, wait=_JOBS_WAIT_S):
-                            self._jobs_fd = fd
-                        else:
-                            os.close(fd)
-                            log.debug("record: the other recorder kept the jobs' list - on")
-                    except OSError as e:
-                        log.debug("record: the jobs' list not locked: %s", e)
-                yield
+                    self._jobs_go = self._take_jobs(wait)
+                yield self._jobs_go
             finally:
                 self._jobs_depth -= 1
                 if self._jobs_depth == 0 and self._jobs_fd is not None:
                     fd, self._jobs_fd = self._jobs_fd, None
                     _unlock(fd)
                     os.close(fd)
+
+    def _take_jobs(self, wait: float | None) -> bool:
+        """(jobs_lock, outermost) The jobs' list locked: whether to go on."""
+        start = time.monotonic()
+        missed = self._jobs_missed
+        going_on = missed is not None and start - missed[1] < _JOBS_MISS_GAP_S
+        if wait is None:
+            wait = _TRY_S if going_on else JOBS_WAIT_S.get(self.who, JOBS_PATIENCE_S)
+        try:
+            self.ensure()
+            fd = _open(self._path(JOBS_LOCK))
+        except OSError as e:
+            log.debug("record: the jobs' list not locked: %s", e)
+            return True                 # no lock to be had: as before, on
+        try:
+            got = _lock_soon(fd, wait=max(0.0, wait))
+        except OSError as e:
+            os.close(fd)
+            log.debug("record: the jobs' list not locked: %s", e)
+            return True
+        if got:
+            self._jobs_fd = fd
+            self._jobs_missed = None
+            return True
+        os.close(fd)
+        first = missed[0] if going_on and missed is not None else start
+        now = time.monotonic()
+        self._jobs_missed = (first, now)
+        if now - first >= JOBS_PATIENCE_S:
+            log.debug("record: the other recorder kept the jobs' list - on without it")
+            return True
+        return False
 
     def touch_jobs(self) -> str:
         """The jobs' list changed: a new stamp (returned) for the other."""

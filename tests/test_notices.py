@@ -467,6 +467,28 @@ def test_the_history_keeps_what_was_said_and_the_persons_work_that_ended(app, mo
     assert hub.history() == []
 
 
+def test_the_history_keeps_nothing_while_a_private_playback_plays_on(app):
+    """Private viewing turned off while what began in it still plays: a
+    note of its reconnect or its recording names it, so nothing is kept
+    until it stops (rule 4: never the switch alone)."""
+    from dopeiptv.core import privacy
+    hub = _hub()
+    try:
+        privacy.set_private(True)
+        privacy.playback_started("live", "7")
+        privacy.set_private(False)
+        assert not privacy.private() and privacy.playing_private()
+        hub.note("Reconnecting to Secret Channel…")
+        hub.post("Recording of Secret Channel stopped", level="error")
+        assert hub.history() == []
+        privacy.playback_stopped()                  # Stop: the next is a new playback
+        hub.note("Copied")
+        assert [h.text for h in hub.history()] == ["Copied"]
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()
+
+
 def test_the_history_never_shows_a_login_and_copies_scrubbed(app):
     hub = _hub()
     hub.post("Failed http://alice:s3cret@example.com/live/alice/s3cret/1.ts", level="error")

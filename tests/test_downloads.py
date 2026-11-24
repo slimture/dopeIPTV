@@ -464,6 +464,76 @@ def test_a_damaged_queue_and_sidecar_are_passed_over(tmp_path):
     assert only.stream_id == "2" and only.poster == ""
 
 
+@pytest.mark.parametrize("bad", ["1e999", "NaN", "-1e999", "1" + "0" * 400, "-5", "true",
+                                 '"12"', "[1]"])
+def test_one_bad_number_in_a_sidecar_or_the_queue_hides_nothing(tmp_path, bad):
+    """JSON allows 1e999, NaN and 400 digits: in a damaged or edited
+    sidecar's added, size or format - or the queue's - they are no number,
+    and every download is still listed, sorted, grouped into its series."""
+    from dopeiptv.providers.downloaded import DownloadedClient
+    series = tmp_path / "Series" / "Show"
+    series.mkdir(parents=True)
+    for name, raw in (
+            ("good.mkv", {"format": 1, "kind": "movie", "source": "abc", "stream_id": "1",
+                          "title": "Good", "added": 5}),
+            ("again.mkv", None),           # the same film again: the scan compares them
+            ("Series/Show/e.mkv", None)):
+        (tmp_path / name).write_bytes(b"x" * 2000)
+        text = json.dumps(raw) if raw else (
+            '{"format":%s,"kind":"movie","source":"abc","stream_id":"1","title":"Again",'
+            '"added":%s,"size":%s}' % (bad, bad, bad) if name == "again.mkv" else
+            '{"format":1,"kind":"episode","source":"abc","stream_id":"9","title":"E",'
+            '"series_id":"7","series_title":"Show","added":%s,"size":%s}' % (bad, bad))
+        (tmp_path / (name + dl.SIDECAR)).write_text(text)
+    s = Settings({dl.DIR_KEY: str(tmp_path), dl.QUEUE_KEY: json.dumps(
+        [{"kind": "movie", "source": "abc", "stream_id": "2", "title": "Queued"}]).replace(
+        '"title"', '"added": %s, "title"' % bad)})
+    m = dl.Downloads(s, gated=False)
+    (job,) = m.jobs()
+    assert job.title == "Queued" and isinstance(job.added, float) and 0 <= job.added < 1e12
+    m.scan()
+    assert m.scanned and sorted(i.kind for i in m.items()) == ["episode", "movie"]
+    for i in m.items():
+        assert isinstance(i.added, float) and 0 <= i.added < 1e12
+        for k in ("added", "size", "format"):
+            v = i.info.get(k)
+            assert v is None or (isinstance(v, (int, float)) and 0 <= v <= 1e15), (k, v)
+    assert sorted(m.items(), key=lambda i: -i.added)
+    c = DownloadedClient(m, "abc")
+    assert [r["name"] for r in c.series_list()] == ["Show"]
+    assert c.series_list()[0]["last_modified"].isdigit()
+    assert len(c.vod_streams()) == 1
+    assert dl.Item("/x", 1, {"added": 10 ** 400}).added == 0.0
+    assert dl.Item("/x", 1, {"added": float("nan")}).added == 0.0
+
+
+def test_a_source_name_with_a_login_never_goes_into_a_sidecar(tmp_path):
+    """A source an older release named "user:password@host" (core/names):
+    its name is left out of what a sidecar keeps - and a sidecar a test
+    build wrote with it is written again without it as the folder is read."""
+    from dopeiptv.core import site_out
+    for name in ("kund:hemligt@line.example.com:8080", "kund@line.example",
+                 "line.example?username=kund&password=x", "http://kund:x@line.example"):
+        assert "source_name" not in dl.clean_meta({"source_name": name}), name
+    assert dl.clean_meta({"source_name": "Pirat"}) == {"source_name": "Pirat"}
+    site_out.forget_for_tests()
+    try:
+        site_out.learn([{"username": "kund4711", "password": "hemligt-lösen-9"}])
+        assert "source_name" not in dl.clean_meta({"source_name": "kund4711 at home"})
+    finally:
+        site_out.forget_for_tests()
+    (tmp_path / "f.mkv").write_bytes(b"x" * 2000)
+    side = tmp_path / ("f.mkv" + dl.SIDECAR)
+    side.write_text(json.dumps({"format": 1, "kind": "movie", "source": "abc", "stream_id": "1",
+                                "title": "Film", "source_name": "kund:hemligt@line.example.com"}))
+    m = dl.Downloads(Settings({dl.DIR_KEY: str(tmp_path)}), gated=False)
+    m.scan()
+    (item,) = m.items()
+    assert "source_name" not in item.info and item.title == "Film"
+    text = side.read_text()
+    assert "hemligt" not in text and "kund" not in text and json.loads(text)["title"] == "Film"
+
+
 def test_clean_meta_keeps_only_what_a_sidecar_may():
     got = dl.clean_meta({"year": 2021, "plot": "Se https://x.example/u/p nu", "length": "5400",
                          "password": "x", "url": "http://a/b", "rating": "7.4", "season": True,

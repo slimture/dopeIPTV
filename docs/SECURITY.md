@@ -100,7 +100,7 @@ change a playlist file on its web server.
 | A title spliced into the command after a recording, or into its file name | `core/rec_extras.py`: no shell, placeholders filled per argument, a batch file on Windows given text only (`through_cmd`); a name without control characters or device names, a folder never outside the recordings folder (`core/recording.py`) |
 | A film's or an episode's title made into a download's file name (`../../.bashrc`, `CON`, a NUL), a link left on the way, a page or an error message instead of the video, an answer longer than it said, a download that fills the disk | `core/downloads.py`: the name through recording's `safe_filename`, every folder on the way checked as `_stays_inside` does (no link that leads out of the downloads folder), the `.part` and the sidecar opened without following a link (`O_NOFOLLOW`); the first bytes refused as the rewind buffer refuses a page (`dvr_ingest.not_a_stream`, a `text/html` answer too); Content-Length matched; the downloads' space limit and recording's `DISK_FLOOR` of free space looked at before and while it writes; renamed from `.part` only once whole |
 | A download's address or an HLS film's segments sending the app to this computer, a link-local host or the home network | The bytes through `core/dvr_ingest.open_for` (the app's guarded request path, `core/dest_guard.py`); an HLS film through `core/restream.ffmpeg_opener` - ffmpeg reads an alias through the bridge, whose `Policy` judges every segment, key and redirect; no address, login or token in ffmpeg's arguments |
-| A sidecar in the downloads folder that names a poster elsewhere, or is not one | `core/downloads.read_sidecar`: at most 64 KB, JSON of a kind and source this app writes, only the fields a sidecar keeps (`clean_meta`), a poster by its own name beside it - never a path, a hidden file or one going up; the folder read without following a link, bounded in depth and number |
+| A sidecar in the downloads folder that names a poster elsewhere, or is not one | `core/downloads.read_sidecar`: at most 64 KB, JSON of a kind and source this app writes, only the fields a sidecar keeps (`clean_meta`), its numbers through `core/num.py` in range or left out, a poster by its own name beside it - never a path, a hidden file or one going up; the folder read without following a link, bounded in depth and number |
 
 **What is left.**
 
@@ -833,7 +833,10 @@ the title, year, plot, length and category, the poster's file name, and
 for an episode its series (id, title, plot, category, poster's file name),
 season, number and title. It never holds an address, a login, a token or
 an account; a text that came with an address in it is kept without the
-address (`clean_meta`). The queue of what is still to download is in the
+address (`clean_meta`), and a source's name that holds a login - one an
+older release made of an address with "user:password@" in it, which the
+start now renames to the host and port (`PlaylistStore.rename_login_names`)
+- is left out whole. The queue of what is still to download is in the
 settings file (0600) - the poster's address too, never the stream's: that
 is asked of the source's client when a download starts.
 

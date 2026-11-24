@@ -169,3 +169,68 @@ def test_todays_app_starts_on_what_this_release_left(tag, tmp_path):
     out = subprocess.run([sys.executable, "-c", _CHILD, str(FIXTURES / tag)], cwd=str(ROOT),
                          env=env, capture_output=True, text=True, timeout=180)
     assert "UPGRADE_OK" in out.stdout, (tag, out.stdout[-2000:] + out.stderr[-4000:])
+
+
+_NAMED_CHILD = r"""
+import json, os, sys
+from PyQt6.QtCore import QSettings
+from PyQt6.QtWidgets import QApplication
+app = QApplication([])
+from dopeiptv import ORG
+from dopeiptv import app as start
+from dopeiptv.i18n import set_language, tr
+
+folder = os.path.join(os.environ["XDG_CONFIG_HOME"], ORG)
+main = QSettings(os.path.join(folder, ORG + ".conf"), QSettings.Format.IniFormat)
+rows = json.loads(main.value("playlists"))
+server = "http://kund:hemligt@line.invalid:8080"
+# What 1.6.12 named a source added with no name (mw_onboarding._wizard_connect
+# and the quick form's values(), word for word): its login with it.
+rows.append({"name": server.split("//")[-1].split("/")[0], "kind": "xtream", "server": server,
+             "username": "kund", "password": "hemligt", "id": "c0ffee12"})
+main.setValue("playlists", json.dumps(rows))
+main.sync()
+del main
+
+
+def started():
+    settings = start._settings_at_start()
+    set_language(settings.value("language", "en"))
+    start._profiles_at_start(settings, tr("profile_me"))
+    return settings, start._sources_at_start(settings)
+
+
+settings, store = started()
+by_id = {p["id"]: p for p in store.playlists()}
+named = by_id["c0ffee12"]
+assert named["name"] == "line.invalid:8080", named["name"]
+assert (named["server"], named["username"], named["password"]) == (server, "kund", "hemligt")
+assert sorted(p["name"] for p in store.playlists()) == [
+    "Upgrade M3U", "Upgrade Xtream", "line.invalid:8080"], store.playlists()
+assert "kund:hemligt@line" not in json.dumps([p["name"] for p in store.playlists()])
+settings.sync()
+before = QSettings(os.path.join(folder, ORG + ".conf"), QSettings.Format.IniFormat).value("playlists")
+settings, store = started()
+settings.sync()
+after = QSettings(os.path.join(folder, ORG + ".conf"), QSettings.Format.IniFormat).value("playlists")
+assert before == after, "a second start renames nothing"
+print("NAMED_OK", flush=True)
+os._exit(0)
+"""
+
+
+def test_a_source_1612_named_by_its_login_address_goes_by_its_host(tmp_path):
+    """1.6.12's settings with a source it named by its address - the login
+    with it ("kund:hemligt@line.invalid:8080"): today's start names it by
+    its host and port, its login kept where a login is kept, once."""
+    home = tmp_path / "home"
+    for sub in ("cache", "data", "run"):
+        (home / sub).mkdir(parents=True)
+    (home / "run").chmod(0o700)
+    _place("v1.6.12", home)
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", HOME=str(home),
+               XDG_CONFIG_HOME=str(home / "config"), XDG_CACHE_HOME=str(home / "cache"),
+               XDG_DATA_HOME=str(home / "data"), XDG_RUNTIME_DIR=str(home / "run"))
+    out = subprocess.run([sys.executable, "-c", _NAMED_CHILD], cwd=str(ROOT), env=env,
+                         capture_output=True, text=True, timeout=180)
+    assert "NAMED_OK" in out.stdout, out.stdout[-2000:] + out.stderr[-4000:]

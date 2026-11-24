@@ -235,6 +235,42 @@ def test_the_jobs_stamp_changes_with_each_write_and_the_lock_nests(folder):
             pass
 
 
+def test_the_window_waits_a_moment_for_the_jobs_list_never_the_others_patience(folder, monkeypatch):
+    """The other recorder keeps the jobs' list locked (suspended, stuck on a
+    slow network disk): the window - whose thread draws it - waits a moment
+    and is told to come back (False), a try again soon is one short look, and
+    once the other has kept it JOBS_PATIENCE_S in a row it goes on without
+    it, as before. The server waits its whole patience at once."""
+    window, server = rc.Claims(folder, rc.WINDOW), rc.Claims(folder, rc.SERVER)
+    assert rc.JOBS_WAIT_S[rc.WINDOW] <= 0.25 and rc.JOBS_WAIT_S[rc.SERVER] == rc.JOBS_PATIENCE_S
+    monkeypatch.setattr(rc, "JOBS_PATIENCE_S", 1.0)
+    with server.jobs_lock() as held:
+        assert held
+        t0 = time.monotonic()
+        with window.jobs_lock() as go:
+            assert go is False
+        assert time.monotonic() - t0 < 0.5, "a moment, not the other's patience"
+        t0 = time.monotonic()
+        with window.jobs_lock() as go:
+            assert go is False
+            with window.jobs_lock() as inner:
+                assert inner is False, "nested, the same answer"
+        assert time.monotonic() - t0 < 0.2, "a try again soon: one short look"
+        time.sleep(1.05)
+        with window.jobs_lock() as go:
+            assert go is True, "kept past its patience: on without it"
+    with window.jobs_lock() as go:
+        assert go is True and window._jobs_fd is not None, "free again: locked"
+    assert window._jobs_missed is None
+    monkeypatch.setitem(rc.JOBS_WAIT_S, rc.SERVER, 0.3)
+    monkeypatch.setattr(rc, "JOBS_PATIENCE_S", 0.3)
+    with window.jobs_lock():
+        t0 = time.monotonic()
+        with server.jobs_lock() as go:
+            assert go is True and server._jobs_fd is None
+        assert time.monotonic() - t0 >= 0.28, "the server waited its patience at once"
+
+
 def test_finished_claims_are_swept_after_a_while_and_live_ones_never(folder):
     window, server = rc.Claims(folder, rc.WINDOW), rc.Claims(folder, rc.SERVER)
     window.take("done", {"stop": time.time()})

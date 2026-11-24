@@ -262,6 +262,39 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 - After a backup or a sync brought a source whose first login failed, the
   strip under the list said there was no source yet. It now says the source
   could not be reached, with Try again and Settings › Sources.
+- One damaged or hand-edited download's file beside a video (`1e999`,
+  `NaN` or a number of hundreds of digits where its time or size is) hid
+  downloads: the Downloaded place was not drawn, offline mode's Series
+  list was empty, and with the same title downloaded twice no download was
+  listed at all. Such a number is now no number, and every download is
+  listed; a hand-edited download queue can no longer stop the window
+  opening. A title with no space in it, tens of kilobytes long, no longer
+  takes minutes to clean, and one with an odd character from the provider
+  is kept.
+- A waiting download could start while a live channel waited a moment to
+  reconnect - the account looked free - and take the one connection the
+  channel needed. A channel coming back now holds the account as playing
+  does, and every waiting download is held before the player opens a
+  stream, not only the one running.
+- With `dopeiptv --server` (or the app on another computer sharing the
+  settings folder) stuck while it held the scheduled recordings' list - a
+  suspended process, a slow network disk - the window froze for up to 5 s
+  at every look and save. It waits a moment at most now and saves at its
+  next look, with nothing lost or kept twice.
+- A source an older release named after its address had the login in its
+  name ("user:password@host"), and that name was written beside a
+  download. Such a source is named by its host and port at the first
+  start, an older release's export is read the same way, and a source's
+  name that holds a login is never written beside a download (one a test
+  build wrote is written again without it).
+- Painting a downloaded title's pill looked at its file on the disk each
+  time; with the downloads folder on a share that stopped answering that
+  could hold the window. The pill, the menus and the column under the
+  poster go by what the folder held when it was last read, and the file
+  is looked at once, as it plays (one that is gone plays from the source).
+- The activity panel's History could keep a note about a title that began
+  playing in private viewing and played on after it was turned off (its
+  reconnect, its recording). Nothing is kept until that playback ends.
 
 ## [1.6.12]
 
