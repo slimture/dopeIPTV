@@ -493,9 +493,23 @@ def test_the_history_tab_lists_filters_copies_and_clears(app):
     panel.history.chips["done"].click()
     assert panel.history.empty.text() == tr("notice_hist_none")
     panel.history.chips["all"].click()
+    # Copy list: what the list shows, its words saying so; a row's own Copy.
+    assert panel.history.copy_btn.text() == tr("notice_hist_copy_list")
+    assert panel.history.copy_btn.toolTip() == tr("notice_hist_copy_tip")
     panel.history.copy_btn.click()
-    assert "Could not save" in QApplication.clipboard().text()
+    got = QApplication.clipboard().text()
+    assert "Could not save" in got and "Copied" in got
     assert panel.history.copy_btn.text() == tr("problem_copied")
+    rows = [panel.history._rows.itemAt(i).widget() for i in range(2)]
+    assert rows[1].contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
+    panel.history.copy_one(rows[1].item_id)
+    one = QApplication.clipboard().text()
+    assert "Could not save" in one and "Copied" not in one and one.count("\n") == 0
+    # Filtered to errors, Copy list copies the errors alone.
+    panel.history.chips["error"].click()
+    panel.history.copy_btn.click()
+    assert "Copied" not in QApplication.clipboard().text()
+    panel.history.chips["all"].click()
     panel.history.clear_btn.click()
     assert hub.history() == [] and panel.history.empty.isVisible()
     # Work going on: it opens on Now; the tab goes back and forth.

@@ -18,6 +18,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   warnings, notes and done, with Copy (scrubbed of your logins) and
   Clear. Kept in memory only, and nothing while viewing privately. A ✕ in
   the panel's corner closes it, beside Esc and a click elsewhere.
+  History's Copy list copies what the list shows (its filter too), its
+  tooltip saying so; a right click on a row copies that one.
 
 ### Fixed
 

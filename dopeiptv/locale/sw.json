@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg haikuweza kukihifadhi",
   "dl_why_certificate": "cheti chake hakithibitiki",
   "dl_why_refused": "kiliongoza mahali programu haipakui kutoka",
-  "dl_why_other": "kuna hitilafu imetokea"
+  "dl_why_other": "kuna hitilafu imetokea",
+  "notice_hist_copy_list": "Nakili orodha",
+  "notice_hist_copy_tip": "Inanakili kile orodha inachoonyesha sasa, kama maandishi, bila taarifa zako za kuingia. Bofya kulia mstari ili kunakili huo pekee."
 }

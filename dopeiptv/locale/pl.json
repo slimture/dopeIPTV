@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg nie zdołał go zapisać",
   "dl_why_certificate": "jego certyfikat się nie zgadza",
   "dl_why_refused": "prowadziło tam, skąd aplikacja nie pobiera",
-  "dl_why_other": "coś poszło nie tak"
+  "dl_why_other": "coś poszło nie tak",
+  "notice_hist_copy_list": "Kopiuj listę",
+  "notice_hist_copy_tip": "Kopiuje to, co lista teraz pokazuje, jako tekst, bez twoich danych logowania. Kliknij prawym przyciskiem wiersz, aby skopiować tylko jego."
 }

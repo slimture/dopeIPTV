@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg konnte es nicht speichern",
   "dl_why_certificate": "sein Zertifikat stimmt nicht",
   "dl_why_refused": "es führte dorthin, wovon die App nicht herunterlädt",
-  "dl_why_other": "etwas ist schiefgelaufen"
+  "dl_why_other": "etwas ist schiefgelaufen",
+  "notice_hist_copy_list": "Liste kopieren",
+  "notice_hist_copy_tip": "Kopiert, was die Liste gerade zeigt, als Text – ohne deine Zugangsdaten. Rechtsklick auf eine Zeile kopiert nur diese."
 }

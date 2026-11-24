@@ -607,13 +607,17 @@ class NoticeHub(QObject):
             self.history_changed.emit()
 
     def history_text(self, levels: tuple[str, ...] | None = None,
-                     names: dict[str, str] | None = None, personal: Any = ()) -> str:
+                     names: dict[str, str] | None = None, personal: Any = (),
+                     ids: Any = None) -> str:
         """The history as plain text for Copy, the oldest first: its time,
         its level's name (*names*, else the level) and its words - already
         without logins or addresses (core/log.for_people), scrubbed once more
-        by core/report with the person's own values (*personal*)."""
+        by core/report with the person's own values (*personal*). *ids*: only
+        those (a row's own Copy)."""
         lines = []
         for h in reversed(self.history(levels)):
+            if ids is not None and h.id not in ids:
+                continue
             when = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(h.at))
             name = (names or {}).get(h.level, h.level)
             lines.append(f"{when}  {name}  " + h.text.replace("\n", " - "))

@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg ga nije mogao spremiti",
   "dl_why_certificate": "njegov certifikat nije ispravan",
   "dl_why_refused": "vodilo je onamo odakle aplikacija ne preuzima",
-  "dl_why_other": "nešto je pošlo po zlu"
+  "dl_why_other": "nešto je pošlo po zlu",
+  "notice_hist_copy_list": "Kopiraj popis",
+  "notice_hist_copy_tip": "Kopira ono što popis sada prikazuje, kao tekst, bez vaših podataka za prijavu. Desni klik na redak kopira samo njega."
 }

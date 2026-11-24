@@ -389,6 +389,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "notice_hist_notes": {"en": "Notes"},
     "notice_hist_empty": {"en": "Nothing yet - what the app tells you, and the work you start, shows up here until it closes."},
     "notice_hist_none": {"en": "Nothing of this kind."},
+    "notice_hist_copy_list": {"en": "Copy list"},
+    "notice_hist_copy_tip": {"en": "Copies what the list shows now, as text, without your logins. Right-click a row to copy just that one."},
     "menu_activity": {"en": "Activity and messages…"},
     "notice_unread": {"en": "Unread messages: {n}"},
     "status_playing": {"en": "Playing: {title}"},

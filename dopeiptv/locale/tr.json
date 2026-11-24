@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg kaydedemedi",
   "dl_why_certificate": "sertifikası doğrulanmıyor",
   "dl_why_refused": "uygulamanın indirmediği bir yere götürdü",
-  "dl_why_other": "bir şeyler ters gitti"
+  "dl_why_other": "bir şeyler ters gitti",
+  "notice_hist_copy_list": "Listeyi kopyala",
+  "notice_hist_copy_tip": "Listenin şu an gösterdiğini, giriş bilgileriniz olmadan metin olarak kopyalar. Yalnızca bir satırı kopyalamak için o satıra sağ tıklayın."
 }

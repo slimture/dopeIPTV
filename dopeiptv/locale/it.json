@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg non è riuscito a salvarlo",
   "dl_why_certificate": "il suo certificato non è valido",
   "dl_why_refused": "portava dove l'app non scarica",
-  "dl_why_other": "qualcosa è andato storto"
+  "dl_why_other": "qualcosa è andato storto",
+  "notice_hist_copy_list": "Copia elenco",
+  "notice_hist_copy_tip": "Copia ciò che l'elenco mostra ora, come testo, senza i tuoi dati di accesso. Clic destro su una riga per copiare solo quella."
 }

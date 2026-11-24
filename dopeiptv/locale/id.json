@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg tidak bisa menyimpannya",
   "dl_why_certificate": "sertifikatnya tidak valid",
   "dl_why_refused": "mengarah ke tempat yang tidak diunduh oleh aplikasi",
-  "dl_why_other": "ada yang salah"
+  "dl_why_other": "ada yang salah",
+  "notice_hist_copy_list": "Salin daftar",
+  "notice_hist_copy_tip": "Menyalin apa yang ditampilkan daftar sekarang sebagai teks, tanpa data login Anda. Klik kanan sebuah baris untuk menyalin baris itu saja."
 }

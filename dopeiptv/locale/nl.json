@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg kon het niet opslaan",
   "dl_why_certificate": "het certificaat klopt niet",
   "dl_why_refused": "het leidde naar waar de app niet van downloadt",
-  "dl_why_other": "er ging iets mis"
+  "dl_why_other": "er ging iets mis",
+  "notice_hist_copy_list": "Lijst kopiëren",
+  "notice_hist_copy_tip": "Kopieert wat de lijst nu toont als tekst, zonder je inloggegevens. Klik met rechts op een regel om alleen die te kopiëren."
 }

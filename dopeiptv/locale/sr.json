@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg nije mogao da ga sačuva",
   "dl_why_certificate": "njegov sertifikat nije ispravan",
   "dl_why_refused": "vodilo je tamo odakle aplikacija ne preuzima",
-  "dl_why_other": "nešto je pošlo naopako"
+  "dl_why_other": "nešto je pošlo naopako",
+  "notice_hist_copy_list": "Kopiraj listu",
+  "notice_hist_copy_tip": "Kopira ono što lista sada prikazuje, kao tekst, bez vaših podataka za prijavu. Desni klik na red kopira samo njega."
 }

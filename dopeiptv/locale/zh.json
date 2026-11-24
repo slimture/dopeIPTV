@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg 无法保存它",
   "dl_why_certificate": "它的证书无法通过验证",
   "dl_why_refused": "它指向了应用不会从中下载的地方",
-  "dl_why_other": "出了点问题"
+  "dl_why_other": "出了点问题",
+  "notice_hist_copy_list": "复制列表",
+  "notice_hist_copy_tip": "以文本形式复制列表当前显示的内容，不含你的登录信息。右键单击某一行可只复制该行。"
 }

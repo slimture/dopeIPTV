@@ -16,7 +16,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
-    QApplication, QButtonGroup, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel,
+    QApplication, QButtonGroup, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMenu,
     QPushButton, QScrollArea, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -1038,7 +1038,10 @@ class HistoryView(QWidget):
         foot.setContentsMargins(0, 0, 0, 0)
         foot.setSpacing(6)
         foot.addStretch(1)
-        self.copy_btn = self._foot_button(tr("problem_copy"), self._copy)
+        # The list as it shows (the filter too), without the person's logins;
+        # a row's own right click copies that one.
+        self.copy_btn = self._foot_button(tr("notice_hist_copy_list"), self._copy)
+        self.copy_btn.setToolTip(tr("notice_hist_copy_tip"))
         self.clear_btn = self._foot_button(tr("btn_clear"), hub.clear_history)
         foot.addWidget(self.copy_btn)
         foot.addWidget(self.clear_btn)
@@ -1080,7 +1083,7 @@ class HistoryView(QWidget):
         everything = self._hub.history()
         items = self._hub.history(self._levels)[:self.MAX_SHOWN]
         for i, h in enumerate(items):
-            row = _HistoryRow(self._body, h)
+            row = _HistoryRow(self._body, h, self)
             self._rows.insertWidget(i, row)
             row.show()
         self.scroll.setVisible(bool(items))
@@ -1106,6 +1109,22 @@ class HistoryView(QWidget):
         self.updateGeometry()
 
     def _copy(self) -> None:
+        """Copy list: what the list shows now, as plain text."""
+        QApplication.clipboard().setText(self._text(None))
+        self.copy_btn.setText(tr("problem_copied"))
+        QTimer.singleShot(1500, self._copy_back)
+
+    def copy_one(self, item_id: int) -> None:
+        """A row's own Copy: that one, as Copy list writes it."""
+        QApplication.clipboard().setText(self._text({item_id}))
+
+    def row_menu(self, row: QWidget, pos: QPoint) -> None:
+        menu = QMenu(row)
+        menu.addAction(tr("problem_copy"), lambda: self.copy_one(row.item_id))
+        menu.exec(row.mapToGlobal(pos))
+        menu.deleteLater()
+
+    def _text(self, ids: set[int] | None) -> str:
         names = {"error": tr("notice_error"), "warning": tr("notice_warning"),
                  "info": tr("notice_info"), "done": tr("rec_status_done"),
                  "cancelled": tr("rec_status_cancelled")}
@@ -1117,13 +1136,11 @@ class HistoryView(QWidget):
                 personal = values()
             except Exception:
                 log.debug("notices: the person's values not had for the copy", exc_info=True)
-        QApplication.clipboard().setText(self._hub.history_text(self._levels, names, personal))
-        self.copy_btn.setText(tr("problem_copied"))
-        QTimer.singleShot(1500, self._copy_back)
+        return self._hub.history_text(self._levels, names, personal, ids=ids)
 
     def _copy_back(self) -> None:
         try:
-            self.copy_btn.setText(tr("problem_copy"))
+            self.copy_btn.setText(tr("notice_hist_copy_list"))
         except RuntimeError:            # the window went meanwhile
             pass
 
@@ -1131,9 +1148,14 @@ class HistoryView(QWidget):
 class _HistoryRow(QWidget):
     """One thing in the history: its mark, its words and its time."""
 
-    def __init__(self, parent: QWidget, h: HistoryItem) -> None:
+    def __init__(self, parent: QWidget, h: HistoryItem, view: HistoryView | None = None) -> None:
         super().__init__(parent)
         self._level = h.level
+        self.item_id = h.id
+        # A right click: Copy this one (HistoryView.row_menu).
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        if view is not None:
+            self.customContextMenuRequested.connect(lambda pos: view.row_menu(self, pos))
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)

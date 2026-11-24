@@ -3286,5 +3286,7 @@
   "dl_why_ffmpeg": "ffmpeg가 저장하지 못했습니다",
   "dl_why_certificate": "그 인증서가 올바르지 않습니다",
   "dl_why_refused": "앱이 다운로드하지 않는 곳으로 이어졌습니다",
-  "dl_why_other": "문제가 발생했습니다"
+  "dl_why_other": "문제가 발생했습니다",
+  "notice_hist_copy_list": "목록 복사",
+  "notice_hist_copy_tip": "지금 목록에 보이는 내용을 로그인 정보 없이 텍스트로 복사합니다. 한 줄만 복사하려면 그 줄을 오른쪽 클릭하세요."
 }
