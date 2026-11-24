@@ -280,6 +280,11 @@ class _ContextMenuMixin:
                         self._account_action("ctx_watchlist_add"),
                         lambda it=it, k=wl_kind: self._add_watchlist(
                             it, k, True))
+        # Download a film or an episode, a series' every episode - or what
+        # its download is (mw_downloads).
+        dl_menu = getattr(self, "_dl_item_menu", None)
+        if dl_menu is not None:
+            dl_menu(m, it, content_kind)
         if (self.mode in ("live", "vod", "series")
                 and not self.series_ctx):
             ov_mode = self.mode

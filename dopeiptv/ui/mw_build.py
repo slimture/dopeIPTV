@@ -220,6 +220,7 @@ class _BuildMixin(_BuildDetailMixin):
         self._rail_glyphs = {
             "mitt": "star", "search": "search", "live": "tv", "guide": "guide", "vod": "movie",
             "series": "series", "rec": "rec", "local": "folder_o", "radio": "radio",
+            "dl": "download",
         }
         self._nav_texts: dict[str, str] = {}
         self.nav_btns: dict[str, NavButton] = {}
@@ -272,7 +273,7 @@ class _BuildMixin(_BuildDetailMixin):
                  ("vod", tr("nav_movies")), ("series", tr("nav_series")),
                  ("guide", tr("nav_guide")), ("search", tr("nav_search")))
         lower = (("local", tr("nav_local")), ("radio", tr("nav_radio")),
-                 ("rec", tr("nav_recordings")))
+                 ("rec", tr("nav_recordings")), ("dl", tr("nav_downloads")))
         for key, text in upper:
             _make_nav(key, text, self._places_lay, primary=True)
         # Between the two groups, on the rail too: a hairline and its gap.

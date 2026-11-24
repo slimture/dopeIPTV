@@ -104,6 +104,7 @@ from .mw_series_page import _SeriesPageMixin
 from .mw_place_films import _PlaceFilmsMixin
 from .mw_place_local import _PlaceLocalMixin
 from .mw_place_rec import _PlaceRecMixin
+from .mw_downloads import _DownloadsMixin
 from .mw_place_radio import _PlaceRadioMixin
 from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
@@ -133,7 +134,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _ListsMixin,
                  _LocalFilesMixin, _PlaceLocalMixin, _LocalWatchMixin, _RadioMixin, _WebStreamsMixin,
                  _QueueMixin,
-                 _PlaceRecMixin, _PlaceRadioMixin,
+                 _PlaceRecMixin, _PlaceRadioMixin, _DownloadsMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PlaceLookMixin, _PopularMixin,
                  _GuideMixin,
                  _SeriesPageMixin, _PlaceFilmsMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
@@ -273,6 +274,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # Events pushed out (Nerd): they only watch.
         self.rec.recording_stopped.connect(self._events_rec_stopped)
         self.rec.jobs_changed.connect(self._events_jobs)
+        # Films and episodes downloaded to watch without the network, one at
+        # a time over one connection (mw_downloads, core/downloads.py).
+        self._init_downloads()
         self.wake = WakeLock()
         self._init_donate()
         # Settings sync between a person's computers (off until started).
@@ -1711,8 +1715,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 self.history.add(url, title, icon, key, kind)
             return
 
-        self._start_playback(url, title, icon, key, kind,
-                             record=self.mode != "history", item=it)
+        # A downloaded film or episode plays its file (mw_downloads).
+        start = getattr(self, "_dl_start", self._start_playback)
+        start(url, title, icon, key, kind, record=self.mode != "history", item=it)
 
     # -- local files ---------------------------------------------------------------
 
@@ -2083,7 +2088,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             # _start_playback doesn't snapshot the Continue list as episodes.
             self._ep_queue_override = []
             self._ep_index_override = -1
-            self._start_playback(
+            getattr(self, "_dl_start", self._start_playback)(
                 url, title, it.get("stream_icon") or it.get("cover"),
                 self._item_key(it), "episode", record=True, item=it)
         finally:
@@ -2359,7 +2364,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 self._start_at_once(key, "episode", item)
             self._ep_queue_override = queue
             self._ep_index_override = index
-            self._start_playback(
+            getattr(self, "_dl_start", self._start_playback)(
                 url, title, item.get("stream_icon") or item.get("cover"),
                 key, "episode", record=True, item=item)
             return True
@@ -3736,6 +3741,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                 daemon=True).start()
         self._simkl_stop_current()
         self.rec.shutdown()
+        self._dl_shutdown()             # the download carries on at the next start
         if self.player:
             self.player.shutdown()
         # Now that the player has let go of an in-player recording's file.

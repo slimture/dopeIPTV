@@ -44,7 +44,7 @@ def app():
 # -- the sidebar's entries ---------------------------------------------------------
 
 def test_only_the_lower_places_and_pages_can_be_taken_out():
-    assert places.HIDEABLE == ("guide", "search", "local", "radio", "rec")
+    assert places.HIDEABLE == ("guide", "search", "local", "radio", "rec", "dl")
     assert not {"mitt", "tv", "films", "series"} & set(places.HIDEABLE)
     s = S()
     assert places.hidden(s) == frozenset() and places.shown(s) == places.PLACES
@@ -52,9 +52,9 @@ def test_only_the_lower_places_and_pages_can_be_taken_out():
     assert not places.set_hidden(s, "radio", True)          # already out
     assert not places.set_hidden(s, "tv", True) and not places.set_hidden(s, "mitt", True)
     assert s[places.HIDDEN_KEY] == "guide,radio"             # the sidebar's order
-    assert places.shown(s) == ("mitt", "tv", "films", "series", "search", "local", "rec")
+    assert places.shown(s) == ("mitt", "tv", "films", "series", "search", "local", "rec", "dl")
     assert places.lower_shown(s)
-    for p in ("local", "rec"):
+    for p in ("local", "rec", "dl"):
         places.set_hidden(s, p, True)
     assert not places.lower_shown(s)                          # the hairline goes
     assert places.set_hidden(s, "radio", False) and places.lower_shown(s)

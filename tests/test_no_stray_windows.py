@@ -72,7 +72,7 @@ def step(fn):
         app.processEvents()
 
 for place in ("mitt", "tv", "films", "series", "guide", "search", "local",
-              "radio", "rec", "mitt"):
+              "radio", "rec", "dl", "mitt"):
     step(lambda p=place: w._show_place(p))
     ok = w._place == place
     if not ok:

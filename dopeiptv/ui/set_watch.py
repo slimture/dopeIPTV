@@ -471,9 +471,9 @@ def build_multiview(ctx: SettingsContext) -> None:
 
 
 def build_recording(ctx: SettingsContext) -> None:
-    """Recording: the folder and MP4, the size limits, the padding, the
-    series recordings (an Enigma2 box's AutoTimer rules beside them) and
-    the recorder found."""
+    """Recording: the folder and MP4, the size limits, the downloads (their
+    folder and space), the padding, the series recordings (an Enigma2 box's
+    AutoTimer rules beside them) and the recorder found."""
     win, d, rec = ctx.win, ctx.dialog, ctx.pages["recording"]
     flag, nerd_link = ctx.flag, ctx.nerd_link
     rec_dir_btn = QPushButton(tr("btn_choose_folder"))
@@ -539,6 +539,9 @@ def build_recording(ctx: SettingsContext) -> None:
     c = rec.card(tr("set_card_limits"))
     c.row(tr("rec_max_label"), rec_max_box)
     c.row(tr("rec_total_label"), rec_total_box)
+    # Downloads to watch without the network (core/downloads.py): their
+    # folder and the space they may take - never below the disk's floor.
+    dl_box, dl_cap_mb = _downloads_card(win, d, rec.card(tr("set_card_downloads")))
     # Minutes before and after a programme recorded from the guide
     # (and by a series rule); 0 and 0 record its listed times, as
     # before.
@@ -672,12 +675,45 @@ def build_recording(ctx: SettingsContext) -> None:
             val, unit = mb_value(rec_total_box.value())
             put("rec_total_value", val)
             put("rec_total_unit", unit)
+        if dl_box.value() != dl_cap_mb:
+            win.downloads.set_cap_gb(dl_box.value() / 1000)
         # Untouched and never set: not written (0 is the default).
         for skey, box, was in ((srules.PAD_BEFORE_KEY, pad_before_box, pad_before),
                                (srules.PAD_AFTER_KEY, pad_after_box, pad_after)):
             if box.value() != was or win.settings.value(skey) is not None:
                 put(skey, box.value())
     ctx.page_commits["recording"] = commit_recording
+
+
+def _downloads_card(win, d, c):
+    """Settings > Recording's Downloads: where they are saved, the space
+    they may take, what they take now and how they behave. (The space's
+    stepper, the space as it was in MB.)"""
+    from ..core import downloads as dl
+    folder_btn = QPushButton(tr("btn_choose_folder"))
+    folder_row = c.row(tr("dl_folder"), folder_btn, win.downloads.folder())
+
+    def pick() -> None:
+        path = QFileDialog.getExistingDirectory(
+            d, tr("dl_choose_folder"), win.downloads.folder(),
+            file_dialog_options(QFileDialog.Option.ShowDirsOnly))
+        if path:
+            win.downloads.set_folder(path)
+            win._dl_trust()
+            folder_row.hint_label.setText(path)
+
+    folder_btn.clicked.connect(pick)
+    cap_mb = round(dl.cap_gb(win.settings) * 1000)
+    spin = SizeSpin([0, 5000, 10000, 20000, 25000, 50000, 75000, 100000, 150000, 200000,
+                     250000, 500000, 750000, 1_000_000, 2_000_000, 4_000_000],
+                    tr("rec_cap_no_limit"), cap_mb)
+    spin.setValue(cap_mb)
+    box = Stepper(spin, width=spin.widest() + 80)
+    box.setAccessibleName(tr("dl_cap"))
+    c.row(tr("dl_cap"), box, tr("dl_cap_hint"))
+    c.note(tr("dl_used", size=format_size(win.downloads.used_bytes())))
+    c.note(tr("dl_note"))
+    return box, cap_mb
 
 
 def build_casting(ctx: SettingsContext) -> None:

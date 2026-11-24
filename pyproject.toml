@@ -155,6 +155,7 @@ files = [
     "dopeiptv/core/night_mode.py",
     "dopeiptv/core/rec_mp4.py",
     "dopeiptv/core/rec_view.py",
+    "dopeiptv/core/downloads.py",
     "dopeiptv/core/num.py",
     "dopeiptv/core/names.py",
     "dopeiptv/core/viewing_stats.py",

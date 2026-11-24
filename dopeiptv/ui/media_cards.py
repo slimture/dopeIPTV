@@ -126,11 +126,12 @@ def playing_ink() -> QColor:
 
 #: The pills, the same everywhere: what is on the air, a new title or
 #: episode, what plays here now, what plays on a TV now (a cast), one already
-#: watched, the one up next, one that failed (a recording).
-PILL_KINDS = ("live", "new", "playing", "tv", "seen", "next", "fail")
+#: watched, the one up next, one that failed (a recording), one whose file is
+#: downloaded (core/downloads.py).
+PILL_KINDS = ("live", "new", "playing", "tv", "seen", "next", "fail", "dl")
 _PILL_WORDS = {"live": "pill_live", "new": "pill_new", "playing": "pill_playing",
                "tv": "pill_on_tv", "seen": "pill_seen", "next": "sp_up_next",
-               "fail": "rec_status_failed"}
+               "fail": "rec_status_failed", "dl": "pill_downloaded"}
 
 #: Whether what plays plays on a TV (a cast) rather than here - one thing
 #: plays at a time, so every view's mark says the same (the window sets it:
@@ -185,13 +186,15 @@ def pill_size(text: str, fm: QFontMetrics | None = None) -> QSize:
 def pill_colours(kind: str) -> tuple[QColor, QColor]:
     """(fill, ink) of a pill of *kind*: Live in the recording red, New and
     Playing in the accent, Watched a soft wash of the theme's "ok" green,
-    Failed one of its "error" red, Up next a soft wash of the accent - each
-    ink made to read on its fill."""
+    Failed one of its "error" red, Up next a soft wash of the accent,
+    Downloaded a calm one of the text's own colour - each ink made to read
+    on its fill."""
     if kind == "live":
         return QColor(P["rec"]), QColor(ink_on(P["rec"]))
     if kind in ("new", "playing", "tv"):
         return QColor(P["accent"]), QColor(P["on_accent"])
-    base = P["ok"] if kind == "seen" else P["error"] if kind == "fail" else P["accent"]
+    base = (P["ok"] if kind == "seen" else P["error"] if kind == "fail"
+            else P["text2"] if kind == "dl" else P["accent"])
     wash, ink = _wash(base, 0.24)
     return QColor(wash), QColor(ink)
 

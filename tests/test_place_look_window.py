@@ -100,10 +100,10 @@ def rows_of_entries():
     return len({b.geometry().y() for b in btns.values() if not b.isHidden()})
 
 
-# 1. Folded: the same entries as icons in two rows, the one lit still lit, the
-#    categories given the room; kept for the profile.
+# 1. Folded: the same entries as icons in even rows (ten and the fold: three),
+#    the one lit still lit, the categories given the room; kept for the profile.
 assert not lay.is_folded() and fold.isVisible() and fold.toolTip() == tr("places_fold")
-assert rows_of_entries() == 9 and w._places_rule.isVisible()
+assert rows_of_entries() == 10 and w._places_rule.isVisible()
 h0, box0 = w.cat_list.height(), w._places_box.height()
 fold.click()
 settle(lambda: lay.is_folded() and w.cat_list.height() > h0 + 150, what="folded")
@@ -111,7 +111,8 @@ assert s.value(places.FOLDED_KEY) == "true"
 assert all(b.text() == "" and b.property("tile") and b.property("rail") for b in btns.values())
 assert all(b.toolTip() and b.accessibleName() for b in btns.values())
 assert btns["live"].isChecked() and [k for k, b in btns.items() if b.isChecked()] == ["live"]
-assert rows_of_entries() == 2 and not w._places_rule.isVisible()
+assert rows_of_entries() == lay.grid(w._places_box.width(), len(btns) + 1)[1] == 3
+assert not w._places_rule.isVisible()
 assert fold.isVisible() and fold.is_folded() and fold.toolTip() == tr("places_unfold")
 # Its status on its icon: a recording's red dot, its words in the tooltip.
 w.rec.stop_inplayer_cb = lambda: None
@@ -133,7 +134,7 @@ w._set_sidebar_collapsed(True)
 idle(0.3)
 assert not lay.is_folded() and not fold.isVisible() and w._places_rule.isVisible()
 assert all(b.text() == "" and not b.property("tile") for b in btns.values())
-assert rows_of_entries() == 9
+assert rows_of_entries() == 10
 w._set_sidebar_collapsed(False)
 idle(0.3)
 assert lay.is_folded() and all(b.text() == "" for b in btns.values())
@@ -149,10 +150,10 @@ settle(lambda: top.recent.isVisible(), what="TV again")
 
 # 2. Entries taken out: gone, the hairline with the last lower one; their
 #    places still open; the app does not open on one.
-for p in ("guide", "local", "radio", "rec"):
+for p in ("guide", "local", "radio", "rec", "dl"):
     places.set_hidden(s, p, True)
 w._places_look_changed("test")
-assert all(btns[k].isHidden() for k in ("guide", "local", "radio", "rec"))
+assert all(btns[k].isHidden() for k in ("guide", "local", "radio", "rec", "dl"))
 assert not any(btns[k].isHidden() for k in ("mitt", "live", "vod", "series", "search"))
 assert not w._places_rule.isVisible()
 w._shortcut_epg_guide()

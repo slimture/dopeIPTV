@@ -239,6 +239,10 @@ class _PrivacyMixin:
             # Watch together tells the others what plays: out of the room.
             if hasattr(self, "_together_private_on"):
                 self._together_private_on()
+            # Nothing downloads while viewing privately: the running one
+            # waits, and goes on once private viewing ends (mw_downloads).
+            if hasattr(self, "_dl_private_on"):
+                self._dl_private_on()
         elif was:
             # Private viewing ended: the rewind buffers of the channels
             # left in it go now (the one still playing when it is left).

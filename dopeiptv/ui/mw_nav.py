@@ -96,7 +96,7 @@ class _NavMixin:
         """What the nav shows, all of it already known - nothing here asks
         the network: recordings running now, episodes of followed series that
         arrived since the series was last opened, what waits under Watch
-        later (on Mine, which holds it)."""
+        later (on Mine, which holds it), the downloads still to come."""
         rec = getattr(self, "rec", None)
         followed = getattr(self, "followed", None)
         wl = getattr(self, "watchlist", None)
@@ -107,21 +107,23 @@ class _NavMixin:
                        if followed is not None else 0),
             "mitt": (len(wl.movies) + len(wl.shows)
                      if wl is not None else 0),
+            "dl": getattr(self, "_dl_queued_count", lambda: 0)(),
         }
 
     def _refresh_nav_status(self) -> None:
         """Put the status on its entries: a red dot on Recordings while
         anything records, a pill with the new episodes on Series, a muted
-        count of Watch later on Mine - dots in the icon's corner on the
-        rail."""
+        count of Watch later on Mine and of the downloads to come on
+        Downloaded - dots in the icon's corner on the rail."""
         btns = getattr(self, "nav_btns", None)
         if not btns:
             return
         st = self._nav_status()
-        kinds = {"rec": "dot", "series": "pill", "mitt": "count"}
+        kinds = {"rec": "dot", "series": "pill", "mitt": "count", "dl": "count"}
         words = {"rec": tr("nav_status_recording", n=st["rec"]),
                  "series": tr("nav_status_new_episodes", n=st["series"]),
-                 "mitt": tr("nav_status_watchlist", n=st["mitt"])}
+                 "mitt": tr("nav_status_watchlist", n=st["mitt"]),
+                 "dl": tr("nav_status_downloads", n=st["dl"])}
         for key, kind in kinds.items():
             b = btns.get(key)
             if b is None:
@@ -476,6 +478,15 @@ class _NavMixin:
             pr.drawEllipse(QPointF(s * 0.36, s * 0.60), s * 0.12, s * 0.12)
             pr.drawLine(QPointF(s * 0.60, s * 0.52), QPointF(s * 0.76, s * 0.52))
             pr.drawLine(QPointF(s * 0.60, s * 0.68), QPointF(s * 0.76, s * 0.68))
+        elif kind == "download":
+            # Downloaded: an arrow down into a tray - apart from Recordings'
+            # ring and Local files' folder.
+            stroke()
+            pr.drawLine(QPointF(s * 0.5, s * 0.12), QPointF(s * 0.5, s * 0.62))
+            pr.drawPolyline(QPolygonF([QPointF(s * 0.30, s * 0.44), QPointF(s * 0.5, s * 0.64),
+                                       QPointF(s * 0.70, s * 0.44)]))
+            pr.drawPolyline(QPolygonF([QPointF(s * 0.14, s * 0.62), QPointF(s * 0.14, s * 0.86),
+                                       QPointF(s * 0.86, s * 0.86), QPointF(s * 0.86, s * 0.62)]))
         elif kind == "gear":
             # A cog's outline round a hub: eight teeth with sloped flanks.
             stroke()
