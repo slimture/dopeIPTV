@@ -44,7 +44,7 @@ SHOTS = {
     # Its section is there only in a build with a Simkl client id
     # (providers/simkl.py, PUBLIC_CLIENT_ID).
     "more-simkl": ("history", "tab_simkl"),
-    "watch-night": ("playback", "night_mode"),
+    "watch-night": ("audio", "night_mode"),
     "watch-web": ("playback", "ytdlp_card"),
     "more-castback": ("casting", "set_cast_keep_buffer"),
 }
