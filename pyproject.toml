@@ -148,6 +148,8 @@ files = [
     "dopeiptv/core/series_rules.py",
     "dopeiptv/core/series_plan.py",
     "dopeiptv/core/rec_claims.py",
+    "dopeiptv/core/rec_close.py",
+    "dopeiptv/core/start_channel.py",
     "dopeiptv/core/series_view.py",
     "dopeiptv/core/film_view.py",
     "dopeiptv/core/series_continue.py",

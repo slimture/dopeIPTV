@@ -335,6 +335,146 @@ def test_the_restream_counts_what_the_server_records(served):
     assert "/live/u/p/2.ts" not in p.connections
 
 
+def test_a_recording_never_cuts_off_a_device_that_watches(served):
+    """The server's own recording makes room only of channels nobody
+    watches (the restream's make_room, idle_only): a device watching keeps
+    its stream, and the recording waits."""
+    p = served.provider
+    r = _watch(served.srv, f"/stream/p1/2?token={TOKEN}")
+    try:
+        assert served.srv.restream.make_room("p1", 1, idle_only=True) == 0
+        job = _job(served.mgr, 1, "Film", p.base)
+        for _ in range(3):
+            served.mgr.tick()
+        assert job["status"] == "scheduled" and job["_held"]
+        assert r.read(188 * 400), "the device's stream goes on"
+        assert p.open_now == 1 and "/live/u/p/1.ts" not in p.connections
+        assert served.srv.restream.status()["channels"][0]["viewers"]
+    finally:
+        r.close()
+
+
+# -- carried on from a window that closes (core/rec_close.py) ----------------------------------
+
+def _own_connection(p: Provider, order: list, folder: Path):
+    """A window's recorder's spawn whose connection is a real one to the
+    provider, closed when it is stopped."""
+    def spawn(j: dict) -> None:
+        r = OPENER.open(f"{p.base}/live/u/p/1.ts", timeout=10)
+        stop = threading.Event()
+
+        def read() -> None:
+            try:
+                while not stop.is_set() and r.read(188 * 40):
+                    pass
+            except OSError:
+                pass
+            finally:
+                r.close()
+        t = threading.Thread(target=read, daemon=True)
+        t.start()
+
+        def terminate() -> None:
+            stop.set()
+            t.join(5)
+            order.append("window let go of its connection")
+        j["path"] = str(folder / "News (window).ts")
+        Path(j["path"]).write_bytes(b"\x47" * 188 * 10)
+        j.update(status="recording", proc=SimpleNamespace(poll=lambda: None, terminate=terminate,
+                                                          wait=lambda _t=None: 0))
+        order.append("window opened its connection")
+    return spawn
+
+
+def test_a_recording_the_window_makes_goes_on_in_a_server_that_runs(served):
+    """The window closes while it records a scheduled job and a server
+    runs: its connection ends, then - only once it let go - the server opens
+    its own and records the rest into a recording of its own; never two
+    connections at once, never a second recording of what the window made,
+    each part saying so in its info."""
+    p = served.provider
+    order: list = []
+    path = served.settings.fileName()
+    win = RecordingManager(QSettings(path, QSettings.Format.IniFormat),
+                           claims=rc.Claims(rc.folder_for(served.settings), rc.WINDOW))
+    win._timer.stop()
+    win._spawn = _own_connection(p, order, served.tmp)
+    most = [0]
+    watching = threading.Event()
+
+    def sample() -> None:
+        while not watching.is_set():
+            most[0] = max(most[0], p.open_now)
+            time.sleep(0.002)
+    threading.Thread(target=sample, daemon=True).start()
+    try:
+        assert win.claims.present(rc.SERVER), "the server says it runs"
+        job = _job(win, 1, "News", p.base)
+        assert job["status"] == "recording" and order == ["window opened its connection"]
+        assert spin(lambda: p.open_now == 1)
+        served.mgr.tick()
+        theirs = next(j for j in served.mgr.jobs if j["id"] == job["id"])
+        assert theirs["_elsewhere"]["who"] == rc.WINDOW
+        # The window closes, the server carrying it on.
+        win.shutdown(carry=[job["id"]])
+        assert order[-1] == "window let go of its connection"
+        assert spin(lambda: p.open_now == 0)
+        first = str(served.tmp / "News (window).ts")
+        note = json.loads(Path(first + ".info.json").read_text())["description"]
+        assert "dopeiptv --server" in note and "few seconds" in note
+        # Until the window let go of the claim, the server takes nothing.
+        for _ in range(2):
+            served.mgr.tick()
+        assert theirs["_elsewhere"] and p.connections == {"/live/u/p/1.ts": 1}
+        assert theirs[RecordingManager.CARRY]["part"] == "News (window).ts"
+        win.let_go_carried()
+        # Known to the server from the window's claim: its address asked for
+        # as it starts, as a portal's is.
+        assert spin(lambda: (served.mgr.tick() or True) and theirs["status"] == "recording", 10)
+        assert not theirs.get("_elsewhere")
+        assert spin(lambda: p.connections.get("/live/u/p/1.ts") == 2 and p.open_now == 1)
+        assert theirs["path"] != first and _size(first) == 188 * 10, "the window's part kept"
+        assert served.mgr.resumes_at(theirs) == theirs[RecordingManager.CARRY]["at"]
+        assert spin(lambda: _size(theirs["path"]) > 188 * 100)
+        info = json.loads(Path(theirs["path"] + ".info.json").read_text())
+        assert "News (window).ts" in info["description"] and info["channel"] == "News"
+        assert served.claims.read(job["id"]).who == rc.SERVER
+    finally:
+        watching.set()
+        win.let_go_carried()
+    assert most[0] == 1, "never two connections at once for it"
+
+
+def test_without_a_server_the_window_s_recording_stops_as_before(app, tmp_path):
+    path = tmp_path / "s.ini"
+    _stored(path, _due_job("j1"))
+    spawned: list = []
+    window = _manager(path, rc.WINDOW, spawned)
+    window.tick()
+    assert not window.claims.present(rc.SERVER)
+    window.shutdown()
+    job = next(j for j in window.jobs if j["id"] == "j1")
+    assert job["status"] == "done" and RecordingManager.CARRY not in job
+    assert window.claims.read("j1").state == rc.DONE, "nobody records the rest"
+    window.tick()                       # closed: nothing starts any more
+    assert spawned == [(rc.WINDOW, "News")]
+
+
+def test_a_carry_that_fails_stops_the_recording_as_before(app, tmp_path, caplog):
+    path = tmp_path / "s.ini"
+    _stored(path, _due_job("j1"))
+    spawned: list = []
+    window = _manager(path, rc.WINDOW, spawned)
+    window.tick()
+    window._hand_over = lambda j: 1 / 0
+    with caplog.at_level("WARNING", logger="dopeiptv"):
+        window.shutdown(carry=["j1"])
+    assert "not carried on by the server" in caplog.text
+    job = next(j for j in window.jobs if j["id"] == "j1")
+    assert job["status"] == "done" and window.claims.read("j1").state == rc.DONE
+    window.let_go_carried()
+
+
 # -- one recorder per job ------------------------------------------------------------------------
 
 def _manager(settings_path: Path, who: str, spawned: list) -> RecordingManager:
