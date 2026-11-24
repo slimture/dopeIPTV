@@ -1222,6 +1222,15 @@ What the credential leaves:
 what it cannot open, and it cannot tell an older app from someone without
 the code.
 
+### The sync server sees when, and how much
+
+The site sees a slot's id, the sealed copy's size, when it comes and the
+address it comes from. It cannot open the copy: the key never leaves the
+computers (`core/sync.py`).
+
+*Why:* a copy has to be put somewhere both computers can reach. Padding it
+to a few sizes would hide little of how often a computer syncs.
+
 ### The sync server can hold a copy back
 
 The sealed counter tells a computer that has seen a later copy. A computer

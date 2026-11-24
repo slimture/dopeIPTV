@@ -451,3 +451,41 @@ promise, and closes the smaller findings.
 | Website | Access logs, error logs and backups not shown | medium (conditional) | Answered: every access log is off in `deploy/` (the statistics' lines wait in memory); the runbook now says how to check it by hand, turn the `crit` error logs over, and which backups or snapshots to destroy (dopeiptv-server) |
 | Wording | Absolute words ("never", "nothing") where the code does not enforce them | info | Open: the transparency page's words, on the website branch |
 | Release signing | The Apple certificate and notary key were repository-wide secrets | low | Fixed: the macOS job runs in the environment `macos-signing` (main, testing, v* only); no other job names them (tests/test_nightly_workflow.py); the maintainer moves the secrets in (docs/MAINTAINING.md) |
+
+## November 2026 - reviews before 1.7.0 (testing at 6300516)
+
+Before the kit, an AI review of everything changed since 1.6.12 - the
+first-run guide, offline mode, downloads and the recordings shared with
+`dopeiptv --server` - found no way a login leaves, and a list of smaller
+faults that were fixed on testing before the kit was made: offline mode
+let web streams and an external player out and turned itself on at the
+system's "limited" word alone; the guide could come up over TV mode or
+under what a command played, kept a login typed for a failed try, and left
+a Plex sign-in and a sync fetch running after it closed; a damaged
+download sidecar could hide every download; a download could take the one
+connection a reconnecting channel needed; and the window could freeze
+while `--server` held the recordings' list (CHANGELOG, 1.7.0's Fixed).
+
+The maintainer then gave 1.7.0's kit (22 parts) to an independent AI
+assistant. It found no critical or high weakness and no way a provider's
+login reaches dopeiptv.org in parts 1 to 10 (provisional scores 8-9/10).
+It could not open GitHub, so parts 11 to 22 - which gave links, not code -
+were not reviewed; they go to it again with the source itself. Part 4
+came without its list of hosts: the kit now carries it (website branch,
+`tools/review_kit.py`).
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | A settings read that fails leaves the check against dopeiptv.org with what it learnt before | low | Fixed: it fails closed - settings that cannot be read send nothing to the site (`site_out.UNCHECKED`; the update check then asks GitHub). tests/test_site_out.py |
+| Logins | The check recognises known values; it is not a general information-flow control | low | Answered: each service sends fixed fields of its own (a report shown in full first, sync and Watch together sealed under keys the site never has); the check is the net behind them, and says what it cannot: a login it was never told |
+| Logins | Equal file permissions are not shown for Windows | conditional medium | Answered: on Windows the settings are in the registry under the user's own key and in the user's profile, which Windows keeps to that user; written down in docs/SECURITY.md (reading the settings files) |
+| TMDB | A provider's title could carry identifying text past the cleaning | low | Answered: the title is what the lookup needs; artwork can be taken from the provider alone or TMDB turned off (Settings > Posters & info) - nothing is then asked of TMDB |
+| TMDB | A lookup already sent when private viewing begins is not called back | low | Answered, as for 1.6.11: it is asked again right before the request; one sent cannot be taken back - written down |
+| Updates | The server sees the address and the build's kind | low (intended) | Answered: needed for an update; no id, account or name; what the site keeps is in its privacy policy |
+| Hosts | A list cannot show what runs at runtime | not rated | Answered: the transparency page says so and how to watch it (tcpdump, ss); every request the app makes goes through one adapter and the destination guard (`core/dest_guard.py`) |
+| Private viewing | What was kept before stays during private viewing | info | Answered: private viewing keeps and sends nothing new; earlier posters and metadata in the cache stay - said on the transparency page |
+| Sync | The server sees a copy's size and when it comes | low | Answered: written down (docs/SECURITY.md, the sync server); padding a copy would hide little of how often it syncs |
+| Crypto | ChaCha20-Poly1305 and Ed25519 are the app's own code | low | Answered: checked against RFC 8439's and RFC 8032's own vectors (tests/test_sync.py, tests/test_ed25519.py) and fuzzed; no dependency the builds would have to trust |
+| Watch together | About 50 bits in a room code; padding hides lengths, not sizes' classes or timing | low | Answered: a code a person reads out loud, 600 000 PBKDF2 rounds before a guess can be tested, the relay keeping rooms in memory only; what the relay sees is written down (docs/SECURITY.md) |
+| Website | A visitor mark is sealed with a 48-bit nonce and an HMAC pad, no tag | low | Answered: the mark is six bytes under a pad from HMAC-SHA256 of the month's key and a random nonce - unreadable without the key, which lives in memory alone; at tens of thousands of visits a month two equal nonces are about one in ten thousand months, and changing a mark takes writing to the service's files, which already means its statistics are not to be trusted |
+| Website | The month's key ties a month's visits together while it is kept | low (intended) | Answered: that is what counts a visitor once a month; the key goes with its month (the privacy policy) |

@@ -156,6 +156,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
+- The check that keeps every login of yours from dopeiptv.org now fails
+  closed: when the settings cannot be read to check a request for a login
+  added since, nothing is sent to the site (the update check then asks
+  GitHub). From an independent review of 1.7.0.
 - With `DOPEIPTV_LOG=debug` the log says where the window's thread is when
   it has not answered for 3 seconds (the desktop's spinning pointer), and
   the cast window's search says how many Chromecasts it found, as it does

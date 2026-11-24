@@ -242,23 +242,29 @@ def account_logins(settings: Any) -> set[str]:
     return out
 
 
-def _fresh() -> None:
+#: What ``refusal`` says when the settings could not be read to check a
+#: request: it fails closed - a login added since may be among them.
+UNCHECKED = "the settings, which could not be read to check it"
+
+
+def _fresh() -> bool:
     """The sources and accounts as the settings hold them now: one added,
     signed in or synced since the last ``learn`` is known before anything
-    is sent."""
+    is sent. False when the settings handed to ``learn`` could not be read -
+    the request is then not sent (``UNCHECKED``)."""
     global _seen_raw, _learnt
     ref = _settings
     s = ref() if ref is not None else None
     if s is None:
-        return
+        return True
     try:
         raw = str(s.value("playlists", "") or "")
         accounts = account_logins(s)
     except Exception:
-        return
+        return False
     stamp = raw + "\0" + "\0".join(sorted(accounts))
     if stamp == _seen_raw:
-        return
+        return True
     try:
         rows = json.loads(raw) if raw else []
     except ValueError:
@@ -269,6 +275,7 @@ def _fresh() -> None:
             _learnt = _learnt | accounts
             _rebuild()
     _seen_raw = stamp
+    return True
 
 
 def sealed(data: bytes | str) -> bytes | str:
@@ -321,7 +328,8 @@ def refusal(url: str, headers: Mapping[str, Any] | None = None,
     a login (never the login) - or None. Anything not for dopeiptv.org: None."""
     if not _service(url):
         return None
-    _fresh()
+    if not _fresh():
+        return UNCHECKED
     with _lock:
         long_, short_re = _long, _short_re
     if not long_ and short_re is None:
@@ -389,6 +397,12 @@ def check(url: str, headers: Mapping[str, Any] | None = None,
     if why is None:
         return
     key = hashlib.sha256(f"{urlsplit(url).path}|{why}".encode()).hexdigest()
+    if why == UNCHECKED:
+        if key not in _told:
+            _told.add(key)
+            log.warning("dopeiptv.org: the settings could not be read to check a request "
+                        "for logins - nothing sent")
+        raise LoginRefused("the settings could not be read to check it - not sent")
     if key not in _told:
         _told.add(key)
         log.warning("dopeiptv.org: a request held a login of a source in %s - nothing sent", why)

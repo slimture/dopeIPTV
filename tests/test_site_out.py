@@ -175,6 +175,22 @@ def test_a_source_added_since_is_known_before_anything_is_sent(tmp_path):
     assert site_out.refusal("https://dopeiptv.org/x?t=" + PASSWORD)
 
 
+def test_settings_that_cannot_be_read_send_nothing_to_the_site():
+    """A login added since may be in settings that could not be read: the
+    check fails closed rather than going on with what it learnt before
+    (an outside review of 1.7.0). Nothing else is held back."""
+    class Unreadable:
+        def value(self, *_a, **_k):
+            raise OSError("the settings file went away")
+
+    keep = Unreadable()
+    site_out.learn([_playlist()], settings=keep)
+    assert site_out.refusal("https://dopeiptv.org/api/report", {}, b"{}") == site_out.UNCHECKED
+    with pytest.raises(site_out.LoginRefused, match="could not be read"):
+        site_out.check("https://dopeiptv.org/api/report", {}, b"{}")
+    assert site_out.refusal("https://api.themoviedb.org/3/search/movie") is None
+
+
 def test_the_codes_that_open_a_copy_or_a_room_never_go():
     site_out.never("ABCD-EFGH-JKLM")
     assert site_out.refusal("https://dopeiptv.org/x", {}, b"code ABCD-EFGH-JKLM")
