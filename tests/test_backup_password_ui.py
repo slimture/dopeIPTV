@@ -185,8 +185,9 @@ _CARD = r"""
 import json, os, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings
-from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QLineEdit, QMessageBox, QPushButton
+from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QLineEdit, QPushButton
 app = QApplication.instance() or QApplication([])
+from dopeiptv.ui import message_box
 base = tempfile.mkdtemp()
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, base)
 from dopeiptv.core import backup
@@ -210,10 +211,10 @@ saved = []
 QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: saved.append(a[2]) or (out, ""))
 QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: (out, ""))
 said = []
-QMessageBox.information = staticmethod(
-    lambda parent, title, text, *a, **k: said.append(text) or QMessageBox.StandardButton.Ok)
-QMessageBox.warning = staticmethod(
-    lambda parent, title, text, *a, **k: said.append("WARN " + text) or QMessageBox.StandardButton.Ok)
+message_box.information = (
+    lambda parent, title, text, *a, **k: said.append(text))
+message_box.warning = (
+    lambda parent, title, text, *a, **k: said.append("WARN " + text))
 shown = []
 
 def restore_exec(dlg):

@@ -33,7 +33,8 @@ from .settings_ui import (
 )
 from .source_page import KIND_NAMES
 from .theme import P
-from .widgets import confirm, file_dialog_options
+from .message_box import confirm
+from .widgets import file_dialog_options
 
 if TYPE_CHECKING:
     from .mw_settings import SettingsContext
@@ -187,7 +188,7 @@ def build_sources(ctx: SettingsContext) -> None:
         if not (store and pid):
             return
         if confirm(d, tr("msg_remove_playlist_title"),
-                   tr("msg_remove_playlist_body")):
+                   tr("msg_remove_playlist_body"), danger=True):
             was_active = pid == store.active_id
             store.remove(pid)
             reload_pl_list()

@@ -19,7 +19,6 @@ import weakref
 from typing import Any
 
 from PyQt6.QtCore import QLocale, QTimer
-from PyQt6.QtWidgets import QInputDialog
 
 from ..core import channel_prefs, privacy
 from ..core import teletext as ttx
@@ -399,7 +398,8 @@ class TeletextSubsMixin:
         cur = self._ttx_current
         start = int(ttx.page_text(cur.page)) if cur is not None and cur.page else (
             tsubs.mpv_page(options[0], self._ttx_mpv_version()) or 199)
-        value, ok = QInputDialog.getInt(self, tr("sub_ttx_page_pick").rstrip("…"),
+        from ..ui import message_box
+        value, ok = message_box.get_int(self, tr("sub_ttx_page_pick").rstrip("…"),
                                         tr("sub_ttx_page_ask"), max(100, min(899, start)),
                                         100, 899)
         page = ttx.page_from_text(str(value)) if ok else None

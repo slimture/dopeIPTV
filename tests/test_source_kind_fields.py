@@ -88,8 +88,8 @@ def test_another_kind_never_shows_or_stores_the_xtream_login(app):
 def _warnings(monkeypatch):
     said = []
     from dopeiptv.ui import source_page
-    monkeypatch.setattr(source_page.QMessageBox, "warning",
-                        staticmethod(lambda *a, **k: said.append(a[1:])))
+    monkeypatch.setattr(source_page.message_box, "warning",
+                        lambda *a, **k: said.append(a[1:]))
     return said
 
 

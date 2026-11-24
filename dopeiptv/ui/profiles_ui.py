@@ -17,12 +17,13 @@ from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPaintEvent, QPen
 from PyQt6.QtWidgets import (
     QAbstractButton, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
+    QLineEdit, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from ..core import profiles
 from ..core.profiles import Profile
 from ..i18n import tr
+from . import message_box
 from .theme import ACCENTS, P, ink_on, rounded
 
 
@@ -89,32 +90,12 @@ def ask_pin(parent: QWidget, title: str, text: str,
             longest: int = profiles.PIN_LONGEST) -> str | None:
     """A profile's PIN asked for (up to *longest* characters: a grown-up's
     may be the parental PIN, which can be longer), hidden as it is typed;
-    None when cancelled."""
-    d = QDialog(parent)
-    d.setWindowTitle(title)
-    lay = QVBoxLayout(d)
-    msg = QLabel(text)
-    msg.setWordWrap(True)
-    lay.addWidget(msg)
-    field = QLineEdit()
-    field.setEchoMode(QLineEdit.EchoMode.Password)
-    field.setMaxLength(max(4, int(longest)))
-    field.setInputMask("")
-    field.setAccessibleName(tr("profile_pin"))
-    field.setPlaceholderText("••••")
-    lay.addWidget(field)
-    box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
-                           | QDialogButtonBox.StandardButton.Cancel)
-    box.accepted.connect(d.accept)
-    box.rejected.connect(d.reject)
-    lay.addWidget(box)
-    field.setFocus()
-    try:
-        return field.text().strip() if d.exec() else None
-    finally:
-        # The PIN typed is not kept in a hidden window for the session.
-        field.clear()
-        d.deleteLater()
+    None when cancelled. In the app's own look (ui/message_box.py), which
+    empties the field before the window goes: the PIN typed is not kept in
+    a hidden window for the session."""
+    pin, ok = message_box.get_text(parent, title, text, password=True, placeholder="••••",
+                                   max_length=max(4, int(longest)), name=tr("profile_pin"))
+    return pin.strip() if ok else None
 
 
 # -- the picker: "Who's watching?" -------------------------------------------------
@@ -791,17 +772,17 @@ class ProfilesPage:
             self.refresh()
 
     def _remove(self, pid: str) -> None:
-        from .widgets import confirm
+        from .message_box import confirm
         p = self.w.profiles.get(pid)
         if p is None or not self.w._profile_unlock(p, self.d):
             return
         if not confirm(self.d, tr("profile_remove_title"),
-                       tr("profile_remove_confirm", name=p.name), default_yes=False):
+                       tr("profile_remove_confirm", name=p.name), default_yes=False, danger=True):
             return
         if self.w._profile_remove(pid):
             self.refresh()
         else:
-            QMessageBox.information(self.d, tr("profile_remove_title"), tr("profile_remove_active"))
+            message_box.information(self.d, tr("profile_remove_title"), tr("profile_remove_active"))
 
 
 # -- TV mode's picker -------------------------------------------------------------

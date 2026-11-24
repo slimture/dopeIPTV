@@ -64,7 +64,12 @@ def _relative_import_targets():
             if isinstance(node, ast.ImportFrom) and node.level:
                 name = "." * node.level + (node.module or "")
                 target = importlib.util.resolve_name(name, anchor)
-                yield modname, target
+                # "from ..ui import message_box" imports that module, not the
+                # whole package: named as what it is.
+                folder = root.parent.joinpath(*target.split("."))
+                subs = [f"{target}.{a.name}" for a in node.names
+                        if (folder / f"{a.name}.py").is_file() or (folder / a.name).is_dir()]
+                yield from ((modname, sub) for sub in subs or [target])
 
 
 # The one-way rule (docs/ARCHITECTURE.md): what each layer must never import.
@@ -72,13 +77,19 @@ _ABOVE = {"core": ("providers", "services", "media", "ui"),
           "providers": ("services", "media", "ui"),
           "media": ("services", "ui"),
           "services": ("ui",)}
-# The one cross-edge the architecture names: the player overlays' colours
+# The cross-edges the architecture names: the player overlays' colours
 # (the player itself, its loading indicator, its visualiser and the number
 # typed in the picture's corner).
 _CROSS_EDGES = {("dopeiptv.media.embedded", "dopeiptv.ui.theme"),
                 ("dopeiptv.media.loading_overlay", "dopeiptv.ui.theme"),
                 ("dopeiptv.media.audio_effects", "dopeiptv.ui.theme"),
-                ("dopeiptv.media.sleep_timer", "dopeiptv.ui.theme")}
+                ("dopeiptv.media.sleep_timer", "dopeiptv.ui.theme"),
+                # ... and its messages and questions in the app's own look
+                # (ui/message_box.py: an external player not found, the sleep
+                # timer's minutes, a teletext page).
+                ("dopeiptv.media.players", "dopeiptv.ui.message_box"),
+                ("dopeiptv.media.sleep_timer", "dopeiptv.ui.message_box"),
+                ("dopeiptv.media.teletext_subs", "dopeiptv.ui.message_box")}
 
 
 def test_no_layer_imports_one_above_it():

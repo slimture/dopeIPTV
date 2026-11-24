@@ -12,15 +12,15 @@ from typing import Any, Callable
 from PyQt6 import sip
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QWidget,
+    QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget,
 )
 
 from ..core import cert_pin, doh, nerd, nerd_check, net_route
 from ..i18n import tr
 from .cert_trust import CertFetch, CertTrustDialog
 from .nerd_check_line import CheckLine
+from . import message_box
 from .theme import P
-from .widgets import plain_text
 
 KEYS = ("dns", "dns_url", "ip_family", cert_pin.KEY, cert_pin.KEY_FOR)
 DNS_CHOICES = [("", "nerd_src_inherit"), ("off", "nerd_dns_off"), ("cloudflare", "Cloudflare"),
@@ -233,8 +233,8 @@ class SourceNetOptions(QWidget):
         if sip.isdeleted(self):
             return
         self._reset_button()
-        QMessageBox.warning(self.window(), tr("nerd_ck_title_pin"),
-                            plain_text(tr("cert_fetch_failed", error=message)))
+        message_box.warning(self.window(), tr("nerd_ck_title_pin"),
+                            tr("cert_fetch_failed", error=message))
 
     def forget(self) -> None:
         self._pin = None

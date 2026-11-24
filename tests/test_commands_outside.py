@@ -326,8 +326,21 @@ def test_a_channel_s_name_in_the_question_is_plain_text():
     import inspect
 
     from dopeiptv.ui import mw_commands, mw_recording
-    assert "Qt.TextFormat.PlainText" in inspect.getsource(mw_recording._RecordingMixin._choice_dialog)
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QApplication, QLabel, QWidget
+
+    from dopeiptv.ui import message_box
+    assert "message_box.MessageDialog(" in inspect.getsource(
+        mw_recording._RecordingMixin._choice_dialog)
     assert "_choice_dialog" in inspect.getsource(mw_commands._CommandsMixin._ask_link_channel)
+    app = QApplication.instance() or QApplication([])
+    assert app is not None
+    name = 'SVT1 <img src="file:///etc/passwd"><b>HD</b>'
+    host = QWidget()
+    d = message_box.MessageDialog(host, "Play?", name, options=[("Play", "primary")])
+    shown = [lbl for lbl in d.findChildren(QLabel) if lbl.accessibleName() == name]
+    assert shown and all(lbl.textFormat() == Qt.TextFormat.PlainText for lbl in shown)
+    host.deleteLater()
 
 
 def test_the_question_is_the_computer_s_and_one_at_a_time(app):

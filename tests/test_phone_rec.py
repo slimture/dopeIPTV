@@ -28,6 +28,14 @@ class _NoDialog:
         raise AssertionError("a warning box was left on the computer for the phone's request")
 
 
+class _NoBox:
+    """ui/message_box.py while a phone asks: any message or question left on
+    the computer's screen fails."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"a message box ({name}) was left on the computer for the phone")
+
+
 class _Player:
     def __init__(self, visible=True):
         self.visible = visible
@@ -126,7 +134,7 @@ def window(tmp_path, monkeypatch):
     from dopeiptv.ui.mw_reminders import _RemindersMixin
 
     monkeypatch.setattr(mw_recording, "QDialog", _NoDialog)
-    monkeypatch.setattr(mw_recording, "QMessageBox", _NoDialog)
+    monkeypatch.setattr(mw_recording, "message_box", _NoBox())
     R = _RecordingMixin
 
     class W(_PhoneMixin):

@@ -56,7 +56,7 @@ from typing import Any
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, QThreadPool, QTimer
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMenu
+from PyQt6.QtWidgets import QApplication, QMenu
 
 from ..core import mitt, places, privacy, profiles
 from ..core.log import log
@@ -67,6 +67,7 @@ from ..core.stores import (
 )
 from ..core.workers import run_async
 from ..i18n import tr
+from . import message_box
 from ..media.players import launch_player
 from .media_cards import Card, ChannelRow, NowNext
 from .mitt_page import FolderItemsView, FolderTileView, Heading, MittPage
@@ -2083,7 +2084,7 @@ class _MittMixin:
     def _mitt_folder_rename(self, name: str) -> None:
         """Renamed in every source that holds it - its titles, its lock and
         its colour with it."""
-        new, ok = QInputDialog.getText(self, tr("ctx_rename_folder"), tr("prompt_folder_name"),
+        new, ok = message_box.get_text(self, tr("ctx_rename_folder"), tr("prompt_folder_name"),
                                        text=name)
         new = (new or "").strip()
         if not ok or not new or new in (name, FAV_DEFAULT_GROUP):

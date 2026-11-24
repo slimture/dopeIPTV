@@ -46,6 +46,14 @@ class _NoDialog:
         raise AssertionError("the window's own warning box opened in TV mode")
 
 
+class _NoBox:
+    """ui/message_box.py in TV mode: any message or question of the
+    window's own small kind fails."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"the window's own message box ({name}) opened in TV mode")
+
+
 class _Player(QWidget):
     """The docked player: not shown while TV mode's page is in front of
     it, its stream going on (current_url)."""
@@ -118,7 +126,7 @@ def window(app, tmp_path, monkeypatch):
     from dopeiptv.ui.mw_tv import _TvMixin
 
     monkeypatch.setattr(mw_recording, "QDialog", _NoDialog)
-    monkeypatch.setattr(mw_recording, "QMessageBox", _NoDialog)
+    monkeypatch.setattr(mw_recording, "message_box", _NoBox())
 
     class W(_TvMixin, _PhoneRecMixin, QWidget):
         _choice_dialog = R._choice_dialog

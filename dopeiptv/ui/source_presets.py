@@ -8,12 +8,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QInputDialog, QMenu, QPushButton, QWidget
+from PyQt6.QtWidgets import QMenu, QPushButton, QWidget
 
 from ..i18n import tr
-from . import theme
+from . import message_box, theme
 from .theme import P
-from .widgets import plain_text
 
 
 @dataclass(frozen=True)
@@ -77,8 +76,7 @@ class PresetButton(QPushButton):
         m.popup(self.mapToGlobal(self.rect().bottomLeft()))
 
     def _pick(self, p: Preset) -> None:
-        host, ok = QInputDialog.getText(self, p.label,
-                                        plain_text(tr("nerd_preset_host", name=p.label)),
+        host, ok = message_box.get_text(self, p.label, tr("nerd_preset_host", name=p.label),
                                         text=p.host or "192.168.1.")
         if ok and host.strip():
             self._on_pick(fill(p, host))

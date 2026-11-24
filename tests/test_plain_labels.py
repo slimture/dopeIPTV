@@ -2,8 +2,9 @@
 Qt's AutoText reads a tag before the first line break as markup - a
 programme called <span style="font-size:200px"> blew the activity panel up,
 an <img src="/path"> showed a picture from the disk. Labels that show such
-text are PlainText; a QMessageBox or a tooltip, which have no plain mode,
-get it escaped (ui/widgets.plain_text)."""
+text are PlainText - a message or a question is ui/message_box.py's, plain
+text by itself; a tooltip, which has no plain mode, gets it escaped
+(ui/widgets.plain_text)."""
 from __future__ import annotations
 
 import time
@@ -14,7 +15,7 @@ pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtCore import Qt  # noqa: E402
 from PyQt6.QtGui import QTextDocument  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox, QWidget  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QLabel, QWidget  # noqa: E402
 
 HOSTILE = 'Recording <span style="font-size:200px">News</span><img src="/tmp/x.png">'
 
@@ -81,15 +82,16 @@ def test_the_cast_card_and_the_problem_window_show_words(app):
 
 
 def test_a_confirmation_names_a_title_as_words(app, monkeypatch):
-    from dopeiptv.ui import widgets
+    from dopeiptv.ui import message_box
     seen = []
 
     def exec_(box):
-        seen.append((box.textFormat(), box.text()))
-        return QMessageBox.StandardButton.No
-    monkeypatch.setattr(QMessageBox, "exec", exec_)
-    assert widgets.confirm(None, "Delete", HOSTILE) is False
-    assert seen == [(Qt.TextFormat.PlainText, HOSTILE)]
+        seen.append([(lbl.textFormat(), lbl.accessibleName()) for lbl in box.findChildren(QLabel)
+                     if lbl.accessibleName() == HOSTILE])
+        return 0                        # Escape: No
+    monkeypatch.setattr(message_box.MessageDialog, "exec", exec_)
+    assert message_box.confirm(None, "Delete", HOSTILE) is False
+    assert seen == [[(Qt.TextFormat.PlainText, HOSTILE)]]
 
 
 def test_tv_mode_s_headings_are_words(app):
@@ -175,17 +177,16 @@ def test_the_seek_bar_s_programme_tip_is_words(app):
 
 
 def test_a_box_s_names_in_its_questions_are_words(app, monkeypatch):
-    from types import SimpleNamespace
-
-    from PyQt6.QtWidgets import QInputDialog
-
+    from dopeiptv.ui import message_box
     from dopeiptv.ui.mw_box import _BoxMixin
     asked = []
 
-    def get_text(_parent, _title, label, **_kw):
-        asked.append(label)
-        return "", False
-    monkeypatch.setattr(QInputDialog, "getText", get_text)
-    _BoxMixin._box_rec_rename(SimpleNamespace(), {"name": HOSTILE, "stream_id": "1"})
-    assert asked and "<img" not in asked[0] and "<span" not in asked[0]
-    assert "Recording" in _shown(asked[0])
+    def exec_(box):
+        asked.extend((lbl.textFormat(), lbl.accessibleName()) for lbl in box.findChildren(QLabel))
+        return 0                        # Cancel
+    monkeypatch.setattr(message_box.MessageDialog, "exec", exec_)
+    window = QWidget()
+    _BoxMixin._box_rec_rename(window, {"name": HOSTILE, "stream_id": "1"})
+    window.deleteLater()
+    question = [fmt for fmt, words in asked if HOSTILE in words]
+    assert question == [Qt.TextFormat.PlainText]       # the name as written, as words

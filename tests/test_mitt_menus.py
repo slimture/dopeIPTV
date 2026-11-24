@@ -20,7 +20,7 @@ import json, os, tempfile, time
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from datetime import datetime, timedelta
 from PyQt6.QtCore import QPoint, QSettings
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMenu
+from PyQt6.QtWidgets import QApplication, QMenu
 
 _tmp = tempfile.mkdtemp()
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
@@ -189,7 +189,8 @@ assert not w.movie_favs.is_favorite(40)
 page.set_tab("folders")
 w._mitt_render()
 barn = next(c for c in page.folder_tiles.items() if c.title == "Barn")
-QInputDialog.getText = staticmethod(lambda *a, **k: ("Kids", True))
+from dopeiptv.ui import message_box
+message_box.get_text = lambda *a, **k: ("Kids", True)
 pick.append(tr("ctx_rename_folder"))
 w._mitt_folder_menu(barn, QPoint(0, 0))
 assert "Kids" in w.favs.groups and "Barn" not in w.favs.groups

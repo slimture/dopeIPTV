@@ -28,9 +28,10 @@ from datetime import datetime, timedelta, timezone
 faulthandler.dump_traceback_later(240, exit=True)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings, Qt
-from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMenu
 app = QApplication.instance() or QApplication([])
-QMessageBox.warning = staticmethod(lambda *a, **k: 0)
+from dopeiptv.ui import message_box
+message_box.warning = lambda *a, **k: 0
 tmp = tempfile.mkdtemp()
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tmp)
 

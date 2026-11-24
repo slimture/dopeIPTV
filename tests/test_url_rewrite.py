@@ -523,12 +523,11 @@ def test_the_line_under_the_rules_and_its_test_against_a_panel(settings):
 
 
 def test_a_rule_that_cannot_work_is_refused_by_the_page(settings, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
-
     from dopeiptv.i18n import tr
+    from dopeiptv.ui import message_box
     from tests.test_source_page import source_page
     said = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: said.append(a[2]))
+    monkeypatch.setattr(message_box, "warning", lambda *a, **k: said.append(a[2]))
     backs = []
     d = source_page({"name": "TV", "kind": "m3u", "server": "http://h/tv.m3u"},
                     back=lambda: backs.append(1))

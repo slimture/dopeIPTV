@@ -110,7 +110,7 @@ def test_reset_all_clears_every_file_and_a_staged_restore(tmp_path, monkeypatch)
     pending.write_text("{}")
     monkeypatch.setattr(backup, "pending_path", lambda folder=None: str(pending))
     monkeypatch.setattr(mw_settings, "confirm", lambda *a, **k: True)
-    monkeypatch.setattr(mw_settings.QMessageBox, "information", lambda *a, **k: None)
+    monkeypatch.setattr(mw_settings.message_box, "information", lambda *a, **k: None)
 
     class Rec:
         def directory(self) -> str:

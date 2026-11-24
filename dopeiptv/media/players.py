@@ -13,9 +13,9 @@ from ..core.privacy import for_log
 from ..core.xdg import system_env
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QMessageBox
 
 from ..i18n import english, tr
+from ..ui import message_box
 
 from ..core.player_exec import HANDOFF_S as _HANDOFF_S
 from ..core.player_exec import (address_scheme, carries_login, fetchable,
@@ -384,7 +384,7 @@ def launch_player(player: str, url: str, title: str | None = None,
         # handed to a player, whatever "--" then does with it.
         log.warning("external %s not started: not a stream's address (%s:)",
                     name, address_scheme(url)[:20] or "-")
-        QMessageBox.warning(parent, name, tr("open_address_bad"))
+        message_box.warning(parent, name, tr("open_address_bad"))
         return
     if offline.stream_refusal(url):
         # Offline mode: the player (an external mpv's own yt-dlp too) would
@@ -394,11 +394,11 @@ def launch_player(player: str, url: str, title: str | None = None,
         if callable(say):
             say("an external player")
         else:
-            QMessageBox.information(parent, name, tr("offline_needs_network"))
+            message_box.information(parent, name, tr("offline_needs_network"))
         return
     exe = find_player_executable(player)
     if not exe:
-        QMessageBox.warning(parent, tr("status_player_not_found"),
+        message_box.warning(parent, tr("status_player_not_found"),
                             tr("status_player_not_found_msg", name=name))
         return
     handoff = handoff_file(url, title) if handed_over(url) else ""
@@ -406,7 +406,7 @@ def launch_player(player: str, url: str, title: str | None = None,
         # Never the address in its command line instead, where every
         # account on this computer could read it: not started, and said.
         log.warning("external %s not started: no private file for its address", name)
-        QMessageBox.warning(parent, name, tr("status_player_no_handoff", name=name))
+        message_box.warning(parent, name, tr("status_player_no_handoff", name=name))
         return
     cmd = player_command(player, exe, url, title, handoff)
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

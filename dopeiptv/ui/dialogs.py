@@ -8,8 +8,8 @@ from typing import Any
 from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
-    QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QScrollArea,
+    QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QProgressBar, QPushButton, QScrollArea,
     QSpinBox, QVBoxLayout, QWidget,
 )
 
@@ -19,8 +19,8 @@ from .box_finder import (
     add_media_kinds,
 )
 from .media_signin import MediaSignIn
+from . import message_box
 from .theme import P
-from .widgets import plain_text
 # Feedback and the backup's restore have modules of their own; their
 # windows stay importable from here.
 from .feedback_dialogs import (  # noqa: F401
@@ -591,7 +591,7 @@ class PlaylistDialog(SourceFields, QDialog):
                 return
         bad = self.problem()
         if bad is not None:
-            QMessageBox.warning(self, bad[0], plain_text(bad[1]))     # a typed or restored line
+            message_box.warning(self, bad[0], bad[1])     # a typed or restored line: words
             return
         self.accept()
 
@@ -689,7 +689,7 @@ class ContentManagerDialog(QDialog):
             self.mode, cid,
             next((c.get("category_name", "") for c in self.categories
                   if c.get("category_id") == cid), ""))
-        name, ok = QInputDialog.getText(
+        name, ok = message_box.get_text(
             self, tr("cm_rename_title"), tr("cm_new_name"), text=current)
         if ok:
             self.overrides.update(self.mode, cid, name=name.strip())

@@ -201,12 +201,11 @@ def test_a_change_is_stored_as_the_old_dialog_stored_it(settings, tmp_path):
 
 
 def test_what_cannot_be_stored_is_refused_and_said(settings, monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
-
     from dopeiptv.core.nerd_check import FAIL
     from dopeiptv.core.url_rewrite import Rule, parse
+    from dopeiptv.ui import message_box
     said = []
-    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: said.append(a[2]))
+    monkeypatch.setattr(message_box, "warning", lambda *a, **k: said.append(a[2]))
     store = Store({"id": "s1", "name": "TV", "kind": "m3u", "server": "http://h/tv.m3u"})
     backs = []
     d = source_page(store.get("s1"), store=store, back=lambda: backs.append(1))

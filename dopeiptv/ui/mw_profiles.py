@@ -18,7 +18,6 @@ from typing import Any
 
 from PyQt6 import sip
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QMessageBox
 
 from ..core import pins, profiles
 from ..core.log import log
@@ -28,6 +27,7 @@ from ..core.stores import (
 )
 from ..core.workers import run_async
 from ..i18n import tr
+from . import message_box
 
 #: Wrong PINs asked over the network (the phone remote, the remote API, Home
 #: Assistant) within REMOTE_PIN_SECS before a switch by PIN is refused until
@@ -606,7 +606,7 @@ class _ProfilesMixin:
         wait = self._pin_tries().wait(*names)
         if wait <= 0:
             return False
-        QMessageBox.information(parent or self, title, tr("pin_wait", n=max(1, math.ceil(wait))))
+        message_box.information(parent or self, title, tr("pin_wait", n=max(1, math.ceil(wait))))
         return True
 
     def _pin_was_wrong(self, names: list[str], title: str, parent=None) -> None:
@@ -617,7 +617,7 @@ class _ProfilesMixin:
         if wait > 0:
             text += "\n\n" + tr("pin_wait", n=max(1, math.ceil(wait)))
             log.info("profiles: wrong PINs - the next try waits %d s", math.ceil(wait))
-        QMessageBox.warning(parent or self, title, text)
+        message_box.warning(parent or self, title, text)
 
     def _pin_given(self, pin: str, *found: Profile) -> str:
         """Which PIN *pin* is - one of those profiles' ("profile/<id>"), the
@@ -651,7 +651,7 @@ class _ProfilesMixin:
         if pin:
             self._pin_was_wrong(names, p.name, parent)
         else:                           # nothing typed: no guess
-            QMessageBox.warning(parent or self, p.name, tr("msg_wrong_pin"))
+            message_box.warning(parent or self, p.name, tr("msg_wrong_pin"))
         return False
 
     def _profile_pick(self, pid: str, tv: bool = False) -> bool:
@@ -713,7 +713,7 @@ class _ProfilesMixin:
         the person is told how a grown-up sets one."""
         store = self.profiles
         if not self._grown_up_pin_exists():
-            QMessageBox.information(self, title, tr("profile_kids_no_pin"))
+            message_box.information(self, title, tr("profile_kids_no_pin"))
             return False
         grown_ups = [p for p in store.profiles() if not p.kids]
         names = self._pin_names(*grown_ups)
@@ -728,7 +728,7 @@ class _ProfilesMixin:
         if pin:
             self._pin_was_wrong(names, title)
         else:
-            QMessageBox.warning(self, title, tr("msg_wrong_pin"))
+            message_box.warning(self, title, tr("msg_wrong_pin"))
         return False
 
     # -- the picker -----------------------------------------------------------------------

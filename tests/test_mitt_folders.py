@@ -28,7 +28,7 @@ faulthandler.dump_traceback_later(240, exit=True)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QPoint, QSettings
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMenu, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMenu
 
 _tmp = tempfile.mkdtemp()
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _tmp)
@@ -45,7 +45,8 @@ from dopeiptv.ui.mw_mitt import LOOSE
 
 i18n.set_language("en")
 app = QApplication.instance() or QApplication([])
-QMessageBox.warning = staticmethod(lambda *a, **k: 0)
+from dopeiptv.ui import message_box
+message_box.warning = lambda *a, **k: 0
 epgmod.XmltvGuide.PARSE_ELSEWHERE = False
 epgmod.XmltvGuide._download = lambda self: (_ for _ in ()).throw(OSError("offline"))
 mw_mod.launch_player = lambda *a, **k: None                  # never a real mpv
@@ -237,7 +238,7 @@ assert json.dumps(w.favs.groups["Sport"]) == pa_sport
 assert titles()[:3] == [C3, "Nordic Tennis", "Nordic Sport"], titles()
 
 # -- renamed in every source that holds it ------------------------------------------------
-QInputDialog.getText = staticmethod(lambda *a, **k: ("Sporten", True))
+message_box.get_text = lambda *a, **k: ("Sporten", True)
 w.favs.set_group_color("Sport", bgcolor="#2FBF71")
 w._mitt_folder_rename("Sport")
 assert "Sporten" in w.favs.groups and "Sport" not in w.favs.groups
@@ -255,7 +256,7 @@ def broken(self, old, new):
         raise OSError("disk full")
     return _rename(self, old, new)
 FavoriteStore.rename_group = broken
-QInputDialog.getText = staticmethod(lambda *a, **k: ("Idrott", True))
+message_box.get_text = lambda *a, **k: ("Idrott", True)
 w._mitt_folder_rename("Sporten")
 FavoriteStore.rename_group = _rename
 assert toasts[-1] == tr("mitt_folder_not_changed"), toasts

@@ -24,19 +24,18 @@ from PyQt6.QtCore import QLocale, QRectF, QSize, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import (
     QAbstractButton, QButtonGroup, QCheckBox, QComboBox, QFrame, QHBoxLayout,
-    QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
+    QLabel, QLineEdit, QPlainTextEdit, QPushButton, QScrollArea,
     QSpinBox, QVBoxLayout, QWidget,
 )
 
 from ..core import catchup, channel_numbers, mirrors, nerd
 from ..i18n import tr
-from . import a11y
+from . import a11y, message_box
 from .box_finder import MEDIA_KINDS
 from .dialogs import SourceFields
 from .nav_widgets import source_initials
 from .settings_ui import PAGE_MAX_WIDTH, SettingsCard, Stepper, ToggleSwitch, align_controls
 from .theme import P, _mix, ink_on
-from .widgets import plain_text
 
 #: Each kind as the page and the list of sources name it.
 KIND_NAMES = {"xtream": "Xtream", "m3u": "M3U", "stalker": "Stalker", "enigma2": "Enigma2",
@@ -792,7 +791,7 @@ class SourcePage(SourceFields, QScrollArea):
         bad = self.problem()
         if bad is not None and self.values() != self._stored and not self._just_browsed():
             self._show_part(bad[2])
-            QMessageBox.warning(self.window(), bad[0], plain_text(bad[1]))
+            message_box.warning(self.window(), bad[0], bad[1])
             return
         if self._back is not None:
             self._back()
@@ -807,8 +806,7 @@ class SourcePage(SourceFields, QScrollArea):
         if not stored and self.values() != self._stored and not self._just_browsed():
             bad = self.problem()
             if bad is not None:
-                QMessageBox.warning(self.window(), bad[0],
-                                    plain_text(f"{bad[1]}\n\n{tr('src_not_saved')}"))
+                message_box.warning(self.window(), bad[0], f"{bad[1]}\n\n{tr('src_not_saved')}")
         if self._left_cb is not None:
             self._left_cb(self._pid, self._changed)
 

@@ -15,7 +15,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, Qt, QThreadPool
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QDialog, QFormLayout, QHBoxLayout, QLabel, QLayout, QMessageBox, QPushButton, QVBoxLayout,
+    QDialog, QFormLayout, QHBoxLayout, QLabel, QLayout, QPushButton, QVBoxLayout,
     QWidget,
 )
 
@@ -23,8 +23,8 @@ from ..core import cert_pin, net_route
 from ..core.log import log
 from ..core.workers import run_async
 from ..i18n import tr
+from . import message_box
 from .theme import P
-from .widgets import plain_text
 
 
 def two_lines(fp: str) -> str:
@@ -171,16 +171,13 @@ class _Review(QObject):
         self.fetch = CertFetch(self, self._show, self._failed)
 
     def ask(self, host: str, port: int) -> None:
-        box = QMessageBox(self.window)
-        box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle(tr("cert_changed_title"))
-        # The source's name is shown as words (a QMessageBox has no plain mode).
-        box.setText(plain_text(tr("cert_changed_body", name=str(self.pl.get("name") or ""),
-                                  server=f"{host}:{port}")))
-        review = box.addButton(tr("cert_review_btn"), QMessageBox.ButtonRole.AcceptRole)
-        box.addButton(tr("common_close"), QMessageBox.ButtonRole.RejectRole)
-        box.exec()
-        if box.clickedButton() is not review:
+        # Review the default (Enter), Close for Escape and the window's close.
+        got = message_box.choose(
+            self.window, tr("cert_changed_title"),
+            tr("cert_changed_body", name=str(self.pl.get("name") or ""), server=f"{host}:{port}"),
+            [(tr("common_close"), message_box.NORMAL), (tr("cert_review_btn"), message_box.PRIMARY)],
+            default=1, escape=0, kind=message_box.WARNING)
+        if got != 1:
             self.deleteLater()
             return
         src = dict(self.pl.get("options") or {}, _kind=self.pl.get("kind") or "xtream")
@@ -201,8 +198,8 @@ class _Review(QObject):
         self.deleteLater()
 
     def _failed(self, message: str) -> None:
-        QMessageBox.warning(self.window, tr("cert_changed_title"),
-                            plain_text(tr("cert_fetch_failed", error=message)))
+        message_box.warning(self.window, tr("cert_changed_title"),
+                            tr("cert_fetch_failed", error=message))
         self.deleteLater()
 
 

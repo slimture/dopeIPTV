@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QDialog,
     QFileDialog,
     QHBoxLayout, QLineEdit,
-    QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
+    QPlainTextEdit, QPushButton, QScrollArea,
     QScrollBar, QSpinBox, QVBoxLayout, QWidget,
 )
 
@@ -71,7 +71,9 @@ from ..core.num import whole
 from . import a11y, about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
-from .widgets import as_label, confirm, file_dialog_options, plain_text
+from . import message_box
+from .message_box import confirm
+from .widgets import as_label, file_dialog_options
 from .notices import hub_of
 from ..core.workers import run_async
 
@@ -430,17 +432,14 @@ class _SettingsMixin:
         """The question a settings file others may read asks: "go" (go on
         with it, for this file), "open" (its folder, and close) or "quit" -
         Close the default, and Escape."""
-        box = QMessageBox(QMessageBox.Icon.Warning, tr("settings_open_title"),
-                          plain_text(tr("settings_open_body", path=path)),
-                          QMessageBox.StandardButton.NoButton, self)
-        opened = box.addButton(tr("btn_open_folder"), QMessageBox.ButtonRole.ActionRole)
-        quit_btn = box.addButton(tr("settings_open_quit"), QMessageBox.ButtonRole.RejectRole)
-        go = box.addButton(tr("settings_open_go"), QMessageBox.ButtonRole.AcceptRole)
-        box.setDefaultButton(quit_btn)
-        box.setEscapeButton(quit_btn)
-        box.exec()
-        clicked = box.clickedButton()
-        return "go" if clicked is go else "open" if clicked is opened else "quit"
+        answers = ("quit", "go", "open")
+        got = message_box.choose(
+            self, tr("settings_open_title"), tr("settings_open_body", path=path),
+            [(tr("settings_open_quit"), message_box.PRIMARY),
+             (tr("settings_open_go"), message_box.NORMAL),
+             (tr("btn_open_folder"), message_box.NORMAL)],
+            default=0, escape=0, kind=message_box.WARNING)
+        return answers[got] if got is not None else "quit"
 
     def _ask_desktop_entry(self) -> None:
         """The status-row link was clicked: ask, and remember the answer."""
@@ -458,7 +457,7 @@ class _SettingsMixin:
                     # the compositor resolved for it when it appeared, so
                     # this one does not change until the next start. Saying
                     # so beats leaving the user to conclude it did nothing.
-                    QMessageBox.information(
+                    message_box.information(
                         self, tr("desktop_entry_title"),
                         tr("desktop_entry_done"))
             else:
@@ -614,10 +613,10 @@ class _SettingsMixin:
         confirmation because it can't be undone. Playlists live in the same
         QSettings config, so this really does reset back to the login screen."""
         if not confirm(parent_dialog, tr("settings_reset_all"),
-                       tr("settings_reset_confirm_1"), default_yes=False):
+                       tr("settings_reset_confirm_1"), default_yes=False, danger=True):
             return
         if not confirm(parent_dialog, tr("settings_reset_all"),
-                       tr("settings_reset_confirm_2"), default_yes=False):
+                       tr("settings_reset_confirm_2"), default_yes=False, danger=True):
             return
         # The recordings stay wherever they are, also inside a folder the
         # reset empties - read before the setting that names it goes.
@@ -660,7 +659,7 @@ class _SettingsMixin:
         # that during a reset, or the freshly cleared config gets seeded
         # with those keys again.
         self._resetting = True
-        QMessageBox.information(
+        message_box.information(
             parent_dialog, tr("settings_reset_all"),
             tr("settings_reset_done"))
         parent_dialog.reject()
@@ -693,12 +692,12 @@ class _SettingsMixin:
         """Without a password the file leaves every login, token and the
         sync code out (core/backup.without_logins): made so only when the
         person says so, Cancel the default."""
-        box = QMessageBox(QMessageBox.Icon.Warning, tr("backup_title"),
-                          tr("backup_no_pw_warn"), QMessageBox.StandardButton.Cancel, parent)
-        plain = box.addButton(tr("backup_no_pw_go"), QMessageBox.ButtonRole.AcceptRole)
-        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
-        box.exec()
-        return box.clickedButton() is plain
+        got = message_box.choose(
+            parent, tr("backup_title"), tr("backup_no_pw_warn"),
+            [(tr("backup_no_pw_go"), message_box.NORMAL),
+             (tr("common_cancel"), message_box.PRIMARY)],
+            default=1, escape=1, kind=message_box.WARNING)
+        return got == 0
 
     def _backup_save(self, parent, password: str = "") -> bool:
         """Settings > Privacy and data > Backup: everything to one file - with
@@ -708,7 +707,7 @@ class _SettingsMixin:
 
         from ..core import backup
         if password and len(password) < backup.PASSWORD_MIN:
-            QMessageBox.warning(parent, tr("backup_title"),
+            message_box.warning(parent, tr("backup_title"),
                                 tr("backup_pw_short", n=backup.PASSWORD_MIN))
             return False
         if not password and not self._backup_without_password_ok(parent):
@@ -733,7 +732,7 @@ class _SettingsMixin:
                 backup.write(path, backup.for_file(doc))
         except OSError as exc:
             log.warning("backup: not written: %s", exc)
-            QMessageBox.warning(parent, tr("backup_title"),
+            message_box.warning(parent, tr("backup_title"),
                                 tr("pl_export_failed", error=exc))
             return False
         counts = backup.summary(backup.parse(doc))
@@ -741,7 +740,7 @@ class _SettingsMixin:
                  ", ".join(f"{k} {n}" for k, n in counts.items() if n))
         done = tr("backup_done_locked" if locked else "backup_done",
                   what=self._backup_counts(counts), path=path)
-        QMessageBox.information(parent, tr("backup_title"), done)
+        message_box.information(parent, tr("backup_title"), done)
         return True
 
     def _backup_restore(self, parent, playlists_added) -> None:
@@ -752,7 +751,7 @@ class _SettingsMixin:
         b, why = pick_backup(parent)
         if b is None:
             if why:     # the file's own words in it (its version)
-                QMessageBox.warning(parent, tr("restore_title"), plain_text(why))
+                message_box.warning(parent, tr("restore_title"), why)
             return
         store = getattr(self, "playlist_store", None)
         on = getattr(self, "_sync_on", None)
@@ -766,29 +765,29 @@ class _SettingsMixin:
             added = store.import_data(b.sources)
             log.info("restore: %d playlist(s) added from a backup", added)
             playlists_added()
-            QMessageBox.information(parent, tr("restore_title"),
+            message_box.information(parent, tr("restore_title"),
                                     tr("pl_import_done", n=added))
             return
         if not backup.replaceable(b):
             # Nothing it holds would replace anything: it would only empty
             # what is here (the dialog offers no such choice either).
-            QMessageBox.warning(parent, tr("restore_title"), tr("restore_cannot_replace"))
+            message_box.warning(parent, tr("restore_title"), tr("restore_cannot_replace"))
             return
         # Over everything: the PIN and what it locks are part of it.
         if self.parental.has_pin() and not self._request_unlock():
             return
         if not confirm(parent, tr("restore_title"), tr("restore_confirm"),
-                       default_yes=False):
+                       default_yes=False, danger=True):
             return
         why = stage_backup(b)
         if why:
-            QMessageBox.warning(parent, tr("restore_title"), plain_text(why))
+            message_box.warning(parent, tr("restore_title"), why)
             return
         # As after Reset all: nothing written on the way out, and the app
         # closes - the backup is put in place as it next starts, where no
         # store held in memory here can write over it.
         self._resetting = True
-        QMessageBox.information(parent, tr("restore_title"),
+        message_box.information(parent, tr("restore_title"),
                                 tr("restore_closing"))
         parent.reject()
         self.close()

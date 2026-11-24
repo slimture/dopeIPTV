@@ -764,14 +764,12 @@ def test_a_login_failing_for_want_of_a_network_waits_for_what_plays(host):
 def test_a_wrong_login_after_coming_back_online_is_said(host, monkeypatch):
     """The words are "Wrong user name or password." now: told by the
     error's key, as the start tells it (providers/client.wrong_login)."""
-    from PyQt6.QtWidgets import QMessageBox
-
     from dopeiptv.i18n import LocalizedError
     from dopeiptv.providers import client as client_mod
-    from dopeiptv.ui import cert_trust
+    from dopeiptv.ui import cert_trust, message_box
     h, offline = host
     told: list = []
-    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: told.append(a[2])))
+    monkeypatch.setattr(message_box, "warning", lambda *a, **k: told.append(a[2]))
     monkeypatch.setattr(cert_trust, "offer_review", lambda *a, **k: False)
 
     class Refused:
