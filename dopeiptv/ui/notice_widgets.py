@@ -484,7 +484,9 @@ class ActivityLine(QWidget):
         super().hideEvent(e)
 
     def _opens(self) -> bool:
-        return bool(self._entries) or bool(self._hub.messages())
+        """Whatever the line shows opens the panel - work, a message, or a
+        passing note (kept in History, where the panel then opens)."""
+        return bool(self._entries or self._note or self._unread) or bool(self._hub.messages())
 
     def _activate(self) -> None:
         """A click or Enter: the one job's own act (a recording asks to

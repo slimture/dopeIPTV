@@ -351,6 +351,11 @@ def test_the_line_says_a_note_the_work_or_the_count(app):
     assert line.isHidden()                                      # nothing: nothing drawn
     hub.note("EPG cache cleared")
     assert line.isVisible() and line.text() == "EPG cache cleared"
+    # A passing note opens the panel too (it is kept in History).
+    opened: list[int] = []
+    line.open_panel.connect(lambda: opened.append(1))
+    QTest.mouseClick(line, Qt.MouseButton.LeftButton)
+    assert opened == [1]
     hub._note_over()
     hub.start(tr("notice_reading_folder", name="Music"), kind="folder", mine=True)
     hub.start(tr("status_loading_programme_guide"), kind="guide", done=45, total=100)
