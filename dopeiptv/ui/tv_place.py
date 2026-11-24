@@ -486,7 +486,7 @@ class ChannelCardDelegate(QStyledItemDelegate):
         playing = bool(card.key) and card.key == s.playing_key
         hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        focus = selected and s.hasFocus() and index == s.currentIndex()
+        focus = s.hasFocus() and index == s.currentIndex()
         slot = option.rect
         box = QRect(slot.x() + (STRIP_GAP if rtl else 0), slot.y(),
                     max(1, slot.width() - STRIP_GAP), slot.height())

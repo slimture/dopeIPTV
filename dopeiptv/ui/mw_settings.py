@@ -68,7 +68,7 @@ from ..core import connections
 from ..core import places as _places
 from ..core.log import log
 from ..core.num import whole
-from . import about, set_content, set_services, set_system, set_watch
+from . import a11y, about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
 from .widgets import confirm, file_dialog_options, plain_text
@@ -846,6 +846,7 @@ class _SettingsMixin:
         # Icon only: the 30 px poster overlay has no room for a label, and
         # stamping one on here left clipped text after a language switch.
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
+        self._rename_chrome()
         # Player control tooltips (embedded bar + fullscreen overlay).
         if self.player:
             self.player.retranslate_ui()
@@ -863,6 +864,23 @@ class _SettingsMixin:
         self._place_tv_restyle()     # the TV place, in the new language
         getattr(self, "_mitt_restyle", lambda: None)()   # Mine
         self._palette_retranslate()
+
+    def _rename_chrome(self) -> None:
+        """What a screen reader calls the window's controls that show an
+        icon or a glyph (ui/a11y.py), again in the language now in use - the
+        names given as they were built (mw_build, mw_build_detail)."""
+        for widget, words in (
+                (self.play_mpv, tr("tooltip_play_in_mpv")),
+                (self._reopen_btn, tr("tooltip_show_list")),
+                (self.cat_solo_btn, tr("tooltip_solo_category")),
+                (self.cat_list, tr("tv_categories")),
+                (self.size_box, tr("label_size")),
+                (self._size_menu_btn, tr("label_size")),
+                (self.sort_box, tr("label_sort")),
+                (self._sort_menu_btn, tr("label_sort")),
+                (self.side_btn, a11y.without_key(tr("tooltip_toggle_sidebar"))),
+                (self.focus_btn, a11y.without_key(tr("tooltip_hide_list")))):
+            widget.setAccessibleName(words)
 
     def _inline_view_changed(self, *_) -> None:
         # Density and grid are global; the sort dropdown applies only to the
@@ -1088,6 +1106,7 @@ class _SettingsMixin:
         # A sidebar of pages with a search over it, instead of a row of ten
         # tabs that set the dialog's width (and, translated, overflowed it).
         shell = SettingsShell(tr("set_search"), tr("set_search_none"))
+        shell.nav.setAccessibleName(tr("settings_title"))      # the pages, by name
         outer.addWidget(shell, 1)
         # Its sidebar as wide as it was dragged last - this computer's
         # layout, never synced or in a backup.

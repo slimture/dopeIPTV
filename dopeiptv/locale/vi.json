@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Xem trước đó",
   "card_view_switch_a11y": "Chế độ xem",
   "card_sort_a11y": "Sắp xếp: {order}",
+  "sa_results_a11y": "Kết quả",
+  "about_notes_a11y": "Ghi chú phát hành",
   "card_continue": "Xem tiếp",
   "card_popular": "Đang thịnh hành",
   "card_grid": "Lưới",

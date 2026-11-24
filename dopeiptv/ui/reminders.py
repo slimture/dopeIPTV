@@ -51,6 +51,7 @@ class RemindersDialog(QDialog):
         lay.setSpacing(8)
 
         self.list = QListWidget()
+        self.list.setAccessibleName(tr("reminders_title"))
         self.list.setAlternatingRowColors(True)
         self.list.setWordWrap(True)
         self.list.setSelectionMode(

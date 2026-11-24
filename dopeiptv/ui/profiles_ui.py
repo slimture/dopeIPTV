@@ -308,7 +308,11 @@ class _Swatch(QAbstractButton):
         self.setFixedSize(30, 30)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAccessibleName(emoji or (ACCENTS.get(colour) or ("",))[0] or tr("profile_no_emoji"))
+        # An emoji is read by its own name ("Avatar fox face"); a colour by
+        # the name Settings gives it, in the language in use.
+        self.setAccessibleName(f"{tr('profile_avatar')} {emoji}" if emoji
+                               else tr(f"accent_{colour}") if colour in ACCENTS
+                               else tr("profile_no_emoji"))
         self.toggled.connect(self.update)
 
     def paintEvent(self, _e: QPaintEvent) -> None:

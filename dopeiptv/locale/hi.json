@@ -2991,6 +2991,8 @@
   "card_scroll_back": "पिछले दिखाएँ",
   "card_view_switch_a11y": "दृश्य",
   "card_sort_a11y": "क्रम: {order}",
+  "sa_results_a11y": "परिणाम",
+  "about_notes_a11y": "रिलीज़ नोट्स",
   "card_continue": "जारी रखें",
   "card_popular": "अभी लोकप्रिय",
   "card_grid": "ग्रिड",

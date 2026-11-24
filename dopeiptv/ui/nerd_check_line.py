@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from ..core.nerd_check import FAIL, INFO, OK, WARN, Check
 from ..core.workers import run_async
 from ..i18n import tr
+from . import a11y
 from .theme import P
 
 GLYPHS = {OK: "✓", WARN: "!", FAIL: "✗", INFO: "i"}
@@ -77,7 +78,8 @@ class CheckLine(QWidget):
         self._act: Callable[[], None] | None = None
         self.action_btn: QPushButton | None = None
         if action is not None:
-            self.action_btn = QPushButton("")
+            # Its words come with what a result offers (_offer).
+            self.action_btn = a11y.words_later(QPushButton(""))
             self.action_btn.clicked.connect(self._do_action)
             self.action_btn.hide()
             h.addWidget(self.action_btn)

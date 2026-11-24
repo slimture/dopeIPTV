@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from . import a11y
 from ..media.embedded import EmbeddedPlayer
 from ..media.players import embedded_playback_supported
 from .cast_card import CastCard
@@ -43,6 +44,7 @@ class _BuildDetailMixin:
         self._reopen_btn = QToolButton(det, objectName="ReopenStrip")
         self._reopen_btn.setArrowType(Qt.ArrowType.RightArrow)
         self._reopen_btn.setToolTip(tr("tooltip_show_list"))
+        self._reopen_btn.setAccessibleName(tr("tooltip_show_list"))
         self._reopen_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._reopen_btn.clicked.connect(lambda: self._set_focus_mode(False))
         self._reopen_btn.hide()
@@ -216,6 +218,10 @@ class _BuildDetailMixin:
         # selectors - a bare 'background: transparent' cascades onto child
         # widgets; see the #SideContent note.)
         self._info_scroll = QScrollArea(objectName="InfoScroll")
+        # Tab goes to what can be used in it - a film's Continue, an actor,
+        # a programme - and the column scrolls to it; never an invisible
+        # stop on the column itself (ui/a11y.py).
+        a11y.unfocused(self._info_scroll)
         self._info_scroll.setWidgetResizable(True)
         self._info_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._info_scroll.setHorizontalScrollBarPolicy(
@@ -287,6 +293,7 @@ class _BuildDetailMixin:
         # when the poster size changes.
         self.play_mpv = QPushButton(self.d_logo, objectName="PlayGhost")
         self.play_mpv.setToolTip(tr("tooltip_play_in_mpv"))
+        self.play_mpv.setAccessibleName(tr("tooltip_play_in_mpv"))
         self.play_mpv.setFixedSize(30, 30)
         self.play_mpv.setCursor(Qt.CursorShape.PointingHandCursor)
         self._apply_play_icon(30)
@@ -370,7 +377,7 @@ class _BuildDetailMixin:
         dc = QHBoxLayout(self.d_continue)
         dc.setContentsMargins(0, 0, 0, 0)
         dc.setSpacing(12)
-        self.d_continue_btn = QPushButton(objectName="Primary")
+        self.d_continue_btn = QPushButton("  " + tr("card_continue"), objectName="Primary")
         self.d_continue_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.d_continue_btn.clicked.connect(self._detail_film_go_on)
         dc.addWidget(self.d_continue_btn)
@@ -388,6 +395,7 @@ class _BuildDetailMixin:
         il.addWidget(self.d_continue)
 
         self.cast_scroll = QScrollArea()
+        a11y.unfocused(self.cast_scroll)        # Tab goes to the actors in it
         self.cast_scroll.setWidgetResizable(True)
         self.cast_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.cast_scroll.setHorizontalScrollBarPolicy(
@@ -411,6 +419,7 @@ class _BuildDetailMixin:
         il.addWidget(self.cast_scroll)
 
         self.epg_scroll = QScrollArea()
+        a11y.unfocused(self.epg_scroll)         # ...and to the programmes
         self.epg_scroll.setWidgetResizable(True)
         self.epg_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.epg_holder = QWidget(objectName="EpgHolder")

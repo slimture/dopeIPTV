@@ -1148,6 +1148,7 @@ class _RecordingMixin(_TimeshiftMixin):
         lay.setContentsMargins(16, 14, 16, 14)
         lay.setSpacing(12)
         lst = QListWidget()
+        lst.setAccessibleName(tr("rec_scheduled_title"))
         lst.setStyleSheet("QListWidget { font-size: 13px; }")
         lay.addWidget(lst)
         empty = QLabel(tr("rec_no_upcoming"))
@@ -1321,10 +1322,13 @@ class _RecordingMixin(_TimeshiftMixin):
         lay.setSpacing(8)
         lay.addWidget(QLabel(tr("rec_info_name")))
         title_edit = QLineEdit(info.get("title") or it.get("_filename", ""))
+        title_edit.setAccessibleName(tr("rec_info_name"))
         lay.addWidget(title_edit)
         lay.addWidget(QLabel(tr("rec_info_desc")))
         from PyQt6.QtWidgets import QPlainTextEdit
         desc_edit = QPlainTextEdit(info.get("description", ""))
+        desc_edit.setAccessibleName(tr("rec_info_desc"))
+        desc_edit.setTabChangesFocus(True)
         desc_edit.setMinimumHeight(120)
         lay.addWidget(desc_edit)
         btns = QDialogButtonBox(

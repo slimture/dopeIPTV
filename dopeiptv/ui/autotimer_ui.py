@@ -325,6 +325,7 @@ class AutoTimerPreview(QDialog):
         self.status.setWordWrap(True)
         self.status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
         self.list = QListWidget()
+        self.list.setAccessibleName(self.windowTitle())
         v.addWidget(self.status)
         v.addWidget(self.list, 1)
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

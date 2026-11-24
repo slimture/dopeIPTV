@@ -531,7 +531,7 @@ class CastCard(QWidget):
         self.note.setWordWrap(True)
         self.note.hide()
         words.addWidget(self.note)
-        self.action = QPushButton("")
+        self.action = QPushButton(tr("cast_try_again"))      # set_state's words
         self.action.setObjectName("CastAction")
         self.action.setCursor(Qt.CursorShape.PointingHandCursor)
         self.action.clicked.connect(lambda: self.action_clicked.emit(self.action_kind))

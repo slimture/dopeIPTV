@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Pokaż wcześniejsze",
   "card_view_switch_a11y": "Widok",
   "card_sort_a11y": "Sortowanie: {order}",
+  "sa_results_a11y": "Wyniki",
+  "about_notes_a11y": "Informacje o wydaniu",
   "card_continue": "Kontynuuj",
   "card_popular": "Teraz popularne",
   "card_grid": "Siatka",

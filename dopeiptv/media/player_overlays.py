@@ -36,6 +36,7 @@ class PlayerOverlaysMixin:
         glyph = "play" if paused else "pause"
         self.center_btn.setIcon(_control_icon(glyph, "#FFFFFF", 30))
         self.center_btn.setIconSize(QSize(30, 30))
+        self._name_pause()
 
     def _reveal_center(self) -> None:
         """Show the centre button and, while playing, arm its fade. While

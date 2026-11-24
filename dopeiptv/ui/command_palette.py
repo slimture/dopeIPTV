@@ -248,6 +248,7 @@ class CommandPalette(QWidget):
 
         self.list = QListWidget()
         self.list.setObjectName("PaletteList")
+        self.list.setAccessibleName(tr("sa_results_a11y"))     # what the field finds
         self.list.setItemDelegate(_Delegate(self.list))
         self.list.setMouseTracking(True)
         self.list.setFocusPolicy(Qt.FocusPolicy.NoFocus)

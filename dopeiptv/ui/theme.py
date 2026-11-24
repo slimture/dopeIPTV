@@ -853,6 +853,7 @@ QFrame#NowCard {{
 #EpgHolder {{ background: {p['pane']}; }}
 QFrame#EpgRow {{ background: {p['pane']}; border: none; border-radius: 8px; }}
 QFrame#EpgRow:hover {{ background: {p['hover']}; }}
+QFrame#EpgRow:focus {{ background: {p['sel']}; }}
 QLabel#EpgRowTime  {{ color: {ACCENT}; font-size: 12px; font-weight: 700;
                       background: transparent; }}
 QLabel#EpgRowTitle {{ font-size: 13px; background: transparent; }}
@@ -892,6 +893,12 @@ QToolButton#SectionToggle {{
 }}
 QToolButton#SectionToggle:hover {{ background: {p['hover']}; }}
 QToolButton#SectionToggle:checked {{ background: {p['hover']}; }}
+/* Tool buttons take the focus from Tab alone (never a click): a ring for
+   the keyboard, drawn by none of the styles once a rule styles the button. */
+QToolButton#SectionToggle:focus, QToolButton#ReopenStrip:focus,
+QToolButton#InlineToggle:focus {{
+    border: 1px solid {p['accent_hi']};
+}}
 
 QToolButton#ReopenStrip {{
     background: {p['hover']}; border: none;

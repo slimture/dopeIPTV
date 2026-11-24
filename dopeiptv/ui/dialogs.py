@@ -94,6 +94,8 @@ class FitScroll(QScrollArea):
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # A form's fields take the focus, and the area scrolls to each.
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # Room the dialog needs around this: its margins, title, buttons.
         self.reserve = 160
 
@@ -548,6 +550,12 @@ class PlaylistDialog(SourceFields, QDialog):
         for w in (self._pw_lbl, self.pw):
             w.setVisible(shown["login"])
         self._pw_lbl.setText(shown["pw_label"])
+        # Each field read by its label (they are QLabels of their own here,
+        # so Qt does not tie them as it does a form row's words).
+        for lbl, field in ((self._server_lbl, self.server), (self._user_lbl, self.user),
+                           (self._pw_lbl, self.pw), (self._mac_lbl, self.mac),
+                           (self._satip_lbl, self.satip_m3u)):
+            field.setAccessibleName(lbl.text())
         for w in (self._mac_lbl, self.mac):
             w.setVisible(shown["mac"])
         for w in (self._satip_lbl, self.satip_m3u):
@@ -600,6 +608,7 @@ class ContentManagerDialog(QDialog):
         lay.addWidget(hint)
 
         self.list = QListWidget()
+        self.list.setAccessibleName(tr("cm_title"))
         lay.addWidget(self.list, 1)
 
         btns = QHBoxLayout()

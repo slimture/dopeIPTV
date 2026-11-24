@@ -2991,6 +2991,8 @@
   "card_scroll_back": "پچھلے دکھائیں",
   "card_view_switch_a11y": "منظر",
   "card_sort_a11y": "ترتیب: {order}",
+  "sa_results_a11y": "نتائج",
+  "about_notes_a11y": "ریلیز نوٹس",
   "card_continue": "جاری رکھیں",
   "card_popular": "ابھی مقبول",
   "card_grid": "گرڈ",

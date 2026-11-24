@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Προηγούμενα",
   "card_view_switch_a11y": "Προβολή",
   "card_sort_a11y": "Ταξινόμηση: {order}",
+  "sa_results_a11y": "Αποτελέσματα",
+  "about_notes_a11y": "Σημειώσεις έκδοσης",
   "card_continue": "Συνέχεια",
   "card_popular": "Δημοφιλή τώρα",
   "card_grid": "Πλέγμα",

@@ -250,6 +250,7 @@ class _MultiviewCell(QWidget):
         self._pause_btn.setIcon(self._icon_pause)
         self._pause_btn.setIconSize(QSize(13, 13))
         self._pause_btn.setToolTip(tr("mv_pause"))
+        self._pause_btn.setAccessibleName(tr("mv_pause"))      # a drawn glyph on screen
         self._pause_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._pause_btn.setStyleSheet(
             "QPushButton { background:rgba(0,0,0,170); border:none;"
@@ -258,6 +259,7 @@ class _MultiviewCell(QWidget):
         self._pause_btn.clicked.connect(self.toggle_pause)
         self._pause_btn.hide()
         self._seek = _SeekSlider(self.video)
+        self._seek.setAccessibleName(tr("phone_page_seek"))
         self._seek.setRange(0, 1000)
         self._seek.setMouseTracking(True)   # hover names the programme
         self._seek.seek_requested.connect(self._on_seek_value)

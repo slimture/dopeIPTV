@@ -39,6 +39,7 @@ from ..core.log import log
 from ..core.profiles import adult_category, adult_item
 from ..core.workers import run_async
 from ..i18n import tr
+from . import a11y
 from .theme import P
 from .tv_widgets import (
     ColourLegend, TvGrid, TvList, TvShelf, TvTile, font,
@@ -720,7 +721,7 @@ class TvPage(QWidget):
         # (beside them it pushed the row off a 1080p screen): OK on it is
         # the picture again, so are Play and Back. As wide as its words up
         # to the page's, then cut at the end; hidden, it takes no room.
-        self.now = TvTile("", w=150, h=64, kind="tab")
+        self.now = a11y.words_later(TvTile("", w=150, h=64, kind="tab"))   # what plays, once it does
         self.now.payload = ("now",)
         self.now.clicked.connect(self._now_clicked)
         self.now.hide()

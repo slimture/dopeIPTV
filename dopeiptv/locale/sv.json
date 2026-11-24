@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Visa tidigare",
   "card_view_switch_a11y": "Visning",
   "card_sort_a11y": "Sortering: {order}",
+  "sa_results_a11y": "Resultat",
+  "about_notes_a11y": "Versionsinformation",
   "card_continue": "Fortsätt",
   "card_popular": "Populärt just nu",
   "card_grid": "Rutnät",

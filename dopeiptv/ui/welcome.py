@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
+from .. import APP_NAME
 from ..i18n import LANGUAGES, tr
 from .box_finder import (
     BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
@@ -159,6 +160,8 @@ class WelcomeOverlay(QWidget):
         # Accept keyboard focus so Esc reaches keyPressEvent even before the
         # user clicks a field.
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAccessibleName(APP_NAME)
+        self.setAccessibleDescription(tr("welcome_subtitle"))
         self.setStyleSheet(
             f"#WelcomeOverlay {{ background: {P['bg']}; }}"
             "#WelcomeScroll, #WelcomeScrollView { background: transparent; border: none; }"
@@ -207,6 +210,8 @@ class WelcomeOverlay(QWidget):
         # the whole page (a small screen, a long language, the box finder's
         # note): the card never grows past the window and cuts them off.
         self._scroll = QScrollArea(objectName="WelcomeScroll")
+        # Tab goes to the page's own controls, and it scrolls to each.
+        self._scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(
@@ -723,12 +728,25 @@ class WelcomeOverlay(QWidget):
         self._pw.setPlaceholderText(tr("playlist_pin_hint") if pin else hint)
         for w in (self._lbl_mac, self._mac):
             w.setVisible(stalker)
+        self._name_fields()
         self._finder.row.setVisible(box or media)
         self._finder.wanted = MEDIA_KINDS if media else BOX_KINDS
         if not (box or media):
             self._finder.status.hide()
         self._signin.set_kind(kind)
         self._fit_card(self._stack.currentIndex())
+
+    def _name_fields(self) -> None:
+        """Each field read by the label beside it - a QLabel of its own,
+        which Qt does not tie to the field as a form row's words."""
+        for lbl, field in ((self._lbl_kind, self._conn_kind), (self._lbl_name, self._name),
+                           (self._lbl_server, self._server), (self._lbl_user, self._user),
+                           (self._lbl_pw, self._pw), (self._lbl_mac, self._mac),
+                           (self._lang_label, self._lang_combo)):
+            field.setAccessibleName(lbl.text())
+        code = getattr(self, "_b_code", None)       # the Bring page, built after this one
+        if code is not None:
+            code.setAccessibleName(tr("sync_code"))
 
     def _signin_changed(self) -> None:
         self._fit_card(self._stack.currentIndex())

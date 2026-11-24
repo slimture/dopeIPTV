@@ -1,5 +1,6 @@
 {
 "tests/test_about_dialog.py": 0.1,
+"tests/test_accessibility.py": 6.0,
 "tests/test_airplay.py": 12.2,
 "tests/test_alloc.py": 0.0,
 "tests/test_app_filters.py": 0.0,

@@ -285,6 +285,7 @@ class _QueueMixin:
         dlg.resize(460, 420)
         v = QVBoxLayout(dlg)
         lst = QListWidget()
+        lst.setAccessibleName(tr("queue_title"))
         q = getattr(self, "_track_queue", []) or []
         cur = getattr(self, "_track_index", -1)
         for n, it in enumerate(q):
@@ -434,6 +435,7 @@ class _QueueMixin:
         top.addStretch(1)
         top.addWidget(QLabel(tr("eq_preset")))
         presets = QComboBox()
+        presets.setAccessibleName(tr("eq_preset"))
         for key in ("flat", "bass", "treble", "vocal", "rock"):
             presets.addItem(tr(f"eq_preset_{key}"), key)
         top.addWidget(presets)
@@ -450,6 +452,7 @@ class _QueueMixin:
             sl.setValue(int(round(gains[i])))
             sl.setMinimumHeight(120)
             lab = QLabel(f"{f // 1000}k" if f >= 1000 else str(f))
+            sl.setAccessibleName(f"{f // 1000} kHz" if f >= 1000 else f"{f} Hz")
             lab.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             col.addWidget(sl, 1, Qt.AlignmentFlag.AlignHCenter)
             col.addWidget(lab)

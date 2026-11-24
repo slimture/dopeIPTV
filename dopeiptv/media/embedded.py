@@ -643,6 +643,15 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self.seek_overlay.setMouseTracking(True)
         self.seek_overlay.installEventFilter(self)
         self.seek.installEventFilter(self)
+        # Tab in the order the controls are seen - the scrubber over the
+        # picture, then the bar from its start - not the order they were
+        # made in (Pause went on to the scrubber, Stop came after Options).
+        chain = (self.back_btn, self.seek, self.fwd_btn, self.prev_btn, self.next_btn,
+                 self.pause_btn, self.stop_btn, self.nextep_btn, self.ts_btn, self.rec_btn,
+                 self.opts_btn, self.cast_btn, self.pop_btn, self.fs_btn, self.mute_btn,
+                 self.vol)
+        for first, second in zip(chain, chain[1:], strict=False):
+            QWidget.setTabOrder(first, second)
         self._seek_overlay_timer = QTimer(self)
         self._seek_overlay_timer.setSingleShot(True)
         self._seek_overlay_timer.setInterval(2500)
@@ -994,11 +1003,46 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self.fs_rec_btn.setToolTip(tr("tooltip_record"))
         self.fs_opts_btn.setToolTip(tr("tooltip_audio_subs_aspect"))
         self.fs_exit_btn.setToolTip(tr("tooltip_exit_fullscreen") + " (Esc)")
+        self._name_controls()
         self._label_live_button(force=True)
         self.local_buffer_seek.setToolTip(tr("tooltip_timeshift"))
         self._dvr_switch.retranslate()
         self._ts_switch.retranslate()
         self._ld_refresh()
+
+    def _name_controls(self) -> None:
+        """What a screen reader calls each control - the bar's and the full
+        screen's are glyphs on screen, their words only in the tooltips,
+        which stay their description (with the key). Play / Pause and
+        Mute / Unmute follow the state (_name_pause, _apply_mute_icon)."""
+        for words, buttons in (
+                ("tooltip_previous_channel", (self.prev_btn, self.fs_prev_btn)),
+                ("tooltip_next_channel", (self.next_btn, self.fs_next_btn)),
+                ("tooltip_back_10s", (self.back_btn, self.fs_back_btn)),
+                ("tooltip_forward_30s", (self.fwd_btn, self.fs_fwd_btn)),
+                ("tooltip_volume", (self.vol, self.fs_vol)),
+                ("tooltip_timeshift", (self.ts_btn, self.fs_ts_btn, self.local_buffer_seek,
+                                        self.ts_slider)),
+                ("tooltip_record", (self.rec_btn, self.fs_rec_btn)),
+                ("tooltip_audio_subs_aspect", (self.opts_btn, self.fs_opts_btn)),
+                ("tooltip_stop_playback", (self.stop_btn,)),
+                ("tooltip_next_episode", (self.nextep_btn, self.fs_nextep_btn)),
+                ("tooltip_fullscreen", (self.fs_btn,)),
+                ("tooltip_exit_fullscreen", (self.fs_exit_btn,)),
+                ("tooltip_cast", (self.cast_btn,)),
+                ("phone_page_seek", (self.seek, self.fs_seek))):
+            for b in buttons:
+                b.setAccessibleName(tr(words))
+        self.pop_btn.setAccessibleName(
+            tr("tooltip_popout_exit") if self._popout_mode else tr("tooltip_popout"))
+        self.video.setAccessibleName(tr("opt_video"))
+        self._name_pause()
+        self._apply_mute_icon()
+
+    def _name_pause(self) -> None:
+        words = tr("btn_play") if getattr(self, "_paused", False) else tr("btn_pause")
+        for b in (self.pause_btn, self.fs_pause_btn, self.center_btn):
+            b.setAccessibleName(words)
 
     # -- event filter (fullscreen overlay reveal on hover) --------------------
 
@@ -1239,6 +1283,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         """Connect a video widget's signals/filters to the player."""
         w.installEventFilter(self)
         w.setMouseTracking(True)
+        w.setAccessibleName(tr("opt_video"))
         fallback = getattr(w, "fallback", None)
         if fallback is not None:
             fallback.connect(self._video_fallback)
@@ -2134,6 +2179,7 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         icon = _control_icon(name, self._icon_color, self.ICON_PX)
         self.pause_btn.setIcon(icon)
         self.fs_pause_btn.setIcon(icon)
+        self._name_pause()
         # Paused, the loading indicator gives way to the play button; going
         # on, it comes back while the stream is still on its way.
         self._ld_refresh()
@@ -2603,6 +2649,9 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             self._icon_color, self.ICON_PX)
         self.mute_btn.setIcon(icon)
         self.fs_mute_btn.setIcon(icon)
+        words = tr("mv_unmute") if getattr(self, "_muted", False) else tr("mv_mute")
+        self.mute_btn.setAccessibleName(words)
+        self.fs_mute_btn.setAccessibleName(words)
 
     def toggle_mute(self) -> None:
         self._muted = not self._muted

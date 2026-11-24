@@ -56,6 +56,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from .a11y import keyboard_ring
 from .qt_i18n import format_when
 from .series_cards import ImageSource
 from .theme import P, corner_radius, ink_on, tinted
@@ -1286,10 +1287,13 @@ class CardDelegate(QStyledItemDelegate):
         playing = bool(card.key) and card.key == v.playing_key
         hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        focus = selected and v.hasFocus() and index == v.currentIndex()
+        # The keyboard's card: the current one while the view has the focus,
+        # chosen or not (Tab into a view makes a card current, not chosen).
+        focus = v.hasFocus() and index == v.currentIndex()
         begin_paint(p)
         if v.layout_kind == "list":
             self._paint_row(p, option.rect, index.row(), card, rtl, playing, hover, selected)
+            keyboard_ring(p, option)        # a row: ringed for the keyboard alone
         else:
             self._paint_card(p, option.rect, card, rtl, playing, hover, selected, focus)
         p.restore()
@@ -1838,7 +1842,7 @@ class StripDelegate(QStyledItemDelegate):
         playing = bool(card.key) and card.key == s.playing_key
         hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        focus = selected and s.hasFocus() and index == s.currentIndex()
+        focus = s.hasFocus() and index == s.currentIndex()
         parts = strip_parts(option.rect, s.picture, card.rank > 0, rtl)
         begin_paint(p)
         radius = corner_radius(12)
@@ -2187,11 +2191,28 @@ class Segmented(QWidget):
             b.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
             b.setCheckable(True)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
+            # Tab reaches it, a click does not take the focus: its ring
+            # (restyle) is the keyboard's alone.
+            b.setFocusPolicy(Qt.FocusPolicy.TabFocus)
             b.setAccessibleName(label)
             self._group.addButton(b, i)
             self._lay.addWidget(b)
             self.buttons.append(b)
             self._keys.append(key)
+        # Tab reaches them where the switch is: a button made now joins the
+        # window's focus chain at its end, after the cards under the header.
+        # Chained after the control before the switch (setTabOrder takes no
+        # widget without a focus of its own, as the switch itself is).
+        prev = self.previousInFocusChain()
+        for _ in range(500):
+            if prev is None or prev is self or (
+                    prev.focusPolicy() & Qt.FocusPolicy.TabFocus and not self.isAncestorOf(prev)):
+                break
+            prev = prev.previousInFocusChain()
+        if prev is not None and prev is not self and self.buttons:
+            for b in self.buttons:
+                QWidget.setTabOrder(prev, b)
+                prev = b
         self.set_current(current or (self._keys[0] if self._keys else ""))
         self.setVisible(bool(self._keys))
 
@@ -2206,7 +2227,8 @@ class Segmented(QWidget):
             f"QPushButton#MediaSegment:hover {{ color:{P['text']}; }}"
             f"QPushButton#MediaSegment:checked {{ background:{P['btn_hover']};"
             f" color:{P['text']}; }}"
-            f"QPushButton#MediaSegment:focus {{ outline:none; }}")
+            f"QPushButton#MediaSegment:focus {{ outline:none; color:{P['text']};"
+            f" border:2px solid {P['accent_hi']}; padding:3px 10px; }}")
 
     def current(self) -> str:
         i = self._group.checkedId()
@@ -2315,6 +2337,7 @@ class PageHeader(QWidget):
         self.sort_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.sort_btn.setIconSize(QSize(14, 14))
         self.sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sort_btn.setAccessibleName(tr("label_sort"))      # the order's words once set
         self._sort_menu = QMenu(self.sort_btn)
         self.sort_btn.setMenu(self._sort_menu)
         self._sort_group = QActionGroup(self)
@@ -2347,6 +2370,8 @@ class PageHeader(QWidget):
             f" border:none; border-radius:{r}px; padding:0; font-size:12px;"
             " font-weight:600; }"
             f"QToolButton#MediaSort:hover {{ color:{P['text']}; background:{P['btn']}; }}"
+            # A tool button takes the focus from Tab alone: the keyboard's ring.
+            f"QToolButton#MediaSort:focus {{ border:2px solid {P['accent_hi']}; }}"
             "QToolButton#MediaSort::menu-indicator { image:none; width:0; }")
         self.sort_btn.setIcon(sort_icon(P["text2"], 14, self.devicePixelRatioF() or 1.0))
         self.switch.restyle()

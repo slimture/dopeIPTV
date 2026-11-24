@@ -126,6 +126,7 @@ class MediaSignIn(QWidget):
         srow.setContentsMargins(0, 0, 0, 0)
         self.server_lbl = QLabel(tr("ms_plex_server"))
         self.servers = QComboBox()
+        self.servers.setAccessibleName(tr("ms_plex_server"))
         self.servers.activated.connect(self._server_picked)
         srow.addWidget(self.server_lbl)
         srow.addWidget(self.servers, 1)

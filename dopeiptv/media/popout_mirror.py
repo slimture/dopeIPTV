@@ -408,6 +408,7 @@ class PopoutMirrorMixin:
         self.bar.show()
         self.pop_btn.setToolTip(
             tr("tooltip_popout_exit") if enabled else tr("tooltip_popout"))
+        self.pop_btn.setAccessibleName(self.pop_btn.toolTip())
         self._lock_video_box()
         # Re-settle once the layout is final. A pop-out toggle reparents the
         # player, so right after it the video geometry isn't settled: the fixed

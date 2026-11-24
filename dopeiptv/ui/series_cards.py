@@ -217,6 +217,9 @@ class EpisodeModel(QAbstractListModel):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._items: list[dict] = []
+        #: A card's words for a screen reader (the page's: it knows what is
+        #: watched, playing and next) - else its title alone.
+        self.describe: Callable[[dict], str] | None = None
 
     def rowCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._items)
@@ -227,6 +230,8 @@ class EpisodeModel(QAbstractListModel):
         it = self._items[index.row()]
         if role == Qt.ItemDataRole.UserRole:
             return it
+        if role == Qt.ItemDataRole.AccessibleTextRole and self.describe is not None:
+            return self.describe(it)
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.AccessibleTextRole):
             return str(it.get("_sp_label") or it.get("name") or "")
         return None
@@ -500,6 +505,27 @@ class EpisodeDelegate(QStyledItemDelegate):
         return " · ".join(parts)
 
 
+def episode_a11y(ep: dict, state: EpisodeState, playing: bool = False,
+                 next_up: bool = False, on_tv: bool = False) -> str:
+    """What a screen reader says for an episode's card - the words it shows:
+    "E5 · Title", Playing / Up next / New, its length or what is left,
+    Watched, how far it got, then its plot."""
+    parts = [str(ep.get("_sp_label") or ep.get("name") or "")]
+    if playing:
+        parts.append(tr("pill_on_tv") if on_tv else tr("sp_playing"))
+    elif next_up:
+        parts.append(tr("sp_up_next"))
+    elif state.new:
+        parts.append(tr("sp_new"))
+    parts.append(EpisodeDelegate._meta(ep, state))
+    if state.watched:
+        parts.append(tr("pill_seen"))
+    elif state.progress.started and 0 < state.progress.fraction < 1:
+        parts.append(tr("card_progress_a11y", n=round(state.progress.fraction * 100)))
+    parts.append(sv.plot_of(ep))
+    return ", ".join(p for p in parts if p)
+
+
 def minutes_text(mins: int) -> str:
     if mins >= 60:
         h, m = divmod(mins, 60)
@@ -525,6 +551,7 @@ class EpisodeView(QListView):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("SeriesEpisodes")
+        self.setAccessibleName(tr("sp_episodes"))
         self.setUniformItemSizes(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
