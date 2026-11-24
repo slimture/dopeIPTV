@@ -403,9 +403,13 @@ class HomeServer:
         self.port = config.port
         self._guide_path = guide_path
         self.share = Share(self.served, make_client=make_client, guide_path=guide_path)
+        #: More sources whose guides are kept fresh than those served: the
+        #: ones the server's recorder plans series recordings from
+        #: (services/server_recorder.py); None: none.
+        self.also_guides: Callable[[], list[dict]] | None = None
         #: The served sources' guides kept fresh; the window keeps its active
         #: source's itself (a host's ``guides_kept``).
-        self.guides = GuideKeeper(self.served, self.share._client,
+        self.guides = GuideKeeper(self._guide_sources, self.share._client,
                                   kept=getattr(host, "guides_kept", None), guide_path=guide_path)
         self.limiter = RateLimiter()
         #: How often one address may ask what needs no token.
@@ -540,6 +544,19 @@ class HomeServer:
     def source(self, pid: str) -> dict | None:
         return next((p for p in self.served() if str(p["id"]) == pid), None)
 
+    def _guide_sources(self) -> list[dict]:
+        """The sources whose guides are kept fresh: those served, and those
+        the recorder plans from (``also_guides``)."""
+        out = list(self.served())
+        more = self.also_guides
+        if more is not None:
+            try:
+                seen = {str(p.get("id")) for p in out}
+                out += [p for p in more() if str(p.get("id")) not in seen]
+            except Exception as e:
+                log.debug("server: the recorder's sources not read: %s", e)
+        return out
+
     def allowed_categories(self, pl: dict) -> list[tuple[str, str]]:
         """(id, name) of the categories of *pl* that may be served at all."""
         from ..core.profiles import adult_category
@@ -672,10 +689,13 @@ class HomeServer:
     def _ingest_for(self, pid: str) -> Any:
         """Each channel opened with its own source's options (user agent,
         headers, proxy, route) - not the window's active source's."""
-        from ..core.dvr_ingest import Ingest, opener_for
         pl = self.source(pid)
-        if pl is None:
-            return None
+        return self._ingest_of(pl) if pl is not None else None
+
+    def _ingest_of(self, pl: dict) -> Any:
+        """The buffer's connection for a channel of source *pl* - served or
+        not: a recording's (services/server_recorder.py)."""
+        from ..core.dvr_ingest import Ingest, opener_for
         src = dict(pl.get("options") or {}, _kind=pl.get("kind") or "xtream",
                    _server=str(pl.get("server") or ""))
         opener = opener_for(src)
@@ -795,6 +815,15 @@ class HomeServer:
         for ch in st["channels"]:
             ch["source_name"] = names.get(ch["source"], "")
         st["addresses"] = self.addresses(base)
+        # What the server records (a host with a recorder: dopeiptv --server).
+        recordings = getattr(self.host, "recordings", None)
+        if callable(recordings):
+            try:
+                got = recordings()
+                if got is not None:
+                    st["recordings"] = got
+            except Exception as e:
+                log.debug("server: the recordings not said: %s", e)
         return st
 
     def settings_view(self) -> dict[str, Any]:

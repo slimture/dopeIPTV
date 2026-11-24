@@ -208,6 +208,14 @@ class _ConnectionsMixin:
             log.debug("connections: player not counted: %s", e)
         rec = getattr(self, "rec", None)
         for j in (rec.jobs if rec is not None else []):
+            el = j.get("_elsewhere")
+            if el is not None:
+                # The server's (core/rec_claims.py): a connection of its own
+                # to the account when its claim says so.
+                if j.get("status") == "recording" and el.get("own"):
+                    uses.append(Use("recording", str(j.get("source") or ""),
+                                    str(j.get("url") or "")))
+                continue
             if (j.get("status") == "recording" and not j.get("inplayer")
                     and j.get("recorder") is None and connections.is_network(j.get("url"))):
                 uses.append(Use("recording", str(j.get("source") or ""), str(j.get("url"))))

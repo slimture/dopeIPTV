@@ -1001,7 +1001,7 @@
   "series_where": "Kanal",
   "series_where_this": "Yalnızca {channel}",
   "series_where_any": "Herhangi bir kanal",
-  "series_hint": "Kılavuzdaki her gelecek yayın, göründüğü anda Ayarlar → Kayıt bölümündeki pay süreleriyle zamanlanır. Kayıt başladığında uygulamanın çalışıyor olması gerekir.",
+  "series_hint": "Kılavuzdaki her gelecek yayın, göründüğü anda Ayarlar → Kayıt bölümündeki pay süreleriyle zamanlanır. Kayıt başladığında uygulamanın çalışıyor olması gerekir. Pencere kapalıyken uygulama bunları sunucu olarak kaydeder: dopeiptv --server.",
   "series_added": "Dizi kaydı eklendi: {title}",
   "series_scheduled_n": "Dizi kayıtları: {n} zamanlandı",
   "set_card_series": "Dizi kayıtları",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Yine de kaydet",
   "rec_started_to": "{title} kaydediliyor {length} → {folder}",
   "rec_folder_default": "(Kayıtlar klasörü)",
-  "rec_schedule_hint": "{folder} altına kaydedilir — yerini Ayarlar → Kayıt bölümünden değiştirin. Kayıt başladığında uygulamanın çalışıyor olması gerekir.",
+  "rec_schedule_hint": "{folder} altına kaydedilir — yerini Ayarlar → Kayıt bölümünden değiştirin. Kayıt başladığında uygulamanın çalışıyor olması gerekir. Pencere kapalıyken uygulama onu sunucu olarak kaydeder: dopeiptv --server.",
   "rec_scheduled_for": "{title}, {when} itibarıyla kaydedilecek",
   "rec_delete_failed": "Silinemedi: {error}",
   "ts_programme": "program",
@@ -3215,5 +3215,8 @@
   "expiry_past": "{name} hesabınızın süresi {date} tarihinde doldu.",
   "expiry_open": "Hesap…",
   "set_themes_all": "Tüm temalar ({n})",
-  "set_themes_fewer": "Daha az tema"
+  "set_themes_fewer": "Daha az tema",
+  "rec_by_server": "sunucu kaydediyor",
+  "rec_by_other_app": "başka bir bilgisayardaki dopeIPTV kaydediyor",
+  "srv_rec_by_app": "uygulama penceresi kaydediyor"
 }

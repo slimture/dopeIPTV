@@ -254,7 +254,11 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         self.cast = CastHub(kodi=KodiManager(settings), settings=settings)
         # AirPlay to an Apple TV joins it on macOS (mw_airplay).
         self._init_airplay()
-        self.rec = RecordingManager(settings, self)
+        # Each scheduled recording claimed by one recorder - this window or a
+        # `dopeiptv --server` (core/rec_claims.py); without claims, as before.
+        from ..core import rec_claims
+        self.rec = RecordingManager(settings, self,
+                                    claims=rec_claims.for_settings(settings, rec_claims.WINDOW))
         # A portal's recording asks for its address as it starts.
         self.rec.address_for = self._rec_address_for
         # A scheduled one, as it comes due: counted on its account as one

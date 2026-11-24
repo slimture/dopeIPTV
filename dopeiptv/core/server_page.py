@@ -1,6 +1,8 @@
 """Server mode's page in a browser (services/home_server.py serves it at
 ``/?token=…``): what it is doing - the tuners in use, who watches what from
-which address, the provider connection of each channel - the addresses to
+which address, the provider connection of each channel, and without a window
+what it records, waits to record and records next (services/server_recorder.py;
+what the window plays privately unnamed) - the addresses to
 give Plex, Jellyfin, VLC or Kodi, and its few settings: port, channels at
 once, the sources and categories it serves; and how to start it with the
 computer.
@@ -30,7 +32,9 @@ WORDS = ("srv_page_title", "srv_in_use", "srv_watching", "srv_nobody", "srv_shar
          "nerd_remote_port", "srv_port_hint", "srv_tuners", "srv_tuners_hint", "srv_sources",
          "srv_sources_hint", "srv_all_categories", "common_save", "srv_saved", "srv_start",
          "srv_start_hint", "srv_offline", "srv_no_sources", "common_loading", "srv_minutes",
-         "private_menu", "srv_adult", "srv_adult_hint")
+         "private_menu", "srv_adult", "srv_adult_hint", "nav_recordings",
+         "rec_status_recording", "rec_waiting_room", "rec_upcoming", "rec_no_upcoming",
+         "srv_rec_by_app", "notice_more")
 _HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
@@ -71,6 +75,7 @@ _HTML = """<!doctype html>
   <header><h1 id="title"></h1><span class="pill" id="usage"></span></header>
   <div class="banner" id="banner" role="status" hidden></div>
   <section><h2 id="hWatch"></h2><div class="card" id="watch"></div></section>
+  <section id="sRec" hidden><h2 id="hRec"></h2><div class="card" id="recs"></div></section>
   <section><h2 id="hAddr"></h2>
     <div class="card">
       <div class="row"><div class="what"><b id="lTuner"></b><small id="lTunerHint"></small></div>
@@ -194,6 +199,37 @@ function showStatus(st) {
   $("aTuner").textContent = st.addresses.tuner;
   $("aPlaylist").textContent = st.addresses.playlist;
   $("aGuide").textContent = st.addresses.guide;
+  showRecordings(st.recordings);
+}
+
+function when(t) {
+  try {
+    return new Date(t * 1000).toLocaleString(document.documentElement.lang || undefined,
+      {weekday: "short", hour: "2-digit", minute: "2-digit"});
+  } catch (e) { return new Date(t * 1000).toLocaleString(); }
+}
+function showRecordings(r) {
+  // What the server records (dopeiptv --server): none for the window's server.
+  $("sRec").hidden = !r;
+  if (!r) return;
+  const box = $("recs");
+  box.textContent = "";
+  const rows = (r.now || []).concat(r.next || []);
+  if (!rows.length) { box.appendChild(el("div", "empty", W.rec_no_upcoming)); return; }
+  for (const j of rows) {
+    const d = el("div", "chan");
+    d.appendChild(el("b", "", j.private ? W.private_menu : (j.title || j.channel)));
+    const meta = [];
+    if (j.channel && !j.private && j.title) meta.push(j.channel);
+    if (j.source_name) meta.push(j.source_name);
+    if (j.state === "recording") meta.push(W.rec_status_recording + " · " + mins(j.since));
+    else if (j.state === "held") meta.push(W.rec_waiting_room);
+    else meta.push(W.rec_upcoming + " · " + when(j.start));
+    if (j.by === "window") meta.push(W.srv_rec_by_app);
+    d.appendChild(el("div", "meta", meta.join(" · ")));
+    box.appendChild(d);
+  }
+  if (r.more) box.appendChild(el("div", "empty", fill(W.notice_more, {n: r.more})));
 }
 
 function catList(src, holder) {
@@ -281,6 +317,7 @@ async function poll() {
 function init() {
   $("title").textContent = W.srv_page_title; document.title = W.srv_page_title;
   $("hWatch").textContent = W.srv_watching; $("hAddr").textContent = W.srv_addresses;
+  $("hRec").textContent = W.nav_recordings;
   $("hSet").textContent = W.settings_title; $("hStart").textContent = W.srv_start;
   $("lTuner").textContent = W.srv_addr_tuner; $("lTunerHint").textContent = W.srv_addr_tuner_hint;
   $("lPlaylist").textContent = W.srv_addr_playlist; $("lGuide").textContent = W.srv_addr_guide;

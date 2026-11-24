@@ -23,7 +23,9 @@ dopeiptv/
   app.py               QApplication bootstrap, login flow
   launcher.py          The installed command: app.main, or headless with --server
   headless.py          Server mode without a window (services/home_server.py):
-                       QtCore for the settings, no widget, no mpv
+                       QtCore for the settings and its event loop, no widget,
+                       no mpv; it records what is scheduled
+                       (services/server_recorder.py)
   i18n.py              English source strings + set_language / tr()
   locale/              One <code>.json per non-English language (26 files)
   assets/              The Solecraft and TMDB logotypes; flags/, the bundled
@@ -112,7 +114,11 @@ dopeiptv/
                        device.xml, the UDP 65001 answer
     server_page.py     Server mode's page in a browser (HTML/CSS/JS in one, a
                        CSP of its own)
-    recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers
+    recording.py       RecordingManager - ffmpeg/mpv stream-copy, timers; with
+                       claims, the scheduled jobs shared with the other recorder
+    rec_claims.py      Who records a scheduled job - the window or --server:
+                       a locked claim per job, the window's presence, the list's
+                       lock and stamp, a stop asked of the other
     rec_mp4.py         Recordings as MP4: the remux (stream copy, faststart),
                        the plausibility check, the .ts kept unless it passed
     rec_view.py        Recordings as their place shows them: now and next,
@@ -121,6 +127,8 @@ dopeiptv/
                        after a recording
     series_rules.py    Series recordings: rules, airings found, the plan, padding;
                        a rule that reminds instead, its reminders' plan
+    series_plan.py     From the guide to the recorder's jobs: the look through
+                       the guide and the scheduling the window and --server share
     series_view.py     A series as its page shows it: seasons (Specials last),
                        the next episode, the season it opens on and the one kept
     series_continue.py The Series place's Continue row from what the app keeps
@@ -348,6 +356,9 @@ dopeiptv/
     home_server.py     Server mode: the restream, the HDHomeRun API and
                        discovery, the playlist, the guide, the page and its API
     guide_keeper.py    Server mode's guides kept fresh, one source at a time
+    server_recorder.py --server records what is scheduled while no window runs:
+                       counted with the restream, a watched channel from its
+                       buffer, series rules from the guide on disk
     together.py        Watch together, the catalogue side: what plays here, the
                        same title found in this source
 

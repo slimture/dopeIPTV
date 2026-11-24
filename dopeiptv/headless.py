@@ -2,13 +2,20 @@
 - for a NAS, a Raspberry Pi, a container or a systemd service.
 
 No widget is imported, nor anything that draws (QtGui, mpv): only QtCore
-for the settings, plain threads for the rest. The same settings, sources
-and guides as the app - each served source's guide downloaded again when it
-is six hours old (services/guide_keeper.py) - the household's, never a profile's own
-(the settings are read as they are, not through core/profiles.py) - and the
-usual log (stderr, DOPEIPTV_LOG_FILE, Nerd's log file). Ctrl+C or SIGTERM
-stops it: every viewer is let go, every provider connection closed, the
-buffers wiped.
+for the settings and its event loop, plain threads for the rest. The same
+settings, sources and guides as the app - each served source's guide
+downloaded again when it is six hours old (services/guide_keeper.py) - the
+household's, never a profile's own (the settings are read as they are, not
+through core/profiles.py) - and the usual log (stderr, DOPEIPTV_LOG_FILE,
+Nerd's log file).
+
+It records what is scheduled while no window runs (services/server_recorder.py):
+the household's scheduled recordings and series rules, each job claimed by
+one recorder alone (core/rec_claims.py), counted with the tuner's channels
+against the account's limit (``HeadlessHost.app_use``).
+
+Ctrl+C or SIGTERM stops it: every recording ends with what it holds, every
+viewer is let go, every provider connection closed, the buffers wiped.
 
 ``--port N`` listens on N this time (the setting stays); ``--no-discovery``
 leaves UDP 65001 alone (another tuner emulator on the computer has it). A
@@ -43,6 +50,9 @@ class HeadlessHost:
         self.settings = settings
         self._lock = threading.RLock()
         self._pool: Any = None
+        #: What records the scheduled recordings (services/server_recorder.py);
+        #: None until it is made, or when it cannot be.
+        self.recorder: Any = None
 
     def sources(self) -> list[dict]:
         from .core.stores import PlaylistStore
@@ -64,10 +74,21 @@ class HeadlessHost:
         return cats.excluded_ids("live", include_locked=True), hidden, numbers
 
     def app_use(self, pid: str) -> tuple[int, list[str]]:
-        return 0, []
+        """The connections this computer's recordings hold to *pid*: the
+        restream counts them before it opens one for a device."""
+        rec = self.recorder
+        return rec.connections(pid) if rec is not None else (0, [])
 
     def app_session(self, pid: str, sid: str) -> Any:
-        return None
+        """A channel a recording keeps streaming: a device tuning to it
+        shares its connection."""
+        rec = self.recorder
+        return rec.session_for(pid, sid) if rec is not None else None
+
+    def recordings(self) -> dict | None:
+        """What the server records, waits for and records next (its page)."""
+        rec = self.recorder
+        return rec.status() if rec is not None else None
 
     def pool(self) -> Any:
         with self._lock:
@@ -189,11 +210,14 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr = open(os.devnull, "w")
     configure_logging()
     log.info("%s starting as a server, without a window", BUILD_VERSION)
-    from PyQt6.QtCore import QCoreApplication, QSettings
+    from PyQt6.QtCore import QCoreApplication, QSettings, QTimer
     # The names the app's folders are made from (its cache: the guides, the
     # buffers), as the window has them.
     QCoreApplication.setOrganizationName(ORG)
     QCoreApplication.setApplicationName(APP_NAME)
+    # QtCore's event loop, for the recorder's timers (core/recording.py) -
+    # no window, nothing drawn.
+    app = QCoreApplication.instance() or QCoreApplication([APP_NAME])
     from .core import settings_files
     settings_files.protect()            # the logins and tokens: this user's alone
     settings = QSettings(ORG, ORG)
@@ -246,6 +270,14 @@ def main(argv: list[str] | None = None) -> int:
             log.error("server: --port takes a number from 0 to 65535")
             return 2
     server = HomeServer(host, cfg, discovery_port=0 if "--no-discovery" in argv else 65001)
+    stop = threading.Event()
+
+    def ask_stop(signum: int, _frame: Any) -> None:
+        log.info("server: stopping (signal %d)", signum)
+        stop.set()
+    # Before it listens: a stop asked while it starts is a stop.
+    signal.signal(signal.SIGINT, ask_stop)
+    signal.signal(signal.SIGTERM, ask_stop)
     try:
         server.start()
     except OSError as e:
@@ -262,21 +294,50 @@ def main(argv: list[str] | None = None) -> int:
     if sys.stdout.isatty():
         sys.stdout.write(f"dopeIPTV server: {page}\n")
         sys.stdout.flush()
-    stop = threading.Event()
+    host.recorder = start_recorder(server, host)
+    ticks = [0]
 
-    def ask_stop(signum: int, _frame: Any) -> None:
-        log.info("server: stopping (signal %d)", signum)
-        stop.set()
-    signal.signal(signal.SIGINT, ask_stop)
-    signal.signal(signal.SIGTERM, ask_stop)
+    def look() -> None:
+        # Python's signal handlers run between these: Ctrl+C and SIGTERM
+        # end the loop within a quarter of a second.
+        if stop.is_set():
+            app.quit()
+            return
+        ticks[0] += 1
+        if ticks[0] % 120 == 0:
+            _follow_settings(server, host, port is not None)
+    timer = QTimer()
+    timer.setInterval(250)
+    timer.timeout.connect(look)
+    timer.start()
     try:
-        ticks = 0
-        while not stop.wait(1.0):
-            ticks += 1
-            if ticks % 30 == 0:
-                _follow_settings(server, host, port is not None)
+        if not stop.is_set():
+            app.exec()
     finally:
+        timer.stop()
+        recorder, host.recorder = host.recorder, None
+        if recorder is not None:
+            recorder.close()            # every recording ends, what it holds kept
         server.stop()
         host.close()
+        if recorder is not None:
+            recorder.after_close()      # the command after each, the buffers let go
         log.info("server: done")
     return 0
+
+
+def start_recorder(server: Any, host: HeadlessHost) -> Any:
+    """The server's recorder of what is scheduled (services/server_recorder.py),
+    on a settings object of its own (it runs on this thread, the server's
+    requests on theirs). None when it cannot keep its claims."""
+    from PyQt6.QtCore import QSettings
+
+    from .services import server_recorder
+    try:
+        recorder = server_recorder.start(QSettings(ORG, ORG), server, host.pool)
+    except Exception as e:              # never in the way of the tuner
+        log.warning("server: records nothing - %s", e)
+        return None
+    if recorder is not None:
+        server.also_guides = recorder.guide_sources
+    return recorder

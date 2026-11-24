@@ -1001,7 +1001,7 @@
   "series_where": "Chaîne",
   "series_where_this": "Uniquement {channel}",
   "series_where_any": "N'importe quelle chaîne",
-  "series_hint": "Chaque diffusion à venir dans le guide est programmée dès qu'elle apparaît, avec les marges de Paramètres → Enregistrement. L'application doit tourner au début d'un enregistrement.",
+  "series_hint": "Chaque diffusion à venir dans le guide est programmée dès qu'elle apparaît, avec les marges de Paramètres → Enregistrement. L'application doit tourner au début d'un enregistrement. Fenêtre fermée, l'application les enregistre en tant que serveur : dopeiptv --server.",
   "series_added": "Enregistrement de série ajouté : {title}",
   "series_scheduled_n": "Enregistrements de séries : {n} programmés",
   "set_card_series": "Enregistrements de séries",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Enregistrer quand même",
   "rec_started_to": "Enregistrement de {title} {length} → {folder}",
   "rec_folder_default": "(Dossier des enregistrements)",
-  "rec_schedule_hint": "Enregistré dans {folder} – changez l'emplacement dans Paramètres → Enregistrement. L'application doit tourner au début de l'enregistrement.",
+  "rec_schedule_hint": "Enregistré dans {folder} – changez l'emplacement dans Paramètres → Enregistrement. L'application doit tourner au début de l'enregistrement. Fenêtre fermée, l'application l'enregistre en tant que serveur : dopeiptv --server.",
   "rec_scheduled_for": "{title} sera enregistré à partir de {when}",
   "rec_delete_failed": "Suppression impossible : {error}",
   "ts_programme": "programme",
@@ -3215,5 +3215,8 @@
   "expiry_past": "Votre compte chez {name} a expiré le {date}.",
   "expiry_open": "Compte…",
   "set_themes_all": "Tous les thèmes ({n})",
-  "set_themes_fewer": "Moins de thèmes"
+  "set_themes_fewer": "Moins de thèmes",
+  "rec_by_server": "enregistré par le serveur",
+  "rec_by_other_app": "enregistré par dopeIPTV sur un autre ordinateur",
+  "srv_rec_by_app": "enregistré par la fenêtre de l'application"
 }

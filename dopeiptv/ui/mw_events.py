@@ -359,7 +359,11 @@ class _EventsMixin:
                 return
             # A recording that began while what played was private stays
             # so to its end, though private viewing is off by then.
-            told = watch.update(list(self.rec.jobs), private=privacy.playing_private())
+            # This window's recordings: not what the server records (the
+            # events say what the app here does).
+            told = watch.update([j for j in self.rec.jobs
+                                 if not (j.get("_elsewhere") or j.get("_was_elsewhere"))],
+                                private=privacy.playing_private())
             d = self._events_live()
             if d is not None:
                 for event, fields in told:

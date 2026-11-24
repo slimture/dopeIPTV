@@ -1001,7 +1001,7 @@
   "series_where": "Zender",
   "series_where_this": "Alleen {channel}",
   "series_where_any": "Elke zender",
-  "series_hint": "Elke komende uitzending in de gids wordt ingepland zodra die verschijnt, met de marge uit Instellingen → Opname. De app moet draaien wanneer een opname begint.",
+  "series_hint": "Elke komende uitzending in de gids wordt ingepland zodra die verschijnt, met de marge uit Instellingen → Opname. De app moet draaien wanneer een opname begint. Met het venster dicht neemt de app ze als server op: dopeiptv --server.",
   "series_added": "Serie-opname toegevoegd: {title}",
   "series_scheduled_n": "Serie-opnames: {n} ingepland",
   "set_card_series": "Serie-opnames",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Toch opnemen",
   "rec_started_to": "{title} wordt {length} opgenomen → {folder}",
   "rec_folder_default": "(Map voor opnames)",
-  "rec_schedule_hint": "Wordt opgeslagen in {folder} – wijzig de plek via Instellingen → Opname. De app moet draaien wanneer de opname begint.",
+  "rec_schedule_hint": "Wordt opgeslagen in {folder} – wijzig de plek via Instellingen → Opname. De app moet draaien wanneer de opname begint. Met het venster dicht neemt de app de opname als server op: dopeiptv --server.",
   "rec_scheduled_for": "{title} wordt opgenomen vanaf {when}",
   "rec_delete_failed": "Kan niet verwijderen: {error}",
   "ts_programme": "programma",
@@ -3215,5 +3215,8 @@
   "expiry_past": "Je account bij {name} is verlopen op {date}.",
   "expiry_open": "Account…",
   "set_themes_all": "Alle thema's ({n})",
-  "set_themes_fewer": "Minder thema's"
+  "set_themes_fewer": "Minder thema's",
+  "rec_by_server": "opgenomen door de server",
+  "rec_by_other_app": "opgenomen door dopeIPTV op een andere computer",
+  "srv_rec_by_app": "opgenomen door het app-venster"
 }

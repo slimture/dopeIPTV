@@ -1001,7 +1001,7 @@
   "series_where": "Kanal",
   "series_where_this": "Samo {channel}",
   "series_where_any": "Bilo koji kanal",
-  "series_hint": "Svako nadolazeće emitiranje u vodiču zakazuje se čim se pojavi, s rezervom iz Postavke → Snimanje. Aplikacija mora raditi kad snimanje počne.",
+  "series_hint": "Svako nadolazeće emitiranje u vodiču zakazuje se čim se pojavi, s rezervom iz Postavke → Snimanje. Aplikacija mora raditi kad snimanje počne. Kad je prozor zatvoren, aplikacija ih snima kao poslužitelj: dopeiptv --server.",
   "series_added": "Dodano snimanje serije: {title}",
   "series_scheduled_n": "Snimanja serija: zakazano {n}",
   "set_card_series": "Snimanja serija",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Ipak snimi",
   "rec_started_to": "Snimanje {title} {length} → {folder}",
   "rec_folder_default": "(mapa snimki)",
-  "rec_schedule_hint": "Sprema se u {folder} — mjesto promijeni u Postavke → Snimanje. Aplikacija mora raditi kad snimanje počne.",
+  "rec_schedule_hint": "Sprema se u {folder} — mjesto promijeni u Postavke → Snimanje. Aplikacija mora raditi kad snimanje počne. Kad je prozor zatvoren, aplikacija ga snima kao poslužitelj: dopeiptv --server.",
   "rec_scheduled_for": "Snimanje „{title}” zakazano je od {when}",
   "rec_delete_failed": "Brisanje nije uspjelo: {error}",
   "ts_programme": "emisija",
@@ -3215,5 +3215,8 @@
   "expiry_past": "Vaš račun kod {name} istekao je {date}.",
   "expiry_open": "Račun…",
   "set_themes_all": "Sve teme ({n})",
-  "set_themes_fewer": "Manje tema"
+  "set_themes_fewer": "Manje tema",
+  "rec_by_server": "snima poslužitelj",
+  "rec_by_other_app": "snima dopeIPTV na drugom računalu",
+  "srv_rec_by_app": "snima prozor aplikacije"
 }

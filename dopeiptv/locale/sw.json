@@ -1001,7 +1001,7 @@
   "series_where": "Kituo",
   "series_where_this": "{channel} pekee",
   "series_where_any": "Kituo chochote",
-  "series_hint": "Kila onyesho lijalo kwenye mwongozo huratibiwa mara linapoonekana, pamoja na muda wa ziada kutoka Mipangilio → Kurekodi. Programu lazima iwe inaendeshwa kurekodi kunapoanza.",
+  "series_hint": "Kila onyesho lijalo kwenye mwongozo huratibiwa mara linapoonekana, pamoja na muda wa ziada kutoka Mipangilio → Kurekodi. Programu lazima iwe inaendeshwa kurekodi kunapoanza. Dirisha likiwa limefungwa, programu huzirekodi kama seva: dopeiptv --server.",
   "series_added": "Kurekodi msururu kumeongezwa: {title}",
   "series_scheduled_n": "Rekodi za misururu: {n} zimeratibiwa",
   "set_card_series": "Rekodi za misururu",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Rekodi hata hivyo",
   "rec_started_to": "Inarekodi {title} {length} → {folder}",
   "rec_folder_default": "(Folda ya rekodi)",
-  "rec_schedule_hint": "Huhifadhiwa chini ya {folder} — badilisha mahali kwenye Mipangilio → Kurekodi. Programu lazima iwe inaendeshwa kurekodi kunapoanza.",
+  "rec_schedule_hint": "Huhifadhiwa chini ya {folder} — badilisha mahali kwenye Mipangilio → Kurekodi. Programu lazima iwe inaendeshwa kurekodi kunapoanza. Dirisha likiwa limefungwa, programu huirekodi kama seva: dopeiptv --server.",
   "rec_scheduled_for": "{title} itarekodiwa kuanzia {when}",
   "rec_delete_failed": "Haikuweza kufuta: {error}",
   "ts_programme": "kipindi",
@@ -3215,5 +3215,8 @@
   "expiry_past": "Akaunti yako kwa {name} iliisha tarehe {date}.",
   "expiry_open": "Akaunti…",
   "set_themes_all": "Mandhari yote ({n})",
-  "set_themes_fewer": "Mandhari machache"
+  "set_themes_fewer": "Mandhari machache",
+  "rec_by_server": "inarekodiwa na seva",
+  "rec_by_other_app": "inarekodiwa na dopeIPTV kwenye kompyuta nyingine",
+  "srv_rec_by_app": "inarekodiwa na dirisha la programu"
 }

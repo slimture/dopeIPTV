@@ -130,6 +130,7 @@ requests they send it.
 | Reaching the app's servers from the internet | `core/home_net.is_home_client`: loopback, the private ranges, link-local and IPv6 ULA, never a public address |
 | Making a playlist's addresses name a host of its choosing, so the token goes there | `home_net.host_for_addresses` (`core/remote_api.py`, `services/home_server.py`) |
 | A cast's own server (a file for a DLNA TV, the converter, the AirPlay bridge) | A 144-bit token in the path, compared in constant time, one stream, stopped with the cast (`providers/dlna.py`, `providers/cast_bridge.py`, `providers/airplay_bridge.py`) |
+| Learning what the household records from server mode's page | Its `api/status` - where `dopeiptv --server` lists what it records, waits for and records next (`services/server_recorder.status`) - needs the page's own token (`K_ADMIN`), never the playlist's; a recording the window makes of what plays privately is not named there (its claim's `private`); nothing there can start, stop or change a recording |
 
 **What is left.**
 
@@ -190,6 +191,7 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 | A socket of its own where Discord or lircd would be | `core/discord_rpc.py`: a socket this user owns only; `core/tv_input.lirc_socket_ok`: lircd's when root or this user owns it, or in a folder nobody else can write to |
 | Reading a media server's token off the session bus | `services/media_session.art_for_bus`: no address with a login on the bus |
 | A file planted in the cache | The guide's index is plain data with no code path - a header, texts and arrays' bytes checked against it (`providers/epg.read_index_blob`); no pickle anywhere in the app (`tests/test_security_rules.py`); pictures from disk only in the app's folders (`core/picture_files.py`) |
+| Stopping a scheduled recording, or keeping the server from one, with a planted claim | `core/rec_claims.py`: the recordings' claims live in a folder of the app's own beside the settings (`recording-claims`), 0700 and this user's - one another account owns, or that cannot be narrowed, is refused, and then the server records nothing; every file in it 0600, opened without following a link (`O_NOFOLLOW`), at most 16 KiB, read as from outside (`parse`: a damaged one is nobody's); a claim is named by a hash of its job's id, so no id names a path, and it carries no stream address - a login never goes into one |
 
 **What is left.**
 
@@ -197,6 +199,8 @@ the person can: their files, their session bus, the ports on 127.0.0.1.
 - An address that is not http(s) and holds a login the app does not see as one, and the page yt-dlp is given, are still arguments: [below](#programs-started-by-the-app-show-their-arguments).
 - The cache and the logs keep the system's folder modes: [below](#the-cache-and-the-logs-keep-the-folder-modes-the-system-gives).
 - Any program on the session bus can drive the app: [below](#any-program-on-the-session-bus-can-drive-the-app).
+- Any program running as the person can write the recordings' claims, and
+  server mode opens a recording's connection by itself: [below](#server-mode-records-unattended).
 - An administrator of the computer can read and change everything.
 
 ### Someone on the network path
@@ -780,6 +784,37 @@ see their sockets, only what they ask a proxy for - so the proxy is the
 app's, and every stream from the internet goes through it, at the cost of
 a copy of each through the app's process.
 
+### Server mode records unattended
+
+`dopeiptv --server` records what is scheduled while no window runs
+(`services/server_recorder.py`): at a recording's time it opens a
+connection to the provider by itself - the one the person scheduled, with
+the source's own route, user agent and certificate check as the window's
+recording has them. It counts it with the channels it streams to devices
+and, while fresh, what the provider last said of other devices, and never
+goes over the account's limit: the recording waits, said in the log, and
+fails at its stop time when no room came (`NO_ROOM`); a channel nobody
+watches gives way, a device watching never does. What it cannot see is a
+window on another computer, or another app on the account the provider did
+not count lately: a recording it opens then can be one too many, as one the
+window opens beside another device's. It sends nothing anywhere new: the
+provider's own address and the guide's, as the window would.
+
+Each job is recorded by one recorder (`core/rec_claims.py`): on one
+computer the claim is the system's lock, held by the recorder's process and
+gone with it, so two never record a job and a crashed one's is taken over.
+Two computers that share a settings folder over the network may not share
+the lock; a claim of another computer stands as long as its recorder
+touches it (`STALE_S`, 90 s). Two recorders that come to one job within the
+same moment through a share that keeps no locks could both take it; a
+recorder that loses the share for longer than that has its claim taken
+over while it still records. Any program running as the person can write
+the claims - stop a recording, or keep the server from one - as it can
+change the settings.
+
+*Why:* the claim needs no server of its own and works wherever the
+settings do.
+
 ### Logins are in the settings files, not a keyring
 
 Every login and token is in Qt's settings, as plain text, in files only
@@ -810,6 +845,12 @@ proxy or a header that may hold a token as an argument:
   on their standard input (`core/recording.Feed`, `piped`): the recorder's
   command line has `-i pipe:0` and `-protocol_whitelist pipe`, no address,
   and ffmpeg may open no network protocol at all.
+* **What `dopeiptv --server` records** (`services/server_recorder.py`) is
+  recorded as the window records it: an http(s) channel is read by the
+  app into a buffer session of the server's own (`SharedRecording`) and
+  written by it - no program at all, no address anywhere but the app's
+  memory - and every other address goes through `RecordingManager` as
+  below.
 * **An HLS playlist**, which the recorder must fetch itself segment by
   segment, and a stream whose certificate the app cannot check while the
   player would play it unchecked (`Feed.classic`), are read through the

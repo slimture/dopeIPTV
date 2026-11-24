@@ -1001,7 +1001,7 @@
   "series_where": "Kanal",
   "series_where_this": "Bara {channel}",
   "series_where_any": "Vilken kanal som helst",
-  "series_hint": "Varje kommande sändning i programguiden schemaläggs så snart den dyker upp, med marginalen från Inställningar → Inspelning. Appen måste vara igång när en inspelning börjar.",
+  "series_hint": "Varje kommande sändning i programguiden schemaläggs så snart den dyker upp, med marginalen från Inställningar → Inspelning. Appen måste vara igång när en inspelning börjar. Med fönstret stängt spelar appen in dem som server: dopeiptv --server.",
   "series_added": "Serieinspelning tillagd: {title}",
   "series_scheduled_n": "Serieinspelningar: {n} schemalagda",
   "set_card_series": "Serieinspelningar",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Spela in ändå",
   "rec_started_to": "Spelar in {title} {length} → {folder}",
   "rec_folder_default": "(Inspelningsmappen)",
-  "rec_schedule_hint": "Sparas under {folder} – byt plats under Inställningar → Inspelning. Appen måste vara igång när inspelningen börjar.",
+  "rec_schedule_hint": "Sparas under {folder} – byt plats under Inställningar → Inspelning. Appen måste vara igång när inspelningen börjar. Med fönstret stängt spelar appen in den som server: dopeiptv --server.",
   "rec_scheduled_for": "{title} spelas in från {when}",
   "rec_delete_failed": "Kunde inte ta bort: {error}",
   "ts_programme": "program",
@@ -3215,5 +3215,8 @@
   "expiry_past": "Ditt konto hos {name} gick ut {date}.",
   "expiry_open": "Konto…",
   "set_themes_all": "Alla teman ({n})",
-  "set_themes_fewer": "Färre teman"
+  "set_themes_fewer": "Färre teman",
+  "rec_by_server": "spelas in av servern",
+  "rec_by_other_app": "spelas in av dopeIPTV på en annan dator",
+  "srv_rec_by_app": "spelas in av appens fönster"
 }

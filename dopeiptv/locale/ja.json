@@ -1001,7 +1001,7 @@
   "series_where": "チャンネル",
   "series_where_this": "{channel}のみ",
   "series_where_any": "すべてのチャンネル",
-  "series_hint": "番組表に今後の放送が載るたびに予約されます。前後の余裕は「設定 → 録画」の値です。録画の開始時にアプリが起動している必要があります。",
+  "series_hint": "番組表に今後の放送が載るたびに予約されます。前後の余裕は「設定 → 録画」の値です。録画の開始時にアプリが起動している必要があります。ウィンドウを閉じている間は、アプリがサーバーとして録画します: dopeiptv --server。",
   "series_added": "シリーズ録画を追加しました: {title}",
   "series_scheduled_n": "シリーズ録画: {n}件を予約しました",
   "set_card_series": "シリーズ録画",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "それでも録画",
   "rec_started_to": "{title}を録画中（{length}）→ {folder}",
   "rec_folder_default": "（録画フォルダー）",
-  "rec_schedule_hint": "{folder}に保存されます — 保存先は「設定 → 録画」で変更できます。録画の開始時にアプリが起動している必要があります。",
+  "rec_schedule_hint": "{folder}に保存されます — 保存先は「設定 → 録画」で変更できます。録画の開始時にアプリが起動している必要があります。ウィンドウを閉じている間は、アプリがサーバーとして録画します: dopeiptv --server。",
   "rec_scheduled_for": "{title}は{when}から録画されます",
   "rec_delete_failed": "削除できませんでした：{error}",
   "ts_programme": "番組",
@@ -3215,5 +3215,8 @@
   "expiry_past": "{name} のアカウントは {date} に期限切れになりました。",
   "expiry_open": "アカウント…",
   "set_themes_all": "すべてのテーマ ({n})",
-  "set_themes_fewer": "テーマを折りたたむ"
+  "set_themes_fewer": "テーマを折りたたむ",
+  "rec_by_server": "サーバーが録画中",
+  "rec_by_other_app": "別のコンピューターの dopeIPTV が録画中",
+  "srv_rec_by_app": "アプリのウィンドウが録画中"
 }
