@@ -248,6 +248,8 @@ settle(lambda: listed() and [os.path.basename(c.key) for c in view.items()] == n
 assert w._local_ctx == films
 
 # The mouse's back button: one folder up.
+applied = []                    # the watcher's thread has done what it was asked
+w._lw._worker.applied.connect(lambda n: applied.append(n))
 vp = view.viewport()
 pos = QPointF(10, 10)
 ev = QMouseEvent(QEvent.Type.MouseButtonPress, pos, vp.mapToGlobal(pos),
@@ -263,6 +265,11 @@ view.focus_key(films)
 before = view.current_item().key
 resets = []
 w.list_model.modelReset.connect(lambda: resets.append(1))
+# One folder up is another folder watched - on the watcher's own thread,
+# a moment later: a file made before the system watches it is no change.
+settle(lambda: w._lw_status()["target"] == ("folder", os.path.normpath(tree))
+       and w._lw.watching == (os.path.normpath(tree),) and applied,
+       what="the folder up watched")
 on_thread(lambda: open(os.path.join(tree, "added.mkv"), "wb").close())
 settle(lambda: view.row_of(os.path.join(tree, "added.mkv")) >= 0, 12, "a file added")
 assert resets == [], "laid out anew"

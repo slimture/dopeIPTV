@@ -831,7 +831,13 @@ def _record_for_real(tmp_path, monkeypatch, provider, kind, name):
         with open(f"/proc/{proc.pid}/environ", "rb") as fh:
             environ = fh.read()
     except FileNotFoundError:
-        argv, environ = b"\0".join(a.encode() for a in proc.args), bridge.secret.encode()
+        argv, environ = b"", b""
+    if not argv:
+        # No /proc, or the recorder already done - a finished process's
+        # cmdline reads empty (a short sample on a busy machine): the words
+        # it was given are the ones Popen handed it.
+        argv = b"\0".join(str(a).encode() for a in proc.args)
+        environ = environ or bridge.secret.encode()
     for word in (b"alice", b"s3cr3tpass", b"t0k3n", str(provider.port).encode(),
                  bridge.secret.encode()):
         assert word not in argv, word

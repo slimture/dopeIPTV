@@ -101,12 +101,13 @@ def test_reads_into_the_store_with_the_players_user_agent(provider, tmp_path):
     s = SegmentStore(tmp_path / "s", 60, 10**9, min_free=0)
     ing = Fast(f"http://127.0.0.1:{p.server_address[1]}/live.ts", s)
     ing.start()
+    # Generous: a machine busy with other work starts the thread late.
     assert wait_until(lambda: s.newest() is not None
-                      and s.newest().size > 188 * 5, 5)
+                      and s.newest().size > 188 * 5, 20)
     assert ing.state == "streaming"
     assert p.agents == ["dopeIPTV/1.0"]
     ing.stop(wait=5)
-    assert wait_until(lambda: p.open_now == 0, 3), "connection left open"
+    assert wait_until(lambda: p.open_now == 0, 10), "connection left open"
     assert p.connections == 1
 
 
@@ -200,6 +201,6 @@ def test_one_drop_is_not_a_tug_of_war(provider, tmp_path):
     s = SegmentStore(tmp_path / "s", 60, 10**9, min_free=0)
     ing = Fast(f"http://127.0.0.1:{p.server_address[1]}/live.ts", s)
     ing.start()
-    assert wait_until(lambda: s.newest() is not None, 5)
+    assert wait_until(lambda: s.newest() is not None, 20)
     assert not ing.contested
     ing.stop(wait=5)

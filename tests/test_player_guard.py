@@ -501,7 +501,12 @@ def _argv_and_env(proc) -> tuple[bytes, bytes]:
         with open(f"/proc/{proc.pid}/environ", "rb") as fh:
             env = fh.read()
     except FileNotFoundError:
-        argv, env = b"\0".join(str(a).encode() for a in proc.args), b""
+        argv, env = b"", b""
+    if not argv:
+        # No /proc, or the program already done - a finished process's
+        # cmdline reads empty (a slow sample on a busy machine): the words
+        # it was given are the ones Popen handed it.
+        argv = b"\0".join(str(a).encode() for a in proc.args)
     return argv, env
 
 
