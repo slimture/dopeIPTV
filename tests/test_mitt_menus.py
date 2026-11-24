@@ -195,15 +195,20 @@ w._mitt_folder_menu(barn, QPoint(0, 0))
 assert "Kids" in w.favs.groups and "Barn" not in w.favs.groups
 assert any(t == tr("ctx_lock_group") for t in offered()), "a folder can be locked"
 
+# The folders are read again on Mine's worker: the tiles follow a moment later.
+settle(lambda: any(c.title == "Kids" for c in page.folder_tiles.items()))
 kids = next(c for c in page.folder_tiles.items() if c.title == "Kids")
 w._mitt_folder_picked(kids)
 [card] = page.folder_items.items()
 pick.append(tr("mitt_out_of_folder"))
 w._mitt_folder_item_menu(card, QPoint(0, 0))
 assert not w.favs.groups.get("Kids"), w.favs.groups.get("Kids")
+assert not page.folder_items.items(), "out of the folder shown at once"
 
+# A favourite filed elsewhere (the sidebar's menus): the tab reads it again.
 w.favs.add("Tmp", dict(chans[2]))
 w._mitt_render()
+settle(lambda: any(c.title == "Tmp" for c in page.folder_tiles.items()))
 tmp = next(c for c in page.folder_tiles.items() if c.title == "Tmp")
 pick.append(tr("ctx_remove_folder", group="Tmp"))
 w._mitt_folder_menu(tmp, QPoint(0, 0))

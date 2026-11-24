@@ -148,20 +148,27 @@ def pick(name):
     w.listw.setCurrentIndex(w.list_model.index(row_of(name)))
 
 
+GUIDE_NOW = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+
+
 def write_nordic_guide():
     # Nordic's guide on this computer, from when it was the source in use
     # (written once Nordic is a source: the window prunes the guides of
-    # sources it does not have as it starts).
-    now =datetime.now(timezone.utc).replace(microsecond=0)
+    # sources it does not have as it starts) - each programme with its
+    # description, which the list's guide around now does not keep.
+    now = GUIDE_NOW
     fmt = "%Y%m%d%H%M%S +0000"
     os.makedirs(os.path.dirname(epgmod.epg_cache_path("b")), exist_ok=True)
+    def prog(a, b, title, desc):
+        return (f'<programme channel="vn" start="{(now + timedelta(minutes=a)).strftime(fmt)}" '
+                f'stop="{(now + timedelta(minutes=b)).strftime(fmt)}"><title>{title}</title>'
+                f'<desc>{desc}</desc></programme>')
     with open(epgmod.epg_cache_path("b"), "wb") as f:
         f.write(('<tv><channel id="vn"><display-name>Vegas Nordic</display-name></channel>'
-                 f'<programme channel="vn" start="{(now - timedelta(minutes=10)).strftime(fmt)}" '
-                 f'stop="{(now + timedelta(minutes=50)).strftime(fmt)}"><title>Nordic Show</title>'
-                 f'</programme><programme channel="vn" start="{(now + timedelta(minutes=50)).strftime(fmt)}" '
-                 f'stop="{(now + timedelta(minutes=90)).strftime(fmt)}"><title>Nordic Late</title>'
-                 '</programme></tv>').encode())
+                 + prog(-90, -10, "Earlier Show", "Earlier tonight, from the north.")
+                 + prog(-10, 50, "Nordic Show", "Nordic Show tonight: the news from the north.")
+                 + prog(50, 90, "Nordic Late", "Late and quiet.")
+                 + '</tv>').encode())
 
 
 def pick_every_source():
@@ -243,6 +250,12 @@ assert epgmod.epg_cache_path("b") not in downloads, downloads
 pick("Vegas Nordic")
 pump()
 assert w.now_title.text() == "Nordic Show", w.now_title.text()
+# ...and, the row resting there, the programme's words too - read from
+# Nordic's own guide on disk for that row alone, never downloaded.
+settle(lambda: w.now_desc.text().startswith("Nordic Show tonight"), what="the programme's words")
+assert list((w._sa_sources._texts.get("b") or {})) == [es.play_key("b", 8)]
+assert all(not d for d in w._xs_tables["b"].schedule(vegas)[3])    # the list's table keeps none
+assert epgmod.epg_cache_path("b") not in downloads, downloads
 # Its tooltip says where it is from.
 from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QHelpEvent
@@ -324,7 +337,7 @@ _exec = QMenu.exec
 QMenu.exec = lambda self, *a: menus.append([x.text() for x in self.actions() if x.text()])
 pick("Nordic Nine")
 w._context_menu(w.listw.visualRect(w.list_model.index(row_of("Nordic Nine"))).center())
-assert menus[-1] == [tr("btn_play"), tr("ctx_add_to_favorites"),
+assert menus[-1] == [tr("btn_play"), tr("ctx_add_to_favorites"), tr("xs_switch_source"),
                      tr("sa_from_source", source="Nordic")], menus
 nine = w.list_model.items()[row_of("Nordic Nine")]
 w._xs_toggle_favorite(nine)
@@ -366,6 +379,61 @@ w._failover_row = {"stream_id": 9, "name": "Nordic Nine"}
 assert w._kids_may_play("live", None, es.play_key("b", 13)) is True
 assert w._kids_may_play("live", None, "failover:b:99") is False      # not what plays
 assert w.switch_profile(MAIN_ID)
+
+# -- Nordic's own guide shift (Nerd), never the source in use's ----------------------------
+from dopeiptv.core import nerd
+s.setValue("nerd_enabled", "true")
+nerd.install(s)
+store.update("b", options={"epg_shift": "60"})            # its guide runs an hour behind
+w._update_playlist_btn()
+w.switch_mode("live")
+settle(lambda: es.CATEGORY in cat_rows(), what="TV's categories with Nerd")
+pick_every_source()
+
+
+def nordic_titles():
+    table = (w._xs_tables or {}).get("b")
+    rows = [r for r in w.list_model.items() if r.get("name") == "Vegas Nordic"]
+    sched = table.schedule(rows[0]) if table is not None and rows else None
+    return list(sched[2]) if sched else []
+
+
+settle(lambda: "Earlier Show" in nordic_titles(), what="Nordic's guide read again at its shift")
+assert w._epg_delay_minutes() == 0                          # Pirat has none of its own
+pick("Vegas Nordic")
+pump()
+
+
+def local(minutes):
+    return (GUIDE_NOW + timedelta(minutes=minutes)).astimezone().strftime("%H:%M")
+
+
+settle(lambda: w.now_title.text() == "Earlier Show", what="on now in Nordic's own time")
+assert local(-30) in w.now_time.text() and local(50) in w.now_time.text(), w.now_time.text()
+settle(lambda: w.now_desc.text().startswith("Earlier tonight"), what="its words at its shift")
+nn, _at = w.delegate._now_next(w.list_model.items()[row_of("Vegas Nordic")])
+assert nn is not None and nn.title == "Earlier Show", nn
+s.setValue("nerd_enabled", "false")
+nerd.install(s)
+
+# -- Switch to this source: Nordic in use, its channel picked in its own list ---------------
+mw.make_client = lambda pl: nordic if pl.get("id") == "b" else Pirat()
+before = len(played)
+pick("Nordic Nine")
+pick_menu = []
+QMenu.exec = lambda self, *a: pick_menu.append(
+    next(x for x in self.actions() if x.text() == tr("xs_switch_source")).trigger())
+w._context_menu(w.listw.visualRect(w.list_model.index(row_of("Nordic Nine"))).center())
+QMenu.exec = _exec
+assert pick_menu, "the menu was not opened"
+settle(lambda: store.active_id == "b" and not w._xs_showing()
+       and (w.list_model.item_at(w.listw.currentIndex().row()) or {}).get("stream_id") == 9,
+       what="Nordic in use, Nordic Nine picked")
+assert w._current_cat == "n", w._current_cat              # in its own category
+assert w.client is nordic and len(played) == before         # nothing played
+w.switch_playlist("a")                                       # back to Pirat for what follows
+settle(lambda: store.active_id == "a" and w.client is not nordic
+       and es.CATEGORY in cat_rows(), what="Pirat in use again")
 
 # -- the second source gone: not offered any more - the list it showed gives way to All ----
 w.switch_mode("live")

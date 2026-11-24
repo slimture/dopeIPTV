@@ -23,14 +23,17 @@ order (``ORDER_KEY``, a profile's own: core/profiles.py).
   series and the time they take where known (``queue_summary``).
 * The timeline: History by day - today, yesterday, earlier this week (the
   locale's first day of the week), last week, then by month (``timeline``).
+* The favourites' folders across every source (``fav_folders``): one folder
+  of a name whatever source and kind hold it, each title with its own
+  source and store (``FavStore``, ``Folder``).
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -38,12 +41,13 @@ from .num import digits, number
 from .palette_match import fold, words
 
 __all__ = [
-    "ALL", "CHANNEL", "EPISODE", "FILM", "FILTERS", "LOCAL", "RADIO", "SERIES", "WEB",
-    "Entry", "QueueSummary", "action_of", "by_habit", "continue_entries", "day_group",
-    "entry_key", "fav_rows", "habit_score", "habitual", "history_entries", "item_key",
-    "length_of", "matches", "merged", "moved", "moved_to", "new_entries", "parse_order",
-    "dump_order", "playing_keys", "queue_ident", "queue_order", "queue_summary", "terms_of",
-    "timeline", "when_of",
+    "ALL", "CHANNEL", "EPISODE", "FAV_SECTIONS", "FILM", "FILTERS", "LOCAL", "RADIO", "SERIES",
+    "WEB", "Entry", "FavStore", "Folder", "QueueSummary", "action_of", "by_habit",
+    "continue_entries", "day_group", "entry_key", "fav_folders", "fav_rows", "folder_entry",
+    "habit_score", "habitual", "history_entries", "item_key", "length_of", "matches", "merged",
+    "moved", "moved_to", "new_entries", "parse_order", "dump_order", "playing_keys",
+    "queue_ident", "queue_order", "queue_summary", "reordered_within", "terms_of", "timeline",
+    "when_of",
 ]
 
 CHANNEL, FILM, SERIES, EPISODE = "channel", "film", "series", "episode"
@@ -262,6 +266,146 @@ def merged(*lists: Iterable[Entry], newest_first: bool = True) -> list[Entry]:
             if had is None or e.when > had.when:
                 best[e.key] = e
     return sorted(best.values(), key=lambda e: e.when, reverse=newest_first)
+
+
+# -- the favourites' folders across every source ------------------------------------------
+
+#: The favourites' stores, in the order a folder lists them: the section's
+#: name (the window's), the kind of title it keeps, the id its rows go by.
+FAV_SECTIONS = (("chan", CHANNEL, "stream_id"), ("movie", FILM, "stream_id"),
+                ("series", SERIES, "series_id"), ("radio", RADIO, "stationuuid"),
+                ("web", WEB, "url"))
+_SECTION = {s: (kind, ident) for s, kind, ident in FAV_SECTIONS}
+#: The catalogue a section's titles are of (the parental lock on
+#: categories, a kids profile's test); stations and web streams none.
+SECTION_MODE = {"chan": "live", "movie": "vod", "series": "series"}
+
+
+@dataclass
+class FavStore:
+    """One favourites store as Mine's folders read it: its *source* (""
+    for the stations' and the web streams', which are no source's), its
+    *section* (``FAV_SECTIONS``), its *groups* - a folder's name -> its rows
+    in their order, the default bucket the favourites in no folder -, the
+    folders *locked* in it and their *colours* ({"color", "bgcolor"} by
+    folder)."""
+    source: str
+    section: str
+    groups: Mapping[str, Sequence[Any]]
+    locked: frozenset[str] = frozenset()
+    colours: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Folder:
+    """One folder as Mine shows it, whatever source and kind hold it: its
+    titles in order (*entries*), how many of each section (*counts*),
+    whether any store keeps it locked, its colour (the first store's that
+    gives one) and the stores that hold it (*places*: (source, section))."""
+    name: str
+    entries: list[Entry] = field(default_factory=list)
+    counts: dict[str, int] = field(default_factory=dict)
+    locked: bool = False
+    colour: dict[str, str] = field(default_factory=dict)
+    places: list[tuple[str, str]] = field(default_factory=list)
+
+
+def folder_entry(source: str, section: str, group: str, row: Any) -> Entry | None:
+    """A favourite of folder *group* in store (*source*, *section*) as a
+    title: its row tagged with its section and folder (what the folders'
+    moves act on); None for a row without its id."""
+    if not isinstance(row, Mapping) or section not in _SECTION:
+        return None
+    kind, id_key = _SECTION[section]
+    ident = row.get(id_key)
+    if ident is None or ident == "":
+        return None
+    tagged = {**row, "_section": section, "_group": group}
+    if kind == RADIO:
+        ident = f"radio:{ident}"
+        tagged.update(_kind="radio", _key=ident)
+    elif kind == WEB:
+        tagged.update(_kind="web", _key=row.get("url"))
+    return Entry(kind, str(ident), str(row.get("name") or row.get("title") or ""), tagged,
+                 "" if kind in SOURCELESS else str(source or ""))
+
+
+def _colour(colours: Mapping[str, Any], name: str) -> dict[str, str]:
+    got = colours.get(name) if isinstance(colours, Mapping) else None
+    if not isinstance(got, Mapping):
+        return {}
+    return {k: str(v) for k, v in got.items() if k in ("color", "bgcolor") and v}
+
+
+def fav_folders(stores: Sequence[FavStore], keep: Callable[[Entry], bool] | None = None,
+                default: str = "all") -> tuple[Folder, dict[str, Folder]]:
+    """Every store's favourites as Mine's folders: those in no folder
+    (*default*) and every folder by name - one of a name across every
+    source and kind ("Sport" of two sources is one folder). A folder lists
+    the channels first, then the films, the series, the stations and the
+    web streams; each kind's from the stores in the order given (the source
+    in use's first), each store's in its own order, a title once per store.
+    *keep* says whether a title may be shown (a kids profile's test, the
+    parental lock on categories): one it leaves out is neither listed nor
+    counted. (The favourites in no folder, the folders by name in the
+    order of their names.)"""
+    names: set[str] = set()
+    for st in stores:
+        names.update(str(g) for g in (st.groups or {}) if g != default)
+    named = {n: Folder(n) for n in sorted(names, key=str.lower)}
+    loose = Folder(default)
+    order = {s: i for i, (s, _k, _i) in enumerate(FAV_SECTIONS)}
+    ranked = sorted(range(len(stores)), key=lambda i: (order.get(stores[i].section, 99), i))
+    for i in ranked:
+        st = stores[i]
+        if st.section not in _SECTION:
+            continue
+        for group, rows in (st.groups or {}).items():
+            folder = loose if group == default else named.get(str(group))
+            if folder is None:
+                continue
+            folder.places.append((st.source, st.section))
+            seen: set[str] = set()
+            for row in rows or ():
+                e = folder_entry(st.source, st.section, str(group), row)
+                if e is None or e.key in seen:
+                    continue
+                seen.add(e.key)
+                if keep is not None:
+                    try:
+                        if not keep(e):
+                            continue
+                    except Exception:
+                        continue            # fails closed: a test that broke shows nothing
+                folder.entries.append(e)
+                folder.counts[st.section] = folder.counts.get(st.section, 0) + 1
+    for st in stores:                       # the given order: the source in use's first
+        for name in st.locked or ():
+            if name in named:
+                named[name].locked = True
+        for name, folder in named.items():
+            if not folder.colour:
+                folder.colour = _colour(st.colours, name)
+    return loose, named
+
+
+def reordered_within(entries: Sequence[Entry], keys: Sequence[str]) -> list[Entry]:
+    """A folder's *entries* after titles were dragged into the order
+    *keys* (the keys shown, in their new order), as their stores keep it:
+    each store's titles among *keys* take the places they held, in the new
+    order - one of another source or kind keeps its own place, as
+    FavoriteStore.reorder keeps a row the view did not show."""
+    rank = {k: i for i, k in enumerate(keys)}
+    out = list(entries)
+    slots: dict[tuple[str, str], list[int]] = {}
+    for i, e in enumerate(entries):
+        if e.key in rank:
+            slots.setdefault((e.source, str(e.row.get("_section") or e.kind)), []).append(i)
+    for held in slots.values():
+        moved = sorted((entries[i] for i in held), key=lambda e: rank[e.key])
+        for i, e in zip(held, moved, strict=True):
+            out[i] = e
+    return out
 
 
 # -- History's action -----------------------------------------------------------------

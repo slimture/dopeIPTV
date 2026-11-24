@@ -22,7 +22,9 @@ user's order.
 - ``NowTable``: another source's guide around now, compact, by row key -
   what its rows' now and next are drawn from, built off the window's
   thread from the guide this computer has on disk (never a download) and
-  the guide itself let go.
+  the guide itself let go. It keeps no description: the row picked's
+  programmes are read with theirs on their own (``listings_of``, each cut
+  to TEXT_MAX, the last TEXTS_KEPT rows of a source kept).
 """
 
 from __future__ import annotations
@@ -53,6 +55,32 @@ _MAX_PROG = 86_400
 MAX_AIRINGS = 400_000
 #: A row's programmes in the detail column, at most.
 LISTINGS = 24
+#: The row picked's programmes are read with their descriptions (``listings_of``),
+#: each kept this long at most - for the last few rows picked of a source.
+TEXT_MAX = 1000
+TEXTS_KEPT = 16
+
+
+def listings_of(sched: sa.Schedule | None, now: float, limit: int = LISTINGS) -> list[dict]:
+    """A channel's programmes - a guide's schedule (starts, stops, titles,
+    descriptions) - from the one on at *now*, as the guide gives them
+    (``_plain`` entries): at most *limit*, each description cut to
+    TEXT_MAX. What the detail column shows of the row picked of another
+    source, read from its own guide."""
+    if not sched:
+        return []
+    starts, stops, titles = sched[0], sched[1], sched[2]
+    descs = sched[3] if len(sched) > 3 else ()
+    out: list[dict] = []
+    j = bisect_left(starts, now - _MAX_PROG)
+    while j < len(starts) and len(out) < limit:
+        if stops[j] > now:
+            text = str(descs[j] or "") if j < len(descs) else ""
+            out.append({"_plain": True, "title": str(titles[j] or ""),
+                        "description": text[:TEXT_MAX],
+                        "start_timestamp": int(starts[j]), "stop_timestamp": int(stops[j])})
+        j += 1
+    return out
 
 
 def play_key(source_id: Any, stream_id: Any) -> str:
@@ -212,17 +240,6 @@ class NowTable:
 
     def listings(self, item: Mapping[str, Any], now: float, limit: int = LISTINGS) -> list[dict]:
         """Row *item*'s programmes from the one on now, as the guide gives
-        them (``_plain`` entries: no description is kept)."""
-        sched = self.schedule(item)
-        if not sched:
-            return []
-        starts, stops, titles = sched[0], sched[1], sched[2]
-        out: list[dict] = []
-        j = bisect_left(starts, now - _MAX_PROG)
-        while j < len(starts) and len(out) < limit:
-            if stops[j] > now:
-                out.append({"_plain": True, "title": titles[j], "description": "",
-                            "start_timestamp": int(starts[j]),
-                            "stop_timestamp": int(stops[j])})
-            j += 1
-        return out
+        them (``_plain`` entries: no description is kept here - the row
+        picked's are read on their own, ``listings_of``)."""
+        return listings_of(self.schedule(item), now, limit)

@@ -19,7 +19,7 @@ from ..core.workers import run_async, tmdb_url_from_provider
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QApplication, QDialog,QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMenu, QVBoxLayout, QWidget
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class _DetailMixin:
@@ -1010,7 +1010,10 @@ class _DetailMixin:
             n = self.EPG_UPCOMING_DEFAULT
         return max(self.EPG_UPCOMING_MIN, min(self.EPG_UPCOMING_MAX, n))
 
-    def _show_epg(self, listings, key) -> None:
+    def _show_epg(self, listings, key, delay_minutes: int | None = None) -> None:
+        """A row's programmes under the video. *delay_minutes*: the guide
+        offset their times take - another source's own (Every source:
+        mw_every_source._xs_delay); the source in use's by default."""
         if key != self._current_key:
             return
         self.now_card.hide()
@@ -1020,9 +1023,14 @@ class _DetailMixin:
         all_posts, upcoming = [], []
         current = None
         seen: set = set()
+        shift = None if delay_minutes is None else timedelta(minutes=delay_minutes)
         for e in listings or []:
             start, stop = epg_times(e)
-            start, stop = self._apply_epg_delay(start), self._apply_epg_delay(stop)
+            if shift is None:
+                start, stop = self._apply_epg_delay(start), self._apply_epg_delay(stop)
+            elif shift:
+                start = start + shift if start is not None else None
+                stop = stop + shift if stop is not None else None
             if e.get("_plain"):
                 title, desc = (e.get("title") or "",
                                e.get("description") or "")

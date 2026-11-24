@@ -260,7 +260,8 @@ dopeiptv/
                        row (no id of the source in use's), the sections under
                        their headings, another source's guide around now
     mitt.py            Mine's content: entries out of the stores, the filter,
-                       favourites by habit, the queue's order, History by day
+                       favourites by habit, the queue's order, History by day,
+                       the favourites' folders across every source
     places.py          The app's places (Mine, TV, Movies, Series, Guide,
                        Search, Local files, Radio, Recordings, Downloaded):
                        entries, modes, where the app opens, Home's settings
@@ -546,7 +547,8 @@ dopeiptv/
                        own page through its hook, else its list under the
                        shared header; the start where the person left off
     mw_mitt.py         Mine's own page in the window: the stores read on a
-                       worker, everything played through the window's paths
+                       worker, everything played through the window's paths;
+                       the folders of every source, changed in each - all or none
     mitt_page.py       Mine's page itself: tiles, the queue, the timeline,
                        the folders - painted views on media_cards' PlacePage
     mw_popular.py      Popular right now for Movies and Series, matched to

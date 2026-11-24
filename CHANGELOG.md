@@ -63,6 +63,24 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   without switching to it, and the list stays where it is. What is on comes
   from the guides already on this computer; no guide is downloaded and nothing
   streams for it until you play a channel.
+  A channel of another source picked shows what is on with its description
+  too, at that source's own guide shift (Nerd) rather than the one in use's -
+  read from that source's guide on this computer for the row picked alone;
+  and its menu has **Switch to this source**, which makes it the source in
+  use and picks the channel in its own list.
+- **Mine's Favorite folders from every source**: the folders tab holds the
+  favourites of all your sources, one folder of a name whatever source has it
+  ("Sport" of two sources is one), each title saying which source it is of.
+  A title plays as Mine's Overview plays it - another source's channel from
+  that source without switching, its film or series once that source is
+  switched to. Moving, ordering and removing a title act on its own source;
+  renaming, removing, locking or colouring a folder does it in every source
+  that has it - all of them or none: if one source's favourites cannot be
+  changed, the others are put back as they were and a note says so. A folder
+  locked in any source asks for the PIN; a kids profile sees the source in
+  use alone and no locked folder. The parental lock on categories now holds
+  for Mine's favourites of every source, as it does for History. Read on
+  Mine's own worker, so thousands of favourites keep the window quick.
 
 ### Fixed
 

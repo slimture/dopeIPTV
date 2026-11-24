@@ -19,7 +19,11 @@ under the source's name and how many it has, the sources in their order:
   the selection and the scroll stay (ChannelListModel.insert_items).
 - What is on: the source in use's rows from the window's guide in memory,
   another's from that source's guide on disk (``now_table``, read with
-  load_cached) - never a download for this.
+  load_cached) - never a download for this. Another source's row picked
+  shows its programmes under the video at that source's own guide offset
+  (Settings', and with Nerd the source's own shift: ``_xs_delay``), their
+  descriptions read for that row alone once it rests there
+  (``_xs_listings``, Sources.texts).
 - A row of the source in use is that source's own row: it plays, has its
   menu and its star as in any of its lists. Another source's
   (core/every_source.wrap: no id of the source in use's) plays from that
@@ -28,7 +32,9 @@ under the source's name and how many it has, the sources in their order:
   off the window's thread, then the window's usual path with its questions,
   counted against that source's own account, the status line saying where
   it is from. The list stays (``from_pane``), the row marked playing. Its
-  menu: Play, its own source's favourite, where it is from.
+  menu: Play, its own source's favourite, Switch to this source (the
+  window's switch, then the channel picked in that source's own list:
+  ``_xs_switch_to``), where it is from.
 - The filter typed, the category's own order, Compact / Airy, a grid of
   tiles (no headings there), the arrows, Enter, numbers typed and channel
   up and down work as on any channel list; the Guide over it covers the
@@ -44,7 +50,7 @@ import time
 from functools import partial
 from typing import Any
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtWidgets import QListWidgetItem, QMenu
 
 from ..core import every_source as es
@@ -152,10 +158,13 @@ class _EverySourceMixin:
             if pid in loading or (pid, plan.key) in gave_up:
                 continue
             cat = store.channels_ready(plan)
+            # Another source's guide offset: what is on in its own time.
+            behind = max(0, self._xs_delay(plan.playlist)) * 60.0 if plan.client is None else 0.0
             if cat is None:
                 job, done = partial(_read_channels, store, plan), partial(self._xs_lists_in, pid)
-            elif plan.client is None and not store.now_looked_for(plan):
-                job, done = partial(_read_now, store, plan, cat), partial(self._xs_guide_in, pid)
+            elif plan.client is None and not store.now_looked_for(plan, behind=behind):
+                job = partial(_read_now, store, plan, cat, behind)
+                done = partial(self._xs_guide_in, pid)
             else:
                 continue
             loading.add(pid)
@@ -355,11 +364,81 @@ class _EverySourceMixin:
                 and not self._extending_selection()):
             self._preview_timer.start(350)
 
+    def _xs_delay_for(self, pid: str) -> int:
+        """Source *pid*'s guide offset as it is now (_xs_delay)."""
+        store = getattr(self, "playlist_store", None)
+        return self._xs_delay(store.get(pid) if store is not None and pid else None)
+
     def _xs_listings(self, it: dict) -> None:
+        """Another source's row's programmes under the video, at that
+        source's own guide offset: at once as its guide around now has them
+        (their titles), then - for the row picked alone, once it rests there
+        (XS_TEXTS_MS) - with their descriptions, read from that source's
+        guide on disk on the search's workers (Sources.texts: never a
+        download, only that row's kept)."""
+        pid, key = str(it.get("_xs") or ""), str(it.get("_key") or "")
         table = self._guide_for_row(it)
-        now = time.time() - float(getattr(table, "delay_minutes", 0) or 0) * 60
-        listings = table.listings(it, now) if table is not None else []
-        self._show_epg(listings, self._item_key(it))
+        delay = self._xs_delay_for(pid)
+        if table is not None:
+            table.delay_minutes = delay
+        texts = self._sa_store().texts_in(pid, key, delay) if pid and key else None
+        if texts:
+            listings = texts
+        else:
+            listings = table.listings(it, time.time() - delay * 60) if table is not None else []
+            if listings and texts is None:
+                self._xs_texts_soon(it)
+        self._show_epg(listings, self._item_key(it), delay)
+
+    #: How long a row of another source stays picked before its programmes'
+    #: descriptions are read (the arrows run through rows faster than that).
+    XS_TEXTS_MS = 300
+
+    def _xs_texts_soon(self, it: dict) -> None:
+        self._xs_texts_want = it
+        timer = self.__dict__.get("_xs_texts_timer")
+        if timer is None:
+            timer = QTimer(self if isinstance(self, QObject) else None)
+            timer.setSingleShot(True)
+            timer.setInterval(self.XS_TEXTS_MS)
+            timer.timeout.connect(self._xs_texts_read)
+            self._xs_texts_timer = timer
+        timer.start()
+
+    def _xs_current(self) -> dict | None:
+        try:
+            return self.list_model.item_at(self.listw.currentIndex().row())
+        except Exception:
+            return None
+
+    def _xs_texts_read(self) -> None:
+        """The row still picked: its programmes with their descriptions,
+        read off the window's thread."""
+        it = self.__dict__.pop("_xs_texts_want", None)
+        if it is None or not self._xs_showing():
+            return
+        cur = self._xs_current()
+        pid, key = str(it.get("_xs") or ""), str(it.get("_key") or "")
+        if not cur or str(cur.get("_key") or "") != key or str(cur.get("_xs") or "") != pid:
+            return                          # another row picked since
+        row = self._xs_original(it)
+        if row is None:
+            return
+        delay = self._xs_delay_for(pid)
+        run_async(self._sa_pool(0), partial(self._sa_store().texts, pid, dict(row), key, delay),
+                  partial(self._xs_texts_in, pid, key), partial(self._xs_texts_failed, pid))
+
+    def _xs_texts_in(self, pid: str, key: str, _listings: Any = None) -> None:
+        if not self._xs_showing():
+            return
+        cur = self._xs_current()
+        if not cur or str(cur.get("_key") or "") != key or str(cur.get("_xs") or "") != pid \
+                or self._current_key != self._item_key(cur):
+            return
+        self._xs_listings(cur)
+
+    def _xs_texts_failed(self, _pid: str, _err: Any = None) -> None:
+        log.info("every source: a programme's words were not read")
 
     # -- played --------------------------------------------------------------------------
 
@@ -411,18 +490,52 @@ class _EverySourceMixin:
 
     def _xs_menu(self, it: dict, at: Any) -> None:
         """Another source's row's menu: Play, its own source's favourite,
-        where it is from."""
+        Switch to this source, where it is from."""
         m = QMenu(self)
         m.addAction(tr("btn_play"), partial(self._xs_play, it))
         if self._xs_original(it) is not None:
             on = self._xs_is_favorite(it)
             m.addAction(tr("ctx_remove_from_favorites" if on else "ctx_add_to_favorites"),
                         partial(self._xs_toggle_favorite, it))
+            m.addSeparator()
+            m.addAction(tr("xs_switch_source"), partial(self._xs_switch_to, it))
         m.addSeparator()
         note = m.addAction(tr("sa_from_source", source=str(it.get("_xs_name") or "")))
         note.setEnabled(False)
         m.exec(at)
         m.deleteLater()
+
+    def _xs_switch_to(self, it: dict) -> None:
+        """Another source's row's own source in use from now on - the
+        window's switch, as the source menu makes it -, then the channel
+        picked in that source's list, in its category, once the list holds
+        it (as a jump to what plays lands: _pending_jump_key). Nothing is
+        played."""
+        row = self._xs_original(it)
+        pid = str(it.get("_xs") or "")
+        store = getattr(self, "playlist_store", None)
+        if row is None or not pid or store is None:
+            return
+        if store.get(pid) is None:
+            self._show_toast(tr("sa_source_gone", source=str(it.get("_xs_name") or "")), 4000)
+            return
+        if pid == self._xs_active_id():
+            self._reveal_channel_in_list(row)      # in use already (switched meanwhile)
+            return
+        log.info("every source: switching to a row's own source")
+        self.switch_playlist(pid, then=partial(self._xs_switched, pid, dict(row)))
+
+    def _xs_switched(self, pid: str, row: dict) -> None:
+        """Switched to *row*'s source: its row picked once that source's
+        categories and list are in (the switch reads them anew) - nothing
+        is done to the list as it is now."""
+        if self._xs_active_id() != pid or row.get("stream_id") is None:
+            return
+        self._pending_jump_key = row.get("stream_id")
+        self._pending_jump_cat = row.get("category_id")
+        QTimer.singleShot(8000, self._clear_pending_jump)
+        if getattr(self, "mode", "") != "live":
+            self.switch_mode("live")       # its categories honour the jump
 
     def _xs_fav_store(self, pid: str) -> FavoriteStore:
         """Source *pid*'s channel favourites, this profile's."""
@@ -513,7 +626,8 @@ def _read_channels(store: ss.Sources, plan: ss.Plan) -> str:
     return plan.source.id
 
 
-def _read_now(store: ss.Sources, plan: ss.Plan, cat: sa.Catalogue) -> str:
-    """(a worker) Another source's guide around now, from its copy on disk."""
-    store.now_table(plan, cat)
+def _read_now(store: ss.Sources, plan: ss.Plan, cat: sa.Catalogue, behind: float = 0.0) -> str:
+    """(a worker) Another source's guide around now, from its copy on disk
+    (*behind*: how far its own guide shift puts it behind now)."""
+    store.now_table(plan, cat, behind=behind)
     return plan.source.id

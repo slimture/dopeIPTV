@@ -9,9 +9,20 @@ every other source read from the settings (the profile's own: pinned()) -
 copied on the window's thread, parsed, matched and sorted on a worker of
 the page's own; the viewing log (core/viewing_stats.py) for the habits. A
 kids profile sees the source in use alone, as the lists do, with nothing
-for adults; a favorites folder locked stays out while the lock is shut.
+for adults; a favorites folder locked stays out while the lock is shut, and
+so does a favourite of a category locked (every source's, as History's).
 Nothing is written but the queue's order (core/mitt.ORDER_KEY, a profile's
 own) and what the person does: a heart, a move, a removal.
+
+The Favorite folders tab is every source's too: one folder of a name
+whatever source and kind hold it (core/mitt.fav_folders, built on the
+worker from the stores copied: _mitt_fav_snapshot), each title saying its
+source and playing from it as the Overview plays it. What is done to a
+title acts on its own source's store; a folder renamed, removed, locked,
+opened or coloured is so in every source that holds it - all of them or
+none (_mitt_change puts back what it touched when one store fails, and
+says so). A folder locked in any source is locked; its PIN is asked as the
+lists ask it.
 
 What it plays. Everything through the window's own paths, as the lists,
 Home's shelves and the series page play it: a channel through
@@ -33,8 +44,10 @@ search is forgotten as the page is left.
 
 from __future__ import annotations
 
+import json
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from functools import partial
@@ -50,7 +63,7 @@ from ..core.log import log
 from ..core.privacy import for_log
 from ..core.stores import (
     CategoryOverrides, FAV_DEFAULT_GROUP, FavoriteStore, FollowedSeriesStore, HistoryStore,
-    lock_hides,
+    kept_place, lock_hides,
 )
 from ..core.workers import run_async
 from ..i18n import tr
@@ -123,6 +136,143 @@ def _lock_keeps(row: Any, shut: dict) -> bool:
     return not shut or lock_hides(row, shut) is False
 
 
+#: The key each section's store keeps a source's favourites under, and the
+#: id its rows go by (MainWindow._build_source_stores).
+_FAV_KEY = {"chan": "favorites_{}", "movie": "movie_favorites_{}",
+            "series": "series_favorites_{}"}
+_ID_KEY = {s: ident for s, _k, ident in mitt.FAV_SECTIONS}
+
+
+def _fav_key(section: str, pid: str) -> str:
+    return _FAV_KEY[section].format(pid)
+
+
+def _json_of(raw: Any, kind: type) -> Any:
+    """A JSON value kept in the settings as *kind* (a list, a dict), or an
+    empty one when it is anything else."""
+    try:
+        got = json.loads(raw) if isinstance(raw, (str, bytes)) and raw else None
+    except ValueError:
+        got = None
+    return got if isinstance(got, kind) else kind()
+
+
+@dataclass
+class _FavCopy:
+    """One favourites store as copied on the window's thread for Mine's
+    folders: the window's own store's folders (*groups*, the source in use's
+    and the stations' and web streams'), or another source's as kept (*raw*,
+    parsed on the worker); the folders locked in it and their colours, as
+    kept."""
+    source: str
+    section: str
+    key: str
+    groups: dict | None = None
+    raw: str = ""
+    locked: str = ""
+    colours: str = ""
+
+
+@dataclass
+class _FavSnap:
+    """What Mine's folders are made of, copied on the window's thread:
+    every store (the source in use's first, then every other source's in
+    the user's order, then the stations' and web streams'), a kids
+    profile's test, per source the categories locked while the lock is
+    shut, and what the source in use's catalogue said of kept rows."""
+    made_for: tuple
+    gen: int
+    stamp: tuple
+    stores: list
+    active: str
+    kids: Any = None
+    shut: dict = field(default_factory=dict)
+    found: dict = field(default_factory=dict)
+
+
+@dataclass
+class _Folders:
+    """Mine's folders as the worker made them of a snapshot (*gen*: the
+    newer wins)."""
+    made_for: tuple
+    gen: int
+    stamp: tuple
+    loose: mitt.Folder
+    named: dict
+    wanted: dict = field(default_factory=dict)
+
+
+def _kids_ok(kids: Any, e: mitt.Entry) -> bool:
+    """(the worker) A kids profile's test for one title (none: every one)."""
+    if kids is None:
+        return True
+    mode = {mitt.CHANNEL: "live", mitt.RADIO: "live", mitt.WEB: "live",
+            mitt.SERIES: "series", mitt.EPISODE: "series"}.get(e.kind, "vod")
+    row = e.row if e.row.get("_kind") else {**e.row, "_kind": mode}
+    try:
+        return bool(kids(row))
+    except Exception:
+        return False
+
+
+class _LockTest:
+    """(the worker) The parental lock on categories for the favourites of
+    every source, as the lists leave a category's rows out: none of a
+    category locked while the lock is shut. Another source's row kept
+    without its category stays out while one of its kind is (no catalogue
+    to ask); the source in use's is held back and its category asked of
+    its catalogue (*wanted*, mw_lists._lock_learn)."""
+
+    def __init__(self, shut: dict, found: dict, active: str) -> None:
+        self.shut, self.found, self.active = shut, found, active
+        self.wanted: dict[str, set[str]] = {}
+
+    def __call__(self, source: str, mode: str | None, row: Any) -> bool:
+        shut = self.shut.get(source) if mode else None
+        if not shut or not isinstance(row, dict):
+            return True
+        kept = {**row, "_kind": mode}
+        here = source == self.active
+        hides = lock_hides(kept, shut, self.found if here else None)
+        if hides is None and here:
+            place = kept_place(kept)
+            if place is not None and place[2]:
+                self.wanted.setdefault(place[0], set()).add(place[2])
+        return hides is False
+
+
+def _parse_store(copy: _FavCopy) -> mitt.FavStore:
+    """(the worker) A store's copy as Mine's folders read it."""
+    if copy.groups is not None:
+        groups = copy.groups
+    else:
+        groups = FavoriteStore(_Raw({copy.key: copy.raw}), copy.key,
+                               _ID_KEY.get(copy.section, "stream_id")).groups
+    locked = frozenset(str(x) for x in _json_of(copy.locked, list) if isinstance(x, str))
+    return mitt.FavStore(copy.source, copy.section, groups, locked, _json_of(copy.colours, dict))
+
+
+def _build_folders(snap: _FavSnap, lock: _LockTest | None = None
+                   ) -> tuple[_Folders, dict[tuple[str, str], Any]]:
+    """(the page's worker) Mine's folders across every source - and each
+    store's folders as parsed, by (source, section), for the Overview."""
+    lock = lock if lock is not None else _LockTest(snap.shut, snap.found, snap.active)
+    stores = [_parse_store(c) for c in snap.stores]
+
+    def keep(e: mitt.Entry) -> bool:
+        return (_kids_ok(snap.kids, e)
+                and lock(e.source, mitt.SECTION_MODE.get(str(e.row.get("_section"))), e.row))
+
+    loose, named = mitt.fav_folders(stores, keep, FAV_DEFAULT_GROUP)
+    parsed = {(s.source, s.section): s.groups for s in stores}
+    return (_Folders(snap.made_for, snap.gen, snap.stamp, loose, named,
+                     {m: set(v) for m, v in lock.wanted.items()}), parsed)
+
+
+def _build_folders_only(snap: _FavSnap) -> _Folders:
+    return _build_folders(snap)[0]
+
+
 @dataclass
 class _Snap:
     made_for: tuple
@@ -135,6 +285,7 @@ class _Snap:
     titles: list
     kids: Any
     now: datetime
+    favs: _FavSnap | None = None
 
 
 @dataclass
@@ -149,6 +300,10 @@ class _Data:
     queue: list = field(default_factory=list)
     new: list = field(default_factory=list)
     history: list = field(default_factory=list)
+    folders: _Folders | None = None
+    #: Per catalogue, the source in use's ids a kept row's category is
+    #: asked for (mw_lists._lock_learn) - shown once it is said.
+    wanted: dict = field(default_factory=dict)
 
 
 def _build(snap: _Snap) -> _Data:
@@ -156,6 +311,14 @@ def _build(snap: _Snap) -> _Data:
     from ..services.resume import ResumeStore
     kids = snap.kids
     data = _Data(snap.made_for)
+    parsed: dict[tuple[str, str], Any] = {}
+    lock: _LockTest | None = None
+    if snap.favs is not None:
+        lock = _LockTest(snap.favs.shut, snap.favs.found, snap.favs.active)
+        data.folders, parsed = _build_folders(snap.favs, lock)
+
+    def lock_ok(source: str, mode: str, row: Any) -> bool:
+        return lock is None or lock(source, mode, row)
     cont: list[list[mitt.Entry]] = []
     hist: list[list[mitt.Entry]] = []
     new: list[list[mitt.Entry]] = []
@@ -186,9 +349,14 @@ def _build(snap: _Snap) -> _Data:
         hist.append(entries)
         fav_groups, locked = src.favs, src.locked
         if not src.active:
-            store = FavoriteStore(raw, f"favorites_{pid}")
-            fav_groups, locked = store.groups, (locked or store.locked_groups())
+            got = parsed.get((pid, "chan"))
+            fav_groups = got if got is not None else \
+                FavoriteStore(raw, f"favorites_{pid}").groups
+            locked = locked or {str(x) for x in _json_of(raw.value(f"favorites_{pid}_locked"),
+                                                        list)}
         for row in mitt.fav_rows(fav_groups, "stream_id", locked):
+            if not lock_ok(pid, "live", row):
+                continue
             e = mitt.Entry(mitt.CHANNEL, str(row.get("stream_id")),
                            str(row.get("name") or ""), row, pid)
             if e.key not in seen_live:
@@ -200,8 +368,12 @@ def _build(snap: _Snap) -> _Data:
         for section, kind, id_key in (("movie", mitt.FILM, "stream_id"),
                                       ("series", mitt.SERIES, "series_id")):
             groups = src.raw.get(f"_{section}_groups") if src.active else \
-                FavoriteStore(raw, f"{section}_favorites_{pid}", id_key).groups
+                parsed.get((pid, section))
+            if groups is None and not src.active:
+                groups = FavoriteStore(raw, f"{section}_favorites_{pid}", id_key).groups
             for row in mitt.fav_rows(groups or {}, id_key):
+                if not lock_ok(pid, mitt.SECTION_MODE[section], row):
+                    continue
                 favs.append(mitt.Entry(kind, str(row.get(id_key)),
                                        str(row.get("name") or row.get("title") or ""),
                                        {**row, "_kind": "vod" if kind == mitt.FILM
@@ -219,17 +391,7 @@ def _build(snap: _Snap) -> _Data:
                        {**row, "_kind": "web", "_key": url})
         (live if row.get("_live") else favs).append(e)
 
-    def allowed(e: mitt.Entry) -> bool:
-        if kids is None:
-            return True
-        mode = {mitt.CHANNEL: "live", mitt.RADIO: "live", mitt.WEB: "live",
-                mitt.SERIES: "series", mitt.EPISODE: "series"}.get(e.kind, "vod")
-        row = e.row if e.row.get("_kind") else {**e.row, "_kind": mode}
-        try:
-            return bool(kids(row))
-        except Exception:
-            return False
-
+    allowed = partial(_kids_ok, kids)
     data.cont = [e for e in mitt.merged(*cont) if allowed(e)][:mitt.ROW_MAX * 3]
     data.history = [e for e in mitt.merged(*hist) if allowed(e)]
     data.new = [e for e in mitt.merged(*new) if allowed(e)]
@@ -265,6 +427,8 @@ def _build(snap: _Snap) -> _Data:
         if allowed(e):
             queue.append(e)
     data.queue = queue
+    if lock is not None:
+        data.wanted = {m: set(v) for m, v in lock.wanted.items()}
     return data
 
 
@@ -285,6 +449,12 @@ class _MittMixin:
     _mitt_words: dict | None = None
     _mitt_built_at = 0.0
     _mitt_came_from = ""
+    #: The folders' snapshots so far (the newest is the last made).
+    _mitt_fgen = 0
+    #: A folder was changed since the Overview was read (it is read again).
+    _mitt_folders_dirty = False
+    #: The window's own favourites as the last snapshot of them found them.
+    _mitt_fstamp_asked: tuple = ()
 
     # -- where it is ------------------------------------------------------------------
 
@@ -310,7 +480,7 @@ class _MittMixin:
             page.queue_moved.connect(self._mitt_queue_move)
             page.queue_removed.connect(self._mitt_queue_remove)
             page.filter_changed.connect(self._mitt_render)
-            page.tab_changed.connect(lambda _t: self._mitt_render())
+            page.tab_changed.connect(self._mitt_tab_changed)
             page.more.connect(self._mitt_more)
             page.back.connect(self._mitt_leave)
             page.folder_picked.connect(self._mitt_folder_picked)
@@ -513,9 +683,90 @@ class _MittMixin:
             log_titles = list(self._stats_store().titles.items())
         except Exception:
             log_titles = []
+        kids_test = getattr(self, "_kids_keep", lambda _m: None)("live")
         return _Snap(made_for, sources, radio, web, list(wl.movies), list(wl.shows),
                      mitt.parse_order(own.value(mitt.ORDER_KEY, "")), log_titles,
-                     getattr(self, "_kids_keep", lambda _m: None)("live"), datetime.now())
+                     kids_test, datetime.now(),
+                     self._mitt_fav_snapshot(made_for, kids_test,
+                                             {s.pid: s.shut for s in sources}))
+
+    # -- the favourites' stores, for the folders ---------------------------------------
+
+    def _mitt_own_stores(self) -> list[tuple[str, str, Any]]:
+        """(source, section, store) of the window's own favourites: the
+        source in use's, the stations' and the web streams'."""
+        active = self._mitt_active()
+        out = []
+        for section, attr, _k, kind in _FAV_SECTIONS:
+            store = getattr(self, attr, None)
+            if store is not None:
+                out.append(("" if kind in mitt.SOURCELESS else active, section, store))
+        return out
+
+    def _mitt_other_ids(self) -> list[str]:
+        """Every other source's id in the user's order - none for a kids
+        profile, which sees the source in use alone (as the lists do)."""
+        if getattr(self, "_profile_kids", lambda: False)():
+            return []
+        active = self._mitt_active()
+        return [pid for pid in self._mitt_names() if pid and pid != active]
+
+    def _mitt_store_keys(self) -> list[tuple[str, str, str]]:
+        """(source, section, key) of every favourites store the folders
+        hold, in their order: the source in use's, every other source's,
+        then the stations' and web streams'."""
+        own = [(src, sec, st.key) for src, sec, st in self._mitt_own_stores()]
+        out = [x for x in own if x[1] in _FAV_KEY]
+        for pid in self._mitt_other_ids():
+            out += [(pid, sec, _fav_key(sec, pid)) for sec in _FAV_KEY]
+        return out + [x for x in own if x[1] not in _FAV_KEY]
+
+    def _mitt_fav_stamp(self) -> tuple:
+        """The window's own favourites as they are now: another stamp once
+        any of them changed (the sidebar's menus, the lists' hearts)."""
+        return tuple((st.key, st.version, id(st)) for _s, _sec, st in self._mitt_own_stores())
+
+    def _mitt_fav_snapshot(self, made_for: tuple | None = None, kids: Any = None,
+                           shut: dict | None = None) -> _FavSnap:
+        """(the window's thread) Every favourites store the folders hold,
+        copied: the window's own as it holds them, every other source's as
+        kept (this profile's) - parsed on the worker."""
+        made_for = made_for if made_for is not None else self._mitt_made_for()
+        unlocked = bool(made_for[2])
+        own = self._own(self.settings)
+        mine = {(src, sec): st for src, sec, st in self._mitt_own_stores()}
+        copies = []
+        for src, sec, key in self._mitt_store_keys():
+            st = mine.get((src, sec))
+            if st is not None:
+                copies.append(_FavCopy(src, sec, key, groups={g: list(v) for g, v
+                                                              in st.groups.items()},
+                                       locked=str(own.value(f"{key}_locked", "") or ""),
+                                       colours=str(own.value(f"{key}_colors", "") or "")))
+            else:
+                copies.append(_FavCopy(src, sec, key, raw=str(own.value(key, "") or ""),
+                                       locked=str(own.value(f"{key}_locked", "") or ""),
+                                       colours=str(own.value(f"{key}_colors", "") or "")))
+        active = self._mitt_active()
+        if shut is None:
+            shut = {pid: self._mitt_shut(pid, unlocked) for pid in self._mitt_other_ids()}
+        shut = {pid: s for pid, s in shut.items() if pid != active and s}
+        try:
+            here = self._lock_shut()
+        except Exception:
+            here = {}
+        if here:
+            shut[active] = here
+        try:
+            found = {m: dict(v) for m, v in self._lock_known().items()} if here else {}
+        except Exception:
+            found = {}
+        if kids is None:
+            kids = getattr(self, "_kids_keep", lambda _m: None)("live")
+        self._mitt_fgen += 1
+        stamp = self._mitt_fav_stamp()
+        self._mitt_fstamp_asked = stamp
+        return _FavSnap(made_for, self._mitt_fgen, stamp, copies, active, kids, shut, found)
 
     def _mitt_shut(self, pid: str, unlocked: bool) -> dict[str, frozenset[str]]:
         """Per mode, another source's categories locked while the lock is
@@ -555,12 +806,67 @@ class _MittMixin:
             return
         self._mitt_built_at = time.monotonic() - started
         log.debug("mine: built in %.0f ms", self._mitt_built_at * 1000)
+        old = self._mitt_data
+        if (old is not None and old.folders is not None and data.folders is not None
+                and old.folders.made_for == data.folders.made_for
+                and old.folders.gen > data.folders.gen):
+            data.folders = old.folders      # the folders read since are newer
         self._mitt_data = data
+        self._mitt_folders_dirty = False
+        self._mitt_learn(data.wanted)
         self._mitt_render()
 
     def _mitt_failed(self, gen: int, err: Any = None) -> None:
         if gen == self._mitt_gen:
             log.warning("mine: the page was not built: %s", err)
+
+    def _mitt_learn(self, wanted: dict) -> None:
+        """The source in use's kept favourites whose categories are not
+        known while one of their kind is locked: held back, their categories
+        asked of its catalogue - shown once it says (mw_lists._lock_learn)."""
+        if not wanted:
+            return
+        learn = getattr(self, "_lock_learn", None)
+        if callable(learn):
+            self._lock_held = True
+            try:
+                learn({m: set(v) for m, v in wanted.items()})
+            except Exception:
+                log.debug("mine: the categories not asked for", exc_info=True)
+
+    def _mitt_folders_build(self) -> None:
+        """The folders alone read again off the window's thread (a folder
+        changed): drawn when they are in, unless newer ones are."""
+        if self._mitt_page is None or self._mitt_data is None:
+            return
+        try:
+            snap = self._mitt_fav_snapshot()
+        except Exception:
+            log.exception("mine: the favourites were not read")
+            return
+        run_async(self._mitt_worker(), partial(_build_folders_only, snap),
+                  self._mitt_folders_in, self._mitt_folders_failed)
+
+    def _mitt_folders_failed(self, err: Any = None) -> None:
+        log.warning("mine: the folders were not read: %s", err)
+
+    def _mitt_folders_in(self, folders: _Folders) -> None:
+        data, page = self._mitt_data, self._mitt_page
+        if data is None or page is None or sip.isdeleted(page) \
+                or folders.made_for != data.made_for:
+            return
+        if data.folders is not None and data.folders.gen >= folders.gen:
+            return                          # newer ones are in
+        data.folders = folders
+        self._mitt_learn(folders.wanted)
+        if self._mitt_showing() and page.tab() == "folders":
+            self._mitt_folders_fill()
+
+    def _mitt_folders_pending(self) -> bool:
+        """Whether folders newer than those shown are being read."""
+        data = self._mitt_data
+        have = data.folders.gen if data is not None and data.folders is not None else -1
+        return self._mitt_fgen > have
 
     # -- what it shows ------------------------------------------------------------------
 
@@ -616,6 +922,14 @@ class _MittMixin:
         page.set_empty("" if anything else
                        tr("mitt_nothing") if (terms or chip != mitt.ALL) else tr("mitt_empty"))
         self._mitt_mark()
+
+    def _mitt_tab_changed(self, tab: str = "") -> None:
+        """The other tab: the Overview read again when a folder was changed
+        meanwhile (its favourites are in folders too)."""
+        if tab != "folders" and self._mitt_folders_dirty:
+            self._mitt_folders_dirty = False
+            self._mitt_build()
+        self._mitt_render()
 
     def _mitt_more(self, section: str) -> None:
         if section == "live":
@@ -888,6 +1202,8 @@ class _MittMixin:
             if self._mitt_timer is not None:
                 self._mitt_timer.stop()
             return
+        if page.tab() == "folders":
+            self._mitt_folders_stale()
         keys = self._mitt_keys()
         if keys == self._mitt_playing:
             return
@@ -1374,9 +1690,7 @@ class _MittMixin:
             self.list_model.refresh_all()
         except Exception:
             pass
-        if self._mitt_showing() and self._mitt_page is not None \
-                and self._mitt_page.tab() == "folders":
-            self._mitt_folders_fill()
+        self._mitt_folders_changed()
 
     def _mitt_local_menu(self, m: QMenu, e: mitt.Entry, section: str) -> None:
         self._mitt_open_menu(m, e, tr("card_continue") if e.pos > 0 else tr("btn_play"),
@@ -1491,103 +1805,155 @@ class _MittMixin:
         self._mitt_refresh_soon()
 
     # -- the folders -------------------------------------------------------------------
+    #
+    # Every source's favourites, one folder of a name whatever source and kind
+    # hold it (core/mitt.fav_folders), read on the page's worker. What a move,
+    # a reorder or a title out of its folder does acts on each title's own
+    # source's store; a folder renamed, removed, locked or coloured is so in
+    # every source that holds it - all of them or none (_mitt_change).
 
     def _mitt_fav_stores(self):
+        """(section, store, id key, kind) of the window's own favourites:
+        the source in use's, the stations', the web streams'."""
         for section, attr, id_key, kind in _FAV_SECTIONS:
             store = getattr(self, attr, None)
             if store is not None:
                 yield section, store, id_key, kind
 
-    def _mitt_folder_names(self) -> list[str]:
-        names: set[str] = set()
-        for _s, store, _k, _kind in self._mitt_fav_stores():
-            names.update(store.custom_groups())
-        return sorted(names, key=str.lower)
+    def _mitt_folders(self) -> _Folders | None:
+        data = self._mitt_data
+        return data.folders if data is not None else None
 
-    def _mitt_locked(self, name: str) -> bool:
-        return self.favs.is_locked(name) and not self.parental.session_unlocked
-
-    def _mitt_folders_fill(self) -> None:
-        """The folders' tiles, and the one picked's titles under them."""
-        page = self._mitt_page
-        if page is None:
+    def _mitt_folders_stale(self) -> None:
+        """The window's own favourites changed since the folders were read
+        (the sidebar's menus, a list's heart): read again - once."""
+        folders = self._mitt_folders()
+        if folders is None:
             return
-        kids = self._profile_kids()
-        chip = page.chip()
-        terms = mitt.terms_of(page.query())
-        names = [n for n in self._mitt_folder_names() if not (kids and self._mitt_locked(n))]
-        if self._mitt_folder != LOOSE and f"f:{self._mitt_folder}" not in \
-                {f"f:{n}" for n in names}:
-            self._mitt_folder = LOOSE
-        tiles = [Card(key=LOOSE, title=tr("nav_favorites"),
-                      line=self._mitt_counts(FAV_DEFAULT_GROUP), initials="♥")]
-        for n in names:
-            title = f"{n}  {tr('cat_locked_suffix')}" if self._mitt_locked(n) else n
-            tiles.append(Card(key=f"f:{n}", title=title, line=self._mitt_counts(n), data=n))
-        tiles.append(Card(key=FolderTileView.NEW, title=tr("mitt_new_folder")))
-        current = LOOSE if self._mitt_folder == LOOSE else f"f:{self._mitt_folder}"
-        page.set_folders(tiles, current)
-        group = FAV_DEFAULT_GROUP if self._mitt_folder == LOOSE else self._mitt_folder
-        cards = []
-        if not (self._mitt_folder != LOOSE and self._mitt_locked(self._mitt_folder)):
-            for e in self._mitt_folder_entries(group):
-                if mitt.matches(e, chip, terms):
-                    cards.append(self._mitt_folder_card(e))
-        title = tr("nav_favorites") if self._mitt_folder == LOOSE else self._mitt_folder
-        empty = "" if cards else (tr("mitt_nothing") if (terms or chip != mitt.ALL)
-                                  else tr("mitt_folder_empty"))
-        page.set_folder_items(title, self._mitt_counts(group), cards, empty, True)
-        self._mitt_mark()
+        now = self._mitt_fav_stamp()
+        if now != folders.stamp and now != self._mitt_fstamp_asked:
+            self._mitt_folders_build()
 
-    def _mitt_folder_entries(self, group: str) -> list[mitt.Entry]:
-        keep = getattr(self, "_kids_keep", lambda _m: None)
-        out = []
-        active = self._mitt_active()
-        for section, store, id_key, kind in self._mitt_fav_stores():
-            test = keep("series" if kind == mitt.SERIES else "vod" if kind == mitt.FILM
-                        else "live")
-            for row in store.groups.get(group, []):
-                ident = row.get(id_key)
-                if ident is None or (test is not None and not test(row)):
-                    continue
-                ident = f"radio:{ident}" if kind == mitt.RADIO else str(ident)
-                source = "" if kind in mitt.SOURCELESS else active
-                tagged = {**row, "_section": section, "_group": group}
-                if kind == mitt.RADIO:
-                    tagged.update(_kind="radio", _key=ident)
-                elif kind == mitt.WEB:
-                    tagged.update(_kind="web", _key=row.get("url"))
-                out.append(mitt.Entry(kind, ident, str(row.get("name") or row.get("title")
-                                                       or ""), tagged, source))
+    def _mitt_folders_changed(self) -> None:
+        """A folder or a favourite changed from here: the folders read again
+        (and the Overview once it shows)."""
+        self._mitt_folders_dirty = True
+        self._mitt_folders_build()
+
+    def _mitt_lock_union(self) -> set[str]:
+        """Every folder locked in any store the folders hold, as kept now (a
+        lock set a moment ago counts at once): a folder of a name is locked
+        when any source keeps it so."""
+        own = self._own(self.settings)
+        out: set[str] = set()
+        for _src, _sec, key in self._mitt_store_keys():
+            out.update(x for x in _json_of(own.value(f"{key}_locked", ""), list)
+                       if isinstance(x, str))
         return out
 
-    def _mitt_counts(self, group: str) -> str:
+    def _mitt_lock_real(self, name: str, locks: set[str] | None = None) -> bool:
+        """Whether folder *name* is locked in any source (whether the lock
+        is shut or not)."""
+        locks = locks if locks is not None else self._mitt_lock_union()
+        folders = self._mitt_folders()
+        f = folders.named.get(name) if folders is not None else None
+        return name in locks or bool(f is not None and f.locked)
+
+    def _mitt_locked(self, name: str, locks: set[str] | None = None) -> bool:
+        """Whether folder *name* is locked and the lock is shut."""
+        if getattr(self.parental, "session_unlocked", False):
+            return False
+        return self._mitt_lock_real(name, locks)
+
+    def _mitt_folder_names(self) -> list[str]:
+        """The folders' names across every source - for a kids profile none
+        that is locked."""
+        folders = self._mitt_folders()
+        if folders is None:
+            return []
+        if getattr(self, "_profile_kids", lambda: False)():
+            locks = self._mitt_lock_union()
+            return [n for n in folders.named if not self._mitt_lock_real(n, locks)]
+        return list(folders.named)
+
+    def _mitt_folders_fill(self) -> None:
+        """The folders' tiles, and the one picked's titles under them - of
+        every source, each saying which (a kids profile: the source in
+        use's, and never a locked folder)."""
+        page = self._mitt_page
+        folders = self._mitt_folders()
+        if page is None or folders is None:
+            return
+        self._mitt_folders_stale()
+        kids = bool(getattr(self, "_profile_kids", lambda: False)())
+        unlocked = bool(getattr(self.parental, "session_unlocked", False))
+        locks = self._mitt_lock_union()
+        chip = page.chip()
+        terms = mitt.terms_of(page.query())
+        names = [n for n in folders.named if not (kids and self._mitt_lock_real(n, locks))]
+        if self._mitt_folder != LOOSE and self._mitt_folder not in names \
+                and not self._mitt_folders_pending():
+            self._mitt_folder = LOOSE
+        tiles = [Card(key=LOOSE, title=tr("nav_favorites"),
+                      line=self._mitt_counts(folders.loose), initials="♥")]
+        for n in names:
+            shut = not unlocked and self._mitt_lock_real(n, locks)
+            title = f"{n}  {tr('cat_locked_suffix')}" if shut else n
+            tiles.append(Card(key=f"f:{n}", title=title, line=self._mitt_counts(folders.named[n]),
+                              data=n))
+        tiles.append(Card(key=FolderTileView.NEW, title=tr("mitt_new_folder")))
+        loose = self._mitt_folder == LOOSE
+        page.set_folders(tiles, LOOSE if loose else f"f:{self._mitt_folder}")
+        folder = folders.loose if loose else folders.named.get(self._mitt_folder)
+        hidden = not loose and self._mitt_lock_real(self._mitt_folder, locks) \
+            and (kids or not unlocked)
+        cards = []
+        if folder is not None and not hidden:
+            names_of = self._mitt_names()
+            many = len(names_of) > 1
+            for e in folder.entries:
+                if mitt.matches(e, chip, terms):
+                    cards.append(self._mitt_folder_card(e, many, names_of))
+        title = tr("nav_favorites") if loose else self._mitt_folder
+        empty = "" if cards else (tr("mitt_nothing") if (terms or chip != mitt.ALL)
+                                  else tr("mitt_folder_empty"))
+        page.set_folder_items(title, self._mitt_counts(folder), cards, empty, True)
+        self._mitt_mark()
+
+    def _mitt_counts(self, folder: mitt.Folder | None) -> str:
         words = {"chan": ("mitt_n_channel", "mitt_n_channels"),
                  "movie": ("mitt_n_film", "mitt_n_films"),
                  "series": ("mitt_n_show", "mitt_n_shows"),
                  "radio": ("mitt_n_station", "mitt_n_stations"),
                  "web": ("mitt_n_web_one", "mitt_n_web")}
         parts = []
-        for section, store, _k, _kind in self._mitt_fav_stores():
-            n = len(store.groups.get(group, []))
+        for section, _kind, _id in mitt.FAV_SECTIONS:
+            n = folder.counts.get(section, 0) if folder is not None else 0
             if n:
                 one, many = words[section]
                 parts.append(tr(one if n == 1 else many, n=n))
         return " · ".join(parts)
 
-    def _mitt_folder_card(self, e: mitt.Entry) -> Card:
+    def _mitt_folder_card(self, e: mitt.Entry, many: bool = False,
+                          names: dict[str, str] | None = None) -> Card:
+        """A folder's title: its picture, its name and - with two sources or
+        more - the source it is of, after its kind."""
         row = e.row
         logo = e.kind in (mitt.CHANNEL, mitt.RADIO, mitt.WEB)
         image = str(row.get("stream_icon") or row.get("favicon") or "") if logo else \
             self._mitt_art(row, "vod" if e.kind == mitt.FILM else "series")
-        return Card(key=e.key, title=e.title, line=tr(_KIND_WORD[e.kind]), image=image or "",
+        source = ""
+        if many and e.source:
+            source = (names if names is not None else self._mitt_names()).get(e.source, "?")
+        line = self._mitt_join(tr(_KIND_WORD[e.kind]), source)
+        return Card(key=e.key, title=e.title, line=line, image=image or "",
                     rank=FolderItemsView.LOGO if logo else 0, data=e)
 
     def _mitt_swatch(self, card: Card) -> tuple[QColor, QColor] | None:
         name = card.data if isinstance(card.data, str) else None
-        if not name:
-            return None
-        colours = self.favs.group_color(name) or {}
+        folders = self._mitt_folders()
+        f = folders.named.get(name) if (name and folders is not None) else None
+        colours = f.colour if f is not None else {}
         bg, fg = colours.get("bgcolor"), colours.get("color")
         if bg:
             return QColor(bg), QColor(fg or "#ffffff")
@@ -1603,12 +1969,19 @@ class _MittMixin:
         self._mitt_folders_fill()
 
     def _mitt_folder_play(self, card: Any) -> None:
+        """A folder's title played as Mine plays it - another source's
+        channel from that source without switching, its film or series once
+        it is switched to (_mitt_play)."""
         e = self._mitt_entry(card)
-        if e is not None:
-            self._mitt_play(e)
+        if e is None:
+            return
+        if e.kind in (mitt.CHANNEL, mitt.FILM, mitt.SERIES):
+            e = mitt.Entry(e.kind, e.ident, e.title, self._mitt_plain(e.row), e.source)
+        self._mitt_play(e)
 
     def _mitt_folder_new(self, pos: QPoint) -> None:
-        """New folder: for which kind of favorite, then its name."""
+        """New folder: for which kind of favorite (of the source in use),
+        then its name."""
         m = QMenu(self)
         labels = {"chan": "fav_channels", "movie": "fav_movies", "series": "fav_series",
                   "radio": "fav_radio", "web": "fav_web"}
@@ -1632,7 +2005,27 @@ class _MittMixin:
                 self.list_model.refresh_all()
             except Exception:
                 pass
-        self._mitt_folders_fill()
+        self._mitt_folders_changed()
+
+    def _mitt_change(self, steps: list[tuple[Any, Callable[[Any], None]]]) -> bool:
+        """*steps* - (a store, what is done to it) - in order: all of them or
+        none. One that fails puts every store it touched back as it was
+        (its folders, locks and colours, as kept) and says so. True when
+        all were made."""
+        kept: dict[int, tuple[Any, tuple]] = {}
+        try:
+            for store, step in steps:
+                if id(store) not in kept:
+                    kept[id(store)] = (store, _state_of(store))
+                step(store)
+        except Exception:
+            log.exception("mine: a folder was not changed - every source put back as it was")
+            for store, state in reversed(list(kept.values())):
+                _put_back(store, state)
+            self._show_toast(tr("mitt_folder_not_changed"), 5000)
+            self._mitt_after_folders()
+            return False
+        return True
 
     def _mitt_folder_menu(self, card: Card, pos: QPoint) -> None:
         name = card.data if isinstance(card.data, str) else None
@@ -1641,11 +2034,14 @@ class _MittMixin:
         m = QMenu(self)
         m.addAction(tr("ctx_rename_folder"), partial(self._mitt_folder_rename, name))
         m.addAction(tr("ctx_remove_folder", group=name), partial(self._mitt_folder_remove, name))
-        if name in self.favs.groups:
-            if self.favs.is_locked(name):
-                m.addAction(tr("ctx_unlock_group"), partial(self._mitt_folder_lock, name, False))
-            else:
-                m.addAction(tr("ctx_lock_group"), partial(self._mitt_folder_lock, name, True))
+        folders = self._mitt_folders()
+        f = folders.named.get(name) if folders is not None else None
+        if self._mitt_lock_real(name):
+            m.addAction(tr("ctx_unlock_group"), partial(self._mitt_folder_lock, name, False))
+        elif f is not None and any(sec == "chan" for _src, sec in f.places):
+            # Folders of channels lock (as the lists have it): in every
+            # source that holds this one.
+            m.addAction(tr("ctx_lock_group"), partial(self._mitt_folder_lock, name, True))
         palette = ((tr("color_default"), ""), (tr("accent_blue"), "#4C8DFF"),
                    (tr("accent_green"), "#2FBF71"), (tr("accent_orange"), "#FF9F43"),
                    (tr("accent_red"), "#FF5C5C"), (tr("accent_purple"), "#8E6BFF"),
@@ -1657,63 +2053,137 @@ class _MittMixin:
         m.deleteLater()
 
     def _mitt_folder_rename(self, name: str) -> None:
+        """Renamed in every source that holds it - its titles, its lock and
+        its colour with it."""
         new, ok = QInputDialog.getText(self, tr("ctx_rename_folder"), tr("prompt_folder_name"),
                                        text=name)
         new = (new or "").strip()
         if not ok or not new or new in (name, FAV_DEFAULT_GROUP):
             return
-        for _s, store, _k, _kind in self._mitt_fav_stores():
-            if name in store.groups:
-                store.rename_group(name, new)
+        every = _Stores(self).every()
+        steps: list = [(st, partial(_renamed, name, new)) for _src, _sec, st in every
+                       if name in st.groups]
+        # A lock kept by a source's channels for a folder they do not hold
+        # (its films do) goes with the name too.
+        steps += [(st, partial(_move_lock, name, new)) for _src, _sec, st in every
+                  if name in st.locked_groups()]
+        if not self._mitt_change(steps):
+            return
         if self._mitt_folder == name:
             self._mitt_folder = new
         self._mitt_after_folders()
 
     def _mitt_folder_remove(self, name: str) -> None:
-        if self.favs.is_locked(name) and not self._request_unlock():
+        """Removed from every source that holds it (its titles stay
+        favourites elsewhere); a locked one asks for the PIN."""
+        if self._mitt_lock_real(name) and not self._request_unlock():
             return
-        for _s, store, _k, _kind in self._mitt_fav_stores():
-            if name in store.groups:
-                store.remove_group(name)
+        every = _Stores(self).every()
+        steps: list = [(st, partial(_removed, name)) for _src, _sec, st in every
+                       if name in st.groups]
+        steps += [(st, partial(_lock_off, name)) for _src, _sec, st in every
+                  if name not in st.groups and name in st.locked_groups()]
+        if not self._mitt_change(steps):
+            return
         if self._mitt_folder == name:
             self._mitt_folder = LOOSE
         self._mitt_after_folders()
 
     def _mitt_folder_lock(self, name: str, locked: bool) -> None:
-        self._set_fav_lock(name, locked)
-        self._mitt_folders_fill()
+        """Locked - or opened - in every source that holds it, the PIN
+        asked as the lists ask it (mw_context._set_fav_lock)."""
+        if locked and not self._ensure_pin_configured():
+            return
+        if not locked and not self._request_unlock():
+            return
+        stores = _Stores(self)
+        every = stores.every()
+        steps: list = []
+        if locked:
+            owners: list = []
+            for src, sec, st in every:
+                owner = stores.owner(src, sec) if name in st.groups else None
+                if owner is not None and all(o is not owner for o in owners):
+                    owners.append(owner)
+            steps = [(o, partial(_lock_on, name)) for o in owners]
+        else:
+            steps = [(st, partial(_lock_off, name)) for _src, _sec, st in every
+                     if name in st.locked_groups()]
+        if not self._mitt_change(steps):
+            return
+        if locked:
+            self.parental.lock_session()
+        self._mitt_after_folders()
 
     def _mitt_folder_colour(self, name: str, colour: str) -> None:
-        for _s, store, _k, _kind in self._mitt_fav_stores():
-            if name in store.groups:
-                store.set_group_color(name, bgcolor=colour)
-        self._mitt_folders_fill()
+        every = _Stores(self).every()
+        steps = [(st, partial(_coloured, name, colour)) for _src, _sec, st in every
+                 if name in st.groups]
+        if self._mitt_change(steps):
+            self._mitt_after_folders()
 
     def _mitt_folder_target(self, folder: Any) -> str:
         if isinstance(folder, Card):
             folder = folder.data if isinstance(folder.data, str) else LOOSE
         return FAV_DEFAULT_GROUP if folder in (None, LOOSE) else str(folder)
 
+    def _mitt_folder_here(self) -> str:
+        return FAV_DEFAULT_GROUP if self._mitt_folder == LOOSE else self._mitt_folder
+
+    def _mitt_drop_shown(self, keys: set[str]) -> None:
+        """Titles moved out of the folder shown: gone from it at once (the
+        folders read again bring the rest)."""
+        folders = self._mitt_folders()
+        folder = None if folders is None else (
+            folders.loose if self._mitt_folder == LOOSE else folders.named.get(self._mitt_folder))
+        if folder is not None:
+            gone = [x for x in folder.entries if x.key in keys]
+            folder.entries = [x for x in folder.entries if x.key not in keys]
+            for x in gone:
+                sec = str(x.row.get("_section"))
+                folder.counts[sec] = max(0, folder.counts.get(sec, 0) - 1)
+        self._mitt_folders_fill()
+
     def _mitt_folder_drop(self, cards: list, folder: Any) -> None:
         """Titles dropped on a folder's tile: moved there out of the folder
-        shown (the favorites outside folders: out of no other)."""
+        shown (the favorites outside folders: out of no other) - each in its
+        own source's store. A folder locked or coloured in one source is so
+        in the one a title comes to it from."""
         target = self._mitt_folder_target(folder)
-        source = FAV_DEFAULT_GROUP if self._mitt_folder == LOOSE else self._mitt_folder
-        if target == source:
+        here = self._mitt_folder_here()
+        if target == here:
             return
         if target != FAV_DEFAULT_GROUP and self._mitt_locked(target) \
                 and not self._request_unlock():
             return
-        by: dict[str, list[dict]] = {}
-        for card in cards:
-            e = self._mitt_entry(card)
-            if e is not None:
-                by.setdefault(e.row.get("_section"), []).append(self._mitt_plain(e.row))
-        for section, store, _k, _kind in self._mitt_fav_stores():
-            items = by.get(section)
-            if items:
-                store.move(items, target, source)
+        entries = [e for e in (self._mitt_entry(c) for c in cards) if e is not None]
+        if not entries:
+            return
+        stores = _Stores(self)
+        by: dict[tuple[str, str], list[dict]] = {}
+        for e in entries:
+            by.setdefault((e.source, str(e.row.get("_section"))), []).append(
+                self._mitt_plain(e.row))
+        named = target != FAV_DEFAULT_GROUP
+        locked = named and self._mitt_lock_real(target)
+        folders = self._mitt_folders()
+        f = folders.named.get(target) if (named and folders is not None) else None
+        colour = dict(f.colour) if f is not None else {}
+        steps: list = []
+        for (src, sec), items in by.items():
+            st = stores.get(src, sec)
+            if st is None:
+                continue
+            steps.append((st, partial(_moved_into, items, target, here)))
+            owner = stores.owner(src, sec) if locked else None
+            if owner is not None:
+                steps.append((owner, partial(_lock_on, target)))
+            if colour:
+                steps.append((st, partial(_colour_on, target, colour)))
+        if not self._mitt_change(steps):
+            return
         self._mitt_after_folders()
+        self._mitt_drop_shown({e.key for e in entries})
 
     @staticmethod
     def _mitt_plain(row: dict) -> dict:
@@ -1721,23 +2191,40 @@ class _MittMixin:
                 and not (k in ("_kind", "_key") and row.get("_section") in ("radio", "web"))}
 
     def _mitt_folder_reorder(self, cards: list, index: int) -> None:
-        """Titles dragged to another place in the folder shown."""
+        """Titles dragged to another place in the folder shown - each kept
+        in its own store's order there (a title of another source or kind
+        keeps the place of its own among them)."""
         page = self._mitt_page
         if page is None:
             return
         shown = list(page.folder_items.items())
         keys = [c.key for c in shown]
         moving = [c.key for c in cards if c.key in keys]
+        if not moving:
+            return
         order = mitt.moved_to(keys, moving, index)
-        by = {c.key: c for c in shown}
-        group = FAV_DEFAULT_GROUP if self._mitt_folder == LOOSE else self._mitt_folder
-        for section, store, id_key, _kind in self._mitt_fav_stores():
-            ids = [by[k].data.row.get(id_key) for k in order
-                   if by[k].data.row.get("_section") == section]
-            if ids:
-                store.reorder(group, ids)
+        by = {c.key: c.data for c in shown if isinstance(c.data, mitt.Entry)}
+        group = self._mitt_folder_here()
+        touched = {(by[k].source, str(by[k].row.get("_section"))) for k in moving if k in by}
+        stores = _Stores(self)
+        steps: list = []
+        for src, sec in touched:
+            id_key = _ID_KEY.get(sec, "stream_id")
+            ids = [by[k].row.get(id_key) for k in order if k in by
+                   and by[k].source == src and str(by[k].row.get("_section")) == sec]
+            st = stores.get(src, sec)
+            if st is not None and ids:
+                steps.append((st, partial(_reordered, group, ids)))
+        if not self._mitt_change(steps):
+            return
+        folders = self._mitt_folders()
+        folder = None if folders is None else (
+            folders.loose if self._mitt_folder == LOOSE else folders.named.get(self._mitt_folder))
+        if folder is not None:
+            folder.entries = mitt.reordered_within(folder.entries, order)
         self._mitt_after_folders()
-        page.folder_items.focus_key(moving[0] if moving else "", take_focus=False)
+        self._mitt_folders_fill()
+        page.folder_items.focus_key(moving[0], take_focus=False)
 
     def _mitt_folder_item_menu(self, card: Any, pos: QPoint) -> None:
         e = self._mitt_entry(card)
@@ -1747,7 +2234,15 @@ class _MittMixin:
         picked = page.folder_items.selected_cards() if page is not None else []
         batch = picked if card in picked and len(picked) > 1 else [card]
         m = QMenu(self)
-        if e.kind == mitt.CHANNEL:
+        elsewhere = not self._mitt_is_active(e)
+        if elsewhere:
+            # Another source's title: played or opened from there, out of
+            # its own source's favourites - none of the source in use's
+            # actions apply to it.
+            m.addAction(tr("sa_open_series") if e.kind == mitt.SERIES else tr("btn_play"),
+                        partial(self._mitt_folder_play, card))
+            m.addAction(tr("ctx_remove_from_favorites"), partial(self._mitt_folder_unfav, [card]))
+        elif e.kind == mitt.CHANNEL:
             self._mitt_channel_menu(m, e, "folder")
         elif e.kind in (mitt.RADIO, mitt.WEB):
             self._stream_row_actions(m, e.row)
@@ -1756,7 +2251,7 @@ class _MittMixin:
         m.addSeparator()
         many = f" ({len(batch)})" if len(batch) > 1 else ""
         sub = m.addMenu(tr("ctx_move_to") + many)
-        here = FAV_DEFAULT_GROUP if self._mitt_folder == LOOSE else self._mitt_folder
+        here = self._mitt_folder_here()
         if here != FAV_DEFAULT_GROUP:
             sub.addAction(tr("nav_favorites"), partial(self._mitt_folder_drop, batch, LOOSE))
         for n in self._mitt_folder_names():
@@ -1766,6 +2261,10 @@ class _MittMixin:
         sub.addAction(tr("ctx_new_folder"), partial(self._mitt_folder_move_new, batch))
         if here != FAV_DEFAULT_GROUP:
             m.addAction(tr("mitt_out_of_folder") + many, partial(self._mitt_folder_out, batch))
+        if elsewhere:
+            m.addSeparator()
+            note = m.addAction(tr("sa_from_source", source=self._mitt_names().get(e.source, "?")))
+            note.setEnabled(False)
         m.exec(pos)
         m.deleteLater()
         self._mitt_folders_fill()
@@ -1776,13 +2275,152 @@ class _MittMixin:
             self._mitt_folder_drop(cards, name)
 
     def _mitt_folder_out(self, cards: list) -> None:
-        """Out of the folder shown (still a favorite elsewhere, if it is)."""
+        """Out of the folder shown (still a favorite elsewhere, if it is) -
+        each out of its own source's store."""
         group = self._mitt_folder
-        for card in cards:
-            e = self._mitt_entry(card)
-            if e is None:
-                continue
-            for section, store, id_key, _kind in self._mitt_fav_stores():
-                if section == e.row.get("_section"):
-                    store.remove(e.row.get(id_key), group)
+        if group == LOOSE:
+            return
+        entries = [e for e in (self._mitt_entry(c) for c in cards) if e is not None]
+        stores = _Stores(self)
+        steps: list = []
+        for e in entries:
+            sec = str(e.row.get("_section"))
+            st = stores.get(e.source, sec)
+            if st is not None:
+                steps.append((st, partial(_out_of, e.row.get(_ID_KEY.get(sec, "stream_id")),
+                                          group)))
+        if not self._mitt_change(steps):
+            return
         self._mitt_after_folders()
+        self._mitt_drop_shown({e.key for e in entries})
+
+    def _mitt_folder_unfav(self, cards: list) -> None:
+        """Out of the favorites of its own source, every folder there."""
+        entries = [e for e in (self._mitt_entry(c) for c in cards) if e is not None]
+        stores = _Stores(self)
+        steps: list = []
+        for e in entries:
+            sec = str(e.row.get("_section"))
+            st = stores.get(e.source, sec)
+            if st is not None:
+                steps.append((st, partial(_out_of, e.row.get(_ID_KEY.get(sec, "stream_id")),
+                                          None)))
+        if not self._mitt_change(steps):
+            return
+        self._mitt_after_folders()
+        self._mitt_drop_shown({e.key for e in entries})
+
+
+class _Stores:
+    """The favourites' stores one change acts on, each made once: the
+    source in use's, the stations' and the web streams' the window's own,
+    another source's read from the settings now (this profile's) - none for
+    a kids profile, which sees the source in use alone."""
+
+    def __init__(self, window: Any) -> None:
+        self._w = window
+        self._own = {(src, sec): st for src, sec, st in window._mitt_own_stores()}
+        self._others = set(window._mitt_other_ids())
+        self._made: dict[tuple[str, str], FavoriteStore] = {}
+
+    def get(self, source: str, section: str) -> Any:
+        if section not in _FAV_KEY:
+            source = ""                     # the stations' and web streams': no source's
+        st = self._own.get((source, section))
+        if st is not None:
+            return st
+        if section not in _FAV_KEY or source not in self._others:
+            return None
+        key = (source, section)
+        if key not in self._made:
+            self._made[key] = FavoriteStore(self._w._own(self._w.settings),
+                                            _fav_key(section, source), _ID_KEY[section])
+        return self._made[key]
+
+    def owner(self, source: str, section: str) -> Any:
+        """The store a source keeps its folders' locks in: its channels'
+        (the lists lock channel folders); the stations' and web streams'
+        their own."""
+        return self.get(source, "chan" if section in _FAV_KEY else section)
+
+    def every(self) -> list[tuple[str, str, Any]]:
+        out = []
+        for src, sec, _key in self._w._mitt_store_keys():
+            st = self.get(src, sec)
+            if st is not None:
+                out.append((src, sec, st))
+        return out
+
+
+#: What of a store is kept beside its folders: its folders, locks, colours.
+_STORE_SUFFIXES = ("", "_locked", "_colors")
+
+
+def _state_of(store: Any) -> tuple:
+    """A store as it is now, to be put back (_put_back)."""
+    s = store.settings
+    values = []
+    for suffix in _STORE_SUFFIXES:
+        key = store.key + suffix
+        values.append((key, bool(s.contains(key)), s.value(key)))
+    return {g: list(v) for g, v in store.groups.items()}, values
+
+
+def _put_back(store: Any, state: tuple) -> None:
+    groups, values = state
+    store.groups = groups
+    for key, had, value in values:
+        try:
+            if had:
+                store.settings.setValue(key, value)
+            else:
+                store.settings.remove(key)
+        except Exception:
+            log.warning("mine: a favourites value was not put back")
+    store.version += 1
+
+
+def _renamed(old: str, new: str, store: Any) -> None:
+    store.rename_group(old, new)
+
+
+def _removed(name: str, store: Any) -> None:
+    store.remove_group(name)
+
+
+def _coloured(name: str, colour: str, store: Any) -> None:
+    store.set_group_color(name, bgcolor=colour)
+
+
+def _lock_on(name: str, store: Any) -> None:
+    if name not in store.locked_groups():
+        store.set_group_locked(name, True)
+
+
+def _lock_off(name: str, store: Any) -> None:
+    if name in store.locked_groups():
+        store.set_group_locked(name, False)
+
+
+def _move_lock(old: str, new: str, store: Any) -> None:
+    if old in store.locked_groups():
+        store.set_group_locked(old, False)
+        store.set_group_locked(new, True)
+
+
+def _colour_on(name: str, colour: dict, store: Any) -> None:
+    if not store.group_color(name):
+        store.set_group_color(name, **colour)
+
+
+def _moved_into(items: list, target: str, source: str, store: Any) -> None:
+    store.move(items, target, source)
+
+
+def _reordered(group: str, ids: list, store: Any) -> None:
+    store.reorder(group, ids)
+
+
+def _out_of(ident: Any, group: str | None, store: Any) -> None:
+    if ident is not None:
+        store.remove(ident, group)

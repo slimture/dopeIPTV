@@ -368,3 +368,81 @@ def test_tens_of_thousands_of_channels_are_laid_out_quickly():
     rows, _b, total = es.arrange(secs, lambda s, r: [x for x in r if "1" in x["name"]],
                                  lambda s, n: s.source.name, filtered=True)
     assert total == len(rows) - 2 and time.perf_counter() - start < 1.0
+
+
+# -- the row picked's programmes with their words; another source's own shift -------------
+
+def test_a_rows_programmes_with_their_words_cut_short():
+    long = "x" * (es.TEXT_MAX + 500)
+    sched = (array("q", [NOW - 600, NOW + 1200, NOW + 3000]),
+             array("q", [NOW + 1200, NOW + 3000, NOW + 4000]),
+             ("On now", "Next", "Later"), ("About tonight.", long, ""))
+    got = es.listings_of(sched, NOW)
+    assert [(e["title"], e["description"][:14]) for e in got] == [
+        ("On now", "About tonight."), ("Next", "x" * 14), ("Later", "")]
+    assert len(got[1]["description"]) == es.TEXT_MAX and all(e["_plain"] for e in got)
+    assert es.listings_of(sched, NOW, limit=1)[0]["title"] == "On now"
+    assert es.listings_of(None, NOW) == [] and es.listings_of(sched, NOW + 9 * H) == []
+    # The list's own table keeps none of them.
+    table = es.NowTable([{"stream_id": 8}], lambda ch: es.play_key("b", 8), lambda ch: sched, NOW)
+    assert [e["description"] for e in table.listings({"_key": "failover:b:8"}, NOW)] \
+        == ["", "", ""]
+
+
+class _WordsGuide(_Guide):
+    rows: list = []
+
+    def schedule(self, ch):
+        _WordsGuide.rows.append(dict(ch))
+        return SCHED if ch.get("epg_channel_id") == "v" else None
+
+
+def test_only_the_row_picked_has_its_words_read_from_disk_and_a_few_kept(tmp_path):
+    (tmp_path / "epg_b.xml").write_bytes(b"x")
+    _Guide.opened.clear()
+    _WordsGuide.rows.clear()
+    store = ss.Sources(make_client=lambda pl: _Client(),
+                       guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"),
+                       open_guide=_WordsGuide)
+    row = {"stream_id": 8, "name": "Vegas", "epg_channel_id": "v"}
+    key = es.play_key("b", 8)
+    assert store.texts_in("b", key, 0, NOW) is None        # not read: none
+    got = store.texts("b", row, key, 0, NOW)
+    assert [(e["title"], e["description"]) for e in got] == [
+        ("On now", "desc"), ("Next", "desc"), ("Far", "desc")]
+    assert _WordsGuide.rows == [row]                         # that row's alone was looked up
+    assert store.texts_in("b", key, 0, NOW + 60) == got
+    assert store.texts("b", row, key, 0, NOW + 60) is got and len(_Guide.opened) == 1   # kept
+    # Its guide an hour behind (its own shift): what is on in its time -
+    # "On now" began ten minutes before NOW and is on still an hour later
+    # by that guide's clock.
+    late = store.texts("b", row, key, 60, NOW + H)
+    assert [e["title"] for e in late][:1] == ["On now"] and len(_Guide.opened) == 2
+    assert store.texts_in("b", key, 0, NOW + H) is None      # another offset: read anew
+    # The last few rows picked kept, the oldest let go; read again after a while.
+    for i in range(es.TEXTS_KEPT):
+        store.texts("b", {"stream_id": 100 + i}, es.play_key("b", 100 + i), 0, NOW)
+    assert store.texts_in("b", key, 60, NOW + H) is None
+    assert store.texts_in("b", es.play_key("b", 100), 0, NOW + ss.GUIDE_FRESH_SECS) is None
+    # No guide on this computer: nothing, and nothing downloaded.
+    assert store.texts("c", row, es.play_key("c", 8), 0, NOW) == []
+    # A source let go: what was read of it goes.
+    store.keep({})
+    assert store.texts_in("b", es.play_key("b", 100), 0, NOW) is None
+
+
+def test_the_guide_around_now_keeps_what_is_on_in_a_shifted_sources_own_time(tmp_path):
+    (tmp_path / "epg_b.xml").write_bytes(b"x")
+    store = ss.Sources(make_client=lambda pl: _Client([{"stream_id": 8, "name": "Vegas",
+                                                        "epg_channel_id": "v"}]),
+                       guide_path=lambda pid: str(tmp_path / f"epg_{pid}.xml"), open_guide=_Guide)
+    plan = _plan()
+    cat = store.channels(plan)
+    # "Over" ran from two hours to one hour ago: on now in a guide that
+    # runs two hours behind.
+    plain = store.now_table(plan, cat, NOW)
+    assert "Over" not in plain.schedule({"_key": "failover:b:8"})[2]
+    assert not store.now_looked_for(plan, NOW, behind=2 * H)     # another shift: not yet
+    behind = store.now_table(plan, cat, NOW, behind=2 * H)
+    assert behind is not plain and "Over" in behind.schedule({"_key": "failover:b:8"})[2]
+    assert store.now_looked_for(plan, NOW, behind=2 * H)

@@ -247,6 +247,81 @@ def test_history_actions_and_what_plays():
     assert mitt.playing_keys(None, None, "pa") == set()
 
 
+# -- the favourites' folders across every source ----------------------------------------------
+
+def _stores():
+    """Pirat (in use) and Nordic: a folder "Sport" in both, of channels and films."""
+    return [
+        mitt.FavStore("pa", "chan", {"all": [{"stream_id": 1, "name": "Kanal Ett"}],
+                                     "Sport": [{"stream_id": 3, "name": "Sportkanalen"},
+                                               {"stream_id": 4, "name": "Golf"}]},
+                      colours={"Sport": {"bgcolor": "#2FBF71", "color": ""}}),
+        mitt.FavStore("pa", "movie", {"Sport": [{"stream_id": 40, "name": "Matchen"}]}),
+        mitt.FavStore("pa", "series", {}),
+        mitt.FavStore("pb", "chan", {"all": [{"stream_id": 1, "name": "Nordic One"}],
+                                     "Sport": [{"stream_id": 77, "name": "Nordic Sport"},
+                                               {"stream_id": 77, "name": "twice"}],
+                                     "Vuxen": [{"stream_id": 79, "name": "Late"}]},
+                      locked=frozenset({"Vuxen"}),
+                      colours={"Sport": {"bgcolor": "#FF5C5C"}}),
+        mitt.FavStore("pb", "movie", {"Sport": [{"stream_id": 900, "name": "Nordic Film"},
+                                                {"name": "no id"}]}),
+        mitt.FavStore("", "radio", {"Sport": [{"stationuuid": "u1", "name": "Radio Sport"}]}),
+    ]
+
+
+def test_two_sources_folders_are_one_by_name_each_title_its_own_sources():
+    loose, named = mitt.fav_folders(_stores())
+    assert list(named) == ["Sport", "Vuxen"]                    # one "Sport", by name
+    sport = named["Sport"]
+    # The channels first, then the films, the stations; the source in use's
+    # first in each; a title once per store.
+    assert [(e.kind, e.source, e.ident) for e in sport.entries] == [
+        (mitt.CHANNEL, "pa", "3"), (mitt.CHANNEL, "pa", "4"), (mitt.CHANNEL, "pb", "77"),
+        (mitt.FILM, "pa", "40"), (mitt.FILM, "pb", "900"), (mitt.RADIO, "", "radio:u1")]
+    assert len({e.key for e in sport.entries}) == len(sport.entries)
+    assert sport.counts == {"chan": 3, "movie": 2, "radio": 1}
+    assert sorted(sport.places) == [("", "radio"), ("pa", "chan"), ("pa", "movie"),
+                                    ("pb", "chan"), ("pb", "movie")]
+    e = sport.entries[2]
+    assert e.row["_section"] == "chan" and e.row["_group"] == "Sport" and e.title == "Nordic Sport"
+    assert sport.entries[-1].row["_kind"] == "radio" and sport.entries[-1].row["_key"] == "radio:u1"
+    # Its colour the first store's that gives one (the source in use's); a
+    # folder locked in one source is locked.
+    assert sport.colour == {"bgcolor": "#2FBF71"} and not sport.locked
+    assert named["Vuxen"].locked
+    # The favourites in no folder: every source's, the same id of two
+    # sources two titles.
+    assert [(e.source, e.ident) for e in loose.entries] == [("pa", "1"), ("pb", "1")]
+    assert loose.name == "all" and ("pb", "chan") in loose.places
+
+
+def test_a_title_left_out_is_neither_listed_nor_counted_and_a_broken_test_shows_nothing():
+    def keep(e):
+        if e.ident == "4":
+            raise RuntimeError("a test that broke")
+        return e.source != "pb"
+    _loose, named = mitt.fav_folders(_stores(), keep)
+    sport = named["Sport"]
+    assert [(e.source, e.ident) for e in sport.entries] == [("pa", "3"), ("pa", "40"),
+                                                           ("", "radio:u1")]
+    assert sport.counts == {"chan": 1, "movie": 1, "radio": 1}
+    assert "Vuxen" in named and named["Vuxen"].entries == []     # the folder stays, empty
+    assert mitt.fav_folders([]) == (mitt.Folder("all"), {})
+
+
+def test_a_reorder_keeps_each_stores_titles_in_their_own_places():
+    _loose, named = mitt.fav_folders(_stores())
+    sport = named["Sport"].entries
+    keys = [e.key for e in sport]
+    # Golf dragged to the top, the film of Nordic before Pirat's.
+    order = mitt.moved_to(keys, [sport[1].key], 0)
+    order = mitt.moved_to(order, [sport[4].key], order.index(sport[3].key))
+    got = mitt.reordered_within(sport, order)
+    assert [e.ident for e in got] == ["4", "3", "77", "40", "900", "radio:u1"]
+    assert mitt.reordered_within(sport, []) == sport
+
+
 # -- the page ---------------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
