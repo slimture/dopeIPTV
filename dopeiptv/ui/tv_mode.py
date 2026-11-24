@@ -44,6 +44,7 @@ from .tv_widgets import (
     ColourLegend, TvGrid, TvList, TvShelf, TvTile, font,
     px, set_unit,
 )
+from .widgets import WhileShown
 
 
 def now_next(window, it: dict) -> tuple[str, str, float | None]:
@@ -770,7 +771,9 @@ class TvPage(QWidget):
         self._clock_timer = QTimer(self)
         self._clock_timer.setInterval(15_000)
         self._clock_timer.timeout.connect(self._tick)
-        self._clock_timer.start()
+        # While TV mode shows only (the clock put right as it shows): the
+        # page stays made once TV mode is left (docs/PERFORMANCE.md).
+        WhileShown(self, self._clock_timer, self._tick)
         self.screens: dict[str, TvScreen] = {}
         self.current = ""
         self._focus: QWidget | None = None

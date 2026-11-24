@@ -371,6 +371,13 @@ loads the bundled libmpv, and signs the list of the bundle's own files
 an official build from a modified one (`core/build_check.py`,
 docs/MAINTAINING.md "Official builds").
 
+The suite holds the app's performance to budgets too - the start's import
+chain and time, the idle window's wakes, what is left after hundreds of
+zaps, place switches and windows opened, a big guide and list
+(`tests/test_perf_*.py`). [`PERFORMANCE.md`](PERFORMANCE.md) has the
+numbers, how to run them longer (`DOPEIPTV_PERF_LONG=1`) and how to look
+into one that fails.
+
 ## AirPlay to Apple TV (macOS)
 
 AirPlay goes through Apple's own frameworks, so it is a macOS feature, and

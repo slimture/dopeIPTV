@@ -109,9 +109,12 @@ def ask_pin(parent: QWidget, title: str, text: str,
     box.rejected.connect(d.reject)
     lay.addWidget(box)
     field.setFocus()
-    if not d.exec():
-        return None
-    return field.text().strip()
+    try:
+        return field.text().strip() if d.exec() else None
+    finally:
+        # The PIN typed is not kept in a hidden window for the session.
+        field.clear()
+        d.deleteLater()
 
 
 # -- the picker: "Who's watching?" -------------------------------------------------

@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import zlib
 from array import array
 from bisect import bisect_left, bisect_right
-from datetime import datetime
+from datetime import date, datetime
 from itertools import chain
 from pathlib import Path
 from typing import Any, Callable
@@ -216,6 +216,50 @@ def parse_xmltv_time(s: str | None) -> datetime | None:
         return None
 
 
+_EPOCH_DAY = date(1970, 1, 1).toordinal()
+_UTC_WORDS = ("Z", "GMT", "UTC")
+
+
+def xmltv_moment(s: str | None) -> float | None:
+    """parse_xmltv_time(*s*) as seconds since the epoch (its timestamp()),
+    or None - the same answer for every *s*, without strptime for the form
+    nearly every guide writes: fourteen digits and a numeric offset
+    ("20260927200000 +0200"), read here with int() alone. strptime took
+    three quarters of a big guide's parse (docs/PERFORMANCE.md). Anything
+    else - no offset (local time), a day that is not there, a second 60, a
+    year far from now - is parse_xmltv_time's to read."""
+    t = (s or "").strip()
+    head, rest = t[:14], t[14:].strip()
+    if not (len(head) == 14 and head.isascii() and head.isdigit()):
+        return _moment_slowly(s)
+    if len(rest) == 5 and rest[0] in "+-" and rest[1:].isascii() and rest[1:].isdigit():
+        oh, om = int(rest[1:3]), int(rest[3:5])
+        if oh > 23 or om > 59:
+            return _moment_slowly(s)
+        offset = (oh * 3600 + om * 60) * (-1 if rest[0] == "-" else 1)
+    elif rest.upper() in _UTC_WORDS:
+        offset = 0
+    else:
+        return _moment_slowly(s)
+    year, month, day = int(head[:4]), int(head[4:6]), int(head[6:8])
+    hour, minute, second = int(head[8:10]), int(head[10:12]), int(head[12:14])
+    # Years well inside what every platform's local time reads (Windows'
+    # refuses a time before 1970): there the slow way could only agree.
+    if not (1971 <= year <= 2899 and 1 <= month <= 12 and 1 <= day <= 31
+            and hour <= 23 and minute <= 59 and second <= 59):
+        return _moment_slowly(s)
+    try:
+        ordinal = date(year, month, day).toordinal()
+    except ValueError:              # the 30th of February and the like
+        return _moment_slowly(s)
+    return float((ordinal - _EPOCH_DAY) * 86400 + hour * 3600 + minute * 60 + second - offset)
+
+
+def _moment_slowly(s: str | None) -> float | None:
+    dt = parse_xmltv_time(s)
+    return None if dt is None else dt.timestamp()
+
+
 def _epg_cache_dir() -> "Path":
     base = QStandardPaths.writableLocation(
         QStandardPaths.StandardLocation.CacheLocation)
@@ -331,16 +375,16 @@ def parse_xmltv(data: bytes, keep_past_days: int
             el.clear()
         elif el.tag == "programme":
             cid = (el.get("channel") or "").strip().lower()
-            start = parse_xmltv_time(el.get("start"))
-            stop = parse_xmltv_time(el.get("stop"))
+            start = xmltv_moment(el.get("start"))
+            stop = xmltv_moment(el.get("stop"))
             title = pooled((el.findtext("title") or "").strip())
-            if cid and start and stop and stop.timestamp() > cutoff:
-                dedup_key = (cid, int(start.timestamp()), title.lower())
+            if cid and start is not None and stop is not None and stop > cutoff:
+                dedup_key = (cid, int(start), title.lower())
                 if dedup_key not in seen:
                     seen.add(dedup_key)
                     rows.setdefault(cid, []).append((
-                        int(start.timestamp()),
-                        int(stop.timestamp()),
+                        int(start),
+                        int(stop),
                         title,
                         pooled((el.findtext("desc") or "").strip()),
                     ))

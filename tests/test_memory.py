@@ -162,3 +162,20 @@ def test_disk_cache_prunes_oldest_back_under_budget(tmp_path):
     assert total <= 5000
     # Under budget: a second prune is a no-op.
     assert ld._prune_disk_cache() == 0
+
+
+def test_a_shared_image_cache_is_pruned_once(tmp_path):
+    """The window's logos and posters share one disk cache, and each loader
+    walked all of it a few seconds after the start: once per folder now."""
+    from PyQt6.QtCore import QThreadPool, QTimer
+    from dopeiptv.core.workers import LogoLoader
+
+    pool = QThreadPool()
+    first = LogoLoader(pool, cache_dir=tmp_path / "images")
+    second = LogoLoader(pool, cache_dir=tmp_path / "images")
+    other = LogoLoader(pool, cache_dir=tmp_path / "elsewhere")
+    assert len(first.findChildren(QTimer)) == 1        # its prune, 5 s on
+    assert second.findChildren(QTimer) == []           # the same folder: no walk again
+    assert len(other.findChildren(QTimer)) == 1        # another folder: its own
+    for t in first.findChildren(QTimer) + other.findChildren(QTimer):
+        t.stop()

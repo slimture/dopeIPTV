@@ -265,7 +265,7 @@ class BoxClient(OfflineClient):
         register_secrets(self.username, self.password,
                          quote(self.password, safe=""))
         self.options: dict[str, Any] = dict(options or {})
-        self.session.headers["User-Agent"] = USER_AGENT
+        self.on_session(lambda s: s.headers.__setitem__("User-Agent", USER_AGENT))
         self.epg_url = ""
         self.box_info: dict[str, Any] = {}
         self._auth: Any = None
