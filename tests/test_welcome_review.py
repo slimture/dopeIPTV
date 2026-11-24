@@ -410,6 +410,41 @@ def test_the_strip_folds_its_buttons_under_its_words_on_a_narrow_pane(app):
     strip.deleteLater()
 
 
+@pytest.mark.parametrize("code", ["de", "ru", "ar"])
+def test_on_a_narrow_pane_the_strips_buttons_are_whole_and_it_is_no_taller_than_its_words(app, code):
+    """In German at the list's narrowest, Add your own source was cut to
+    "ne Quelle hinzufü" beside Leave the demo, and the strip stood twice as
+    tall as its words."""
+    from PyQt6.QtWidgets import QBoxLayout, QVBoxLayout
+
+    from dopeiptv.ui import theme
+    from dopeiptv.ui.mw_onboarding import _SourceStrip
+    i18n.set_language(code)
+    app.setStyleSheet(theme.build_style())       # the window's buttons, as wide as there
+    host = QWidget()
+    lay = QVBoxLayout(host)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.addStretch(1)
+    strip = _SourceStrip()
+    lay.addWidget(strip)
+    strip.say(True)
+    host.setFixedSize(300, 600)                  # the list's pane: it cannot grow
+    host.show()
+    for _ in range(6):
+        app.processEvents()
+    assert strip._box.direction() == QBoxLayout.Direction.TopToBottom
+    for button in (strip.add, strip.leave):
+        assert button.isVisible() and button.width() + 1 >= button.sizeHint().width(), (
+            code, button.text(), button.width(), button.sizeHint().width())
+        assert button.mapTo(host, QPoint(button.width(), 0)).x() <= host.width()
+    words = strip.text.heightForWidth(strip.text.width())
+    under = strip.add.height() + strip.leave.height() * (
+        strip._buttons.direction() == QBoxLayout.Direction.BottomToTop)
+    assert strip.height() <= words + under + 60, (code, strip.height(), words, under)
+    host.deleteLater()
+    app.setStyleSheet("")
+
+
 # -- words ---------------------------------------------------------------------------------
 
 def _locales():
@@ -872,12 +907,19 @@ elif SCENARIO == "demo":
     w._show_place("tv")
     idle(0.2)
     assert not w._source_strip.isVisible()
-    # Leave the demo: no source at all, nothing of it behind - and the
-    # strip back, for that.
+    # Leave the demo: no source at all, nothing of it behind - not a film
+    # of it in the column under the video - and the strip back, for that.
+    w._show_place("films")
+    idle(0.2)
+    w._show_detail(films[0])
+    assert w._detail_name == "Big Buck Bunny"
+    w._show_place("tv")
+    idle(0.2)
     w._source_strip_leave.click()
     settle(lambda: isinstance(w.client, OfflineClient) and not isinstance(w.client, DemoClient),
            what="the demo left")
     assert w._demo_kept is None and not privacy.keeping_nothing()
+    assert w._detail_name == tr("detail_select_something") and not w.d_logo.isVisible()
     assert w.windowTitle() == APP_NAME and w.list_model.rowCount() == 0
     settle(lambda: w._source_strip.isVisible()
            and w._source_strip_text.text() == tr("onb_strip_none"), what="no source's words")

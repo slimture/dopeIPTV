@@ -371,6 +371,10 @@ class _OnboardingMixin:
         self._prev_live_item = None
         self._demo_kept = None
         privacy.keep_nothing(False)
+        # A film or channel of the demo's left in the column under the video.
+        show = getattr(self, "_show_detail", None)
+        if callable(show):
+            show(None)
         from ..core.stores import WatchedStore, WatchlistStore
         cache = self._own(self._cache_settings)
         self.watched = WatchedStore(cache)
@@ -650,10 +654,15 @@ class _OnboardingMixin:
 class _SourceStrip(QWidget):
     """The calm strip that says there is no source of one's own: its words,
     Add your own source, in the demo Leave the demo, and a ✕ that puts it
-    away for the session. Its buttons go under its words on a narrow pane
-    (NARROW), so the words take two lines, not five."""
+    away for the session. On a narrow pane (NARROW) its buttons go under its
+    words, so the words take two lines, not five - and one under the other
+    where they do not fit side by side (a long translation)."""
 
     NARROW = 560
+    #: The frame's margins and the room between its parts.
+    _MARGINS = (12, 8, 6, 8)
+    _GAP = 10
+    _BUTTON_GAP = 6
 
     def __init__(self) -> None:
         super().__init__()
@@ -672,28 +681,37 @@ class _SourceStrip(QWidget):
             f" color: {P['muted']}; padding: 2px; }}"
             f"QToolButton#SourceStripAway:hover, QToolButton#SourceStripAway:focus"
             f" {{ color: {P['text']}; }}")
-        self._box = QBoxLayout(QBoxLayout.Direction.LeftToRight, frame)
-        self._box.setContentsMargins(12, 8, 6, 8)
-        self._box.setSpacing(10)
+        row = QHBoxLayout(frame)
+        row.setContentsMargins(*self._MARGINS)
+        row.setSpacing(self._BUTTON_GAP)
+        # The words and the buttons: side by side, or the buttons under the
+        # words on a narrow pane (_fit).
+        self._box = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._box.setSpacing(self._GAP)
         self.text = QLabel("", objectName="SourceStripText")
         self.text.setWordWrap(True)
         self.text.setTextFormat(Qt.TextFormat.PlainText)
         self._box.addWidget(self.text, 1)
-        buttons = QHBoxLayout()
-        buttons.setSpacing(6)
+        # Add your own source and Leave the demo: in a row, or Add your own
+        # source over Leave the demo where the row does not fit.
+        self._buttons = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._buttons.setSpacing(self._BUTTON_GAP)
         self.leave = QPushButton(objectName="SourceStripLeave")
         self.leave.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add = QPushButton(objectName="Primary")
         self.add.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._buttons.addStretch(1)
+        self._buttons.addWidget(self.leave)
+        self._buttons.addWidget(self.add)
+        self._box.addLayout(self._buttons)
+        row.addLayout(self._box, 1)
+        # The ✕ beside it all, at the words' first line on a narrow pane.
         self.away = QToolButton(objectName="SourceStripAway")
         self.away.setText("✕")
         self.away.setAutoRaise(True)
         self.away.setCursor(Qt.CursorShape.PointingHandCursor)
-        buttons.addStretch(1)
-        buttons.addWidget(self.leave, 0, Qt.AlignmentFlag.AlignVCenter)
-        buttons.addWidget(self.add, 0, Qt.AlignmentFlag.AlignVCenter)
-        buttons.addWidget(self.away, 0, Qt.AlignmentFlag.AlignVCenter)
-        self._box.addLayout(buttons)
+        row.addWidget(self.away, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._row = row
         outer.addWidget(frame)
         self.say(False)
 
@@ -707,11 +725,34 @@ class _SourceStrip(QWidget):
         self._fit()
 
     def _fit(self) -> None:
-        narrow = 0 < self.width() < self.NARROW
-        want = (QBoxLayout.Direction.TopToBottom if narrow
-                else QBoxLayout.Direction.LeftToRight)
+        width = self.width()
+        narrow = 0 < width < self.NARROW
+        D = QBoxLayout.Direction
+        changed = False
+        want = D.TopToBottom if narrow else D.LeftToRight
         if self._box.direction() != want:
             self._box.setDirection(want)
+            changed = True
+        # The buttons' row as wide as the room under the words: else Add
+        # your own source on top, Leave the demo under it.
+        left, _top, right, _bottom = self._MARGINS
+        room = width - left - right - self._BUTTON_GAP - self.away.sizeHint().width()
+        need = self.add.sizeHint().width()
+        if not self.leave.isHidden():
+            need += self._BUTTON_GAP + self.leave.sizeHint().width()
+        stack = narrow and need > room
+        want_buttons = D.BottomToTop if stack else D.LeftToRight
+        if self._buttons.direction() != want_buttons:
+            self._buttons.setDirection(want_buttons)
+            changed = True
+        top = Qt.AlignmentFlag.AlignTop if narrow else Qt.AlignmentFlag.AlignVCenter
+        self.text.setAlignment(top | Qt.AlignmentFlag.AlignLeading)
+        self._row.setAlignment(self.away, top)
+        if changed:
+            # The height asked again for the new form (a word-wrapped label
+            # keeps the height of its old width otherwise).
+            self._box.invalidate()
+            self.updateGeometry()
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt's name
         super().resizeEvent(event)
