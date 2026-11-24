@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Aggiungi la tua sorgente",
   "onb_strip_demo": "Stai provando la demo: stream di prova liberi e film con licenza libera. Niente di ciò che fai qui viene conservato.",
   "onb_strip_none": "Ancora nessuna sorgente. Aggiungi il tuo fornitore IPTV, un media server o un decoder di casa per vedere qui canali e film.",
+  "onb_strip_unreached": "Impossibile raggiungere {name}, quindi non c'è ancora nulla da mostrare da questa sorgente.",
   "err_m3u_empty": "La playlist è vuota: controlla il link o chiedine uno nuovo al tuo fornitore.",
   "err_m3u_html": "Questo indirizzo restituisce una pagina web, non una playlist. Controlla di aver copiato il link della playlist stessa.",
   "err_m3u_too_large": "La playlist supera {mb} MB, più di quanto l'app legga.",

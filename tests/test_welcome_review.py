@@ -388,12 +388,16 @@ def test_a_kids_profile_is_offered_no_nerd_and_the_guard_holds(app):
     s.clear()
 
 
+def _strip_says_demo(strip):
+    strip.say(tr("onb_strip_demo"), tr("onb_add_own_source"), tr("onb_leave_demo"))
+
+
 def test_the_strip_folds_its_buttons_under_its_words_on_a_narrow_pane(app):
     from PyQt6.QtWidgets import QBoxLayout
 
     from dopeiptv.ui.mw_onboarding import _SourceStrip
     strip = _SourceStrip()
-    strip.say(True)
+    _strip_says_demo(strip)
     strip.resize(400, 120)
     strip.show()
     for _ in range(3):
@@ -405,7 +409,7 @@ def test_the_strip_folds_its_buttons_under_its_words_on_a_narrow_pane(app):
     strip.resize(900, 60)
     app.processEvents()
     assert strip._box.direction() == QBoxLayout.Direction.LeftToRight
-    strip.say(False)
+    strip.say(tr("onb_strip_none"), tr("onb_add_own_source"))
     assert not strip.leave.isVisibleTo(strip) and strip.text.text() == tr("onb_strip_none")
     strip.deleteLater()
 
@@ -427,7 +431,7 @@ def test_on_a_narrow_pane_the_strips_buttons_are_whole_and_it_is_no_taller_than_
     lay.addStretch(1)
     strip = _SourceStrip()
     lay.addWidget(strip)
-    strip.say(True)
+    _strip_says_demo(strip)
     host.setFixedSize(300, 600)                  # the list's pane: it cannot grow
     host.show()
     for _ in range(6):

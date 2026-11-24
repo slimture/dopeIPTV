@@ -9,7 +9,11 @@ address is a stream's or a file's own path, nothing else. A link's address
 plays, with the address in plain sight (``_ask_link_play``); only one the
 person saved among the favourites plays at once (``_link_known``). A link's
 channel is asked about the same way once it is found, its name in plain
-text (``_ask_link_channel``)."""
+text (``_ask_link_channel``).
+
+What plays is seen: the first-run guide, up or waiting behind "Who's
+watching?", goes first as its Esc closes it (``_cmd_make_way``,
+mw_onboarding) - after a link's question, never before it."""
 
 from __future__ import annotations
 
@@ -146,6 +150,14 @@ class _CommandsMixin:
         if idx == 0:
             self._play_address(url)
 
+    def _cmd_make_way(self) -> None:
+        """What was asked is about to play: the first-run guide goes first
+        (mw_onboarding), so it is seen - after a link's question, before
+        the play path's own (resume, a recording, a kids profile's limits)."""
+        make_way = getattr(self, "_welcome_make_way", None)
+        if callable(make_way):
+            make_way()
+
     def _play_address(self, url: str, title: str | None = None) -> None:
         """A file plays as one opened from Local files (resume, its name);
         a page of YouTube, Twitch and the like through yt-dlp
@@ -154,6 +166,7 @@ class _CommandsMixin:
         provider's channel and need not be a stream at all (a web page),
         which mpv then says at once. Kept out of Recently viewed - it is
         no channel or title of a source."""
+        self._cmd_make_way()
         if url.startswith("file://"):
             # file:///C:/Films/a.mkv is C:\Films\a.mkv on Windows.
             from ..core.commands import file_url_path
@@ -197,6 +210,7 @@ class _CommandsMixin:
                 from PyQt6.QtCore import QTimer
                 QTimer.singleShot(0, lambda: self._ask_link_channel(it, client))
                 return
+            self._cmd_make_way()
             self.play_live_channel(it)
         run_async(self.pool, _rows_job(self, client), done,
                   lambda _e=None: done([]))
@@ -230,6 +244,7 @@ class _CommandsMixin:
             return
         log.info("command: a link's channel %s", "played" if idx == 0 else "not played")
         if idx == 0:
+            self._cmd_make_way()
             self.play_live_channel(it)
 
     def _play_channel_step(self, direction: int) -> bool:
@@ -281,6 +296,7 @@ class _CommandsMixin:
             if it is None:
                 self._chan_not_found(number)
                 return
+            self._cmd_make_way()
             self.play_live_channel(it)
         run_async(self.pool, _rows_job(self, client), done,
                   lambda _e=None: done([]))

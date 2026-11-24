@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Ajouter votre propre source",
   "onb_strip_demo": "Vous essayez la démo : des flux de test libres et des films sous licence libre. Rien de ce que vous faites ici n'est conservé.",
   "onb_strip_none": "Pas encore de source. Ajoutez votre fournisseur IPTV, un serveur multimédia ou un boîtier à la maison pour voir ici des chaînes et des films.",
+  "onb_strip_unreached": "Impossible de joindre {name} : il n'y a donc encore rien à afficher de cette source.",
   "err_m3u_empty": "La playlist est vide – vérifiez le lien, ou demandez-en un nouveau à votre fournisseur.",
   "err_m3u_html": "Cette adresse donne une page web, pas une playlist. Vérifiez que vous avez copié le lien de la playlist elle-même.",
   "err_m3u_too_large": "La playlist dépasse {mb} Mo – plus que ce que l'application lit.",

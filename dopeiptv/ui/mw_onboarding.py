@@ -23,6 +23,19 @@ The guide (ui/welcome.py) asks; the window does the work here:
 * Who is watching first: while "Who's watching?" is up, or a PIN is still
   to be given, the guide waits hidden - its keys, its Esc and its actions
   come after the profile is picked (_welcome_hold, _welcome_after_pick).
+* Never with TV mode: "Start in TV mode" waits at a start the guide comes
+  to (_welcome_due), TV mode is not turned on while the guide is up or
+  waits (mw_tv._tv_guide_up), and the guide shown while TV mode is on
+  leaves it first - TV mode's own "Who's watching?" the window's then
+  (_welcome_out_of_tv). Its keys are always the guide's.
+* Never over what plays: a command that plays something (a file opened with
+  the app, a link, --play, --channel, the remote API) closes the guide
+  first as its Esc does (_welcome_make_way, from mw_commands).
+* The window closing stops a sync the Bring step still fetches - one that
+  brought nothing leaves sync off - and a try under way (_wizard_closing).
+* A source a sync or a backup brought whose first login failed: the strip
+  says it could not be reached, with Try again and Settings > Sources
+  (_source_not_reached), never "no source yet".
 * A kids profile adds no source, brings no settings and turns no Nerd on
   without a grown-up's PIN (mw_profiles._kids_settings_unlock): the strip's
   button, Connect, the Bring step and the Nerd link ask it (the guide's
@@ -138,8 +151,11 @@ class _OnboardingMixin:
     #: (_welcome_hold) - None when nothing waits.
     _welcome_waits: Any = None
     #: The strip put away for the session, and for which state ("demo",
-    #: "none"): it comes back for the other.
+    #: "none", "unreached"): it comes back for another.
     _strip_away: str = ""
+    #: A stored source whose login failed while none of one's own was in
+    #: use (_source_not_reached): the strip says so, with Try again.
+    _unreached: str = ""
 
     def _welcome_blocked(self) -> bool:
         """Who is watching is still to be said: the picker is up, or a PIN
@@ -165,10 +181,54 @@ class _OnboardingMixin:
             return
         ov = self._wizard_view()
         if waits is True and ov is not None:
+            self._welcome_out_of_tv()
+            if self._welcome_blocked():
+                self._welcome_waits = True      # TV mode's own picker: the window's now
+                return
             ov.cover()
             self._update_provider_hint()
             return
         self.show_welcome(PAGE_WELCOME if waits is True else int(waits))
+
+    def _welcome_due(self) -> bool:
+        """The guide comes at this start (app.py): no source stored, and
+        the person did not choose their own files and radio alone there
+        (FILES_ONLY_KEY). "Start in TV mode" waits for it (mw_tv)."""
+        store = getattr(self, "playlist_store", None)
+        if store is not None and store.active() is not None:
+            return False
+        return self.settings.value(FILES_ONLY_KEY, "") != "true"
+
+    def _welcome_out_of_tv(self) -> None:
+        """The guide is to cover the window while TV mode is on: TV mode is
+        left first - its key filter would take every key of the guide's
+        (Enter, Esc) and its Back leave TV mode under it. TV mode's own
+        "Who's watching?" up: the window's picker in its place, and the
+        guide after it (_welcome_blocked)."""
+        if not getattr(self, "_tv_on", False):
+            return
+        page = getattr(self, "_tv_page", None)
+        asking = (page is not None and not sip.isdeleted(page)
+                  and getattr(page, "current", "") == "profiles")
+        log.info("welcome: TV mode left - the guide takes the keys")
+        self.exit_tv_mode()
+        if asking and getattr(self, "_profile_picker", None) is None:
+            self.show_profile_picker()
+
+    def _welcome_make_way(self) -> None:
+        """(mw_commands) What a command asks for is about to play - a file
+        opened with the app, a link, --play, --channel, the remote API: the
+        guide goes first, as its Esc closes it (a try, a sign-in, a sync
+        still fetching stopped, nothing of them kept), so what plays is seen
+        - never sound under the guide. One waiting behind "Who's watching?"
+        does not come back over it. "Add your own source" opens it again."""
+        waited, self._welcome_waits = self._welcome_waits, None
+        ov = self._wizard_view()
+        if ov is None or not (ov.isVisible() or waited is not None):
+            return
+        log.info("welcome: closed - a command plays something")
+        ov.dismiss()
+        self._update_provider_hint()
 
     def _welcome_may_change(self) -> bool:
         """The guide's guard: before a source is tried, settings are brought
@@ -184,7 +244,9 @@ class _OnboardingMixin:
     def show_welcome(self, page: int = PAGE_WELCOME) -> None:
         """Show the guide - from its first page, or *page* (the choice of
         what to watch, from "Add your own source"). Not while who is
-        watching is still to be said: it waits for the profile."""
+        watching is still to be said: it waits for the profile. Never over
+        TV mode: that is left first."""
+        self._welcome_out_of_tv()
         if self._welcome_blocked():
             if self._welcome_waits is not True:
                 self._welcome_waits = page
@@ -511,12 +573,22 @@ class _OnboardingMixin:
         return tr(_SYNC_MISS.get(kind, "onb_sync_err_other"))
 
     def _wizard_sync_cancel(self) -> None:
-        """Back (or Esc) while it fetched."""
+        """Back (or Esc) while it fetched - or the window closed."""
         if not self._wsync_pending:
             return
         self._wsync_pending = False
         if not self._wsync_joined and self._sync_on():
             self._sync_forget()
+
+    def _wizard_closing(self) -> None:
+        """(closeEvent) The window closes while the guide still works: a
+        sync the Bring step fetches is stopped as its Back stops it - one
+        that brought nothing yet leaves sync off, its code not kept - and a
+        try under way is dropped (nothing of it kept)."""
+        if self._wsync_pending:
+            log.info("welcome: the sync still fetching stopped - the window closes")
+        self._wizard_sync_cancel()
+        self._wizard_connect_cancel()
 
     def _wizard_sync_landed(self) -> None:
         ov = self._wizard_view()
@@ -619,29 +691,75 @@ class _OnboardingMixin:
         """(mw_build) The strip under the middle pane's pages that says
         there is no source of one's own - the demo's word, or none at all -
         with "Add your own source" (and in the demo, Leave the demo): in the
-        pane's layout, so it never covers a row."""
+        pane's layout, so it never covers a row. A stored source that could
+        not be reached is said as such, with Try again and Settings >
+        Sources."""
         strip = _SourceStrip()
         self._source_strip_text = strip.text
         self._source_strip_btn = strip.add
         self._source_strip_leave = strip.leave
         strip.add.clicked.connect(self._strip_add_source)
-        strip.leave.clicked.connect(self._demo_to_nothing)
+        strip.leave.clicked.connect(self._strip_second)
         strip.away.clicked.connect(self._strip_put_away)
         strip.hide()
         lay.addWidget(strip)
         self._source_strip = strip
 
+    def _source_not_reached(self, pid: str) -> None:
+        """(switch_playlist) Source *pid* did not answer its login while no
+        source of one's own is in use - a first start's sync or backup
+        brought it: the strip says it could not be reached, not that there
+        is no source yet (one is stored). The demo stays the demo's word."""
+        if type(self.client) is not OfflineClient or self._demo_kept is not None:
+            return
+        self._unreached = str(pid)
+        self._update_provider_hint()
+
+    def _strip_state(self) -> str:
+        """What the strip says: "demo", "unreached" (a stored source whose
+        login failed, _source_not_reached) or "none"."""
+        if self._demo_kept is not None:
+            return "demo"
+        store = getattr(self, "playlist_store", None)
+        if self._unreached and store is not None and store.get(self._unreached):
+            return "unreached"
+        return "none"
+
     def _strip_add_source(self) -> None:
         """Add your own source: the guide on the choice of what to watch - a
-        kids profile only with a grown-up's PIN."""
+        kids profile only with a grown-up's PIN. For a source that could
+        not be reached: Try again, its login asked once more."""
+        if self._strip_state() == "unreached":
+            self.switch_playlist(self._unreached)
+            return
         if not self._welcome_may_change():
             return
         self.show_welcome(PAGE_CHOOSE)
 
+    def _strip_second(self) -> None:
+        """The strip's quieter button: Leave the demo - or, for a source
+        that could not be reached, Settings > Sources (its address, its
+        login)."""
+        if self._strip_state() == "unreached":
+            self.open_settings_at("playlists")
+            return
+        self._demo_to_nothing()
+
     def _strip_put_away(self) -> None:
         """Its ✕: away for the session, while this state lasts."""
-        self._strip_away = "demo" if self._demo_kept is not None else "none"
+        self._strip_away = self._strip_state()
         self._update_provider_hint()
+
+    def _strip_words(self, state: str) -> tuple[str, str, str]:
+        """(the words, the primary button's, the quieter one's - "" for
+        none) for *state*."""
+        if state == "demo":
+            return tr("onb_strip_demo"), tr("onb_add_own_source"), tr("onb_leave_demo")
+        if state == "unreached":
+            pl = self.playlist_store.get(self._unreached) or {}
+            return (tr("onb_strip_unreached", name=str(pl.get("name") or "")),
+                    tr("sp_retry"), self.settings_link_text("playlists"))
+        return tr("onb_strip_none"), tr("onb_add_own_source"), ""
 
     def _update_provider_hint(self) -> None:
         """The strip under the list while there is no source of one's own
@@ -650,13 +768,15 @@ class _OnboardingMixin:
         strip = self._source_strip
         if strip is None or sip.isdeleted(strip):
             return
+        if not self._no_own_source():
+            self._unreached = ""        # a source in use: whatever failed before is past
         overlay_up = self._welcome is not None and self._welcome.isVisible()
-        state = "demo" if self._demo_kept is not None else "none"
+        state = self._strip_state()
         on = (self._no_own_source() and not overlay_up and not getattr(self, "_player_fs", False)
               and getattr(self, "mode", "live") not in _OWN_PLACES
               and self._strip_away != state)
         if on:
-            strip.say(state == "demo")
+            strip.say(*self._strip_words(state))
         strip.setVisible(on)
 
 
@@ -722,13 +842,16 @@ class _SourceStrip(QWidget):
         row.addWidget(self.away, 0, Qt.AlignmentFlag.AlignVCenter)
         self._row = row
         outer.addWidget(frame)
-        self.say(False)
+        self.say(tr("onb_strip_none"), tr("onb_add_own_source"))
 
-    def say(self, demo: bool) -> None:
-        self.text.setText(tr("onb_strip_demo") if demo else tr("onb_strip_none"))
-        self.add.setText(tr("onb_add_own_source"))
-        self.leave.setText(tr("onb_leave_demo"))
-        self.leave.setVisible(demo)
+    def say(self, words: str, primary: str, second: str = "") -> None:
+        """Its *words* (plain text: a source's name may be in them), the
+        primary button's and the quieter one's - none for "" (hidden, it
+        keeps words a screen reader can say)."""
+        self.text.setText(words)
+        self.add.setText(primary)
+        self.leave.setText(second or tr("onb_leave_demo"))
+        self.leave.setVisible(bool(second))
         self.away.setToolTip(tr("common_close"))
         self.away.setAccessibleName(tr("common_close"))
         self._fit()

@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Adicione sua própria fonte",
   "onb_strip_demo": "Você está experimentando a demonstração: transmissões de teste livres e filmes com licença livre. Nada do que você faz aqui é guardado.",
   "onb_strip_none": "Ainda não há fonte. Adicione seu provedor de IPTV, um servidor de mídia ou um receptor em casa para ver canais e filmes aqui.",
+  "onb_strip_unreached": "Não foi possível alcançar {name}, por isso ainda não há nada dessa fonte para mostrar.",
   "err_m3u_empty": "A lista está vazia — confira o link ou peça um novo ao seu provedor.",
   "err_m3u_html": "Este endereço traz uma página web, não uma lista. Confira se você copiou o link da própria lista.",
   "err_m3u_too_large": "A lista tem mais de {mb} MB — mais do que o aplicativo lê.",

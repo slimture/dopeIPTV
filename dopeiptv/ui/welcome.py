@@ -28,6 +28,11 @@ dialog, so it feels part of the app), driven by ui/mw_onboarding.py:
 
 Esc closes it (the window's one Escape shortcut calls dismiss()); with no
 source the window then offers a calm "Add your own source" over its lists.
+However it goes (Esc, the demo, just files and radio, a source that came),
+what it had under way stops - a try, a media server's sign-in (a Plex PIN
+approved later connects nothing), a sync still fetching - and no login typed
+stays in it (_leave). The form's Back stops a sign-in too, and keeps what
+was typed.
 """
 
 from __future__ import annotations
@@ -670,7 +675,7 @@ class WelcomeOverlay(QWidget):
         lay.addSpacing(2)
         row = QHBoxLayout()
         self._c_back = QPushButton(tr("onb_back"))
-        self._c_back.clicked.connect(lambda: self._stack.setCurrentIndex(PAGE_CHOOSE))
+        self._c_back.clicked.connect(self._form_back)
         row.addWidget(self._c_back)
         row.addStretch(1)
         lay.addLayout(row)
@@ -808,9 +813,9 @@ class WelcomeOverlay(QWidget):
 
     def _choose(self, family: str) -> None:
         """A card picked: its form - or, for files and radio, no source."""
+        self._drop_signin()
         if family == FILES:
-            self._flash.stop()
-            self.hide()
+            self._leave()
             self._on_files()
             return
         self._fill_kinds(family)
@@ -924,6 +929,10 @@ class WelcomeOverlay(QWidget):
             self._finder.status.hide()
         self._presets.setVisible(box and self._nerd_on())
         self._signin.set_kind(kind)
+        if not self._signin.busy:
+            # Another kind stopped the sign-in Connect asked for: a later
+            # one (Quick Connect) does not connect by itself.
+            self._connect_signed = False
         # A media server signs in, then connects: Connect does both.
         self._c_connect.setVisible(True)
         self._name_fields()
@@ -956,11 +965,26 @@ class WelcomeOverlay(QWidget):
         self._fit_card(self._stack.currentIndex())
 
     def _signin_finished(self, ok: bool) -> None:
-        """A sign-in Connect asked for has ended: connect if it worked."""
+        """A sign-in Connect asked for has ended: connect if it worked -
+        only while the guide is up on its form (closed, or left for another
+        page meanwhile, nothing is tried and nothing kept)."""
         pending, self._connect_signed = self._connect_signed, False
-        if pending and ok and self._signin.signed_in():
+        if (pending and ok and self._signin.signed_in() and self.isVisible()
+                and self._stack.currentIndex() == PAGE_FORM):
             self._connect_media(str(self._conn_kind.currentData()))
         self._fit_card(self._stack.currentIndex())
+
+    def _drop_signin(self) -> None:
+        """A sign-in under way stopped (the form's Back, another card, the
+        guide closed): its answer, whenever it comes, connects nothing."""
+        self._connect_signed = False
+        self._signin.cancel()
+
+    def _form_back(self) -> None:
+        """The form's Back: the choice of what to watch - what was typed
+        kept, a sign-in under way stopped."""
+        self._drop_signin()
+        self._stack.setCurrentIndex(PAGE_CHOOSE)
 
     def _connect_media(self, kind: str) -> None:
         got = self._signin.values()
@@ -1356,28 +1380,33 @@ class WelcomeOverlay(QWidget):
     def dismiss(self) -> None:
         """Esc - the main window's one Escape shortcut: the guide goes. A
         try under way is stopped (nothing of it kept), a sync still fetching
-        too; a source that came is kept."""
-        self._cancel_sync()
-        self._cancel_connect()
+        and a sign-in too; a source that came is kept."""
         if self._done:
             self._finish()
             return
         self._explore()
 
     def _demo(self) -> None:
-        self._flash.stop()
-        self.hide()
+        self._leave()
         self._on_demo()
 
     def _explore(self) -> None:
-        self._flash.stop()
-        self.hide()
+        self._leave()
         self._on_explore()
 
     def _finish(self) -> None:
+        self._leave()
+
+    def _leave(self) -> None:
+        """The guide goes, whichever way (Esc, the demo, just files and
+        radio, a source that came): what it had under way stops - a sync
+        still fetching, a try, a sign-in, nothing of them kept - and no
+        login typed stays in it, a try's that failed neither."""
         self._flash.stop()
-        if self._done:
-            self._forget_login()
+        self._cancel_sync()
+        self._cancel_connect()
+        self._drop_signin()
+        self._forget_login()
         self.hide()
 
     def _forget_login(self) -> None:

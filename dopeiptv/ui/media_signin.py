@@ -254,13 +254,29 @@ class MediaSignIn(QWidget):
         if not self._busy:
             self._plex_clicked()
 
+    def cancel(self) -> None:
+        """A sign-in under way stopped (the guide's Back, the guide closed):
+        its answer, whenever it comes - a Plex PIN approved minutes later -
+        is dropped, and no wait polls on. A sign-in that ended stays."""
+        if not (self._busy or self._qc or self._pin or self._timer.isActive()):
+            return
+        self._stop()
+        self._end()
+        self._say(tr("ms_signed_in", user=self._state.get("user") or "?")
+                  if self.signed_in() else "")
+        log.info("media sign-in: stopped")
+        self.changed.emit()
+
     def forget(self) -> None:
-        """What a sign-in left goes (the guide, once a source is kept)."""
+        """What a sign-in left goes (the guide, once a source is kept or it
+        is closed)."""
         self._stop()
         self._state = {}
         self._for = ("", "", "")
         self._servers = []
         self._plex_token = self._plex_user = ""
+        self._picking = {}
+        self.servers.clear()
         self._say("")
         self._buttons()
 

@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Voeg je eigen bron toe",
   "onb_strip_demo": "Je probeert de demo: vrije teststreams en vrij gelicentieerde films. Niets van wat je hier doet, wordt bewaard.",
   "onb_strip_none": "Nog geen bron. Voeg je IPTV-provider, een mediaserver of een ontvanger thuis toe om hier zenders en films te zien.",
+  "onb_strip_unreached": "{name} was niet bereikbaar, dus er is er nog niets van te zien.",
   "err_m3u_empty": "De afspeellijst is leeg – controleer de link, of vraag je provider om een nieuwe.",
   "err_m3u_html": "Dit adres geeft een webpagina, geen afspeellijst. Controleer of je de link van de afspeellijst zelf hebt gekopieerd.",
   "err_m3u_too_large": "De afspeellijst is groter dan {mb} MB – meer dan de app leest.",

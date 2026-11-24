@@ -3338,6 +3338,7 @@
   "onb_add_own_source": "Thêm nguồn của riêng bạn",
   "onb_strip_demo": "Bạn đang dùng thử bản demo: luồng thử nghiệm miễn phí và phim giấy phép tự do. Những gì bạn làm ở đây đều không được lưu lại.",
   "onb_strip_none": "Chưa có nguồn nào. Thêm nhà cung cấp IPTV, máy chủ đa phương tiện hoặc đầu thu ở nhà để xem kênh và phim tại đây.",
+  "onb_strip_unreached": "Không thể kết nối tới {name}, nên chưa có gì từ nguồn này để hiển thị.",
   "err_m3u_empty": "Danh sách phát trống — hãy kiểm tra liên kết, hoặc xin nhà cung cấp một liên kết mới.",
   "err_m3u_html": "Địa chỉ này trả về một trang web, không phải danh sách phát. Hãy kiểm tra bạn đã sao chép đúng liên kết của chính danh sách phát.",
   "err_m3u_too_large": "Danh sách phát lớn hơn {mb} MB — nhiều hơn mức ứng dụng đọc.",
