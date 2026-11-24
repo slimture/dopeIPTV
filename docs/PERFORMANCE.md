@@ -148,6 +148,14 @@ Fixed, each with a test that fails without it:
   Recordings while the start's channel list was on its way left its
   spinner turning nine times a second behind the page until the list's job
   gave up (25 s). It turns only while it can be seen. (`tests/test_perf_idle.py`)
+- **The Reminders window counted down for ever.** Its 1 s countdown
+  started with the window and was never stopped, and the window was kept:
+  opened once, it ticked in a closed window for the rest of the session -
+  one ticker more each time it was opened. It ticks while it is open, and
+  goes once closed. (`tests/test_dialogs_freed.py`)
+- **TV mode's clock** (15 s) ran from TV mode's first use to the end of the
+  session, the page kept out of sight. It runs while TV mode shows.
+  (`tests/test_tv_mode.py`)
 - **Every cast window stayed.** `CastDialog` was exec()'d and never deleted:
   84 objects, 53 widgets and a top-level window each time, restyled at
   every theme change. It goes once it is closed and no answer of its own is
@@ -162,16 +170,18 @@ Fixed, each with a test that fails without it:
 
 Found, and left - with why:
 
-- **Other dialogs are kept too.** About 55 more `exec()`'d dialogs are never
-  deleted (open address, a channel's settings, stream health, reminders,
-  your statistics, the queue, the equaliser, the catch-up list, the
-  scheduled recordings, Trakt's and Simkl's, profiles'...): each stays a
-  child of the window once opened. Each needs the cast window's look -
-  whether an answer of its own can arrive after it is closed (a worker's
-  callback on a deleted widget raises) - before it is let go; the ones
-  opened most were done first. A list of them: every function that calls a
-  dialog's `exec()` and never `deleteLater`, `WA_DeleteOnClose` or
-  `setParent(None)`.
+- **Other dialogs are kept too.** About 50 more `exec()`'d dialogs are never
+  deleted (open address, a channel's settings, stream health, your
+  statistics, the queue, the equaliser, the catch-up list, the scheduled
+  recordings, Trakt's and Simkl's, profiles'...): each stays a child of the
+  window once opened. None of them keeps a timer running (each dialog with
+  a timer was looked at: the connection test and the stream analysis stop
+  theirs as they close, the box's windows on hide, teletext's goes), but
+  each needs the cast window's look - whether an answer of its own can
+  arrive after it is closed (a worker's callback on a deleted widget
+  raises) - before it is let go; the ones opened most were done first. A
+  list of them: every function that calls a dialog's `exec()` and never
+  `deleteLater`, `WA_DeleteOnClose` or `setParent(None)`.
 - **The recordings' 5 s look** runs with no recording at all (0.2 wakes a
   second). Stopping it would need every way a job is added to start it
   again, and a missed recording costs more than the wake.
