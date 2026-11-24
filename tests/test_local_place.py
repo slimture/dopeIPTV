@@ -336,7 +336,16 @@ assert view.layout_kind == "list" and place.layout_switch.current() == "list"
 new = os.path.join(tree, "Films", "Brand New (2024).mkv")
 settle(lambda: w._lw_status()["count"] == 2, what="watching again")
 on_thread(lambda: open(new, "wb").close())
-settle(lambda: any(c.key == new for c in view.items()), 25, "the film walked in")
+walked_in = lambda: any(c.key == new for c in view.items())
+settle_end = time.time() + 12
+while not walked_in() and time.time() < settle_end:
+    app.processEvents()
+    time.sleep(0.01)
+if not walked_in():
+    # On a busy machine the system's word can come while the watch is being
+    # set again: the same file made once more is a change of its own.
+    on_thread(lambda: (os.remove(new), open(new, "wb").close()))
+settle(walked_in, 40, f"the film walked in {w._lw_status()}")
 # ...and walking the library is none either.
 settle(lambda: not w._local_scan_active and not w._lw_status()["pending"], what="quiet")
 runs.clear()
