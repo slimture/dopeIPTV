@@ -947,7 +947,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             self._set_det_fs_style(True)
             self.menuBar().hide()
             self.player.set_fullscreen_ui(True)
-            self._update_provider_hint()   # tuck the '+ Add provider' hint away
+            self._update_provider_hint()   # the strip under the lists away
             self._was_fullscreen = self.isFullScreen()
             # Remember if the window was maximized/zoomed and its exact
             # geometry, so leaving video-fullscreen restores that state instead

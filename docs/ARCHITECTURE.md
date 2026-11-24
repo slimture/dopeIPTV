@@ -35,7 +35,12 @@ dopeiptv/
 
   providers/           Data sources (the network / provider edge)
     __init__.py        The providers layer (no code)
-    client.py          XtreamClient, OfflineClient/M3UClient/DemoClient
+    client.py          XtreamClient, OfflineClient/M3UClient
+    demo.py            DemoClient - the demo: its channels, guide made here,
+                       the Blender Foundation's films, logos and posters drawn
+    demo_streams.py    The demo's streams in one table (tools/check_demo.py)
+    connect_check.py   The first-run guide's connect step: the login and the
+                       lists counted, each failure in plain words
     stalker.py         StalkerClient - Stalker / Ministra MAC portals
                        (handshake, links, the archive by programme)
     boxes.py           BoxClient - what the boxes at home share: login,
@@ -99,6 +104,7 @@ dopeiptv/
     __init__.py        The core layer (no code)
     stores.py          JSON data stores (playlists, favorites, history, ...)
     workers.py         QThreadPool helpers, LogoLoader, byte-bounded caches
+    drawn_art.py       Pictures the app draws itself (drawn: logos, posters)
     profiles.py        Profiles: what is a profile's own (declared once) and
                        the household's; ProfileSettings, the PIN, kids profiles
     local_buffer.py    Seekable window of a live channel's rewind buffer (DVR)
@@ -165,7 +171,8 @@ dopeiptv/
     together.py        Watch together: the room code, sealed messages, keeping
                        in step, the relay at dopeiptv.org
     discord_rpc.py     Discord status over Discord's local IPC
-    privacy.py         Private viewing; Clear recent history by time range
+    privacy.py         Private viewing; Clear recent history by time range;
+                       the demo's playbacks kept nowhere
     wakelock.py        Screensaver/suspend inhibitor (DBus + caffeinate)
     gcguard.py         Cyclic garbage collection on the GUI thread only
     contest.py         ContestWatch: another device taking the account's connection
@@ -582,8 +589,10 @@ dopeiptv/
     tv_mode.py         TV mode's page and screens (Home, Channels, Options)
     tv_screens.py      TV mode's guide, Movies/Series and Search screens
     tv_widgets.py      TV mode's tiles, lists, keyboard and info bar
-    mw_onboarding.py   The first-run welcome in the window; its Bring step (a
-                       sync code or a backup)
+    mw_onboarding.py   The first-run guide in the window: the connect step,
+                       the demo kept in memory, the strip while there is no
+                       source of one's own; its Bring step (a sync code or a
+                       backup)
     mw_sort.py         List sort order
     widgets.py         Small standalone widgets
     nav_widgets.py     A nav entry (selected bar, status), the rail's hairline,
@@ -591,7 +600,8 @@ dopeiptv/
                        categories (kept hidden)
     category_flags.py  Bundled SVG flags for category names (flag-icons, MIT)
     player_resize.py   Height handle under the docked video
-    welcome.py         First-run welcome overlay (connect / explore)
+    welcome.py         The first-run guide: welcome, what to watch, the kind's
+                       form, connecting, settings from another computer
     channel_list.py    Virtualized list: model, view, painted delegate
     dialogs.py         Playlist editor, content manager
     feedback_dialogs.py Send feedback, the offer of a report, the answers to
@@ -629,9 +639,12 @@ drags in the window.)
    `providers/client.make_client`: `XtreamClient`, `M3UClient`,
    `StalkerClient`, a box's client on `BoxClient` (Enigma2, Tvheadend,
    HDHomeRun, SAT>IP, VDR, DVBViewer, NextPVR, MythTV), a media server's
-   (Jellyfin, Emby, Plex) or `DemoClient`, then `authenticate`),
-   then builds MainWindow.  A first run goes through the setup wizard
-   (`mw_onboarding.py`) instead.
+   (Jellyfin, Emby, Plex), then `authenticate`),
+   then builds MainWindow.  A first run - no source yet - builds it with
+   `OfflineClient` and shows the first-run guide (`ui/welcome.py`,
+   `mw_onboarding.py`): a source tried there is kept, and used with the
+   client that logged in, only once it worked; the demo
+   (`providers/demo.py`) keeps nothing.
 
 2. **MainWindow** loads categories and channels from the provider via
    `run_async()` workers (every client offers the same calls, so the
