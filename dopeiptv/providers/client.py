@@ -17,6 +17,11 @@ from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
 
 
+class PlaylistTooLarge(LocalizedError, ValueError):
+    """A playlist past what is read of one (core/_lazy_requests.LIST_MAX):
+    said in the user's language, a ValueError as it always was."""
+
+
 class NoList(LocalizedError):
     """A list action answered with something that is no list - a refused
     login's {"user_info": {"auth": 0}}, an error object. Treated as a failed
@@ -895,11 +900,17 @@ class M3UClient(OfflineClient):
             # itself: the next one when this one is down.
             r = self.get_from_server("", None, (20, 180), "playlist")
             r.raise_for_status()
+            body = r.content
+            if body[:2] == b"\x1f\x8b":
+                # A playlist sent as a .gz file (not as the transfer's own
+                # gzip, which requests unpacks): unpacked, as far as a
+                # playlist is read.
+                return self._text(self._gunzip(body))
             # UTF-8 first, whatever the server claims: requests falls back to
             # ISO-8859-1 for a text/* type without a charset, which turned
             # every å, ö and ü in a channel name into "Ã¥"-style junk.
             try:
-                return r.content.decode("utf-8-sig")
+                return body.decode("utf-8-sig")
             except UnicodeDecodeError:
                 return r.text           # a declared charset, or a good guess
         if url.startswith("file:"):
@@ -915,15 +926,36 @@ class M3UClient(OfflineClient):
             # (a path that is no file - a device - never ends).
             raw = fh.read(LIST_MAX + 1)
         if len(raw) > LIST_MAX:
-            raise ValueError(f"the playlist is larger than {LIST_MAX >> 20} MB")
+            raise PlaylistTooLarge("err_m3u_too_large", mb=LIST_MAX >> 20)
         # A playlist file of the person's own may name logos beside it:
         # its folder is one the image loader reads pictures from
         # (core/picture_files.py).
         picture_files.trust_also("playlists", os.path.dirname(os.path.abspath(url)))
+        if raw[:2] == b"\x1f\x8b":
+            raw = self._gunzip(raw)
+        return self._text(raw)
+
+    @staticmethod
+    def _text(raw: bytes) -> str:
         try:
             return raw.decode("utf-8-sig")
         except UnicodeDecodeError:
             return raw.decode("cp1252", errors="replace")
+
+    @staticmethod
+    def _gunzip(raw: bytes) -> bytes:
+        """A gzip file's playlist, unpacked no further than a playlist is
+        read (core/_lazy_requests.LIST_MAX)."""
+        import zlib
+        from ..core._lazy_requests import LIST_MAX
+        unpack = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        try:
+            out = unpack.decompress(raw, LIST_MAX + 1)
+        except zlib.error:
+            raise LocalizedError("err_m3u_no_channels") from None
+        if len(out) > LIST_MAX or unpack.unconsumed_tail:
+            raise PlaylistTooLarge("err_m3u_too_large", mb=LIST_MAX >> 20)
+        return out
 
     def _parse(self, text: str) -> None:
         channels: list[dict] = []
@@ -983,7 +1015,11 @@ class M3UClient(OfflineClient):
                         self.epg_url = first
             elif line.startswith("#"):
                 continue                       # other directives: ignore
-            elif pending is not None:
+            elif pending is not None or "://" in line[:24]:
+                if pending is None:
+                    # A playlist of bare addresses, one per line, no
+                    # #EXTINF: each a channel named from its address.
+                    pending = self._bare(line)
                 sid += 1
                 pending["stream_id"] = sid
                 pending["num"] = sid
@@ -1015,18 +1051,51 @@ class M3UClient(OfflineClient):
         self._by_line = ({c["num"]: c for c in channels} if self.stable else
                          dict(zip(stable, channels, strict=True)))
 
+    @staticmethod
+    def _bare(line: str) -> dict:
+        """A channel for an address alone on its line: named by the last
+        part of its path (no extension), else its host - never its login."""
+        from urllib.parse import unquote, urlsplit
+        try:
+            parts = urlsplit(line)
+            leaf = unquote(parts.path.rstrip("/").rsplit("/", 1)[-1])
+            name = leaf.rsplit(".", 1)[0] if "." in leaf[1:] else leaf
+            name = name.strip() or (parts.hostname or "")
+        except ValueError:
+            name = ""
+        return {"name": name[:120] or "?", "stream_icon": "", "epg_channel_id": "",
+                "category_name": "Uncategorized", "catchup": "", "catchup_source": "",
+                "tv_archive": 0, "tv_archive_duration": 0}
+
     def authenticate(self) -> dict:
         # Fetching + parsing the list is this provider's "auth": it proves the
         # URL is reachable and yields at least one channel.
         old = (self._channels, self._by_stream_id, self._by_line, self.epg_url)
-        self._parse(self._fetch())
+        text = self._fetch()
+        self._parse(text)
         if not self._channels:
             # A refresh that comes back empty keeps the lineup it had.
             self._channels, self._by_stream_id, self._by_line, self.epg_url = old
-            raise LocalizedError("err_m3u_no_channels")
+            raise LocalizedError(self.why_empty(text))
         self._loaded = True
         self._stale = False
         return {"user_info": {"auth": 1}}
+
+    #: What a list with no channel in it is said as (why_empty).
+    EMPTY_KEYS = ("err_m3u_empty", "err_m3u_html", "err_m3u_no_channels")
+
+    @staticmethod
+    def why_empty(text: str) -> str:
+        """Why *text* gave no channel: nothing at all, a web page in its
+        place (a login or an error page, a link to the page about the list),
+        or a list with no entry that plays."""
+        head = text.lstrip("\ufeff \t\r\n")[:4096].lower()
+        if not head:
+            return "err_m3u_empty"
+        if head.startswith(("<!doctype html", "<html", "<head", "<body")) \
+                or ("<html" in head and "#extinf" not in head):
+            return "err_m3u_html"
+        return "err_m3u_no_channels"
 
     def clear_list_cache(self) -> None:
         # Refresh: download the list again on the next call. The current
@@ -1556,50 +1625,17 @@ def _make_client(playlist: dict):
                         cache_path=_list_cache_path(playlist))
 
 
-class DemoClient(OfflineClient):
-    """A no-account 'try it out' provider: one Live category of official,
-    free, public HLS test streams so the app can be exercised end to end
-    without any real credentials. Everything else (movies, series, EPG) is
-    empty, inherited from OfflineClient. These are well-known test assets
-    (Mux, Apple, Bitmovin) - not a third-party IPTV service."""
+def __getattr__(name: str) -> Any:
+    """``DemoClient`` lives in providers/demo.py (it builds on this module);
+    still importable from here."""
+    if name == "DemoClient":
+        from .demo import DemoClient
+        return DemoClient
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-    # (name, HLS url). Kept deliberately small and to stable public streams.
-    STREAMS: list[tuple[str, str]] = [
-        ("Big Buck Bunny",
-         "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"),
-        ("Apple BipBop",
-         "https://devstreaming-cdn.apple.com/videos/streaming/examples/"
-         "bipbop_4x3/bipbop_4x3_variant.m3u8"),
-        ("Sintel",
-         "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"),
-        ("Art of Motion",
-         "https://bitdash-a.akamaihd.net/content/MI201109210084_1/m3u8s/"
-         "f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8"),
-        ("Tears of Steel",
-         "https://test-streams.mux.dev/tos_ismc/main.m3u8"),
-    ]
-    CATEGORY_ID = "demo"
 
-    def __init__(self) -> None:
-        super().__init__()
-        # stream_id -> url, with 1-based ids matching the list order.
-        self._urls = {i + 1: url for i, (_n, url) in enumerate(self.STREAMS)}
-
-    def live_categories(self) -> list[dict]:
-        return [{"category_id": self.CATEGORY_ID,
-                 "category_name": tr("demo_channels")}]
-
-    def live_streams(self, category_id: str | None = None) -> list[dict]:
-        return [{"stream_id": i + 1, "num": i + 1, "name": name,
-                 "stream_icon": "", "category_id": self.CATEGORY_ID,
-                 "epg_channel_id": ""}
-                for i, (name, _url) in enumerate(self.STREAMS)]
-
-    def live_url(self, stream_id: int | str, fmt: str = "ts") -> str:
-        try:
-            return self._urls.get(int(stream_id), "")
-        except (TypeError, ValueError):
-            return ""
+#: The pages of an Xtream panel a provider's link names (parse_xtream_url).
+_XTREAM_ENDPOINTS = frozenset(("get.php", "player_api.php", "panel_api.php", "xmltv.php"))
 
 
 def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
@@ -1614,7 +1650,9 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
     server/username/password entry keeps working untouched.
 
     ``server`` is normalised to ``scheme://host[:port]`` (no trailing path or
-    query). Returns ``None`` when *text* isn't a URL carrying credentials, so
+    query) - with the path a panel sits under kept when the link names its
+    get.php there (``http://host/iptv/get.php?...``: ``http://host/iptv``).
+    Returns ``None`` when *text* isn't a URL carrying credentials, so
     the caller can leave a plain hostname or a half-typed value alone.
     """
     from urllib.parse import parse_qs, urlparse
@@ -1637,6 +1675,11 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
     user = (q.get("username") or [""])[0].strip()
     pw = (q.get("password") or [""])[0].strip()
     if user and pw:
+        # A panel under a path of its own (http://host/iptv/get.php?...):
+        # its API is beside get.php there, not at the host's root.
+        head, _, leaf = u.path.rpartition("/")
+        if leaf.lower() in _XTREAM_ENDPOINTS and head.strip("/"):
+            server += "/" + head.strip("/")
         return server, user, pw
 
     # Fallback: path-based stream URLs embed the credentials as the first two
@@ -1655,7 +1698,10 @@ def parse_xtream_url(text: str) -> tuple[str, str, str] | None:
         parts = parts[1:]
     if (len(parts) >= 3 and parts[0] and parts[1]
             and re.fullmatch(r"\d+(\.[A-Za-z0-9]{1,5})?", parts[-1])):
-        return server, parts[0], parts[1]
+        # As the panel wrote them into its address: a login with a space or
+        # an "@" in it comes percent-encoded (pa%20ss is "pa ss").
+        from urllib.parse import unquote
+        return server, unquote(parts[0]), unquote(parts[1])
     return None
 
 
@@ -1703,6 +1749,9 @@ def detect_provider_link(text: str) -> tuple[str, str, str, str] | None:
     never disturbed.
     """
     s = (text or "").strip()
+    local = _playlist_file(s)
+    if local:
+        return "m3u", local, "", ""
     if "://" not in s:
         return None
     got = _detect_provider_link_once(s)
@@ -1721,6 +1770,20 @@ def detect_provider_link(text: str) -> tuple[str, str, str, str] | None:
         if got is not None and _sane_link_netloc(got[1]):
             return got
     return None
+
+
+def _playlist_file(s: str) -> str:
+    """*s* when it names a playlist file on this computer - a path from its
+    root (``/home/me/tv.m3u``, ``C:\\Lists\\tv.m3u8``) or a ``file:``
+    address of one - else ""."""
+    low = s.lower()
+    if not low.endswith(PLAYLIST_FILE_EXTS) or "\n" in s:
+        return ""
+    if low.startswith("file:"):
+        return s
+    if s.startswith("/") or re.match(r"[A-Za-z]:[\\/]", s) or s.startswith("\\\\"):
+        return s
+    return ""
 
 
 def _detect_provider_link_once(s: str) -> tuple[str, str, str, str] | None:

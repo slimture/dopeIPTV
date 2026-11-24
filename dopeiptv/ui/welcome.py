@@ -1,25 +1,33 @@
-"""First-run onboarding, shown when the app opens without a provider.
+"""First-run welcome guide, shown when the app opens without a source.
 
-A compact multi-step overlay drawn on top of the main content (a plain
-child widget, not a modal dialog, so it feels part of the app):
+A compact card drawn over the window (a plain child widget, not a modal
+dialog, so it feels part of the app), driven by ui/mw_onboarding.py:
 
-  1. Welcome - a greeting that flashes through languages, plus a language
-               picker for the whole app.
-  2. Connect - Xtream Codes server / username / password (or an M3U URL,
-               or a Stalker / Ministra portal and a MAC address, or a
-               Jellyfin, Emby or Plex server to sign in to), with a short tour of what the app does right below it. A whole
-               Xtream link pasted into the server field auto-fills the three
-               credential fields.
-  3. Trakt   - optional Trakt.tv sync.
-  4. Bring   - for someone who uses dopeIPTV on another computer already
-               (a quiet link on the first page): the sync code from there,
-               or a backup file. The window does the work
-               (ui/mw_onboarding.py, with Settings' own sync and restore)
-               and says how it went.
+  1. Welcome  - a greeting that flashes through languages, the app's
+                language (applied at once), one clear "Get started", and two
+                quiet links: the demo, and settings brought from another
+                computer (the Bring step). Nerd offered quietly under them.
+  2. Choose   - "What do you want to watch?": an IPTV provider (Xtream
+                Codes, an M3U playlist link or file, a Stalker / Ministra
+                portal), a media server (Jellyfin, Emby, Plex), a box at home
+                (Enigma2, Tvheadend, HDHomeRun, SAT>IP...), or just one's own
+                files and radio (no source: Local files).
+  3. Form     - the kind's own fields and heading (ui/dialogs.SourceFields'
+                rules: a whole provider link pasted fills the rest, an M3U
+                link switches to M3U, a box is found on the network, a media
+                server signed in to with ui/media_signin.py).
+  4. Connect  - the source tried off the window's thread
+                (providers/connect_check.py): what it is doing, then "Done!"
+                with what came, or why not in plain words with what to do.
+                Back always works and keeps what was typed; nothing is kept
+                until it worked.
+  5. Bring    - for someone who uses dopeIPTV on another computer already:
+                the sync code from there, or a backup file. The window does
+                the work (ui/mw_onboarding.py, with Settings' own sync and
+                restore) and says how it went.
 
-At any point the user can "Skip for now" and explore the empty app; a
-pulsing "+ Add provider" button in the middle pane brings the wizard back
-until a provider is configured.
+Esc closes it (the window's one Escape shortcut calls dismiss()); with no
+source the window then offers a calm "Add your own source" over its lists.
 """
 
 from __future__ import annotations
@@ -27,24 +35,54 @@ from __future__ import annotations
 from html import escape
 from typing import Callable
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QLocale, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
-    QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel,
+    QLineEdit, QMenu, QMenuBar, QProgressBar, QPushButton, QScrollArea, QSizePolicy,
+    QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from .. import APP_NAME
 from ..i18n import LANGUAGES, tr
+from . import a11y, theme
 from .box_finder import (
-    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PIN_KINDS, PLACEHOLDERS, FindOnNetwork, add_box_kinds,
-    add_media_kinds, retranslate_box_kinds,
+    BOX_KINDS, LOGIN_KINDS, MEDIA_KINDS, PIN_KINDS, PLACEHOLDERS, SHORT_NAMES, FindOnNetwork,
+    KIND_LABELS,
 )
 from .dialogs import KindOwnFields, PlaylistDialog, stalker_available
 from .media_signin import MediaSignIn
 from .theme import P
 
 #: The pages, in the stack's order.
-PAGE_WELCOME, PAGE_CONNECT, PAGE_TRAKT, PAGE_BRING = range(4)
+PAGE_WELCOME, PAGE_CHOOSE, PAGE_FORM, PAGE_WORK, PAGE_BRING = range(5)
+#: The connect step begins with the choice of what to watch.
+PAGE_CONNECT = PAGE_CHOOSE
+
+#: What the choice offers, and the kinds of each.
+IPTV, MEDIA, BOX, FILES = "iptv", "media", "box", "files"
+
+
+def family_kinds(family: str) -> tuple[str, ...]:
+    if family == MEDIA:
+        return MEDIA_KINDS
+    if family == BOX:
+        return BOX_KINDS
+    if family == IPTV:
+        return ("xtream", "m3u", "stalker") if stalker_available() else ("xtream", "m3u")
+    return ()
+
+
+def family_of(kind: str) -> str:
+    for family in (IPTV, MEDIA, BOX):
+        if kind in family_kinds(family):
+            return family
+    return ""
+
+
+#: The connect step's words for each step it reports (connect_check.STEPS).
+STEP_WORDS = {"login": "ms_signing_in", "live": "onb_step_live",
+              "vod": "onb_step_vod", "series": "onb_step_series"}
 
 
 class _Link(QLabel):
@@ -76,7 +114,7 @@ class _Link(QLabel):
 
     def _paint(self) -> None:
         hot = self._hot or self.hasFocus()
-        colour = P["text"] if hot else P["muted2"]
+        colour = P["text"] if hot else P["muted"]
         body = escape(self._plain)
         self.setText(f"<span style='color:{colour}'>"
                      + (f"<u>{body}</u>" if hot else body) + "</span>")
@@ -112,8 +150,123 @@ class _Link(QLabel):
         super().keyPressEvent(event)
 
 
+class _Choice(QPushButton):
+    """One answer to "What do you want to watch?": its name over what it
+    covers, a card as wide as the page. A button for the keyboard and a
+    screen reader alike - its name its words, what it covers its
+    description - painted in the theme's colours, mirrored right to left."""
+
+    PAD_X, PAD_Y, GAP, ARROW = 14, 11, 3, 18
+
+    def __init__(self, title: str = "", detail: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("OnbChoice")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAutoDefault(False)
+        sp = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+        self._title, self._detail = "", ""
+        self.set_words(title, detail)
+
+    def set_words(self, title: str, detail: str) -> None:
+        self._title, self._detail = title, detail
+        self.setText(title)
+        self.setAccessibleName(title)
+        self.setAccessibleDescription(detail)
+        self.updateGeometry()
+        self.update()
+
+    def words(self) -> tuple[str, str]:
+        return self._title, self._detail
+
+    def _fonts(self) -> tuple[QFont, QFont]:
+        big = QFont(self.font())
+        big.setPixelSize(14)
+        big.setWeight(QFont.Weight.Bold)
+        small = QFont(self.font())
+        small.setPixelSize(12)
+        return big, small
+
+    def _text_width(self, width: int) -> int:
+        return max(40, width - 2 * self.PAD_X - self.ARROW)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 - Qt's name
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 - Qt's name
+        big, small = self._fonts()
+        tw = self._text_width(width)
+        flags = int(Qt.TextFlag.TextWordWrap)
+        h1 = QFontMetrics(big).boundingRect(0, 0, tw, 10_000, flags, self._title).height()
+        h2 = QFontMetrics(small).boundingRect(0, 0, tw, 10_000, flags, self._detail).height() \
+            if self._detail else 0
+        return 2 * self.PAD_Y + h1 + (self.GAP + h2 if h2 else 0)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        w = max(self.width(), 320)
+        return QSize(w, self.heightForWidth(w))
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt's name
+        return QSize(160, self.heightForWidth(max(self.width(), 160)))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self.height() != self.heightForWidth(self.width()):
+            self.updateGeometry()
+
+    def enterEvent(self, event) -> None:
+        super().enterEvent(event)
+        self.update()
+
+    def leaveEvent(self, event) -> None:
+        super().leaveEvent(event)
+        self.update()
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        hot = self.underMouse() or self.isDown()
+        focus = self.hasFocus()
+        box = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        p.setPen(QPen(QColor(theme.ACCENT if focus else P["border_in"]), 2 if focus else 1))
+        p.setBrush(QColor(P["sel"] if hot else P["input"]))
+        p.drawRoundedRect(box, 10, 10)
+        big, small = self._fonts()
+        rtl = self.isRightToLeft()
+        tw = self._text_width(self.width())
+        x = self.width() - self.PAD_X - tw if rtl else self.PAD_X
+        side = Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft
+        flags = int(side | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap)
+        y = self.PAD_Y
+        p.setFont(big)
+        p.setPen(QColor(P["text"]))
+        r1 = QFontMetrics(big).boundingRect(0, 0, tw, 10_000, flags, self._title)
+        p.drawText(QRectF(x, y, tw, r1.height()), flags, self._title)
+        if self._detail:
+            y += r1.height() + self.GAP
+            p.setFont(small)
+            p.setPen(QColor(P["muted"]))
+            r2 = QFontMetrics(small).boundingRect(0, 0, tw, 10_000, flags, self._detail)
+            p.drawText(QRectF(x, y, tw, r2.height()), flags, self._detail)
+        # A chevron on the trailing edge: it leads on.
+        cx = self.PAD_X if rtl else self.width() - self.PAD_X - 6
+        cy = self.height() / 2
+        path = QPainterPath()
+        d = -1 if rtl else 1
+        path.moveTo(cx - 3 * d, cy - 6)
+        path.lineTo(cx + 3 * d, cy)
+        path.lineTo(cx - 3 * d, cy + 6)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(QColor(P["text"] if hot or focus else P["muted2"]), 2))
+        p.drawPath(path)
+        p.end()
+
+
 class WelcomeOverlay(QWidget):
-    """First-run onboarding overlay: a multi-step welcome/connect/Trakt wizard drawn over the main content."""
+    """The first-run guide (see the module): welcome, what to watch, the
+    kind's form, connecting, and bringing settings from another computer."""
 
     #: The Bring step asks the window (ui/mw_onboarding.py): sync with this
     #: code; stop the sync it started; pick a backup to restore; quit, so a
@@ -122,6 +275,8 @@ class WelcomeOverlay(QWidget):
     sync_cancelled = pyqtSignal()
     restore_asked = pyqtSignal()
     quit_asked = pyqtSignal()
+    #: The connect step: stop the try under way (Back, Esc).
+    connect_cancelled = pyqtSignal()
     # Decorative greetings that flash on the first page - one per shipped
     # language, so the rotation mirrors how many languages the app speaks.
     _GREETINGS = (
@@ -134,59 +289,72 @@ class WelcomeOverlay(QWidget):
     )
     #: The card's width and its inner padding; the pages lay out in what is
     #: left between the paddings.
-    CARD_W = 430
+    CARD_W = 440
     PAD = 26
     #: Room kept free above and below the card when it fills the window.
     MARGIN = 16
 
     def __init__(self, parent: QWidget, *, settings,
-                 # (server, user, password, kind, name) - and a portal's MAC
-                 # address as a sixth for kind "stalker", a media server's
-                 # sign-in ({"token", "options"}) as a seventh.
+                 # (server, user, password, kind, name, mac, signed, extra):
+                 # a portal's MAC address for kind "stalker", a media server's
+                 # sign-in ({"token", "options"}), a preset's guide address
+                 # and options ({"epg_url", "options"}).
                  on_connect: Callable[..., None],
                  on_explore: Callable[[], None],
-                 on_connect_trakt: Callable[[], None],
                  on_language_change: Callable[[str], None],
-                 on_demo: Callable[[], None]) -> None:
+                 on_demo: Callable[[], None],
+                 on_files: Callable[[], None] | None = None) -> None:
         super().__init__(parent)
         self._settings = settings
         self._on_connect = on_connect
         self._on_explore = on_explore
-        self._on_connect_trakt = on_connect_trakt
         self._on_language_change = on_language_change
         self._on_demo = on_demo
+        self._on_files = on_files or on_explore
+        self._family = IPTV
+        self._filling = False
+        # The connect step: trying (a try under way), done (a source came).
+        self._trying = False
+        self._done = False
+        self._last_try: tuple = ()
+        self._extra: dict = {}
 
         self.setObjectName("WelcomeOverlay")
+        # Its own background painted (a plain QWidget paints none of its
+        # style sheet's): the lists behind it - which take no click while it
+        # is up - are not seen through it.
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         # Accept keyboard focus so Esc reaches keyPressEvent even before the
         # user clicks a field.
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAccessibleName(APP_NAME)
-        self.setAccessibleDescription(tr("welcome_subtitle"))
+        self.setAccessibleDescription(tr("onb_welcome_sub"))
         self.setStyleSheet(
             f"#WelcomeOverlay {{ background: {P['bg']}; }}"
             "#WelcomeScroll, #WelcomeScrollView { background: transparent; border: none; }"
             f"#WelcomeCard {{ background: {P['pane']};"
             f" border: 1px solid {P['border']}; border-radius: 16px; }}"
             f"#Hero {{ font-size: 23px; font-weight: 800; color: {P['text']}; }}"
-            f"#OnbTitle {{ font-size: 15px; font-weight: 700;"
+            f"#OnbTitle {{ font-size: 16px; font-weight: 700;"
             f" color: {P['text']}; }}"
             f"#OnbSub {{ font-size: 12px; color: {P['muted']}; }}"
-            f"#OnbFeat {{ font-size: 12px; color: {P['muted']}; }}"
             f"#OnbErr {{ font-size: 12px; color: {P['error']}; }}"
-            f"#OnbOk {{ font-size: 12px; font-weight: 700;"
-            f" color: {P.get('ok', '#3fb950')}; }}"
+            f"#OnbOk {{ font-size: 12px; font-weight: 700; color: {P['ok']}; }}"
+            f"#OnbWarn {{ font-size: 12px; color: {P['warn']}; }}"
             # A tinted "tip" band so the paste-a-link hint is the first thing
-            # read on the connect step, clearly set apart from the fields.
+            # read on the form, clearly set apart from the fields.
             f"#OnbTip {{ font-size: 12px; color: {P['text']};"
             f" background: {P['input']}; border: 1px solid {P['border']};"
             f" border-radius: 8px; padding: 8px 10px; }}"
             # What came over from the other computer, and what did not: over
-            # the connect step, set apart from the tip by the accent's edge.
+            # the choice, set apart from the tip by the accent's edge.
             f"#OnbNote {{ font-size: 12px; color: {P['text']};"
             f" background: {P['input']}; border: 1px solid {P['accent']};"
             f" border-radius: 8px; padding: 8px 10px; }}"
-            f"#OnbLink {{ font-size: 11px; padding: 4px 0; }}"
-            f"#OnbOr {{ font-size: 11px; color: {P['muted2']}; }}")
+            f"#OnbLink {{ font-size: 12px; padding: 3px 0; }}"
+            f"#OnbOr {{ font-size: 11px; color: {P['muted2']}; }}"
+            f"#OnbBar {{ background: {P['input']}; border: none; border-radius: 3px; }}"
+            f"#OnbBar::chunk {{ background: {P['accent']}; border-radius: 3px; }}")
 
         # Stretches above and below keep the card at its natural (content)
         # height, centred - without them the card stretches to fill the whole
@@ -198,14 +366,15 @@ class WelcomeOverlay(QWidget):
         self._card.setSizePolicy(QSizePolicy.Policy.Fixed,
                                  QSizePolicy.Policy.Maximum)
         card_l = QVBoxLayout(self._card)
-        card_l.setContentsMargins(self.PAD, 16, self.PAD, 16)
+        card_l.setContentsMargins(self.PAD, 18, self.PAD, 18)
         card_l.setSpacing(6)
 
         self._stack = QStackedWidget()
-        self._stack.addWidget(self._build_welcome_page())   # 0
-        self._stack.addWidget(self._build_connect_page())   # 1
-        self._stack.addWidget(self._build_trakt_page())     # 2
-        self._stack.addWidget(self._build_bring_page())     # 3
+        self._stack.addWidget(self._build_welcome_page())   # PAGE_WELCOME
+        self._stack.addWidget(self._build_choose_page())    # PAGE_CHOOSE
+        self._stack.addWidget(self._build_form_page())      # PAGE_FORM
+        self._stack.addWidget(self._build_work_page())      # PAGE_WORK
+        self._stack.addWidget(self._build_bring_page())     # PAGE_BRING
         # The pages scroll inside the card when the window is too low for
         # the whole page (a small screen, a long language, the box finder's
         # note): the card never grows past the window and cuts them off.
@@ -229,37 +398,52 @@ class WelcomeOverlay(QWidget):
         card_l.addWidget(self._scroll)
         outer.addWidget(self._card, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addStretch(1)
-        # The connect form's rows as its first kind wants them: until a kind
-        # or a language was picked, Xtream showed the MAC address, the media
-        # sign-in and the box finder too.
-        self._update_conn_kind()
+        # The form as its first kind wants it.
+        self._fill_kinds(IPTV)
         # A QStackedWidget otherwise reserves the height of its tallest page,
         # so the short welcome page would look as tall as the connect form.
         # Let the card hug whichever page is showing.
-        self._stack.currentChanged.connect(self._fit_card)
+        self._stack.currentChanged.connect(self._page_shown)
         self._fit_card(0)
 
         # Esc is handled by the main window's single Escape shortcut (it calls
         # dismiss() when this overlay is up) - a second shortcut here would
         # just make Escape ambiguous and fire neither.
 
-        self._trakt_connected = False
         self._greet_idx = 0
         self._flash = QTimer(self)
         self._flash.timeout.connect(self._next_greeting)
         self._flash.start(1300)
 
+        # Enter presses the button that has the keys, as Space does (a
+        # button outside a dialog takes Space alone): the guide is used with
+        # the keyboard only from its first page to its last.
+        for button in self.findChildren(QPushButton):
+            button.setAutoDefault(True)
+
+        # While the guide is up the keys stay in it: what is under it cannot
+        # be seen, and the window's start (its first list, a place opened)
+        # gives its list the focus a moment after the guide shows.
+        app = QApplication.instance()
+        if app is not None:
+            app.focusChanged.connect(self._focus_moved)
+
     # -- pages ---------------------------------------------------------------
+
+    @staticmethod
+    def _label(text: str, name: str, wrap: bool = True, centred: bool = False) -> QLabel:
+        lbl = QLabel(text, objectName=name)
+        lbl.setWordWrap(wrap)
+        if centred:
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return lbl
 
     def _build_welcome_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(7)
-        self._hero = QLabel(self._GREETINGS[0], objectName="Hero")
-        self._hero.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._w_sub = QLabel(tr("welcome_subtitle"), objectName="OnbSub")
-        self._w_sub.setWordWrap(True)
-        self._w_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.setSpacing(8)
+        self._hero = self._label(self._GREETINGS[0], "Hero", wrap=False, centred=True)
+        self._w_sub = self._label(tr("onb_welcome_sub"), "OnbSub", centred=True)
 
         self._lang_label = QLabel(tr("onb_choose_language"), objectName="OnbSub")
         self._lang_combo = QComboBox()
@@ -270,121 +454,128 @@ class WelcomeOverlay(QWidget):
         if i >= 0:
             self._lang_combo.setCurrentIndex(i)
         self._lang_combo.currentIndexChanged.connect(self._language_picked)
+        self._lang_label.setBuddy(self._lang_combo)
 
-        self._w_next = QPushButton(tr("onb_next"), objectName="Primary")
-        self._w_next.setMinimumHeight(34)
-        self._w_next.clicked.connect(lambda: self._stack.setCurrentIndex(1))
-        self._w_demo = QPushButton(tr("onb_try_demo"))
+        self._w_next = QPushButton(tr("onb_get_started"), objectName="Primary")
+        self._w_next.setMinimumHeight(38)
+        self._w_next.clicked.connect(self._get_started)
+        # Quiet ways in, under the one button: the demo, and settings from
+        # another computer (the Bring step) instead of starting from nothing.
+        self._w_demo = _Link(tr("onb_demo_link"))
         self._w_demo.clicked.connect(self._demo)
-        self._w_skip = QPushButton(tr("welcome_explore"))
-        self._w_skip.clicked.connect(self._explore)
-
-        lay.addWidget(self._hero)
-        lay.addWidget(self._w_sub)
-        lay.addSpacing(2)
-        lay.addWidget(self._lang_label)
-        lay.addWidget(self._lang_combo)
-        lay.addSpacing(2)
-        lay.addWidget(self._w_next)
-        lay.addWidget(self._w_demo)
-        lay.addWidget(self._w_skip)
-        lay.addSpacing(2)
-        # For someone who has dopeIPTV on another computer: their settings
-        # brought over (the Bring step) instead of starting from nothing.
         self._w_bring = _Link(tr("onb_bring_offer"))
         self._w_bring.clicked.connect(self._open_bring)
-        lay.addWidget(self._w_bring)
-        # Nerd, offered quietly: a small link under it all. On, the next
-        # step offers boxes on the home network too; off, nothing changes.
+        # Nerd, offered quietly: a small link under it all.
         self._w_nerd = QPushButton(objectName="OnbNerd")
         self._w_nerd.setFlat(True)
         self._w_nerd.setCursor(Qt.CursorShape.PointingHandCursor)
         self._w_nerd.setStyleSheet(
             f"QPushButton#OnbNerd {{ background: transparent; border: none;"
             f" color: {P['muted2']}; font-size: 11px; padding: 4px 0; }}"
-            f"QPushButton#OnbNerd:hover {{ color: {P['text']}; text-decoration: underline; }}")
+            f"QPushButton#OnbNerd:hover, QPushButton#OnbNerd:focus {{ color: {P['text']};"
+            " text-decoration: underline; }")
         self._w_nerd.clicked.connect(self._toggle_nerd)
+
+        lay.addWidget(self._hero)
+        lay.addWidget(self._w_sub)
+        lay.addSpacing(4)
+        lay.addWidget(self._lang_label)
+        lay.addWidget(self._lang_combo)
+        lay.addSpacing(6)
+        lay.addWidget(self._w_next)
+        lay.addSpacing(2)
+        lay.addWidget(self._w_demo)
+        lay.addWidget(self._w_bring)
         lay.addWidget(self._w_nerd, 0, Qt.AlignmentFlag.AlignHCenter)
         self._sync_nerd_link()
         return page
 
-    def _nerd_on(self) -> bool:
-        return bool(self._settings) and self._settings.value("nerd_enabled", "false") == "true"
-
-    def _toggle_nerd(self) -> None:
-        if not self._settings:
-            return
-        self._settings.setValue("nerd_enabled", "false" if self._nerd_on() else "true")
-        from ..core import nerd
-        nerd.install(self._settings)
-        self._sync_nerd_link()
-        # The kinds the next step offers follow.
-        combo = getattr(self, "_conn_kind", None)
-        if combo is not None:
-            if self._nerd_on():
-                if combo.findData(BOX_KINDS[0]) < 0:
-                    add_box_kinds(combo)
-            else:
-                if combo.currentData() in BOX_KINDS:
-                    combo.setCurrentIndex(0)
-                for kind in BOX_KINDS:
-                    i = combo.findData(kind)
-                    if i >= 0:
-                        combo.removeItem(i)
-
-    def _sync_nerd_link(self) -> None:
-        self._w_nerd.setText(tr("onb_nerd_on") if self._nerd_on() else tr("onb_nerd_offer"))
-
-    def _build_connect_page(self) -> QWidget:
+    def _build_choose_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(6)
-        self._c_title = QLabel(tr("login_subtitle"), objectName="OnbTitle")
-        self._c_title.setWordWrap(True)
-        # Prominent tip at the very top of the step: you can paste a whole
-        # provider link, or fill the fields in by hand. Shown in both modes.
-        self._c_hint = QLabel(tr("onb_xtream_link_hint"), objectName="OnbTip")
-        self._c_hint.setWordWrap(True)
+        lay.setSpacing(8)
+        self._ch_title = self._label(tr("onb_choose_title"), "OnbTitle")
         # After a sync that brought settings but no source (sync_no_sources).
-        self._c_note = QLabel("", objectName="OnbNote")
-        self._c_note.setWordWrap(True)
+        self._c_note = self._label("", "OnbNote")
         self._c_note.setVisible(False)
+        self._cards: dict[str, _Choice] = {}
+        lay.addWidget(self._ch_title)
+        lay.addWidget(self._c_note)
+        for family in (IPTV, MEDIA, BOX, FILES):
+            card = _Choice()
+            card.clicked.connect(lambda _c=False, f=family: self._choose(f))
+            self._cards[family] = card
+            lay.addWidget(card)
+        self._card_words()
+        lay.addSpacing(2)
+        row = QHBoxLayout()
+        self._ch_back = QPushButton(tr("onb_back"))
+        self._ch_back.clicked.connect(lambda: self._stack.setCurrentIndex(PAGE_WELCOME))
+        row.addWidget(self._ch_back)
+        row.addStretch(1)
+        lay.addLayout(row)
+        return page
+
+    def _card_words(self) -> None:
+        for family, (title, detail) in {
+                IPTV: ("onb_choose_iptv", "onb_choose_iptv_sub"),
+                MEDIA: ("onb_choose_media", "onb_choose_media_sub"),
+                BOX: ("onb_choose_box", "onb_choose_box_sub"),
+                FILES: ("onb_choose_files", "onb_choose_files_sub")}.items():
+            self._cards[family].set_words(tr(title), tr(detail))
+
+    def _build_form_page(self) -> QWidget:
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setSpacing(7)
+        self._c_title = self._label("", "OnbTitle")
+        # The kind's tip at the top of the form: paste a whole link, a
+        # playlist file, a box found for you.
+        self._c_hint = self._label("", "OnbTip")
 
         form = QFormLayout()
+        form.setSpacing(8)
         s = self._settings
         self._conn_kind = QComboBox()
-        self._conn_kind.addItem(tr("playlist_kind_xtream"), "xtream")
-        self._conn_kind.addItem(tr("playlist_kind_m3u"), "m3u")
-        if stalker_available():
-            self._conn_kind.addItem(tr("playlist_kind_stalker"), "stalker")
-        # Jellyfin, Emby and Plex for everyone; boxes on the home network
-        # with Nerd.
-        add_media_kinds(self._conn_kind)
-        if self._nerd_on():
-            add_box_kinds(self._conn_kind)
         # A long kind's name ("Enigma2 box (VU+, Dreambox, Zgemma...)") is
         # cut short rather than widening the form past the card.
         self._conn_kind.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self._conn_kind.setMinimumContentsLength(12)
         self._conn_kind.currentIndexChanged.connect(self._update_conn_kind)
+        # The IPTV card's kinds to begin with, before each kind keeps its
+        # own fields (KindOwnFields, below): what the settings hold from
+        # before (an older version's login) stays Xtream's.
+        self._filling = True
+        for k in family_kinds(IPTV):
+            self._conn_kind.addItem(tr(KIND_LABELS.get(k, f"playlist_kind_{k}")), k)
+        self._filling = False
         self._name = QLineEdit(s.value("playlist_name", "") if s else "")
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._server = QLineEdit(s.value("server", "") if s else "")
         self._server.setPlaceholderText("http://server:port")
         # A single pasted link is recognised as Xtream (fans out into
-        # server/username/password) or M3U (a plain playlist URL) and the mode
-        # dropdown follows automatically; manual entry is untouched.
-        # textEdited fires on every user edit (incl. paste) but NOT on our own
-        # setText, so the fields fill the instant the link is pasted - no need
-        # to tab away first - while a half-typed URL simply doesn't match yet.
+        # server/username/password) or M3U (a playlist's address or file)
+        # and the kind follows; manual entry is untouched. textEdited fires
+        # on every user edit (paste too) but NOT on our own setText.
         self._server.textEdited.connect(lambda _t: self._maybe_autodetect_link())
+        self._browse = QPushButton(tr("onb_choose_file"))
+        self._browse.setAutoDefault(False)
+        self._browse.clicked.connect(self._pick_file)
+        server_row = self._server_row = QWidget()
+        srl = QHBoxLayout(server_row)
+        srl.setContentsMargins(0, 0, 0, 0)
+        srl.setSpacing(6)
+        srl.addWidget(self._server, 1)
+        srl.addWidget(self._browse)
         self._user = QLineEdit(s.value("username", "") if s else "")
         self._pw = QLineEdit(s.value("password", "") if s else "")
         self._pw.setEchoMode(QLineEdit.EchoMode.Password)
         # A Stalker / Ministra portal logs in with the box's MAC address.
         self._mac = QLineEdit()
         self._mac.setPlaceholderText("00:1A:79:12:34:56")
+        for field in (self._name, self._server, self._user, self._pw, self._mac):
+            field.returnPressed.connect(self._do_connect)
         self._lbl_kind = QLabel(tr("playlist_kind"))
         self._lbl_name = QLabel(tr("playlist_name"))
         self._lbl_server = QLabel(tr("login_server"))
@@ -392,12 +583,15 @@ class WelcomeOverlay(QWidget):
         self._lbl_pw = QLabel(tr("login_password"))
         self._lbl_mac = QLabel(tr("playlist_mac"))
         form.addRow(self._lbl_kind, self._conn_kind)
-        form.addRow(self._lbl_name, self._name)
-        form.addRow(self._lbl_server, self._server)
-        # Only for a box on the home network (a Nerd kind).
+        form.addRow(self._lbl_server, server_row)
+        # For a box on the home network and a media server.
         self._finder = FindOnNetwork(page)
         self._finder.picked.connect(self._box_found)
         form.addRow("", self._finder.row)
+        # Nerd: devices and servers with known playlist / guide addresses.
+        from .source_presets import PresetButton
+        self._presets = PresetButton(self._preset_picked, page)
+        form.addRow("", self._presets)
         form.addRow(self._lbl_user, self._user)
         form.addRow(self._lbl_pw, self._pw)
         # A media server is signed in to here (ui/media_signin.py).
@@ -414,79 +608,62 @@ class WelcomeOverlay(QWidget):
         self._connect_signed = False
         form.addRow("", self._signin)
         form.addRow(self._lbl_mac, self._mac)
+        form.addRow(self._lbl_name, self._name)
 
-        self._c_err = QLabel("", objectName="OnbErr")
-        self._c_err.setWordWrap(True)
+        self._c_err = self._label("", "OnbErr")
+        self._c_err.setTextFormat(Qt.TextFormat.PlainText)
         # Hidden until there is an error, so the empty line doesn't push a
-        # gap between the Connect button and the feature tour below.
+        # gap under the Connect button.
         self._c_err.setVisible(False)
         self._c_connect = QPushButton(tr("btn_connect"), objectName="Primary")
-        self._c_connect.setMinimumHeight(34)
+        self._c_connect.setMinimumHeight(36)
         self._c_connect.clicked.connect(self._do_connect)
 
-        # Short tour of what the app does, right under the login form.
-        self._f_title = QLabel(tr("onb_features_title"), objectName="OnbSub")
-        self._feats = [QLabel("•  " + tr(k), objectName="OnbFeat")
-                       for k in ("onb_feat_1", "onb_feat_2",
-                                 "onb_feat_3", "onb_feat_4")]
-
         lay.addWidget(self._c_title)
-        lay.addWidget(self._c_note)
         lay.addWidget(self._c_hint)
         lay.addLayout(form)
-        # Connect sits directly under the Password field; the error line
-        # (hidden until needed) lives just below the button.
-        lay.addWidget(self._c_connect)
         lay.addWidget(self._c_err)
-        lay.addSpacing(8)
-        # Keep the "What's inside" heading tight against its bullet list.
-        feats_box = QVBoxLayout()
-        feats_box.setSpacing(1)
-        feats_box.setContentsMargins(0, 0, 0, 0)
-        feats_box.addWidget(self._f_title)
-        for f in self._feats:
-            f.setWordWrap(True)
-            feats_box.addWidget(f)
-        lay.addLayout(feats_box)
+        lay.addWidget(self._c_connect)
         lay.addSpacing(2)
         row = QHBoxLayout()
         self._c_back = QPushButton(tr("onb_back"))
-        self._c_back.clicked.connect(lambda: self._stack.setCurrentIndex(0))
-        self._c_skip = QPushButton(tr("onb_skip"))
-        self._c_skip.clicked.connect(self._explore)
+        self._c_back.clicked.connect(lambda: self._stack.setCurrentIndex(PAGE_CHOOSE))
         row.addWidget(self._c_back)
         row.addStretch(1)
-        row.addWidget(self._c_skip)
         lay.addLayout(row)
         return page
 
-    def _build_trakt_page(self) -> QWidget:
+    def _build_work_page(self) -> QWidget:
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.setSpacing(7)
-        self._t_title = QLabel(tr("onb_trakt_title"), objectName="OnbTitle")
-        self._t_title.setWordWrap(True)
-        self._t_desc = QLabel(tr("onb_trakt_desc"), objectName="OnbSub")
-        self._t_desc.setWordWrap(True)
-        self._t_connect = QPushButton(tr("onb_trakt_connect"))
-        self._t_connect.setMinimumHeight(30)
-        self._t_connect.clicked.connect(self._on_connect_trakt)
-        # A green confirmation that appears once Trakt is linked, so the user
-        # sees the step succeeded instead of wondering if anything happened.
-        self._t_ok = QLabel("", objectName="OnbOk")
-        self._t_ok.setWordWrap(True)
-        self._t_ok.setVisible(False)
-        self._t_finish = QPushButton(tr("onb_finish"), objectName="Primary")
-        self._t_finish.setMinimumHeight(34)
-        self._t_finish.clicked.connect(self._finish)
-
-        lay.addWidget(self._t_title)
-        lay.addWidget(self._t_desc)
-        lay.addSpacing(2)
-        lay.addWidget(self._t_connect)
-        lay.addWidget(self._t_ok)
-        lay.addSpacing(2)
-        lay.addWidget(self._t_finish)
+        lay.setSpacing(8)
+        self._k_title = self._label("", "OnbTitle")
+        self._k_bar = QProgressBar(objectName="OnbBar")
+        self._k_bar.setRange(0, 0)               # busy: no end known
+        self._k_bar.setTextVisible(False)
+        self._k_bar.setFixedHeight(6)
+        self._k_step = self._label("", "OnbSub")
+        # What came, or why not: the app's own words (connect_check).
+        self._k_text = self._label("", "OnbSub")
+        self._k_text.setTextFormat(Qt.TextFormat.PlainText)
+        self._k_warn = self._label("", "OnbWarn")
+        self._k_warn.setTextFormat(Qt.TextFormat.PlainText)
+        self._k_go = a11y.words_later(QPushButton("", objectName="Primary"))
+        self._k_go.setMinimumHeight(36)
+        self._k_go.clicked.connect(self._work_go)
+        row = QHBoxLayout()
+        self._k_back = QPushButton(tr("onb_back"))
+        self._k_back.clicked.connect(self._work_back)
+        row.addWidget(self._k_back)
+        row.addStretch(1)
+        lay.addWidget(self._k_title)
+        lay.addWidget(self._k_bar)
+        lay.addWidget(self._k_step)
+        lay.addWidget(self._k_text)
+        lay.addWidget(self._k_warn)
+        lay.addSpacing(4)
+        lay.addWidget(self._k_go)
+        lay.addLayout(row)
         return page
 
     def _build_bring_page(self) -> QWidget:
@@ -501,6 +678,7 @@ class WelcomeOverlay(QWidget):
         # separators); checked by the window with core/sync.parse_code.
         self._b_code = QLineEdit()
         self._b_code.setPlaceholderText(tr("sync_code"))
+        self._b_code.setAccessibleName(tr("sync_code"))
         self._b_code.returnPressed.connect(self._ask_sync)
         self._b_code.textEdited.connect(self._bring_edited)
         self._b_go = QPushButton(tr("onb_bring_go"), objectName="Primary")
@@ -561,17 +739,396 @@ class WelcomeOverlay(QWidget):
         self._b_staged = False
         return page
 
-    def set_trakt_connected(self, connected: bool) -> None:
-        """Reflect a successful Trakt link: swap the connect button for a green
-        confirmation and nudge the finish button so the step reads as done."""
-        if not connected:
+    # -- Nerd ------------------------------------------------------------------
+
+    def _nerd_on(self) -> bool:
+        return bool(self._settings) and self._settings.value("nerd_enabled", "false") == "true"
+
+    def _toggle_nerd(self) -> None:
+        if not self._settings:
             return
-        self._trakt_connected = True
-        self._t_ok.setText(tr("onb_trakt_connected"))
-        self._t_ok.setVisible(True)
-        self._t_connect.setText(tr("onb_trakt_reconnect"))
-        self._t_finish.setText(tr("onb_finish_done"))
+        self._settings.setValue("nerd_enabled", "false" if self._nerd_on() else "true")
+        from ..core import nerd
+        nerd.install(self._settings)
+        self._sync_nerd_link()
+        self._update_conn_kind()
+
+    def _sync_nerd_link(self) -> None:
+        self._w_nerd.setText(tr("onb_nerd_on_now") if self._nerd_on() else tr("onb_nerd_offer"))
+
+    # -- the choice and the form -----------------------------------------------
+
+    def _get_started(self) -> None:
+        self._stack.setCurrentIndex(PAGE_CHOOSE)
+
+    def _choose(self, family: str) -> None:
+        """A card picked: its form - or, for files and radio, no source."""
+        if family == FILES:
+            self._flash.stop()
+            self.hide()
+            self._on_files()
+            return
+        self._fill_kinds(family)
+        self._hide_error()
+        self._stack.setCurrentIndex(PAGE_FORM)
+
+    def _fill_kinds(self, family: str, kind: str | None = None) -> None:
+        """The form's kinds: *family*'s, *kind* (else the first) picked. What
+        was typed for each kind stays with it (KindOwnFields)."""
+        kinds = family_kinds(family)
+        if not kinds:
+            return
+        want = kind if kind in kinds else None
+        if family == self._family and self._conn_kind.count() == len(kinds):
+            if want is not None:
+                self._conn_kind.setCurrentIndex(self._conn_kind.findData(want))
+            self._update_conn_kind()
+            return
+        self._family = family
+        self._filling = True
+        try:
+            self._conn_kind.clear()
+            for k in kinds:
+                self._conn_kind.addItem(tr(KIND_LABELS.get(k, f"playlist_kind_{k}")), k)
+            if want is not None:
+                self._conn_kind.setCurrentIndex(self._conn_kind.findData(want))
+        finally:
+            self._filling = False
+        self._update_conn_kind()
+
+    def _set_kind(self, kind: str) -> None:
+        """*kind* picked - from another card's kinds too (a link pasted, a
+        server found on the network): the form follows."""
+        family = family_of(kind)
+        if not family:
+            return
+        if family != self._family:
+            self._fill_kinds(family, kind)
+            return
+        idx = self._conn_kind.findData(kind)
+        if idx >= 0 and idx != self._conn_kind.currentIndex():
+            self._conn_kind.setCurrentIndex(idx)   # fires _update_conn_kind
+
+    def _heading(self, kind: str) -> str:
+        if kind == "xtream":
+            return tr("onb_head_xtream")
+        if kind == "m3u":
+            return tr("onb_head_m3u")
+        if kind == "stalker":
+            return tr("onb_head_stalker")
+        name = SHORT_NAMES.get(kind, kind)
+        return tr("onb_head_media", name=name) if kind in MEDIA_KINDS else tr("onb_head_box", name=name)
+
+    def _tip(self, kind: str) -> str:
+        if kind == "xtream":
+            return tr("onb_tip_xtream")
+        if kind == "m3u":
+            return tr("onb_tip_m3u")
+        if kind in BOX_KINDS:
+            return tr("onb_tip_box")
+        return ""
+
+    def _update_conn_kind(self) -> None:
+        if self._filling:
+            return
+        kind = self._conn_kind.currentData() or ""
+        m3u, stalker = kind == "m3u", kind == "stalker"
+        box = kind in BOX_KINDS
+        media = kind in MEDIA_KINDS
+        self._c_title.setText(self._heading(kind))
+        tip = self._tip(kind)
+        self._c_hint.setText(tip)
+        self._c_hint.setVisible(bool(tip))
+        # Only one kind to pick (never here), or the card already said it.
+        self._lbl_kind.setVisible(self._conn_kind.count() > 1)
+        self._conn_kind.setVisible(self._conn_kind.count() > 1)
+        # M3U needs only an address or a file, a portal its address and a
+        # MAC address, a box on the home network its address and, if it
+        # asks, a login, a media server a sign-in (Plex's in the browser,
+        # the address from it).
+        self._lbl_server.setText(
+            tr("playlist_m3u_url") if m3u
+            else tr("playlist_portal_url") if stalker
+            else tr("playlist_box_address") if box or media else tr("login_server"))
+        self._server.setPlaceholderText(
+            "https://example.com/playlist.m3u" if m3u
+            else "http://portal.example.com/c/" if stalker
+            else PLACEHOLDERS.get(kind, "http://server:port"))
+        for w in (self._lbl_server, self._server_row, self._server):
+            w.setVisible(kind != "plex")
+        self._browse.setVisible(m3u)
+        login = (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
+                 or kind in ("jellyfin", "emby"))
+        pin = kind in PIN_KINDS
+        for w in (self._lbl_user, self._user):
+            w.setVisible(login and not pin)
+        for w in (self._lbl_pw, self._pw):
+            w.setVisible(login)
+        self._lbl_pw.setText(tr("login_pin") if pin else tr("login_password"))
+        hint = tr("playlist_login_optional") if box else ""
+        self._user.setPlaceholderText(hint)
+        self._pw.setPlaceholderText(tr("playlist_pin_hint") if pin else hint)
+        for w in (self._lbl_mac, self._mac):
+            w.setVisible(stalker)
+        self._finder.row.setVisible(box or media)
+        self._finder.wanted = MEDIA_KINDS if media else BOX_KINDS
+        if not (box or media):
+            self._finder.status.hide()
+        self._presets.setVisible(box and self._nerd_on())
+        self._signin.set_kind(kind)
+        # A media server signs in, then connects: Connect does both.
+        self._c_connect.setVisible(True)
+        self._name_fields()
         self._fit_card(self._stack.currentIndex())
+
+    def _name_fields(self) -> None:
+        """Each field read by the label beside it - a QLabel of its own,
+        which Qt does not tie to the field as a form row's words."""
+        for lbl, field in ((self._lbl_kind, self._conn_kind), (self._lbl_name, self._name),
+                           (self._lbl_server, self._server), (self._lbl_user, self._user),
+                           (self._lbl_pw, self._pw), (self._lbl_mac, self._mac),
+                           (self._lang_label, self._lang_combo)):
+            field.setAccessibleName(lbl.text())
+        code = getattr(self, "_b_code", None)       # the Bring page, built after this one
+        if code is not None:
+            code.setAccessibleName(tr("sync_code"))
+        bar = getattr(self, "_k_bar", None)
+        if bar is not None:
+            bar.setAccessibleName(tr("ms_signing_in"))
+
+    def _pick_file(self) -> None:
+        """An M3U file on this computer, picked: its path in the field."""
+        path, _flt = QFileDialog.getOpenFileName(
+            self, tr("onb_choose_file"), "", tr("tab_playlists") + " (*.m3u *.m3u8 *.M3U *.M3U8)")
+        if path:
+            self._server.setText(path)
+            self._server.setFocus()
+
+    def _signin_changed(self) -> None:
+        self._fit_card(self._stack.currentIndex())
+
+    def _signin_finished(self, ok: bool) -> None:
+        """A sign-in Connect asked for has ended: connect if it worked."""
+        pending, self._connect_signed = self._connect_signed, False
+        if pending and ok and self._signin.signed_in():
+            self._connect_media(str(self._conn_kind.currentData()))
+        self._fit_card(self._stack.currentIndex())
+
+    def _connect_media(self, kind: str) -> None:
+        got = self._signin.values()
+        name = self._name.text().strip() or got["name"]
+        self._hide_error()
+        self._start(got["server"], got["username"], "", kind, name, "",
+                    {"token": got["token"], "options": got["options"]})
+
+    def _box_found(self, found: dict) -> None:
+        self._set_kind(found.get("kind", ""))
+        self._server.setText(found.get("server", ""))
+        if not self._name.text().strip():
+            self._name.setText(str(found.get("name", "")).split(" - ")[0])
+        if found.get("kind") == "satip" and found.get("description"):
+            self._extra = {"options": {"description": str(found.get("description"))}}
+        if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
+            (self._pw if found.get("kind") in PIN_KINDS else self._user).setFocus()
+        if found.get("kind") in MEDIA_KINDS:
+            self._signin.prefer(found)
+        self._fit_card(self._stack.currentIndex())
+
+    def _preset_picked(self, src: dict) -> None:
+        """Nerd's preset: its kind, address and guide (and a SAT>IP
+        server's lists)."""
+        self._set_kind(str(src.get("kind") or ""))
+        self._server.setText(str(src.get("server") or ""))
+        extra: dict = {}
+        if src.get("epg_url"):
+            extra["epg_url"] = str(src["epg_url"])
+        if src.get("m3u"):
+            extra["options"] = {"m3u": str(src["m3u"])}
+        self._extra = extra
+        if not self._name.text().strip():
+            self._name.setText(str(src.get("name") or ""))
+
+    def _maybe_autodetect_link(self) -> None:
+        """Recognise a pasted provider link in the address field and set
+        the form up for it: Xtream (split into server/username/password,
+        preferred) or M3U (a playlist's address or file). A bare host with no
+        link shape is left alone so manual entry keeps working. A portal's,
+        a box's or a media server's address is never taken for one."""
+        if self._conn_kind.currentData() not in ("xtream", "m3u"):
+            return
+        from ..providers.client import detect_provider_link
+        detected = detect_provider_link(self._server.text())
+        if not detected:
+            return
+        kind, server, user, pw = detected
+        self._set_kind(kind)
+        self._server.setText(server)
+        if kind == "xtream":
+            self._user.setText(user)
+            self._pw.setText(pw)
+
+    def _do_connect(self) -> None:
+        if self._trying or self._stack.currentIndex() != PAGE_FORM:
+            return
+        kind = self._conn_kind.currentData()
+        server = self._server.text().strip()
+        name = self._name.text().strip()
+        if kind == "stalker":
+            mac = PlaylistDialog.normal_mac(self._mac.text())
+            if not (server and mac):
+                self._show_error(tr("playlist_portal_required"))
+                return
+            self._hide_error()
+            self._start(server, "", "", kind, name, mac)
+            return
+        if kind in MEDIA_KINDS:
+            if self._signin.signed_in():
+                self._connect_media(kind)
+            elif self._signin.busy:
+                return
+            elif self._signin.sign_in():
+                # Name and password typed, Sign in not pressed: Connect does it.
+                self._connect_signed = True
+                self._hide_error()
+            else:
+                self._show_error(tr("ms_sign_in_needed"))
+            return
+        if kind in BOX_KINDS:
+            if not server:
+                self._show_error(tr("playlist_box_required"))
+                return
+            self._hide_error()
+            user = self._user.text().strip() if kind in LOGIN_KINDS and kind not in PIN_KINDS else ""
+            pw = self._pw.text().strip() if kind in LOGIN_KINDS else ""
+            self._start(server, user, pw, kind, name)
+            return
+        if kind == "m3u":
+            if not server:
+                self._show_error(tr("onb_fill_m3u"))
+                return
+            user = pw = ""
+        else:
+            user = self._user.text().strip()
+            pw = self._pw.text().strip()
+            if not (server and user and pw):
+                self._show_error(tr("onb_fill_all"))
+                return
+        self._hide_error()
+        self._start(server, user, pw, kind, name)
+
+    # -- connecting ------------------------------------------------------------
+
+    def _start(self, server: str, user: str, pw: str, kind: str, name: str,
+               mac: str = "", signed: dict | None = None) -> None:
+        """The source tried: the connect step shows, the window tries it."""
+        if self._trying:
+            return
+        extra = dict(self._extra) if kind in ("m3u", "satip") else {}
+        self._last_try = (server, user, pw, kind, name, mac, signed, extra)
+        self._trying, self._done = True, False
+        shown = name or server.split("//")[-1].split("/")[0] or SHORT_NAMES.get(kind, "")
+        self._k_title.setText(tr("onb_connecting", name=shown))
+        self._k_title.setAccessibleName(self._k_title.text())
+        self._k_bar.setVisible(True)
+        self._k_step.setText(tr("ms_signing_in"))
+        self._k_step.setVisible(True)
+        self._k_text.setVisible(False)
+        self._k_warn.setVisible(False)
+        self._k_go.setVisible(False)
+        self._k_back.setText(tr("onb_back"))
+        self._k_back.setVisible(True)
+        self._stack.setCurrentIndex(PAGE_WORK)
+        self._k_back.setFocus()
+        self._on_connect(server, user, pw, kind, name, mac, signed, extra)
+
+    def connect_step(self, step: str) -> None:
+        """The window: what the try is doing now (connect_check.STEPS)."""
+        if self._trying and step in STEP_WORDS:
+            self._k_step.setText(tr(STEP_WORDS[step]))
+            self._k_bar.setAccessibleName(self._k_step.text())
+
+    def connect_done(self, channels: int, movies: int | None = None,
+                     series: int | None = None, warning: str = "") -> None:
+        """The window: the source worked and is kept - what came."""
+        self._trying, self._done = False, True
+        loc = QLocale()
+        parts = [tr("count_channels", n=loc.toString(int(channels)))] if channels else []
+        if movies:
+            parts.append(tr("count_movies", n=loc.toString(int(movies))))
+        if series:
+            parts.append(tr("count_series", n=loc.toString(int(series))))
+        self._k_title.setText(tr("onb_done_title"))
+        self._k_bar.setVisible(False)
+        self._k_step.setVisible(False)
+        self._k_text.setText(tr("onb_done_counts", what=", ".join(parts)))
+        self._k_text.setObjectName("OnbOk")
+        self._restyle(self._k_text)
+        self._k_text.setVisible(True)
+        self._k_warn.setText(warning)
+        self._k_warn.setVisible(bool(warning))
+        self._k_go.setText(tr("onb_start_watching"))
+        self._k_go.setVisible(True)
+        self._k_back.setVisible(False)
+        self._fit_card(PAGE_WORK)
+        self._k_go.setFocus()
+
+    def connect_failed(self, text: str) -> None:
+        """The window: the source did not work - why, in plain words. Back
+        to the form as it was typed, or try again."""
+        if not self._trying:
+            return
+        self._trying, self._done = False, False
+        self._k_title.setText(tr("onb_fail_title"))
+        self._k_bar.setVisible(False)
+        self._k_step.setVisible(False)
+        self._k_text.setText(text)
+        self._k_text.setObjectName("OnbErr")
+        self._restyle(self._k_text)
+        self._k_text.setVisible(True)
+        self._k_warn.setVisible(False)
+        self._k_go.setText(tr("sp_retry"))
+        self._k_go.setVisible(True)
+        self._k_back.setText(tr("onb_back"))
+        self._k_back.setVisible(True)
+        self._fit_card(PAGE_WORK)
+        self._k_back.setFocus()
+
+    @staticmethod
+    def _restyle(w: QWidget) -> None:
+        style = w.style()
+        if style is not None:
+            style.unpolish(w)
+            style.polish(w)
+
+    def trying(self) -> bool:
+        return self._trying
+
+    def _work_go(self) -> None:
+        if self._done:
+            self._finish()
+            return
+        if not self._trying and self._last_try:
+            server, user, pw, kind, name, mac, signed, _extra = self._last_try
+            self._start(server, user, pw, kind, name, mac, signed)
+
+    def _work_back(self) -> None:
+        """Back: the form, as it was typed - a try under way stopped."""
+        self._cancel_connect()
+        self._stack.setCurrentIndex(PAGE_FORM)
+
+    def _cancel_connect(self) -> None:
+        if self._trying:
+            self._trying = False
+            self.connect_cancelled.emit()
+
+    def _show_error(self, text: str) -> None:
+        self._c_err.setText(text)
+        self._c_err.setVisible(True)
+        self._fit_card(self._stack.currentIndex())
+
+    def _hide_error(self) -> None:
+        self._c_err.setText("")
+        self._c_err.setVisible(False)
 
     # -- the Bring step: what the window says back ----------------------------
 
@@ -583,8 +1140,9 @@ class WelcomeOverlay(QWidget):
         self._fit_card(self._stack.currentIndex())
 
     def sync_no_sources(self, saved: str = "") -> None:
-        """Settings and profiles came, no source: the connect step, with a
-        word on why and what to do - and *saved*, how old the copy was."""
+        """Settings and profiles came, no source: the choice of what to
+        watch, with a word on why and what to do - and *saved*, how old the
+        copy was."""
         self._set_busy(False)
         self._b_code.clear()
         self._b_err.setVisible(False)
@@ -599,7 +1157,7 @@ class WelcomeOverlay(QWidget):
         return tr("onb_sync_no_sources", what=tr("tab_playlists"), where=tr("sync_nav"))
 
     def finish(self) -> None:
-        """Sources came along: the wizard goes, the window loads them."""
+        """Sources came along: the guide goes, the window loads them."""
         self._set_busy(False)
         self._b_code.clear()
         self._finish()
@@ -697,173 +1255,15 @@ class WelcomeOverlay(QWidget):
         self._on_language_change(code)
         self._retranslate()
 
-    def _update_conn_kind(self) -> None:
-        kind = self._conn_kind.currentData()
-        m3u, stalker = kind == "m3u", kind == "stalker"
-        box = kind in BOX_KINDS
-        media = kind in MEDIA_KINDS
-        # M3U needs only a URL, a portal its URL and a MAC address, a box
-        # on the home network its address and, if it asks, a login, a media
-        # server a sign-in (Plex's in the browser, the address from it).
-        self._lbl_server.setText(
-            tr("playlist_m3u_url") if m3u
-            else tr("playlist_portal_url") if stalker
-            else tr("playlist_box_address") if box or media else tr("login_server"))
-        self._server.setPlaceholderText(
-            "https://example.com/playlist.m3u" if m3u
-            else "http://portal.example.com/c/" if stalker
-            else PLACEHOLDERS.get(kind, "http://server:port"))
-        for w in (self._lbl_server, self._server):
-            w.setVisible(kind != "plex")
-        login = (not (m3u or stalker or box or media) or kind in LOGIN_KINDS
-                 or kind in ("jellyfin", "emby"))
-        pin = kind in PIN_KINDS
-        for w in (self._lbl_user, self._user):
-            w.setVisible(login and not pin)
-        for w in (self._lbl_pw, self._pw):
-            w.setVisible(login)
-        self._lbl_pw.setText(tr("login_pin") if pin else tr("login_password"))
-        hint = tr("playlist_login_optional") if box else ""
-        self._user.setPlaceholderText(hint)
-        self._pw.setPlaceholderText(tr("playlist_pin_hint") if pin else hint)
-        for w in (self._lbl_mac, self._mac):
-            w.setVisible(stalker)
-        self._name_fields()
-        self._finder.row.setVisible(box or media)
-        self._finder.wanted = MEDIA_KINDS if media else BOX_KINDS
-        if not (box or media):
-            self._finder.status.hide()
-        self._signin.set_kind(kind)
-        self._fit_card(self._stack.currentIndex())
-
-    def _name_fields(self) -> None:
-        """Each field read by the label beside it - a QLabel of its own,
-        which Qt does not tie to the field as a form row's words."""
-        for lbl, field in ((self._lbl_kind, self._conn_kind), (self._lbl_name, self._name),
-                           (self._lbl_server, self._server), (self._lbl_user, self._user),
-                           (self._lbl_pw, self._pw), (self._lbl_mac, self._mac),
-                           (self._lang_label, self._lang_combo)):
-            field.setAccessibleName(lbl.text())
-        code = getattr(self, "_b_code", None)       # the Bring page, built after this one
-        if code is not None:
-            code.setAccessibleName(tr("sync_code"))
-
-    def _signin_changed(self) -> None:
-        self._fit_card(self._stack.currentIndex())
-
-    def _signin_finished(self, ok: bool) -> None:
-        """A sign-in Connect asked for has ended: connect if it worked."""
-        pending, self._connect_signed = self._connect_signed, False
-        if pending and ok and self._signin.signed_in():
-            self._connect_media(str(self._conn_kind.currentData()))
-        self._fit_card(self._stack.currentIndex())
-
-    def _connect_media(self, kind: str) -> None:
-        got = self._signin.values()
-        name = self._name.text().strip() or got["name"]
-        self._hide_error()
-        self._on_connect(got["server"], got["username"], "", kind, name, "",
-                         {"token": got["token"], "options": got["options"]})
-        self._stack.setCurrentIndex(2)
-
-    def _box_found(self, found: dict) -> None:
-        self._set_kind(found.get("kind", ""))
-        self._server.setText(found.get("server", ""))
-        if not self._name.text().strip():
-            self._name.setText(str(found.get("name", "")).split(" - ")[0])
-        if found.get("login") or found.get("kind") in ("jellyfin", "emby"):
-            self._user.setFocus()
-        if found.get("kind") in MEDIA_KINDS:
-            self._signin.prefer(found)
-        self._fit_card(self._stack.currentIndex())
-
-    def _set_kind(self, kind: str) -> None:
-        idx = self._conn_kind.findData(kind)
-        if idx >= 0 and idx != self._conn_kind.currentIndex():
-            self._conn_kind.setCurrentIndex(idx)   # fires _update_conn_kind
-
-    def _maybe_autodetect_link(self) -> None:
-        """Recognise a pasted provider link in the server field and configure
-        the form for it: Xtream (split into server/username/password, the
-        preferred mode) or M3U (a plain playlist URL). A bare host with no link
-        shape is left alone so manual entry keeps working. A portal's
-        address is never taken for one of those."""
-        if self._conn_kind.currentData() == "stalker" \
-                or self._conn_kind.currentData() in BOX_KINDS + MEDIA_KINDS:
-            return
-        from ..providers.client import detect_provider_link
-        detected = detect_provider_link(self._server.text())
-        if not detected:
-            return
-        kind, server, user, pw = detected
-        self._set_kind(kind)
-        self._server.setText(server)
-        if kind == "xtream":
-            self._user.setText(user)
-            self._pw.setText(pw)
-
-    def _do_connect(self) -> None:
-        kind = self._conn_kind.currentData()
-        server = self._server.text().strip()
-        name = self._name.text().strip()
-        if kind == "stalker":
-            mac = PlaylistDialog.normal_mac(self._mac.text())
-            if not (server and mac):
-                self._show_error(tr("playlist_portal_required"))
-                return
-            self._hide_error()
-            self._on_connect(server, "", "", kind, name, mac)
-            self._stack.setCurrentIndex(2)
-            return
-        if kind in MEDIA_KINDS:
-            if self._signin.signed_in():
-                self._connect_media(kind)
-            elif self._signin.busy:
-                return
-            elif self._signin.sign_in():
-                # Name and password typed, Sign in not pressed: Connect does it.
-                self._connect_signed = True
-                self._hide_error()
-            else:
-                self._show_error(tr("ms_sign_in_needed"))
-            return
-        if kind in BOX_KINDS:
-            if not server:
-                self._show_error(tr("playlist_box_required"))
-                return
-            self._hide_error()
-            user = self._user.text().strip() if kind in LOGIN_KINDS and kind not in PIN_KINDS else ""
-            pw = self._pw.text().strip() if kind in LOGIN_KINDS else ""
-            self._on_connect(server, user, pw, kind, name)
-            self._stack.setCurrentIndex(2)
-            return
-        if kind == "m3u":
-            ok = bool(server)
-            user = pw = ""
-        else:
-            user = self._user.text().strip()
-            pw = self._pw.text().strip()
-            ok = bool(server and user and pw)
-        if not ok:
-            self._show_error(tr("onb_fill_all"))
-            return
-        self._hide_error()
-        self._on_connect(server, user, pw, kind, name)
-        self._stack.setCurrentIndex(2)   # continue to the optional Trakt step
-
-    def _show_error(self, text: str) -> None:
-        self._c_err.setText(text)
-        self._c_err.setVisible(True)
-        self._fit_card(self._stack.currentIndex())
-
-    def _hide_error(self) -> None:
-        self._c_err.setText("")
-        self._c_err.setVisible(False)
-
     def dismiss(self) -> None:
-        """Close the wizard the same as 'Continue without account' - called by
-        the main window's Escape shortcut. A sync still fetching stops."""
+        """Esc - the main window's one Escape shortcut: the guide goes. A
+        try under way is stopped (nothing of it kept), a sync still fetching
+        too; a source that came is kept."""
         self._cancel_sync()
+        self._cancel_connect()
+        if self._done:
+            self._finish()
+            return
         self._explore()
 
     def _demo(self) -> None:
@@ -881,47 +1281,32 @@ class WelcomeOverlay(QWidget):
         self.hide()
 
     def _retranslate(self) -> None:
-        self._w_sub.setText(tr("welcome_subtitle"))
+        self.setAccessibleDescription(tr("onb_welcome_sub"))
+        self._w_sub.setText(tr("onb_welcome_sub"))
         self._lang_label.setText(tr("onb_choose_language"))
-        self._w_next.setText(tr("onb_next"))
-        self._w_demo.setText(tr("onb_try_demo"))
-        self._w_skip.setText(tr("welcome_explore"))
-        self._c_title.setText(tr("login_subtitle"))
+        self._w_next.setText(tr("onb_get_started"))
+        self._w_demo.set_plain(tr("onb_demo_link"))
+        self._w_bring.set_plain(tr("onb_bring_offer"))
+        self._sync_nerd_link()
+        self._ch_title.setText(tr("onb_choose_title"))
+        self._card_words()
+        self._ch_back.setText(tr("onb_back"))
         self._lbl_kind.setText(tr("playlist_kind"))
         self._lbl_name.setText(tr("playlist_name"))
         self._name.setPlaceholderText(tr("playlist_name_hint"))
         self._lbl_user.setText(tr("login_username"))
-        self._lbl_pw.setText(tr("login_pin") if self._conn_kind.currentData() in PIN_KINDS
-                             else tr("login_password"))
         self._lbl_mac.setText(tr("playlist_mac"))
-        for kind, key in (("xtream", "playlist_kind_xtream"), ("m3u", "playlist_kind_m3u"),
-                          ("stalker", "playlist_kind_stalker")):
-            i = self._conn_kind.findData(kind)
-            if i >= 0:
-                self._conn_kind.setItemText(i, tr(key))
-        retranslate_box_kinds(self._conn_kind)
+        self._browse.setText(tr("onb_choose_file"))
+        for i in range(self._conn_kind.count()):
+            k = self._conn_kind.itemData(i)
+            self._conn_kind.setItemText(i, tr(KIND_LABELS.get(k, f"playlist_kind_{k}")))
         self._finder.retranslate()
         self._signin.retranslate()
-        self._sync_nerd_link()
-        self._c_hint.setText(tr("onb_xtream_link_hint"))
-        self._update_conn_kind()   # re-labels the server row for the mode
+        self._presets.setText(tr("nerd_presets"))
         self._c_connect.setText(tr("btn_connect"))
-        self._f_title.setText(tr("onb_features_title"))
-        for lbl, key in zip(self._feats, ("onb_feat_1", "onb_feat_2",
-                                          "onb_feat_3", "onb_feat_4"),
-                            strict=False):
-            lbl.setText("•  " + tr(key))
         self._c_back.setText(tr("onb_back"))
-        self._c_skip.setText(tr("onb_skip"))
-        self._t_title.setText(tr("onb_trakt_title"))
-        self._t_desc.setText(tr("onb_trakt_desc"))
-        connected = self._trakt_connected
-        self._t_connect.setText(
-            tr("onb_trakt_reconnect") if connected else tr("onb_trakt_connect"))
-        self._t_ok.setText(tr("onb_trakt_connected"))
-        self._t_finish.setText(
-            tr("onb_finish_done") if connected else tr("onb_finish"))
-        self._w_bring.set_plain(tr("onb_bring_offer"))
+        self._k_back.setText(tr("onb_back"))
+        self._update_conn_kind()   # re-labels the form for its kind
         self._c_note.setText(self._no_sources_text())
         self._b_title.setText(tr("onb_bring_title"))
         self._b_sub.setText(tr("onb_bring_sub", page=tr("sync_title")))
@@ -937,14 +1322,36 @@ class WelcomeOverlay(QWidget):
         if not self._b_allowed:
             from ..core import build_check
             self._b_err.setText(build_check.notice("sync"))
+        self._fit_card(self._stack.currentIndex())
 
     # -- geometry ------------------------------------------------------------
+
+    def _page_shown(self, idx: int) -> None:
+        self._fit_card(idx)
+        self._page_shown_focus(idx)
+
+    def _page_shown_focus(self, idx: int) -> None:
+        """The page's first control takes the keys: Tab and Enter from there."""
+        if not self.isVisible():
+            return
+        first: QWidget | None = {PAGE_WELCOME: self._w_next,
+                                 PAGE_CHOOSE: self._cards[IPTV]}.get(idx)
+        if idx == PAGE_FORM:
+            first = self._server if self._server.isVisibleTo(self._stack.widget(PAGE_FORM)) \
+                else self._c_connect
+        elif idx == PAGE_WORK:
+            first = self._k_go if self._k_go.isVisibleTo(self._stack.widget(PAGE_WORK)) \
+                else self._k_back
+        elif idx == PAGE_BRING and self._b_code.isEnabled():
+            first = self._b_code
+        if first is not None:
+            first.setFocus(Qt.FocusReason.OtherFocusReason)
 
     @staticmethod
     def _page_height(page: QWidget, width: int) -> int:
         """The height *page* needs at *width*. Its size hint alone fell
         short wherever text wraps: before the page had been laid out at the
-        card's width (the first time the wizard shows), a wrapped label
+        card's width (the first time the guide shows), a wrapped label
         asked for the height of fewer lines and was cut off - the box
         finder's note in the middle of a sentence."""
         # Asked, not resized: adjustSize() here gave the page its hint's
@@ -991,16 +1398,67 @@ class WelcomeOverlay(QWidget):
         super().resizeEvent(event)
         self._fit_card(self._stack.currentIndex(), cover=False)
 
-    def reset(self) -> None:
-        """Return to the first page and resume the greeting flash (used when
-        the wizard is reopened from the '+ Add provider' button)."""
-        self._stack.setCurrentIndex(0)
+    # -- the keys -------------------------------------------------------------
+
+    def _stops(self) -> list[QWidget]:
+        """The page's Tab stops, in the window's focus order."""
+        out: list[QWidget] = []
+        start = self
+        w = start.nextInFocusChain()
+        while w is not None and w is not start and len(out) < 400:
+            if (self.isAncestorOf(w) and w.isVisible() and w.isEnabled()
+                    and w.focusPolicy() & Qt.FocusPolicy.TabFocus
+                    and w.focusProxy() is None):
+                out.append(w)
+            w = w.nextInFocusChain()
+        return out
+
+    def focusNextPrevChild(self, next: bool) -> bool:  # noqa: N802 - Qt's name
+        """Tab and Shift+Tab go round the page's own controls - never to
+        the window's under it, which cannot be seen."""
+        stops = self._stops()
+        if not stops:
+            return super().focusNextPrevChild(next)
+        held = QApplication.focusWidget()
+        try:
+            i = stops.index(held)
+        except ValueError:
+            i = -1 if next else 0
+        target = stops[(i + (1 if next else -1)) % len(stops)]
+        target.setFocus(Qt.FocusReason.TabFocusReason if next
+                        else Qt.FocusReason.BacktabFocusReason)
+        return True
+
+    def _focus_moved(self, _old, new) -> None:
+        """The window gave the keys to something under the guide: back to
+        the page (a menu, a dialog or another window keeps them)."""
+        if new is None or not self.isVisible():
+            return
+        if new is self or self.isAncestorOf(new) or new.window() is not self.window():
+            return
+        if isinstance(new, (QMenu, QMenuBar)):
+            return
+        QTimer.singleShot(0, self._take_keys)
+
+    def _take_keys(self) -> None:
+        held = QApplication.focusWidget()
+        if not self.isVisible() or held is None or held is self or self.isAncestorOf(held):
+            return
+        if held.window() is not self.window() or isinstance(held, (QMenu, QMenuBar)):
+            return
+        self._page_shown_focus(self._stack.currentIndex())
+
+    def reset(self, page: int = PAGE_WELCOME) -> None:
+        """Back to *page* (the first, or the choice of what to watch) with
+        the greeting flashing again - when the guide is opened again."""
+        self._stack.setCurrentIndex(page)
         self._c_err.setText("")
         self._c_err.setVisible(False)
         self._c_note.setVisible(False)
         self._b_err.setVisible(False)
         self._b_rerr.setVisible(False)
         self._set_busy(False)
+        self._trying = self._done = False
         if not self._flash.isActive():
             self._flash.start(1300)
 
@@ -1013,4 +1471,10 @@ class WelcomeOverlay(QWidget):
         self.raise_()
         self.show()
         self._fit_card(self._stack.currentIndex(), cover=False)
-        self.setFocus()   # so Esc works without clicking first
+        # The keys to the page's first control - unless they are in the
+        # guide already (a resize of the window covers it again).
+        held = QApplication.focusWidget()
+        if held is None or not (held is self or self.isAncestorOf(held)):
+            self.setFocus()
+        if held is None or held is self or not self.isAncestorOf(held):
+            self._page_shown_focus(self._stack.currentIndex())

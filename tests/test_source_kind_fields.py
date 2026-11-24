@@ -191,11 +191,11 @@ def test_the_welcome_keeps_an_xtream_login_to_xtream(app, tmp_path):
         s.setValue(k, v)
     parent = QWidget()
     w = WelcomeOverlay(parent, settings=s, on_connect=lambda *a: None, on_explore=lambda: None,
-                       on_connect_trakt=lambda: None, on_language_change=lambda c: None,
-                       on_demo=lambda: None)
+                       on_language_change=lambda c: None, on_demo=lambda: None)
     assert (w._server.text(), w._user.text()) == ("http://xt.invalid:8080", "xtuser")
-    _pick(w._conn_kind, "jellyfin")
+    w._set_kind("jellyfin")             # the media server card's kind
+    assert w._conn_kind.currentData() == "jellyfin"
     assert (w._server.text(), w._user.text(), w._pw.text()) == ("", "", "")
-    _pick(w._conn_kind, "xtream")
+    w._set_kind("xtream")
     assert (w._server.text(), w._user.text(), w._pw.text()) == (
         "http://xt.invalid:8080", "xtuser", "xtpw")

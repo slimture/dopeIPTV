@@ -592,6 +592,36 @@ def test_fuzz_phone_queries():
         fz.decoded(rng.choice(fz.ODD_TEXT)), rng.choice(fz.ODD_TEXT + (5, -1, 10 ** 30, None))))
 
 
+def test_fuzz_drawn_pictures():
+    """A picture the app draws (core/drawn_art.py) is asked by its address -
+    the demo's, but a provider's logo field could name one too: what it asks
+    is words alone, bounded, and drawn at a fixed size whatever it says."""
+    pytest.importorskip("PyQt6.QtGui")
+    from PyQt6.QtGui import QGuiApplication
+
+    from dopeiptv.core import drawn_art
+    app = QGuiApplication.instance() or QGuiApplication([])
+    drawn_art.use_palette({"blue": "#3b82f6", "green": "#22c55e"}, lambda _c: "#ffffff")
+    seeds = (drawn_art.address("logo", "SV", "blue"),
+             drawn_art.address("poster", "Big Buck Bunny", "green", "2008 · Blender Foundation"))
+
+    def target(value):
+        got = drawn_art.parse(value)
+        if got is not None:
+            assert got.kind in drawn_art.KINDS and got.text and all(c.isprintable() for c in got.text)
+            assert len(got.text) <= drawn_art.TEXT_MAX and len(got.line) <= drawn_art.LINE_MAX
+        img = drawn_art.render(value, 64)
+        assert (img is None) == (got is None), value
+        if img is not None:
+            assert max(img.width(), img.height()) <= 512
+        return got
+
+    fz.fuzz("drawn-picture", target, lambda rng: fz.decoded(text_from(rng, seeds, tokens=(
+        "drawn:", "logo", "poster", "?", "&", "t=", "c=", "l=", "%0A", "%00", "‮", "%",
+        "blue", "x" * 600))), seeds=seeds)
+    assert app is not None
+
+
 @pytest.mark.parametrize("module", ["backup", "sync"])
 def test_nesting_deeper_than_python_reads_is_refused(module, tmp_path):
     """JSON nested past Python's limit inside what is opened is no backup,

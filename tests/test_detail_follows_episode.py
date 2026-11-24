@@ -43,7 +43,10 @@ assert w._current_key == "ep-5", w._current_key
 assert w._detail_name == "Pilot", w._detail_name
 assert w.d_logo.width() == w.POSTER_SIZE_MEDIA[0], "a series' poster, not a channel's logo"
 assert w.d_logo.text() == "E", w.d_logo.text()
-print("ok")
+print("ok", flush=True)
+# Out at once, as the other window children: a guide still loading on the
+# pool (the demo's own) would be torn down under its thread.
+os._exit(0)
 """
 
 

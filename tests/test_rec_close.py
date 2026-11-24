@@ -219,7 +219,13 @@ def test_carried_on_through_the_list(app, tmp_path):
     server.tick()
     assert theirs["_elsewhere"] and len(spawned) == 2, "the claim still the window's"
     window.let_go_carried()
-    server.tick()
+    # The server ticks every second; on a loaded machine the claim the window
+    # let go can take a tick more to be seen free - as the app goes on ticking.
+    for _ in range(50):
+        server.tick()
+        if spawned[-1] == (rc.SERVER, "News"):
+            break
+        time.sleep(0.05)
     assert spawned[-1] == (rc.SERVER, "News") and theirs["status"] == "recording"
     assert theirs["path"] != first and os.path.getsize(first) == 188
     assert server.carried_from(theirs) == back["carry"]["at"]

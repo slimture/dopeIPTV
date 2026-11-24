@@ -1,7 +1,23 @@
-"""First-run onboarding + offline provider-hint mixin for MainWindow.
+"""The first-run guide, the demo and "no source yet", in the window.
 
-The welcome overlay and its wizard steps, plus the "+ Add provider" hint shown
-when the app is running against the empty offline stand-in.
+The guide (ui/welcome.py) asks; the window does the work here:
+
+* Connect: the source the form describes tried off the window's thread
+  (providers/connect_check.py: logged in, its lists read and counted) under
+  an id of its own, and kept only once it worked - then used at once with
+  the client that logged in (main_window._use_source: no second login).
+  One try at a time (a second Connect while one runs is nothing); Back, Esc
+  or closing the guide drop it, and what it left in the cache (its lists, a
+  playlist's id map) goes with it. Never a password in a log.
+* The demo (providers/demo.py, main_window.start_demo): its stores in
+  memory (core/stores.PassingSettings), what it plays kept nowhere
+  (core/privacy.py) - a source of one's own taking its place leaves nothing
+  of it behind (_leave_demo), and what plays from it stops.
+* Just my files and radio: no source; Local files, with its Add folder, and
+  Radio. Remembered, so the guide does not come back at every start.
+* No source of one's own (explore, the demo): a calm strip under the list
+  says so with "Add your own source" - in the pane's layout, never over the
+  list - and the guide opens on the choice of what to watch.
 
 The welcome's Bring step (settings from another computer) is done here
 with what Settings does: the sync code joined as Settings > Sync joins it
@@ -19,22 +35,36 @@ logged.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import threading
+import uuid
 from typing import Any
 
 from PyQt6 import sip
-from PyQt6.QtCore import QPropertyAnimation, Qt, QTimer
-from PyQt6.QtWidgets import QGraphicsOpacityEffect, QPushButton
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ..core import privacy
 from ..core.log import log
+from ..core.stores import PassingSettings
+from ..core.workers import on_gui_thread, run_async
 from ..i18n import tr
-from ..providers.client import DemoClient, OfflineClient
-from .welcome import WelcomeOverlay
+from ..providers.client import OfflineClient
+from .theme import P
+from .welcome import PAGE_CHOOSE, PAGE_WELCOME, WelcomeOverlay
 
 #: What the other computer may sync that this one does not by default.
 _FOLLOWED = ("sources", "history")
 #: The welcome's words for a sync that did not finish (mw_sync's kinds).
 _SYNC_MISS = {"net": "onb_sync_err_net", "none": "onb_sync_err_none",
               "read": "sync_err_read", "newer": "sync_err_newer", "stale": "sync_err_stale"}
+#: What plays from no source at all: kept as ever while the demo is in use.
+_OWN_KINDS = frozenset({"local", "radio", "web", "recording"})
+#: The places no source fills: the strip leaves them be.
+_OWN_PLACES = frozenset({"local", "radio", "rec"})
+#: Chosen at the guide: no source, files and radio (the guide stays away).
+FILES_ONLY_KEY = "welcome_files_only"
 
 
 def _a_source(ident: str) -> bool:
@@ -58,8 +88,28 @@ def shared_there(doc: dict[str, Any]) -> set[str]:
     return out
 
 
+def drop_source_files(pid: str) -> None:
+    """What a source tried and never kept left in the cache: its guide and
+    its index, its lists, a playlist's id map (core/m3u_ids.py)."""
+    from ..core.source_files import file_part
+    from ..providers.epg import _epg_cache_dir
+    try:
+        d = _epg_cache_dir()
+        part = file_part(pid)
+    except Exception:
+        return
+    for name in (f"epg_{part}.xml", f"epg_{part}.xml.idx", f"lists_{part}.json",
+                 f"m3u_ids_{part}.json"):
+        try:
+            os.remove(d / name)
+        except OSError:
+            pass
+    shutil.rmtree(d / f"lists_{part}.d", ignore_errors=True)
+
+
 class _OnboardingMixin:
-    """MainWindow mixin: the first-run welcome wizard and the '+ Add provider' hint."""
+    """MainWindow mixin: the first-run guide, the demo, and the strip that
+    says there is no source of one's own yet."""
 
     #: The Bring step's sync: waiting for how it went; something came
     #: already (a miss after that leaves sync on); the source ids before.
@@ -67,70 +117,197 @@ class _OnboardingMixin:
     _wsync_joined = False
     _wsync_hooked = False
     _wsync_before: frozenset[str] = frozenset()
+    #: The connect step's try under way: its row, client and stop flag.
+    _wtry: dict | None = None
+    #: The demo in use: what its stores write to (in memory).
+    _demo_kept: PassingSettings | None = None
+    _source_strip: QWidget | None = None
 
-    def show_welcome(self) -> None:
-        """Show the first-run onboarding wizard (no provider configured)."""
+    def show_welcome(self, page: int = PAGE_WELCOME) -> None:
+        """Show the guide - from its first page, or *page* (the choice of
+        what to watch, from "Add your own source")."""
         if self._welcome is None:
             self._welcome = WelcomeOverlay(
                 self, settings=self.settings,
                 on_connect=self._wizard_connect,
                 on_explore=self._wizard_explore,
-                on_connect_trakt=self._wizard_connect_trakt,
                 on_language_change=self._wizard_language,
-                on_demo=self.start_demo)
+                on_demo=self.start_demo,
+                on_files=self._wizard_files)
             self._welcome.sync_asked.connect(self._wizard_sync)
             self._welcome.sync_cancelled.connect(self._wizard_sync_cancel)
             self._welcome.restore_asked.connect(self._wizard_restore)
             self._welcome.quit_asked.connect(self._wizard_quit)
+            self._welcome.connect_cancelled.connect(self._wizard_connect_cancel)
             watch = getattr(self, "_notices_watch", None)
             if watch is not None:
                 watch(self._welcome)
+            if page != PAGE_WELCOME:
+                self._welcome.reset(page)
         else:
-            self._welcome.reset()
-        # If Trakt was linked in an earlier visit, show it as connected.
-        self._welcome.set_trakt_connected(self.trakt.is_connected())
+            self._welcome.reset(page)
         self._welcome.cover()
         follow = getattr(self, "_notice_follow", None)
         if follow is not None:
             follow.poke()           # the notices held while it covers the window
         self._update_provider_hint()
 
-    def _wizard_connect_trakt(self) -> None:
-        """Run the Trakt sign-in flow, then reflect the result in the wizard so
-        the user gets a clear 'connected' confirmation on the same screen."""
-        self._trakt_connect_flow(self)
-        if self._welcome is not None:
-            self._welcome.set_trakt_connected(self.trakt.is_connected())
-
     def _wizard_language(self, code: str) -> None:
         # The same switch as Settings makes: Arabic, Persian, Hebrew and
         # Urdu mirror the layout right away, and Qt's own buttons follow.
         self._set_language(code)
 
+    # -- the connect step ---------------------------------------------------------
+
     def _wizard_connect(self, server: str, user: str, pw: str,
                         kind: str = "xtream", name: str = "", mac: str = "",
-                        signed: dict | None = None) -> None:
+                        signed: dict | None = None, extra: dict | None = None) -> None:
+        """The form's source tried, off the window's thread; kept once it
+        worked. One try at a time."""
+        if self._wtry is not None:
+            return
         # Use the name the user typed; fall back to the server host so an
         # unnamed playlist still gets a sensible label.
         name = name.strip() or server.split("//")[-1].split("/")[0] \
             or tr("playlist_default_name")
-        row = {"name": name, "kind": kind, "server": server, "username": user,
-               "password": pw, "epg_url": "", "refresh": "never", "mac": mac}
+        store = self.playlist_store
+        taken = {str(p.get("id")) for p in (store.playlists() if store is not None else [])}
+        pid = uuid.uuid4().hex[:8]
+        while pid in taken:
+            pid = uuid.uuid4().hex[:8]
+        row: dict[str, Any] = {"id": pid, "name": name, "kind": kind, "server": server,
+                               "username": user, "password": pw,
+                               "epg_url": str((extra or {}).get("epg_url") or ""),
+                               "refresh": "never", "mac": mac}
+        options = dict((extra or {}).get("options") or {})
         if signed:
             # A media server: the token its sign-in left, and its ids.
             row["token"] = str(signed.get("token") or "")
-            if signed.get("options"):
-                row["options"] = dict(signed["options"])
-        pl = self.playlist_store.add(row)
-        self.playlist_store.set_active(pl["id"])
-        self.switch_playlist(pl["id"])
-        # The wizard stays open for the optional Trakt step and hides itself
-        # on Finish; the provider hint should not appear now.
-        self._update_provider_hint()
+            options.update(signed.get("options") or {})
+        if options:
+            row["options"] = options
+        ov = self._wizard_view()
+        try:
+            from ..providers.client import make_client
+            client = make_client(row)
+        except Exception as e:
+            log.info("welcome: the source could not be set up - %s", type(e).__name__)
+            from ..providers.connect_check import reason
+            if ov is not None:
+                ov.connect_failed(reason(e, kind))
+            return
+        stop = threading.Event()
+        attempt = {"row": row, "client": client, "stop": stop}
+        self._wtry = attempt
+        log.info("welcome: trying a %s source", kind)
+
+        def say(step: str) -> None:
+            on_gui_thread(self._wizard_step, attempt, step)
+
+        def work():
+            from ..providers.connect_check import check
+            return check(client, say, stop.is_set, kind)
+
+        run_async(self.pool, work, lambda got: self._wizard_tried(attempt, got),
+                  lambda msg: self._wizard_tried(attempt, None))
+
+    def _wizard_step(self, attempt: dict, step: str) -> None:
+        ov = self._wizard_view()
+        if attempt is self._wtry and ov is not None:
+            ov.connect_step(step)
+
+    def _wizard_tried(self, attempt: dict, got: Any) -> None:
+        """How the try went: kept and used, or why not - unless it was
+        dropped meanwhile (its cache files go then)."""
+        row = attempt["row"]
+        if attempt is not self._wtry or attempt["stop"].is_set():
+            drop_source_files(str(row["id"]))
+            return
+        self._wtry = None
+        ov = self._wizard_view()
+        if got is None or not got.ok:
+            drop_source_files(str(row["id"]))
+            from ..providers.connect_check import reason
+            why = got.reason if got is not None else reason(RuntimeError(), row.get("kind", ""))
+            log.info("welcome: the source did not work")
+            if ov is not None:
+                ov.connect_failed(why)
+            return
+        store = self.playlist_store
+        pl = store.add(row)
+        store.set_active(pl["id"])
+        log.info("welcome: a %s source added - %d channels", row.get("kind"), got.channels)
+        if ov is not None:
+            ov.connect_done(got.channels, got.movies, got.series, got.warning)
+        self.settings.remove(FILES_ONLY_KEY)
+        self._use_source(pl["id"], attempt["client"], got.auth)
+
+    def _wizard_connect_cancel(self) -> None:
+        """Back or Esc while it tried: nothing of it is kept."""
+        attempt, self._wtry = self._wtry, None
+        if attempt is not None:
+            attempt["stop"].set()
+            log.info("welcome: the try was stopped")
 
     def _wizard_explore(self) -> None:
+        self._wizard_connect_cancel()
         self._set_status(tr("welcome_add_hint"))
         self._update_provider_hint()
+
+    def _wizard_files(self) -> None:
+        """Just my files and radio: no source - Local files, where its Add
+        folder is; the guide is not shown again at start for it."""
+        self._wizard_connect_cancel()
+        self.settings.setValue(FILES_ONLY_KEY, "true")
+        self._show_place("local")
+        self._update_provider_hint()
+
+    # -- the demo -------------------------------------------------------------------
+
+    def _passing_settings(self) -> PassingSettings | None:
+        """What the stores write to while the demo is the source - in
+        memory - else None (the settings, as ever)."""
+        return self._demo_kept
+
+    def _demo_stores(self) -> None:
+        """(start_demo) The demo's stores, in memory."""
+        from ..core.series_rules import SeriesRuleStore
+        from ..core.stores import (
+            CategoryOverrides, ChannelOverrides, WatchedStore, WatchlistStore,
+        )
+        self._demo_kept = kept = PassingSettings()
+        privacy.keep_nothing(True, _OWN_KINDS)
+        self._build_source_stores(None)
+        self._watch_favorites()
+        self.series_rules = SeriesRuleStore(kept, None)
+        self.overrides = CategoryOverrides(kept, "category_overrides")
+        self.channel_ov = ChannelOverrides(kept, "channel_overrides")
+        self.watched = WatchedStore(kept)
+        self.watchlist = WatchlistStore(kept)
+        log.info("demo: started - nothing of it is kept")
+
+    def _leave_demo(self) -> None:
+        """A source taking the demo's place (start_demo, _use_source - which
+        reads the source's own stores after this): what plays from the demo
+        stops, and its stores go - the profile's own are read again."""
+        if self._demo_kept is None:
+            return
+        p = getattr(self, "player", None)
+        lp = getattr(self, "_last_playback", None) or {}
+        if p is not None and lp.get("kind") not in _OWN_KINDS and (
+                getattr(p, "current_url", None) or getattr(self, "_playing_group", None)):
+            p.stop_btn.click()
+        if lp.get("kind") not in _OWN_KINDS:
+            self._last_playback = None
+        self._prev_live_item = None
+        self._demo_kept = None
+        privacy.keep_nothing(False)
+        from ..core.stores import WatchedStore, WatchlistStore
+        cache = self._own(self._cache_settings)
+        self.watched = WatchedStore(cache)
+        self.watchlist = WatchlistStore(cache)
+        self._build_source_stores(None)
+        log.info("demo: left - nothing of it kept")
 
     # -- the Bring step: settings from another computer ----------------------
 
@@ -299,71 +476,56 @@ class _OnboardingMixin:
         self._resetting = True
         self.close()
 
-    # -- "no provider yet" affordance ----------------------------------------
+    # -- "no source of one's own yet" ----------------------------------------------
+
+    def _no_own_source(self) -> bool:
+        """Explore (no source at all) or the demo."""
+        return type(self.client) is OfflineClient or self._demo_kept is not None
+
+    def _build_source_strip(self, lay) -> None:
+        """(mw_build) The strip under the middle pane's pages that says
+        there is no source of one's own - the demo's word, or none at all -
+        with "Add your own source": in the pane's layout, so it never covers
+        a row."""
+        holder = QWidget()
+        hl = QVBoxLayout(holder)
+        hl.setContentsMargins(0, 0, 0, 10)
+        strip = QFrame(objectName="SourceStrip")
+        strip.setStyleSheet(
+            f"#SourceStrip {{ background: {P['input']}; border: 1px solid {P['border']};"
+            " border-radius: 10px; }"
+            f"#SourceStripText {{ color: {P['text2']}; font-size: 12px; }}")
+        row = QHBoxLayout(strip)
+        row.setContentsMargins(12, 8, 10, 8)
+        row.setSpacing(10)
+        words = QVBoxLayout()
+        words.setSpacing(0)
+        self._source_strip_text = QLabel("", objectName="SourceStripText")
+        self._source_strip_text.setWordWrap(True)
+        self._source_strip_text.setTextFormat(Qt.TextFormat.PlainText)
+        words.addWidget(self._source_strip_text)
+        row.addLayout(words, 1)
+        self._source_strip_btn = QPushButton(tr("onb_add_own_source"), objectName="Primary")
+        self._source_strip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._source_strip_btn.clicked.connect(lambda: self.show_welcome(PAGE_CHOOSE))
+        row.addWidget(self._source_strip_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        hl.addWidget(strip)
+        holder.hide()
+        lay.addWidget(holder)
+        self._source_strip = holder
 
     def _update_provider_hint(self) -> None:
-        """Show a big pulsing '+ Add provider' button in the middle pane
-        whenever the app is running without a real provider and the wizard is
-        closed. It brings the wizard back and disappears the moment a provider
-        is added."""
-        # Show the hint until a REAL provider is added: explore mode
-        # (OfflineClient) and the demo (DemoClient) both still want it, so the
-        # user can graduate from trying channels to entering their own. A real
-        # Xtream/M3U client removes it for good. M3UClient also subclasses
-        # OfflineClient, so key on the exact types. Never float it over a
-        # maximized/fullscreen video.
-        no_provider = type(self.client) in (OfflineClient, DemoClient)
-        overlay_up = self._welcome is not None and self._welcome.isVisible()
-        if no_provider and not overlay_up and not self._player_fs:
-            if self._add_provider_btn is None:
-                self._build_provider_hint()
-            self._add_provider_btn.setText(tr("onb_add_provider"))
-            self._add_provider_btn.show()
-            self._add_provider_btn.raise_()
-            self._position_provider_hint()
-            self._add_provider_anim.start()
-        elif self._add_provider_btn is not None:
-            self._add_provider_anim.stop()
-            self._add_provider_btn.hide()
-
-    def _build_provider_hint(self) -> None:
-        btn = QPushButton(tr("onb_add_provider"), self)
-        btn.setMinimumHeight(46)
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Always red, independent of the app theme, so it clearly reads as
-        # a call to action.
-        btn.setStyleSheet(
-            "QPushButton { background:#e5354b; color:#ffffff; font-weight:700;"
-            " font-size:14px; border:none; border-radius:10px; padding:0 22px; }"
-            "QPushButton:hover { background:#c8283b; }")
-        btn.clicked.connect(self.show_welcome)
-        # Slow opacity pulse to draw the eye without being noisy.
-        eff = QGraphicsOpacityEffect(btn)
-        btn.setGraphicsEffect(eff)
-        anim = QPropertyAnimation(eff, b"opacity", self)
-        anim.setDuration(1500)
-        anim.setStartValue(1.0)
-        anim.setKeyValueAt(0.5, 0.45)
-        anim.setEndValue(1.0)
-        anim.setLoopCount(-1)
-        self._add_provider_btn = btn
-        self._add_provider_anim = anim
-
-    def _position_provider_hint(self) -> None:
-        btn = self._add_provider_btn
-        if btn is None or not btn.isVisible():
+        """The strip under the list while there is no source of one's own
+        and the guide is closed - on the places a source fills, never over a
+        video filling the window."""
+        strip = self._source_strip
+        if strip is None or sip.isdeleted(strip):
             return
-        # Centre it at the bottom of the *visible* central area: the central
-        # stack is always laid out and always visible, so the button stays
-        # centred whatever page the middle pane shows.
-        # A fixed margin above the bottom edge (not a percentage) keeps it
-        # planted as the window is resized or the columns are dragged.
-        anchor = getattr(self, "_center_stack", None) or self.listw
-        btn.adjustSize()
-        w = max(240, btn.width() + 40)
-        h = 46
-        margin = 22
-        tl = anchor.mapTo(self, anchor.rect().topLeft())
-        x = tl.x() + (anchor.width() - w) // 2
-        y = tl.y() + anchor.height() - h - margin
-        btn.setGeometry(x, y, w, h)
+        overlay_up = self._welcome is not None and self._welcome.isVisible()
+        on = (self._no_own_source() and not overlay_up and not getattr(self, "_player_fs", False)
+              and getattr(self, "mode", "live") not in _OWN_PLACES)
+        if on:
+            self._source_strip_text.setText(
+                tr("onb_strip_demo") if self._demo_kept is not None else tr("onb_strip_none"))
+            self._source_strip_btn.setText(tr("onb_add_own_source"))
+        strip.setVisible(on)

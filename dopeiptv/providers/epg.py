@@ -655,6 +655,8 @@ class XmltvGuide:
     # that process cannot run, the parse happens in the calling thread.
     PARSE_ELSEWHERE: bool = True
     PARSE_TIMEOUT_S: float = 900.0
+    #: A guide of at most this many bytes is parsed in the calling thread.
+    PARSE_HERE_MAX: int = 256 * 1024
 
     def __init__(self, client: XtreamClient,
                  custom_url: str | None = None,
@@ -1050,7 +1052,10 @@ class XmltvGuide:
         """Parse *data* into the guide and keep its index on disk - and,
         with *keep* (a fresh download), the guide itself as the cache."""
         cache = self.cache_path if keep else None
-        if not (self.PARSE_ELSEWHERE and self._parse_elsewhere(data, cache)):
+        # A guide this small parses here in less time than a process takes
+        # to start (the demo's, a box's few channels).
+        elsewhere = self.PARSE_ELSEWHERE and len(data) > self.PARSE_HERE_MAX
+        if not (elsewhere and self._parse_elsewhere(data, cache)):
             if keep:
                 self._write_cache(data)
             self._parse(data)

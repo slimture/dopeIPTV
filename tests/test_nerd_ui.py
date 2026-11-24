@@ -152,8 +152,7 @@ def _welcome(settings):
     got["_win"] = win          # kept: Qt deletes the overlay with its window
     ov = WelcomeOverlay(win, settings=settings,
                         on_connect=lambda *a: got.update(args=a), on_explore=lambda: None,
-                        on_connect_trakt=lambda: None, on_language_change=lambda c: None,
-                        on_demo=lambda: None)
+                        on_language_change=lambda c: None, on_demo=lambda: None)
     return ov, got
 
 
@@ -161,52 +160,55 @@ def _kinds(ov):
     return [ov._conn_kind.itemData(i) for i in range(ov._conn_kind.count())]
 
 
-def test_welcome_offers_nerd_quietly_and_boxes_only_then(app, settings):
+def test_welcome_offers_nerd_quietly_and_boxes_to_everyone(app, settings):
+    """A box at home is one of the guide's four answers for everyone (as
+    the source dialog offers boxes); Nerd, offered quietly on the first
+    page, adds its presets to that form and nothing else."""
     ov, got = _welcome(settings)
-    assert "enigma2" not in _kinds(ov)
     assert ov._w_nerd.text() == "🤓 Nerd? Show advanced options"
+    ov._cards["box"].click()
+    assert {"enigma2", "tvheadend", "hdhomerun", "satip"} <= set(_kinds(ov))
+    page = ov._stack.currentWidget()
+    assert not ov._presets.isVisibleTo(page)
     ov._toggle_nerd()
     assert settings.value("nerd_enabled") == "true" and nerd.current().on
-    assert {"enigma2", "tvheadend", "hdhomerun"} <= set(_kinds(ov))
     assert ov._w_nerd.text().startswith("🤓 Nerd on")
-    ov._stack.setCurrentIndex(1)
-    ov._conn_kind.setCurrentIndex(ov._conn_kind.findData("enigma2"))
-    assert not ov._finder.row.isHidden()
+    assert ov._presets.isVisibleTo(page) and not ov._finder.row.isHidden()
+    ov._set_kind("enigma2")
     ov._server.setText("http://192.168.1.10")
     ov._do_connect()
     assert got["args"][:4] == ("http://192.168.1.10", "", "", "enigma2")
-    # Off again: the box kinds go, and the form is back on a normal kind.
+    # Off again: the presets go, the box kinds stay.
     ov._toggle_nerd()
-    assert "enigma2" not in _kinds(ov) and ov._conn_kind.currentData() == "xtream"
+    assert "enigma2" in _kinds(ov) and not ov._presets.isVisibleTo(page)
     assert settings.value("nerd_enabled") == "false"
 
 
 def test_welcome_is_no_taller_with_nerd_on(app, settings):
-    """The welcome card with Nerd on holds the box kinds and Find on my
-    network, nothing more: never taller than the forms everyone has - a
-    media server's, with Find on my network and its sign-in, the tallest
-    (the source's own Nerd options live in the source dialog only). The
-    plain Xtream form once measured as tall only because it showed the
-    MAC address and the sign-in too."""
+    """The guide's form with Nerd on holds its presets under Find on my
+    network, nothing more: a box's form one quiet link taller, every other
+    form as it was (the source's own Nerd options live in the source dialog
+    only)."""
     def height(kind):
         ov, got = _welcome(settings)
         got["_win"].resize(1100, 640)
         got["_win"].show()
-        ov._stack.setCurrentIndex(1)
-        i = ov._conn_kind.findData(kind)
-        assert i >= 0, kind
-        ov._conn_kind.setCurrentIndex(i)
-        ov._fit_card(1)
+        ov._set_kind(kind)
+        ov._stack.setCurrentIndex(2)
+        assert ov._conn_kind.currentData() == kind, kind
+        ov._fit_card(2)
         h = ov._card.sizeHint().height()
         got["_win"].close()
         return h
-    # The tallest the plain form measures (a first window can measure a few
-    # pixels apart from a later one - CI saw 504 then 486).
-    plain = max(height("xtream"), height("xtream"), height("jellyfin"))
+    kinds = ("xtream", "m3u", "jellyfin", "enigma2", "tvheadend", "hdhomerun")
+    # A first window can measure a few pixels apart from a later one (CI
+    # saw 504 then 486): each measured twice, the taller kept.
+    plain = {k: max(height(k), height(k)) for k in kinds}
     settings.setValue("nerd_enabled", "true")
     nerd.install(settings)
-    for kind in ("xtream", "enigma2", "tvheadend", "hdhomerun"):
-        assert height(kind) <= plain, kind
+    for kind in kinds:
+        more = height(kind) - plain[kind]
+        assert more <= (40 if kind in ("enigma2", "tvheadend", "hdhomerun") else 0), (kind, more)
 
 
 def test_diagnostics_never_carry_a_secret(app, settings):
