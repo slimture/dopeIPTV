@@ -522,8 +522,11 @@ class ServerRecorder(QObject):
                              pl.get("id"), e)
                     continue
                 if found is not None:
-                    self._found.emit((pl, found, series_plan.links_later(client),
-                                      self.server.known_limit(str(pl["id"]))))
+                    try:
+                        self._found.emit((pl, found, series_plan.links_later(client),
+                                          self.server.known_limit(str(pl["id"]))))
+                    except RuntimeError:    # the server stopped meanwhile
+                        return
         finally:
             self._planning = False
 

@@ -715,13 +715,26 @@ Server for the home, off by default; `dopeiptv --server` without a window,
 
 - **Without a window**: `dopeiptv --server` (`--port N`,
   `--no-discovery`) imports no widget, nothing that draws and no mpv - only
-  QtCore for the settings, plain threads for the rest; the household's
+  QtCore for the settings and its event loop, plain threads for the rest; the household's
   sources, settings and guides (never a profile's own) - each served
   source's guide downloaded again once it is six hours old, one try an
   hour (`services/guide_keeper.py`; in the window, the sources other than
   the active one, whose guide the window keeps) -, the usual log; Ctrl+C / SIGTERM stop it cleanly. The page in a browser shows
   the command to start it with the computer. Run it or the window's
   server, not both: two processes cannot count each other's connections.
+- **Recordings without a window** (`services/server_recorder.py`,
+  November 2026): `--server` records the household's scheduled jobs and
+  series rules while no window runs - the window's presence, its jobs and
+  the one recorder of each job are `core/rec_claims.py`'s (a locked file per
+  job beside the settings; the list of jobs merged by both,
+  `RecordingManager._merge`). Its own connection is an http(s) channel read
+  into the restream's pool, so a device that tunes to it shares it; a
+  channel a device watches is recorded from that buffer; it is held, never
+  over the limit. The window's recordings are counted by the server through
+  their claims, not its player. To be seen for real: a night of recordings
+  on a NAS or a Raspberry Pi, a crash taken over, a settings folder two
+  computers share over NFS or SMB (the lock may not carry: the claim's
+  beat stands in), Windows' byte lock.
 - **Restream** (`core/restream.py`): `/stream/<source id>/<stream id>`
   and the tuner's `/auto/v<number>` fetch a channel here, once, into a
   rewind buffer session (`core/dvr_*`), and every viewer reads its store

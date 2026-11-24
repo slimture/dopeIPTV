@@ -722,8 +722,13 @@ class RecordingManager(QObject):
     def _claim_info(self, j: dict) -> dict:
         """What a claim says of *j* for the other recorder (no address)."""
         from . import privacy
-        info: dict[str, Any] = {k: j.get(k) for k in ("title", "channel", "stream_icon",
-                                                      "source", "path", "error")}
+        from .log import for_people
+        info: dict[str, Any] = {k: j.get(k) for k in ("title", "channel", "source", "path")}
+        # A logo with a login in it stays in the settings; an error says no
+        # address but its server's name (core/log.for_people).
+        icon = str(j.get("stream_icon") or "")
+        info["stream_icon"] = "" if carries_login(icon) or "@" in icon.split("?")[0] else icon
+        info["error"] = for_people(str(j.get("error") or ""))
         info["start"], info["stop"] = j.get("start"), j.get("stop")
         info["stream_key"] = str(j.get("stream_key")
                                  or (j.get(self.LATER) or {}).get("stream_id") or "")

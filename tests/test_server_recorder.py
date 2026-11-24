@@ -499,6 +499,55 @@ def test_while_a_window_runs_the_server_leaves_it_what_comes_due(app, tmp_path):
     server.shutdown()
 
 
+def test_without_its_claims_the_window_records_as_before_and_the_server_not(app, tmp_path):
+    path = tmp_path / "s.ini"
+    (tmp_path / rc.FOLDER).write_text("not a folder")
+    _stored(path, _due_job("j1"))
+    spawned: list = []
+    window = _manager(path, rc.WINDOW, spawned)
+    window.tick()
+    assert spawned == [(rc.WINDOW, "News")], "a recording that works today still does"
+    _stored(path, _due_job("j2", "Later"))
+    server = _manager(path, rc.SERVER, spawned)
+    server.tick()
+    assert spawned == [(rc.WINDOW, "News")], "it cannot know what the window records"
+    window.shutdown()
+    server.shutdown()
+
+
+def test_the_window_counts_and_says_what_the_server_records(app, tmp_path):
+    """A recording the server makes over a connection of its own is one of
+    the account's for the window's questions; its row says who records it,
+    and offers no Record anyway of the window's."""
+    from dopeiptv.i18n import tr
+    from dopeiptv.ui.mw_connections import _ConnectionsMixin
+    from dopeiptv.ui.mw_recording import _RecordingMixin
+
+    class W(_ConnectionsMixin):
+        player = None
+        _multiview_win = None
+        _failover_source = None
+        _playing_src = None
+        playlist_store = SimpleNamespace(active_id="p1", playlists=lambda: [PL])
+        cast = SimpleNamespace(active=None)
+
+        def __init__(self, jobs):
+            self.rec = SimpleNamespace(jobs=jobs)
+    own = {"id": "a", "title": "News", "status": "recording", "source": "p1", "url": "",
+           "start": time.time(), "stop": None,
+           "_elsewhere": {"who": rc.SERVER, "state": rc.RECORDING, "own": True}}
+    ride = dict(own, id="b", _elsewhere={"who": rc.SERVER, "state": rc.RECORDING, "own": False})
+    held = dict(own, id="c", status="scheduled", _held=True,
+                _elsewhere={"who": rc.WINDOW, "state": rc.HELD, "own": False})
+    uses = W([own, ride, held])._conn_uses()
+    assert [(u.kind, u.source) for u in uses] == [("recording", "p1")]
+    item = _RecordingMixin._job_item(None, own)
+    assert tr("rec_by_server") in item["name"] and item["_elsewhere"]
+    item = _RecordingMixin._job_item(None, held)
+    assert not item["_held"] and tr("rec_waiting_room") not in item["name"]
+    assert tr("rec_by_other_app") in item["name"]
+
+
 # -- series rules from the guide on disk -----------------------------------------------------
 
 def _guide(tmp_path: Path, start: float) -> None:
