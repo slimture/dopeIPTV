@@ -897,7 +897,7 @@ def test_a_requested_name_is_never_joined_onto_a_path(tmp_path):
 
 
 @pytest.mark.filterwarnings("ignore")
-def test_a_real_cast_with_a_subtitle_needs_one_connection_and_starts_at_once():
+def test_a_real_cast_with_a_subtitle_needs_one_connection_and_starts_at_once(tmp_path):
     """The claim, end to end, with a real ffmpeg.
 
     Burning a text subtitle in used to cost three opens of the source - the
@@ -916,9 +916,9 @@ def test_a_real_cast_with_a_subtitle_needs_one_connection_and_starts_at_once():
     if not exe:
         pytest.skip("no ffmpeg")
 
-    srt = os.path.join(os.path.dirname(__file__), "_hls_s.srt")
+    srt = str(tmp_path / "s.srt")
     open(srt, "w").write("1\n00:00:00,500 --> 00:00:30,000\nHEJ\n")
-    mkv = os.path.join(os.path.dirname(__file__), "_hls_film.mkv")
+    mkv = str(tmp_path / "film.mkv")
     subprocess.run(
         [exe, "-hide_banner", "-loglevel", "error",
          "-f", "lavfi", "-i", "testsrc=size=640x360:rate=25:duration=30",

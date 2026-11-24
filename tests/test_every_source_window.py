@@ -194,6 +194,11 @@ nordic_chans.update("live", "14", name="Nordic Renamed")
 theme.apply_theme(s)
 app.setStyleSheet(theme.build_style())
 w = mw.MainWindow(Pirat(), s, store)
+# The start shows its place 100 ms in and reads the categories again:
+# nothing here is picked before it has (it would lay the list out anew).
+_started = []
+_open_start = w._open_start_place
+w._open_start_place = lambda: (_open_start(), _started.append(1))
 w.cover.resolver = None
 nordic = Nordic()
 w._sa_sources = ss.Sources(make_client=lambda pl: nordic)
@@ -204,6 +209,7 @@ w.resize(1400, 900)
 w.show()
 pump(30)
 w.switch_mode("live")
+settle(lambda: bool(_started), what="the start's own place")
 settle(lambda: w.list_model.rowCount() > 0 and len(cat_rows()) > 2, what="TV's categories")
 
 # -- one source: not offered -------------------------------------------------------------
