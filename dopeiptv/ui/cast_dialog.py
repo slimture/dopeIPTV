@@ -174,6 +174,10 @@ class CastDialog(QDialog):
         # device it was then (another id, another address): never picked
         # for the person, and said (_note_stranger).
         self._strangers: set[str] = set()
+        # Answers on their way to this window (a search, the tracks, a cast,
+        # a stop) and whether it was closed: it goes once both say so (exec).
+        self._pending = 0
+        self._closed = False
         self.setWindowTitle(tr("cast_title"))
         # The width it starts from on the list, never on the window: a
         # window given a minimum of its own leaves its layout's out, and
@@ -334,6 +338,42 @@ class CastDialog(QDialog):
             self._scan()
         self._load_tracks()
 
+    # -- how long the window lives -------------------------------------------
+
+    def exec(self) -> int:
+        """Modal as ever; closed, the window goes - once no answer of its
+        own is still on its way to it (a cast's answer shows the cast card).
+        Kept, every cast window opened stayed a child of the main window
+        for the rest of the session: 84 objects each, restyled at every
+        theme change (docs/PERFORMANCE.md)."""
+        try:
+            return super().exec()
+        finally:
+            self._closed = True
+            self._let_go()
+
+    def _later(self, fn, done, fail=None) -> None:
+        """*fn* on the pool, *done* or *fail* with its answer here - counted,
+        so the window is not deleted under an answer."""
+        self._pending += 1
+
+        def settle(cb):
+            def run(*args):
+                try:
+                    if cb is not None:
+                        cb(*args)
+                finally:
+                    self._pending -= 1
+                    self._let_go()
+            return run
+        run_async(self.window.pool, fn, settle(done), settle(fail))
+
+    def _let_go(self) -> None:
+        if self._closed and self._pending <= 0:
+            from PyQt6 import sip
+            if not sip.isdeleted(self):
+                self.deleteLater()
+
     # -- audio / subtitle tracks -------------------------------------------
 
     def _load_tracks(self) -> None:
@@ -348,8 +388,7 @@ class CastDialog(QDialog):
             except RuntimeError:
                 pass                       # dialog closed while probing
 
-        run_async(self.window.pool, lambda: probe_tracks(self.url), done,
-                  lambda _msg: done({}))
+        self._later(lambda: probe_tracks(self.url), done, lambda _msg: done({}))
 
     @staticmethod
     def _track_label(t: dict) -> str:
@@ -609,7 +648,7 @@ class CastDialog(QDialog):
                 return
             self._set_status(tr("cast_scan_failed", msg=msg))
 
-        run_async(self.window.pool, self.window.cast.scan, done, fail)
+        self._later(self.window.cast.scan, done, fail)
 
     def _cast(self) -> None:
         item = self.list.currentItem()
@@ -707,7 +746,7 @@ class CastDialog(QDialog):
                                          settle, self.source, quality,
                                          self.height, self.fps, dvr, **more)
 
-        run_async(self.window.pool, work, done, failed)
+        self._later(work, done, failed)
 
     def _add_by_address(self) -> None:
         """Add a Chromecast, a TV or a Kodi by its address - or forget the
@@ -763,6 +802,6 @@ class CastDialog(QDialog):
 
     def _stop(self) -> None:
         self._banner(None, "")
-        run_async(self.window.pool, self.window.cast.stop,
-                  lambda _: self._set_status(tr("cast_stopped")),
-                  lambda msg: self._set_status(tr("cast_stop_failed", msg=msg)))
+        self._later(self.window.cast.stop,
+                    lambda _: self._set_status(tr("cast_stopped")),
+                    lambda msg: self._set_status(tr("cast_stop_failed", msg=msg)))

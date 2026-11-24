@@ -267,3 +267,58 @@ def test_cast_button_keeps_its_whole_words():
     assert dlg.list.minimumWidth() >= 300      # still starts as wide as before
     dlg.close()
     win.deleteLater()
+
+
+def _flush_deletes():
+    from PyQt6.QtCore import QCoreApplication, QEvent
+    from PyQt6.QtWidgets import QApplication
+    for _ in range(3):
+        QApplication.processEvents()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+
+
+def test_a_closed_cast_window_goes(monkeypatch):
+    """Closed, the window is deleted: kept, every cast window opened stayed
+    a child of the main window for the rest of the session - 84 objects
+    each, restyled at every theme change (docs/PERFORMANCE.md)."""
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QDialog
+
+    import dopeiptv.ui.cast_dialog as cc
+    monkeypatch.setattr(QDialog, "exec", lambda self: 0)
+    # The search answers at once, as if it were quick.
+    monkeypatch.setattr(cc, "run_async", lambda pool, fn, done, fail=None: done(fn()))
+    win = _window()
+    dialogs = []
+    for _ in range(5):
+        d = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", probe=False)
+        assert d.list.count() == 2              # what the search found was shown
+        assert d.exec() == 0
+        dialogs.append(d)
+    _flush_deletes()
+    assert all(sip.isdeleted(d) for d in dialogs)
+    assert win.findChildren(cc.CastDialog) == []
+    win.deleteLater()
+
+
+def test_a_cast_window_closed_early_waits_for_its_answer(monkeypatch):
+    """Closed while a search is on its way, it stays until the answer has
+    been put in it - never deleted under it - and goes then."""
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QDialog
+
+    import dopeiptv.ui.cast_dialog as cc
+    monkeypatch.setattr(QDialog, "exec", lambda self: 0)
+    waiting = []
+    monkeypatch.setattr(cc, "run_async", lambda pool, fn, done, fail=None: waiting.append((fn, done)))
+    win = _window()
+    d = cc.CastDialog(win, "http://p/live/u/pw/1.m3u8", "SVT1", probe=False)
+    d.exec()
+    _flush_deletes()
+    assert not sip.isdeleted(d) and len(waiting) == 1
+    fn, done = waiting.pop()
+    done(fn())
+    assert d.list.count() == 2                  # the late answer still landed
+    _flush_deletes()
+    assert sip.isdeleted(d)
+    win.deleteLater()
