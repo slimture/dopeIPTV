@@ -219,13 +219,16 @@ dopeiptv/
                        stays its own, an idle client is let go
     remote_api.py      The remote API and the shared lists' HTTP server (a
                        token on every request)
+    home_gate.py       The one gate the phone remote, the remote API and
+                       server mode ask: who is at home, the Host, a web page,
+                       the token in constant time, budgets and lock-outs
     events.py          Nerd: events pushed out - webhooks and MQTT (queue +
                        a thread per receiver; it only watches)
     mqtt.py            A small MQTT 3.1.1 client (standard library only)
     mqtt_control.py    Nerd: Home Assistant's commands over MQTT (topics,
                        parsing, the controls' discovery, TV mode's switch)
-    phone_remote.py    The phone remote's server (home network, token in the
-                       address, rate limit and lock-out, nothing else)
+    phone_remote.py    The phone remote's server (home network, the key in
+                       the address, signed requests; its checks home_gate's)
     phone_page.py      The phone remote's page (HTML/CSS/JS, nothing fetched):
                        the lists, Now playing with seeking, recording, tracks
                        and the sleep timer, and a remote with a touchpad while

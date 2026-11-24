@@ -43,7 +43,6 @@ person chooses it.
 from __future__ import annotations
 
 import errno
-import hmac
 import ipaddress
 import json
 import re
@@ -57,13 +56,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Iterable, Iterator, Protocol
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
-from ..core import connections, hdhr, home_net
+from ..core import connections, hdhr, home_gate, home_net
 from ..core.dvr_pool import DvrPool
 from ..core.dvr_session import DvrSession
 from ..core.exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin, IdleTimeoutMixin
 from ..core.log import log, redact_url
 from ..core.nerd_check import FAIL, OK, WARN, Check
-from ..core.phone_remote import RateLimiter, cross_site
+from ..core.home_gate import RateLimiter, cross_site
 from ..core.remote_api import lan_addresses
 from ..core.restream import BOX, NO_DATA, TUNERS, VPN, Busy, Restreamer, ffmpeg_opener, is_hls
 from .guide_keeper import GuideKeeper
@@ -873,23 +872,12 @@ def tuner_host_ok(host: str | None) -> bool:
     page whose own name a DNS rebinding pointed at this computer must not
     reach them: its Host is its own public name. Plex, Jellyfin, Channels
     and the rest ask by address."""
-    return True if not host else home_net.home_host(host)
+    return home_gate.host_ok(host)
 
 
-def _loopback(address: str) -> bool:
-    try:
-        ip = ipaddress.ip_address(address.split("%", 1)[0])
-    except ValueError:
-        return False
-    mapped = ip.ipv4_mapped if isinstance(ip, ipaddress.IPv6Address) else None
-    return (mapped or ip).is_loopback
-
-
-def _own(handler: BaseHTTPRequestHandler) -> str:
-    try:
-        return str(handler.connection.getsockname()[0])
-    except (OSError, AttributeError, IndexError):
-        return ""
+# The gate's (core/home_gate.py), by the names the tests reach them by.
+_loopback = home_gate.this_computer
+_own = home_gate.own_address
 
 
 class _Server(ConnectionLimitMixin, ExclusiveBindMixin, ThreadingHTTPServer):
@@ -937,32 +925,20 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
             self._send(code, (text + "\n").encode("utf-8"), "text/plain; charset=utf-8", extra)
 
         # -- the request ---------------------------------------------------------
-        def _token(self, query: dict[str, list[str]]) -> str:
-            auth = self.headers.get("Authorization") or ""
-            if auth[:7].lower() == "bearer ":
-                return auth[7:].strip()
-            return (self.headers.get("X-Dopeiptv-Token") or "").strip() or \
-                (query.get("token") or [""])[0]
-
         def _authorized(self, given: str, admin: bool = False) -> bool:
             """*given* opens what is asked: the page and its api/ only with
             the admin token; the playlist, the guide and the streams with
             either."""
             cfg = server.config
-            tokens = [cfg.admin or cfg.token] if admin else [cfg.token, cfg.admin]
-            got = given.encode("utf-8", "replace")
-            ok = False
-            for t in tokens:
-                if t:
-                    ok |= hmac.compare_digest(got, t.encode("utf-8"))
-            return ok
+            return home_gate.token_ok(given, *([cfg.admin or cfg.token] if admin
+                                              else [cfg.token, cfg.admin]))
 
         def _base(self) -> str:
             return server.base(self.headers.get("Host"), str(self.client_address[0]))
 
         def _handle(self, method: str) -> None:
             who = str(self.client_address[0])
-            if not home_net.is_home_client(who, _own(self)):
+            if not home_gate.at_home(who, _own(self)):
                 self._text(403, "only the home network")
                 return
             lim = server.limiter
@@ -986,11 +962,10 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                     if cross_site(self.headers):
                         self._text(403, "not for a web page")
                         return
-                    if not self._tuner_token(tokened.group(1)):
-                        if not _loopback(who) and lim.failed(who):
-                            log.warning("server: an address on the network kept guessing the "
-                                        "tuner's token; it is shut out for %d minutes",
-                                        int(lim.lockout // 60))
+                    if not home_gate.token_ok(tokened.group(1), server.config.token):
+                        home_gate.wrong_token(lim, who, self.headers, here=_loopback(who),
+                                              said="server: an address on the network kept "
+                                                   "guessing the tuner's token")
                         time.sleep(0.25)
                         self._text(401, "the tuner's address has the wrong token")
                         return
@@ -1032,18 +1007,17 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                 if lim.blocked(who):
                     self._text(429, "too many wrong tokens - try again later", {"Retry-After": "60"})
                     return
-                given = self._token(query)
+                given = home_gate.given_token(self.headers, query)
                 admin = path == "/" or path.startswith("/api/")
                 if not self._authorized(given, admin):
                     # Only a try at the token counts: a browser asks for
                     # /favicon.ico by itself. Never this computer's nor a
                     # web page's: a page in a browser here would shut out
                     # the person's own browser, or a phone that visits it.
-                    if given and not _loopback(who) \
-                            and not cross_site(self.headers, self.headers.get("Host")) \
-                            and lim.failed(who):
-                        log.warning("server: an address on the network kept guessing the token; "
-                                    "it is shut out for %d minutes", int(lim.lockout // 60))
+                    if given:
+                        home_gate.wrong_token(lim, who, self.headers, here=_loopback(who),
+                                              said="server: an address on the network kept "
+                                                   "guessing the token")
                     time.sleep(0.25)
                     self._text(401, "the address needs its token (dopeIPTV > Settings > Nerd > "
                                     "Remote and automation)")
@@ -1080,11 +1054,6 @@ def _make_handler(server: HomeServer) -> type[BaseHTTPRequestHandler]:
                     self._json(500, {"error": type(e).__name__})
                 except OSError:
                     pass
-
-        def _tuner_token(self, given: str) -> bool:
-            t = server.config.token
-            return bool(t) and hmac.compare_digest(given.encode("utf-8", "replace"),
-                                                   t.encode("utf-8"))
 
         def _hdhomerun(self, path: str, method: str, base: str) -> None:
             cfg = server.config

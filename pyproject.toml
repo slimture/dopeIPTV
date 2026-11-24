@@ -173,6 +173,7 @@ files = [
     "dopeiptv/core/qr.py",
     "dopeiptv/core/ical.py",
     "dopeiptv/core/phone_remote.py",
+    "dopeiptv/core/home_gate.py",
     "dopeiptv/core/phone_page.py",
     "dopeiptv/core/phone_browse.py",
     "dopeiptv/core/report.py",

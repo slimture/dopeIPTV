@@ -20,8 +20,6 @@ work (the window hands it to its own thread), and *share* - an object with
 
 from __future__ import annotations
 
-import hmac
-import ipaddress
 import json
 import secrets
 import socket
@@ -33,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Iterable
 from urllib.parse import parse_qs, quote, urlsplit
 
-from . import home_net
+from . import home_gate, home_net
 from .log import log
 from .nerd_check import FAIL, OK, WARN, Check
 from .exclusive_bind import ConnectionLimitMixin, ExclusiveBindMixin
@@ -118,13 +116,6 @@ def asker() -> str:
     return str(getattr(_ASKER, "who", "") or "")
 
 
-def _loopback(address: str) -> bool:
-    try:
-        return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
-    except ValueError:
-        return False
-
-
 class RemoteServer:
     """The server; *remote* and *share* say which half answers."""
 
@@ -141,12 +132,12 @@ class RemoteServer:
         # Per client address: a request budget (a device at home cannot keep
         # the window's thread busy), and ten wrong tokens in a minute shut it
         # out for ten minutes - never this computer, whose scripts ask by
-        # loopback (phone_remote.RateLimiter). Every other address together
+        # loopback (home_gate.RateLimiter). Every other address together
         # has a budget too: a device that asks from address after address
         # cannot take the server down (429).
-        from .phone_remote import SERVER_BURST, SERVER_RATE, RateLimiter, this_computer
-        self.limits = RateLimiter(total_rate=SERVER_RATE, total_burst=SERVER_BURST,
-                                  spare=this_computer)
+        self.limits = home_gate.RateLimiter(total_rate=home_gate.SERVER_RATE,
+                                            total_burst=home_gate.SERVER_BURST,
+                                            spare=home_gate.this_computer)
 
     @property
     def running(self) -> bool:
@@ -174,8 +165,7 @@ class RemoteServer:
         log.info("remote: stopped")
 
     def authorized(self, given: str) -> bool:
-        return bool(self.token) and hmac.compare_digest(given.encode("utf-8", "replace"),
-                                                        self.token.encode("utf-8"))
+        return home_gate.token_ok(given, self.token)
 
     def base(self, host_header: str | None, own: str = "") -> str:
         """This server's address as a playlist writes it: under the Host
@@ -195,15 +185,10 @@ class RemoteServer:
     def client_ok(address: str, own: str = "") -> bool:
         """This computer or the home network, whichever part of it (*own*:
         the address the client reached us at - the same is this computer)."""
-        return home_net.is_home_client(address, own)
+        return home_gate.at_home(address, own)
 
 
-def _own(handler: BaseHTTPRequestHandler) -> str:
-    """The address a client reached this computer at."""
-    try:
-        return str(handler.connection.getsockname()[0])
-    except (OSError, AttributeError, IndexError):
-        return ""
+_own = home_gate.own_address
 
 
 def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
@@ -247,13 +232,6 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
                     self.wfile.write(chunk)
 
         # -- the request ---------------------------------------------------------
-        def _given_token(self, query: dict[str, list[str]]) -> str:
-            auth = self.headers.get("Authorization") or ""
-            if auth[:7].lower() == "bearer ":
-                return auth[7:].strip()
-            return (self.headers.get("X-Dopeiptv-Token") or "").strip() or \
-                (query.get("token") or [""])[0]
-
         def _params(self, query: dict[str, list[str]]) -> dict[str, Any] | None:
             params: dict[str, Any] = {k: v[0] for k, v in query.items() if k != "token" and v}
             try:
@@ -286,20 +264,21 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
 
         def _answer(self, method: str) -> None:
             who = str(self.client_address[0])
-            if not server.client_ok(who, _own(self)):
+            host = self.headers.get("Host")
+            # A web page whose own name a DNS rebinding pointed here asks
+            # under that public name: never answered, token or not, and
+            # turned away before its tries use up the budget.
+            turned = home_gate.front(who, _own(self), host, server.limits, admits=server.client_ok)
+            if turned == home_gate.AWAY:
                 self._json(403, {"error": "only this computer and the home network"})
                 return
-            if server.limits.blocked(who) or not server.limits.allow(who):
-                self._json(429, {"error": "too many requests - try again later"})
-                return
-            host = self.headers.get("Host")
-            if host and not home_net.home_host(host):
-                # A web page whose own name a DNS rebinding pointed here asks
-                # under that public name: never answered, token or not.
+            if turned == home_gate.FOREIGN_HOST:
                 self._json(403, {"error": "ask by this computer's address or a home name"})
                 return
-            from .phone_remote import cross_site
-            if cross_site(self.headers, host):
+            if turned == home_gate.TOO_OFTEN:
+                self._json(429, {"error": "too many requests - try again later"})
+                return
+            if home_gate.cross_site(self.headers, host):
                 # A web page in a browser here or at home (a fetch, a form):
                 # Home Assistant, scripts and players send no Origin.
                 self._json(403, {"error": "not for a web page"})
@@ -307,11 +286,13 @@ def _make_handler(server: RemoteServer) -> type[BaseHTTPRequestHandler]:
             parts = urlsplit(self.path)
             path = parts.path.rstrip("/") or "/"
             query = parse_qs(parts.query, keep_blank_values=False)
-            if not server.authorized(self._given_token(query)):
+            if not server.authorized(home_gate.given_token(self.headers, query)):
                 # A wrong token is slowed a little; the right one is 32
                 # random characters, so this is manners, not the lock.
-                if not _loopback(who):
-                    server.limits.failed(who)
+                home_gate.wrong_token(server.limits, who, self.headers,
+                                      here=home_gate.this_computer(who),
+                                      said="remote: an address on the network kept guessing "
+                                           "the token")
                 time.sleep(0.25)
                 self._json(401, {"error": "unauthorized", "hint": "the token is in Settings > Nerd"})
                 return
