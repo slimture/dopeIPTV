@@ -398,6 +398,25 @@ QDialog.exec = settings_run
 w.open_settings()
 
 # -- the main dialogs ----------------------------------------------------------------------
+# Each opens without a window of its own flashing up first: a widget shown
+# before it has a parent is one, and GNOME's pointer spins for seconds then.
+from PyQt6.QtCore import QObject
+from PyQt6.QtWidgets import QWidget
+stray = []
+
+
+class _StrayWatch(QObject):
+    def eventFilter(self, obj, ev):
+        if (ev.type() == QEvent.Type.Show and isinstance(obj, QWidget) and obj.isWindow()
+                and obj is not w and obj.windowType() not in (
+                    Qt.WindowType.Popup, Qt.WindowType.ToolTip, Qt.WindowType.Dialog)
+                and not isinstance(obj, QDialog)):
+            stray.append(f"{type(obj).__name__} {getattr(obj, 'text', lambda: '')()!r}")
+        return False
+
+
+_stray_watch = _StrayWatch()
+app.installEventFilter(_stray_watch)
 from dopeiptv.ui.cast_dialog import CastDialog
 from dopeiptv.ui.dialogs import FeedbackDialog, PlaylistDialog, ReportDialog, RestoreBackupDialog
 from dopeiptv.ui.feedback_dialogs import AnswersDialog
@@ -447,6 +466,7 @@ for opener in ("_show_scheduled_manager", "open_address", "open_queue", "open_eq
                "show_about", "_open_content_manager"):
     getattr(w, opener)()
     pump(3)
+assert not stray, "shown as windows of their own: " + ", ".join(stray)
 print("A11Y_OK", flush=True)
 os._exit(0)
 """

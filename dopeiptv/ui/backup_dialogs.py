@@ -386,7 +386,10 @@ class RestoreBackupDialog(QDialog):
         self.notes.setStyleSheet(
             f"font-size:12px; color:{P.get('warn', P['muted'])};")
         self.notes.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.notes.setVisible(bool(notes))
+        if not notes:
+            # Hidden, never shown: shown before it has a parent it is a window
+            # of its own, and GNOME's pointer spins for seconds.
+            self.notes.hide()
         # What runs something, lets others in or sends the connections
         # elsewhere: one box each, none ticked - only what is ticked comes.
         self.backup = backup
@@ -422,7 +425,8 @@ class RestoreBackupDialog(QDialog):
         notes_box.setFrameShape(QScrollArea.Shape.NoFrame)
         notes_box.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget"
                                 " { background:transparent; }")
-        notes_box.setVisible(bool(notes) or bool(self.picks))
+        if not (notes or self.picks):
+            notes_box.hide()            # never shown before it has a parent
         col.addWidget(notes_box)
         col.addSpacing(4)
         self.replace = QRadioButton(tr("restore_replace"))

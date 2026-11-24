@@ -199,13 +199,16 @@ class CastDialog(QDialog):
         # A Kodi that mDNS does not find (another subnet, announcing off), or
         # one whose web server wants a login: added by hand. The window owns
         # that form (ui/mw_cast.py), so the button is there only with it.
-        self.kodi_btn = QPushButton(tr("cast_add_kodi"))
+        # Made with the window as their parent: shown before they have one,
+        # each was a window of its own for a moment - GNOME's pointer spun
+        # for seconds as the cast window opened.
+        self.kodi_btn = QPushButton(tr("cast_add_kodi"), self)
         self.kodi_btn.clicked.connect(self._add_kodi)
         self.kodi_btn.setVisible(callable(getattr(window, "add_kodi", None)))
         # A Chromecast or a TV the search does not reach (another part of a
         # network split in VLANs): by its address, kept for next time.
         # Opened on one added that way, it offers to forget it.
-        self.addr_btn = QPushButton(tr("cast_add_by_address"))
+        self.addr_btn = QPushButton(tr("cast_add_by_address"), self)
         self.addr_btn.clicked.connect(self._add_by_address)
         self.addr_btn.setVisible(callable(getattr(window, "add_cast_device", None)))
         kodi_row = QHBoxLayout()
