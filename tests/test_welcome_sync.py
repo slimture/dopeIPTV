@@ -286,14 +286,14 @@ def test_a_copy_a_month_old_is_asked_about_before_it_is_taken(qapp, tmp_path, si
     than a month ago - another computer may have a newer one - is asked
     about first, in plain words, No the default. No: nothing taken, sync
     left off, said why. Yes: joined as ever."""
-    from dopeiptv.ui import widgets
+    from dopeiptv.ui import message_box
     asked = []
     answer = {"yes": False}
 
-    def confirm(parent, title, text, *, default_yes=True):
+    def confirm(parent, title, text, *, default_yes=True, **_k):
         asked.append((text, default_yes))
         return answer["yes"]
-    monkeypatch.setattr(widgets, "confirm", confirm)
+    monkeypatch.setattr(message_box, "confirm", confirm)
     code, pid = _other_computer(tmp_path, site, with_source=True, now=int(time.time()) - 45 * 86400)
     w, ov = _window(tmp_path)
     _ask(ov, code)
