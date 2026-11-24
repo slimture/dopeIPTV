@@ -80,7 +80,9 @@ WHOLE = [
       "dopeiptv/core/svg_safe.py", "dopeiptv/core/_lazy_requests.py", "dopeiptv/core/net_adapter.py", "dopeiptv/core/workers.py", "dopeiptv/providers/client.py",
       "dopeiptv/providers/stalker.py", "dopeiptv/providers/epg.py", "dopeiptv/providers/boxes.py",
       "dopeiptv/providers/enigma2.py", "dopeiptv/providers/satip.py", "dopeiptv/providers/lan_scan.py",
-      "dopeiptv/providers/jellyfin.py", "dopeiptv/providers/plex.py", "dopeiptv/ui/widgets.py"]),
+      "dopeiptv/providers/jellyfin.py", "dopeiptv/providers/plex.py", "dopeiptv/ui/widgets.py",
+      "dopeiptv/ui/message_box.py", "dopeiptv/core/safe_json.py", "dopeiptv/core/safe_xml.py",
+      "dopeiptv/providers/epg_texts.py"]),
     ("secrets", "the logins, tokens and codes it keeps, its logs, backups and error reports",
      "Where are passwords, tokens, the sync code and room codes kept, who can read them, and do any "
      "of them end up in a log file, an error report, a backup or a crash file? What does restoring "
@@ -89,7 +91,7 @@ WHOLE = [
      ["dopeiptv/core/settings_files.py", "dopeiptv/core/stores.py", "dopeiptv/core/log.py",
       "dopeiptv/core/backup.py", "dopeiptv/ui/backup_dialogs.py", "dopeiptv/core/report.py",
       "dopeiptv/core/net_adapter.py", "dopeiptv/core/cert_pin.py", "dopeiptv/core/sync.py",
-      "dopeiptv/ui/sync_review.py"]),
+      "dopeiptv/ui/sync_review.py", "dopeiptv/core/names.py", "dopeiptv/core/site_out.py"]),
     ("links", "how other programs reach the app: dopeiptv:// links, a second start, drops, Discord, LIRC and the media controls",
      "Can a web page, another program or another user of the computer make the app start a server, "
      "play an address, load a plugin or run code through a link or a second start? Are the local "
@@ -126,6 +128,36 @@ WHOLE = [
       "dopeiptv/core/memory_safe.py", "dopeiptv/core/dvr_store.py", "dopeiptv/media/dvr_player.py",
       "dopeiptv/providers/cast_bridge.py", "dopeiptv/providers/airplay_bridge.py",
       "dopeiptv/ui/mw_cast.py", "dopeiptv/ui/mw_recording.py", "dopeiptv/ui/subtitle_search.py"]),
+    ("downloads", "downloads to watch without the network, and offline mode",
+     "A download keeps a film or an episode on the disk: can a provider's answer, a sidecar file "
+     "beside a video or a hand-edited queue write outside the downloads folder, follow a link, fill "
+     "the disk, hang or crash the app? Does anything on the disk name a stream's address, a login or "
+     "the account? Does a download ever open a second connection to the provider by itself, or run "
+     "while viewing privately? Offline mode says nothing goes to the internet: does every way out - "
+     "the app's requests, the bridge, the programs it starts, a web page through yt-dlp, a playlist "
+     "file on this computer that names the internet - go through its one guard, and does that guard "
+     "fail closed?",
+     ["dopeiptv/core/downloads.py", "dopeiptv/providers/downloaded.py", "dopeiptv/ui/mw_downloads.py",
+      "dopeiptv/core/offline.py", "dopeiptv/ui/mw_offline.py", "dopeiptv/core/_lazy_requests.py",
+      "dopeiptv/core/dest_guard.py", "dopeiptv/core/net_bridge.py", "dopeiptv/core/ytdlp.py",
+      "dopeiptv/media/players.py", "dopeiptv/core/dvr_ingest.py"]),
+    ("recorder", "recordings with the window closed (dopeiptv --server) and the window's own",
+     "The window and dopeiptv --server share the scheduled recordings through files beside the "
+     "settings (a claim per recording, the list locked): can another user on the computer, or a "
+     "damaged or hand-written claim, make either one record something, stop a recording, run a "
+     "program, read a file or crash? Is every recording made once, by one of them, and never one "
+     "connection more than the account allows next to the devices watching through the server?",
+     ["dopeiptv/core/rec_claims.py", "dopeiptv/core/recording.py", "dopeiptv/core/rec_close.py",
+      "dopeiptv/services/server_recorder.py", "dopeiptv/core/series_plan.py", "dopeiptv/headless.py",
+      "dopeiptv/ui/mw_rec_close.py", "dopeiptv/core/connections.py", "dopeiptv/core/restream.py"]),
+    ("firstrun", "the first-run guide, its connect step and the demo",
+     "Is a login typed into the guide kept anywhere - the settings, a log, the cache, memory after the "
+     "guide is closed - when the try fails or the guide is left? Can a server answering the connect "
+     "step make the app do more than say why it failed? Does the demo reach any host but the ones it "
+     "names, and does it keep anything of what plays?",
+     ["dopeiptv/providers/connect_check.py", "dopeiptv/ui/welcome.py", "dopeiptv/ui/mw_onboarding.py",
+      "dopeiptv/providers/demo.py", "dopeiptv/providers/demo_streams.py", "dopeiptv/ui/media_signin.py",
+      "dopeiptv/core/privacy.py"]),
     ("build", "how a release is built, signed and checked",
      "Could someone who takes over a dependency, a GitHub Action, the website or the release key's "
      "storage get a changed build to users? What is pinned, what is checked, and what is only "
