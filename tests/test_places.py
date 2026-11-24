@@ -125,6 +125,11 @@ from dopeiptv.ui import theme
 
 i18n.set_language("en")
 mw.launch_player = lambda *a, **k: None
+# Radio as the start place asks radio-browser.info on the pool. A window
+# closed while that still waits on the network ends this process at once
+# (os._exit, as the app does on stuck workers), before it says it is done.
+from dopeiptv.providers import radio_browser as rb
+rb.RadioBrowser.get = lambda self, path, params=None: []
 
 
 class Client(DemoClient):
@@ -173,6 +178,14 @@ def window(prefill):
     return w, s
 
 
+def shut():
+    # Whatever the window still asks on its pools is let finish first, or
+    # its close would end this process (os._exit) before the next window.
+    for pool in (w.pool, w._logo_pool, w._art_pool):
+        pool.waitForDone(20000)
+    w.close()
+
+
 def lit():
     return [k for k, b in w.nav_btns.items() if b.isChecked()]
 
@@ -181,14 +194,14 @@ def lit():
 w, s = window({"last_place": "films", "last_list_place": "films"})
 assert w.mode == "vod" and w._place == "films" and lit() == ["vod"], (w.mode, w._place, lit())
 assert w._place_header.title_text() == "Movies"
-w.close()
+shut()
 w, s = window({"last_place": "guide", "last_list_place": "series"})
 assert until(lambda: w._guide_page_showing())
 assert w.mode == "series" and w._place == "guide" and w._list_place == "series"
 w._leave_guide_page()
 pump()
 assert w._place == "series" and lit() == ["series"]
-w.close()
+shut()
 # Radio, Local files and Recordings too, and the Guide or Search over Radio:
 # the build's first filter runs before any category is picked (1.6.9 and
 # 1.6.10 crashed on every start on Radio, or on a page over it).
@@ -196,7 +209,7 @@ for place, base in (("radio", "radio"), ("local", "local"), ("rec", "rec"),
                     ("guide", "radio"), ("search", "radio")):
     w, s = window({"last_place": place, "last_list_place": base})
     assert w.mode == base and w._list_place == base, (place, w.mode, w._list_place)
-    w.close()
+    shut()
 # ...or always on Mine; Home's "start on Home" carried over to it.
 w, s = window({"home_enabled": "true", "home_start": "true", "home_sh_pop_movies": "false",
                "last_place": "radio"})
@@ -271,7 +284,7 @@ assert [r["name"] for r in got[0]] == ["Dune (2021)", "Oppenheimer"], got
 w._popular_changed()
 assert changed == [1]
 
-w.close()
+shut()
 
 # -- a profile switch: that person's place ---------------------------------------------------
 path = os.path.join(tempfile.mkdtemp(), "p.ini")
