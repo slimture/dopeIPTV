@@ -133,8 +133,32 @@ class SettingsContext:
     soon: Callable[..., None] | None = None
 
 
+#: The pages a menu elsewhere leads to, by key: their title's string - the
+#: one open_settings gives the page (the link reads "Settings › <title>…").
+LINKED_PAGES = {
+    "playback": "tab_playback", "audio": "set_page_av", "guide": "sec_guide",
+    "multiview": "tab_multiview", "recording": "tab_recording",
+    "casting": "set_page_casting", "tv": "set_page_tv", "local": "nav_local",
+}
+
+
 class _SettingsMixin:
     """MainWindow mixin: the Settings dialog, its tabs and persistence."""
+
+    def settings_link_text(self, page: str) -> str:
+        """"Settings › Picture & sound…": a menu's way to the page its
+        settings are on (LINKED_PAGES), in the window's direction."""
+        rtl = QLocale().textDirection() == Qt.LayoutDirection.RightToLeft
+        return f"{tr('settings_title')} {'‹' if rtl else '›'} {tr(LINKED_PAGES[page])}…"
+
+    def open_settings_at(self, page: str) -> None:
+        """Settings on *page*, once the menu or window that asked is gone."""
+        QTimer.singleShot(0, lambda: self.open_settings(at_page=page))
+
+    def add_settings_link(self, menu, page: str):
+        """The way from *menu* to Settings' *page*, at its end."""
+        return menu.addAction(self.settings_link_text(page),
+                              lambda: self.open_settings_at(page))
 
     def _maybe_offer_desktop_entry(self) -> None:
         """Offer, once, to add the app to the desktop's menu.

@@ -605,6 +605,8 @@ class _PlaceRecMixin:
             m.addAction(tr("rec_clear_finished"), self.rec.clear_finished)
         if files and not self._rp_jobs_view():
             m.addAction(tr("rec_delete_all"), self._delete_all_recordings)
+        m.addSeparator()
+        self.add_settings_link(m, "recording")
 
     def _rp_series_rules(self) -> None:
         self.open_settings(at_page="recording", at_row=(-1, -1, tr("set_card_series")))

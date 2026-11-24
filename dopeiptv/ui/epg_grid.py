@@ -2469,6 +2469,7 @@ class EpgGrid(QWidget):
         m = QMenu(self)
         if not data:
             m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
+            self._settings_link(m)
             popup_menu_over_video(m, global_pos)
             return
         ch, p = data["channel"], data["prog"]
@@ -2480,6 +2481,7 @@ class EpgGrid(QWidget):
             m.addAction(tr("epg_play_channel"), lambda: self._tune(ch))
             m.addSeparator()
             m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
+            self._settings_link(m)
             popup_menu_over_video(m, global_pos)
             return
         past = p["stop_timestamp"] < time.time()
@@ -2513,7 +2515,15 @@ class EpgGrid(QWidget):
                     lambda: self.window._add_reminder(ch, p))
         m.addSeparator()
         m.addAction(tr("btn_refresh_epg"), self._refresh_guide)
+        self._settings_link(m)
         popup_menu_over_video(m, global_pos)
+
+    def _settings_link(self, m: QMenu) -> None:
+        """Settings › Guide at the foot of the guide's menu (its offsets, the
+        line at the time now, what it shows)."""
+        link = getattr(self.window, "add_settings_link", None)
+        if callable(link):
+            link(m, "guide")
 
     def _record(self, ch: dict, p: dict) -> None:
         # The detail panel's path, not a job of its own: a programme on the

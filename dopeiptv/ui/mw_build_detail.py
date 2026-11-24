@@ -178,6 +178,11 @@ class _BuildDetailMixin:
             # Nerd: the stream analysis of what plays (only while Nerd is
             # on - an empty label leaves the entry out).
             self.player.extra_options.append((self._tsa_menu_text, self.open_ts_analysis))
+            # Where every choice in the menu is kept for good: Settings ›
+            # Picture & sound (the tracks' languages, subtitles, the video),
+            # last in the menu.
+            self.player.settings_link = (lambda: self.settings_link_text("audio"),
+                                         lambda: self.open_settings_at("audio"))
             # Subtitles from OpenSubtitles, and a subtitle loaded for a title
             # remembered for the next time it plays (mw_subtitles).
             self.player.find_subtitles = self._open_subtitle_search

@@ -251,6 +251,9 @@ class _MultiviewWindow(WindowChanges, QWidget):
                           else tr("popout_hide_titlebar"))
         bar.triggered.connect(lambda: self._set_frameless(not frameless))
         m.addSeparator()
+        link = getattr(self._owner, "add_settings_link", None)
+        if callable(link):
+            link(m, "multiview")      # its size, frame, sound and controls
         m.addAction(tr("mv_close"), self.close)
         popup_menu_over_video(m, pos)
 

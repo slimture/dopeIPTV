@@ -415,6 +415,10 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         # populate_options_menu). Kept as (label_callable, action) so a
         # language change is picked up when the menu is next opened.
         self.extra_options: list = []
+        # The window's way to where these choices are kept for good
+        # ("Settings › Picture & sound…"): (label_callable, action), last in
+        # the menu after a line - None: not offered.
+        self.settings_link = None
         # The window's "Find subtitles online…" (None: not offered), the
         # same way: the player shows the entry, the window knows the site.
         self.find_subtitles = None
@@ -2255,6 +2259,17 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
             text = label()
             if text:            # "": not offered now (a Nerd entry, Nerd off)
                 menu.addAction(text, action)
+        if extras:
+            self.add_settings_link(menu)
+
+    def add_settings_link(self, menu) -> None:
+        """The window's way to Settings (``settings_link``) at the end of
+        *menu*, after a line."""
+        if self.settings_link is None:
+            return
+        label, action = self.settings_link
+        menu.addSeparator()
+        menu.addAction(label(), action)
 
     def _set_mpv(self, prop: str, value) -> None:
         m = self.video.mpv

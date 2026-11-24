@@ -795,6 +795,9 @@ class _PopoutMixin:
                 text = label()
                 if text:
                     m.addAction(text, action)
+            link = getattr(p, "add_settings_link", None)
+            if callable(link):
+                link(m)             # Settings › Picture & sound…, after a line
         m.addSeparator()
         m.addAction(tr("tooltip_popout_exit"), self._exit_popout)
         popup_menu_over_video(m, global_pos)

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QListWidget,
     QPushButton, QVBoxLayout, QWidget,
@@ -206,6 +206,17 @@ class CastDialog(QDialog):
         kodi_row.addWidget(self.kodi_btn)
         kodi_row.addWidget(self.addr_btn)
         kodi_row.addStretch(1)
+        # Where casting's own settings are (the devices added, the buffer
+        # kept while casting): Settings › Casting, the window closing first.
+        link_text = getattr(window, "settings_link_text", None)
+        if callable(link_text):
+            settings_btn = QPushButton(link_text("casting"))
+            settings_btn.setFlat(True)
+            settings_btn.setObjectName("SettingsLink")
+            settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            settings_btn.clicked.connect(
+                lambda _c=False: (self.reject(), window.open_settings_at("casting")))
+            kodi_row.addWidget(settings_btn)
         lay.addLayout(kodi_row)
 
         # Audio and subtitle choice. Both are honoured by converting the

@@ -1135,4 +1135,8 @@ class _LocalFilesMixin(_LocalLibraryMixin):
                 mv.addAction(tr("mv_cell", n=n + 1) + occupant,
                              lambda it=it, n=n:
                              self._local_add_to_multiview(it, n))
+        # Its folders and the music's pictures are kept on Settings › Local
+        # files.
+        m.addSeparator()
+        self.add_settings_link(m, "local")
         m.exec(at if at is not None else self.listw.viewport().mapToGlobal(pos))
