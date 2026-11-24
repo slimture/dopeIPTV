@@ -268,11 +268,14 @@ def _primaries(ov, page):
 
 
 def test_a_media_servers_form_has_one_primary_and_says_what_is_missing(app):
+    from dopeiptv.ui.welcome import family_kinds
     ov, got = _overlay()
     _up(app, ov, got)
-    for kind in ("jellyfin", "emby", "plex"):
-        _form(ov, MEDIA, kind)
-        assert _primaries(ov, PAGE_FORM) == [ov._c_connect], kind
+    # One accent button on every form: Connect.
+    for family in (IPTV, MEDIA, BOX):
+        for kind in family_kinds(family):
+            _form(ov, family, kind)
+            assert _primaries(ov, PAGE_FORM) == [ov._c_connect], kind
     _form(ov, MEDIA, "jellyfin")
     ov._c_connect.click()
     assert ov._c_err.isVisible() and ov._c_err.text() == tr("onb_fill_media")
@@ -455,6 +458,18 @@ def test_the_reviewed_words():
     assert sv["onb_nerd_on_now"].startswith("🤓 Nerd")
     assert "Demokanaler" in sv["demo_title"] and "Demo-kanaler" not in sv["demo_title"]
     assert locales["ja"]["onb_list_sep"] == "、" and locales["ar"]["onb_list_sep"] == "، "
+
+
+def test_a_refused_login_at_start_is_still_told_as_one_after_the_words_changed():
+    """app.py told a refused login by its English words: "username" is
+    "user name" now - it goes by the error's key."""
+    from dopeiptv.app import _wrong_login
+    from dopeiptv.i18n import LocalizedError
+    i18n.set_language("sv")
+    assert _wrong_login(LocalizedError("err_wrong_login"))
+    assert _wrong_login(RuntimeError("Wrong username or password."))       # a server's own
+    assert not _wrong_login(LocalizedError("err_box_login_needed"))
+    assert not _wrong_login(RuntimeError("timed out"))
 
 
 def test_one_of_a_kind_is_said_in_the_singular_with_the_languages_separator(app):
@@ -872,6 +887,29 @@ elif SCENARIO == "demo":
         ("/m/film.mkv", 300.0), ("/m/other.mkv", 400.0)]
     assert "other.mkv" in written()
 
+elif SCENARIO == "demo_with_source":
+    # A source of one's own stored but not in use (added while the demo ran,
+    # its switch not through): the demo's channels are never under its id,
+    # the avatar never names it, and Leave the demo goes to it.
+    srv = Served(xtream_panel(channels=4))
+    pl = store.add({"name": "Mine", "kind": "xtream", "server": srv.base, "username": "anna",
+                    "password": "s3cret pw", "refresh": "never"})
+    store.set_active(pl["id"])
+    w.show_welcome()
+    settle(lambda: guide_up(), what="the guide")
+    w._welcome._w_demo.clicked.emit()
+    settle(lambda: isinstance(w.client, DemoClient) and w.list_model.rowCount() >= 6,
+           what="the demo")
+    w._update_playlist_btn()
+    assert w._own_source_id() is None and w._health_source_id() == "" and w._chno_pid() is None
+    assert not w._playlist_btn.isVisible()
+    assert "Mine" not in (w._playlist_btn.toolTip() or "")
+    w._source_strip_leave.click()
+    settle(lambda: isinstance(w.client, XtreamClient), 20, "one's own source")
+    settle(lambda: w.list_model.rowCount() == 4, 20, "its channels")
+    assert w._demo_kept is None and w._own_source_id() == pl["id"]
+    assert not w._source_strip.isVisible()
+
 elif SCENARIO == "demo_files":
     w.show_welcome()
     settle(lambda: guide_up(), what="the guide")
@@ -901,7 +939,7 @@ def _env(tmp_path) -> dict:
 
 @pytest.mark.parametrize("scenario", ["picker_first", "picker_over", "sync_profiles", "kids",
                                       "over_guide", "settings_explore", "settings_demo", "demo",
-                                      "demo_files"])
+                                      "demo_with_source", "demo_files"])
 def test_the_review_in_the_window(tmp_path, scenario):
     out = subprocess.run([sys.executable, "-c", _CHILD, scenario], cwd=_REPO_ROOT,
                          env=_env(tmp_path), capture_output=True, text=True, timeout=240)

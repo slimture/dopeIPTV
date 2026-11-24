@@ -493,7 +493,7 @@ def test_a_box_the_portal_refuses_is_a_login_error(portal, records, opt):
         c.authenticate()
     assert e.value.key == "err_wrong_login"
     # What app.py looks for to show the "check your playlist" dialog.
-    assert "username or password" in str(e.value)
+    assert "user name or password" in str(e.value)
     with pytest.raises(LocalizedError):
         c.live_categories()
     assert c.account_info() == {}

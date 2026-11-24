@@ -300,8 +300,9 @@ class WelcomeOverlay(QWidget):
     quit_asked = pyqtSignal()
     #: The connect step: stop the try under way (Back, Esc).
     connect_cancelled = pyqtSignal()
-    # Decorative greetings that flash on the first page - one per shipped
-    # language, so the rotation mirrors how many languages the app speaks.
+    # Decorative greetings that flash on the first page, once round - one per
+    # shipped language (Persian and Urdu say it alike: once), so the rotation
+    # mirrors how many languages the app speaks.
     _GREETINGS = (
         "Welcome", "Välkommen", "Bienvenido", "Willkommen", "Bienvenue",
         "欢迎", "Добро пожаловать", "ยินดีต้อนรับ", "Bem-vindo", "Benvenuto",

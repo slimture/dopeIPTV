@@ -114,7 +114,7 @@ def test_a_wrong_password_says_so(app, fake):
     d.pw.setText("nope")
     d.signin.sign_btn.click()
     assert _wait(lambda: not d.signin.busy)
-    assert not d.signin.signed_in() and d.signin.status.text() == "Wrong username or password."
+    assert not d.signin.signed_in() and d.signin.status.text() == "Wrong user name or password."
 
 
 def test_editing_keeps_the_sign_in_until_the_server_changes(app):
