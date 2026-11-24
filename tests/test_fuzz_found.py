@@ -444,6 +444,55 @@ def test_m3u_categories_in_order_each_once():
     assert [x["category_id"] for x in c.live_categories()] == ["b", "a"]
 
 
+# -- what the app keeps on disk (tests/test_fuzz_kept.py) ---------------------------------
+
+@pytest.mark.parametrize("added", ["1e999", "NaN", "1" + "0" * 400])
+def test_a_download_sidecar_whose_time_is_no_number(tmp_path, added):
+    """JSON's 1e999, NaN or 400 digits in a sidecar's added: kept as it was,
+    Item.added raised (OverflowError) or was infinite - the Downloaded place,
+    offline's Series list and, with the same title twice, the whole scan
+    failed. No number now: left out, its time 0."""
+    from dopeiptv.core import downloads as dl
+    path = tmp_path / ("a.mkv" + dl.SIDECAR)
+    path.write_text('{"kind":"movie","source":"a","stream_id":"1","added":%s}' % added)
+    info = dl.read_sidecar(str(path))
+    assert info is not None and "added" not in info
+    assert dl.Item(str(tmp_path / "a.mkv"), 1, {"added": json.loads(added)}).added == 0.0
+
+
+def test_a_recording_claim_nested_past_pythons_limit():
+    """A claim file of 16 KB holds nesting deeper than json reads: parse
+    raised RecursionError - out of the window's look at the other
+    recorder's claims. Nobody's claim now."""
+    from dopeiptv.core import rec_claims as rc
+    c = rc.parse("k", b"[" * rc.MAX_FILE, 1.0)
+    assert (c.job, c.who, c.state, c.pid) == ("", "", "", 0)
+    c = rc.parse("k", b'{"v":1,"job":["x"],"pid":[1],"host":{"a":1},"who":"window"}')
+    assert (c.job, c.pid, c.host, c.who) == ("", 0, "", "window")
+    # A process id no process has: none.
+    assert rc.parse("k", b'{"v":1,"pid":-1}').pid == 0 and rc.parse("k", b'{"v":1,"pid":1e999}').pid == 0
+
+
+def test_a_title_with_no_space_in_it_is_cleaned_in_linear_time():
+    """A sidecar's text without its addresses: r"\\S+://\\S*" was tried from
+    every place of a run with no space - a 60 KB title (a series' episodes
+    kept for offline, a provider's plot) hung known_episodes."""
+    from dopeiptv.core import downloads as dl
+    fz.linear(lambda s: dl._clean_text(s, 300), lambda n: "9" * n, 4000)
+    assert dl._clean_text("Se https://x.example/u/p nu", 300) == "Se nu"
+    assert dl._clean_text("(se:http://x/a) ok", 300) == "ok"
+
+
+def test_a_title_with_a_lone_surrogate_is_kept(tmp_path):
+    """JSON's "\\ud800" in a provider's episode title: its UTF-8 could not be
+    written - the series' episodes were not kept (and a sidecar not
+    written). Kept with it as "?"."""
+    from dopeiptv.core import downloads as dl
+    folder = str(tmp_path)
+    assert dl.keep_episodes(folder, "a", "1", [{"id": 502, "title": "\ud800"}])
+    assert dl.known_episodes(folder, "a", "1") == [{"id": "502", "title": "?"}]
+
+
 def test_the_fuzzer_reproduces_its_inputs():
     a = [fz.mutate_bytes(fz.rng_for("t", i, 0), b"abc") for i in range(20)]
     b = [fz.mutate_bytes(fz.rng_for("t", i, 0), b"abc") for i in range(20)]

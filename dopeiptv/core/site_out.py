@@ -364,6 +364,20 @@ def refusal(url: str, headers: Mapping[str, Any] | None = None,
     return None
 
 
+def holds_login(text: Any) -> bool:
+    """Whether *text* holds a login of the person's this check knows - one
+    of LONG characters or more anywhere, a shorter one as a word of its own
+    - as learnt so far (no settings read: any thread may ask). For words the
+    app writes down outside the settings: a download's sidecar
+    (core/downloads.clean_meta)."""
+    with _lock:
+        long_, short_re = _long, _short_re
+    t = str(text or "")
+    if not t:
+        return False
+    return any(v in t for v in long_) or (short_re is not None and short_re.search(t) is not None)
+
+
 _told: set[str] = set()
 
 

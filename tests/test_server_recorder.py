@@ -552,6 +552,42 @@ def test_the_jobs_list_is_one_for_both(app, tmp_path):
     server.shutdown()
 
 
+def test_a_stuck_other_recorder_never_freezes_the_window(app, tmp_path):
+    """The server keeps the jobs' list locked (suspended, a slow network
+    disk): the window's save and tick wait a moment at most, the save is
+    done at a later tick once the list is free - both recorders' jobs on it,
+    each once - and nothing waits on it at close."""
+    path = tmp_path / "s.ini"
+    spawned: list = []
+    window = _manager(path, rc.WINDOW, spawned)
+    server = _manager(path, rc.SERVER, spawned)
+    now = time.time()
+    theirs = server.add_job("http://a.example.com/live/u/p/2.ts", "Theirs", now + H, now + 2 * H,
+                            extra={"source": "p1"})
+
+    def stored() -> list:
+        raw = QSettings(str(path), QSettings.Format.IniFormat).value("recording_jobs") or "[]"
+        return sorted(j["title"] for j in json.loads(raw))
+
+    stuck = rc.Claims(window.claims.folder, rc.SERVER)      # the other process's lock
+    with stuck.jobs_lock():
+        assert stuck._jobs_fd is not None
+        t0 = time.monotonic()
+        mine = window.add_job("http://a.example.com/live/u/p/1.ts", "Mine", now + H, now + 2 * H,
+                              extra={"source": "p1"})
+        window.tick()
+        window.tick()
+        assert time.monotonic() - t0 < 1.5, "a moment at most, never the other's patience"
+        assert window._save_due and stored() == ["Theirs"], "not written past the other's lock"
+    window.tick()                       # the list free: saved now, merged with theirs
+    assert not window._save_due and stored() == ["Mine", "Theirs"]
+    assert {j["id"] for j in window.jobs if j["status"] == "scheduled"} == {mine["id"], theirs["id"]}
+    server.tick()
+    assert sorted(j["title"] for j in server.jobs) == ["Mine", "Theirs"]
+    window.shutdown()
+    server.shutdown()
+
+
 _HOLDER = r"""
 import sys, time
 sys.path.insert(0, sys.argv[1])

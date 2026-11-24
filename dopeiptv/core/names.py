@@ -13,7 +13,10 @@ is. No Qt; linear in the text.
 ``source_name`` names a source the person gave no name: by its address's
 host (and port), never by what the address carries before it - a login
 written as user:password@ - nor by its path or query; a playlist file by
-its own name.
+its own name. Releases up to 1.6.12 named one by everything between "//"
+and the next "/" (``old_source_name``) - a login with it; such a name goes
+by ``source_name`` from the start after (``renamed``), and ``holds_login``
+tells a name that carries one wherever it would be written down.
 """
 from __future__ import annotations
 
@@ -66,6 +69,55 @@ def source_name(address: str) -> str:
     if ":" in host:
         host = f"[{host}]"          # an IPv6 address
     return (f"{host}:{port}" if port else host)[:NAME_MAX]
+
+
+def old_source_name(address: str) -> str:
+    """The name releases up to 1.6.12 made of a source's *address* when the
+    person gave none (the quick form, the first-run guide, an import): all
+    between "//" and the next "/" - "user:password@host:8080", or
+    "host?username=...&password=..." for an address with no path."""
+    return str(address or "").strip().split("//")[-1].split("/")[0]
+
+
+#: A login written before a host: "user@", "user:password@".
+_USERINFO = re.compile(r"[^\s/@]@")
+#: A query's word, as a name made of an address carries it.
+_QUERY_WORD = re.compile(r"[?&;]\s*([^=&;?#\s]+)\s*=")
+
+
+def holds_login(name: str) -> bool:
+    """Whether a source's *name* carries what opens its account, as one made
+    of its address by an older release can (old_source_name): a login
+    written before a host (user@, user:password@) or a query word for a
+    user name, a password, a key or a token (player_exec.LOGIN_WORDS)."""
+    from .player_exec import LOGIN_WORDS
+    text = str(name or "")
+    if _USERINFO.search(text):
+        return True
+    return any(m.group(1).strip().lower() in LOGIN_WORDS for m in _QUERY_WORD.finditer(text))
+
+
+def renamed(name: str, address: str) -> str | None:
+    """The name a source named *name* goes by from now on: source_name of
+    its *address* in place of the one an older release made of it while
+    that holds a login (old_source_name, holds_login) - its host and port
+    alone; None for a name that stays as it is."""
+    text = str(name or "")
+    if not text or not holds_login(text):
+        return None
+    if text not in (old_source_name(address), str(address or "").split("//")[-1].split("/")[0]):
+        return None                 # a name of the person's own: theirs to change
+    new = source_name(address) or _login_left_out(text)
+    if holds_login(new):
+        new = ""                    # "" - the caller names it as it names one without
+    return new if new != text else None
+
+
+def _login_left_out(text: str) -> str:
+    """An old name with what came before its host and its query left out."""
+    rest = text.rsplit("@", 1)[-1]
+    return "".join(c for c in re.split(r"[?#]", rest, maxsplit=1)[0]
+                   if c.isprintable()).strip()[:NAME_MAX]
 
 
 def _same(a: str, b: str) -> bool:

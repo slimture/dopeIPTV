@@ -395,8 +395,14 @@ def _profiles_at_start(settings, first_name: str) -> None:
 
 def _sources_at_start(settings) -> PlaylistStore:
     """The sources, an M3U source's channels on stable ids before any store
-    or client reads them, and this install's id at the media servers."""
+    or client reads them, and this install's id at the media servers; a
+    source an older release named by its address with the login in it
+    named by its host (PlaylistStore.rename_login_names)."""
     store = PlaylistStore(settings)
+    try:
+        store.rename_login_names()
+    except Exception as e:          # a name is never worth a failed start
+        log.warning("sources: not renamed: %s", e)
     _move_m3u_ids(settings, store)
     # This install's id at Jellyfin, Emby and Plex, before the first client.
     from .providers import mediaserver

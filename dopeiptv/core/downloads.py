@@ -32,13 +32,14 @@ episodes under Series/<the series>, each name made from the title through
 recording's safe_filename, every folder on the way checked as recording's
 _stays_inside does (no link that leads out of the downloads folder). Beside
 each file a sidecar (``<file>.dl.json``) with what offline mode needs and
-nothing else: the kind, the source's id and the name the person gave it,
-the stream id and the playback key, the title, year, plot, length and
-category, the poster as a file of its own beside it (its name, never its
-address), and for an episode its series (id, title, plot, category, its
-poster's file), season, number and title. No address, no login, no account
-(``SIDECAR_FIELDS``). What is downloaded is read back from the sidecars
-(``scan``): the disk is the index.
+nothing else: the kind, the source's id and the name the person gave it
+(never one that holds a login: ``clean_meta``), the stream id and the
+playback key, the title, year, plot, length and category, the poster as a
+file of its own beside it (its name, never its address), and for an
+episode its series (id, title, plot, category, its poster's file), season,
+number and title. No address, no login, no account (``SIDECAR_FIELDS``).
+What is downloaded is read back from the sidecars (``scan``): the disk is
+the index - read as from outside, its numbers in range or none.
 
 **Space.** The downloads together stay within the person's limit
 (``CAP_KEY``, 50 GB by default, 0 for none), and never leave less than
@@ -204,7 +205,9 @@ SIDECAR_FIELDS: dict[str, type | tuple[type, ...]] = {
     # is of no category a kids profile may see (providers/downloaded.py).
     "category_name": str, "series_category_name": str,
 }
-_URL = re.compile(r"\S+://\S*")
+#: The numbers every sidecar has, each from 0 to its most: when it was
+#: downloaded (a Unix time), its size, its format.
+_NUMBER_MAX: dict[str, float] = {"added": 1e12, "size": 1e15, "format": 1e6}
 
 
 class Settings(Protocol):
@@ -259,12 +262,9 @@ def folder_of(settings: Settings | None) -> str:
 
 def cap_gb(settings: Settings | None) -> float:
     """The downloads' space limit in GB (0: none)."""
-    try:
-        v = float(settings.value(CAP_KEY, DEFAULT_CAP_GB) if settings is not None
-                  else DEFAULT_CAP_GB)
-    except (TypeError, ValueError):
-        return float(DEFAULT_CAP_GB)
-    return v if v >= 0 and v == v and v < 1e9 else float(DEFAULT_CAP_GB)
+    v = settings.value(CAP_KEY, DEFAULT_CAP_GB) if settings is not None else DEFAULT_CAP_GB
+    n = number(v, None, lo=0)
+    return n if n is not None and n < 1e9 else float(DEFAULT_CAP_GB)
 
 
 def full_speed(settings: Settings | None) -> bool:
@@ -329,6 +329,13 @@ def _nofollow() -> int:
     return getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
 
 
+def _json_bytes(obj: Any) -> bytes:
+    """*obj* as the UTF-8 JSON a sidecar or a series' episodes are kept in:
+    a lone surrogate from outside (JSON's "\\ud800" in a provider's title)
+    written as "?" - UTF-8 has no way to say it, and encoding raised."""
+    return json.dumps(obj, ensure_ascii=False).encode("utf-8", "replace")
+
+
 def _write_file(path: str, data: bytes) -> None:
     """*data* into *path*, never through a link put there."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _nofollow(), 0o644)
@@ -359,14 +366,30 @@ def _drop(path: str) -> None:
 # -- what a sidecar keeps ----------------------------------------------------------------
 
 def _clean_text(value: Any, limit: int = _TEXT) -> str:
-    text = _URL.sub(" ", str(value)) if value is not None else ""
-    return " ".join(text.split())[:limit]
+    """*value* as plain words, an address among them left out whole (a run
+    of non-spaces that holds "://"), at most *limit* characters. Linear: a
+    long run with no space took time with its square (``\\S+://`` tried
+    from every place in it)."""
+    if value is None:
+        return ""
+    words = [w for w in str(value).split() if "://" not in w]
+    return " ".join(words)[:limit]
+
+
+def _name_holds_login(name: str) -> bool:
+    """A source's name that carries a login - one an older release made of
+    its address (user:password@host, a query's password: core/names), or one
+    of the person's logins as the site check knows them (core/site_out)."""
+    from . import site_out
+    from .names import holds_login
+    return holds_login(name) or site_out.holds_login(name)
 
 
 def clean_meta(meta: dict | None) -> dict:
     """The fields of *meta* a sidecar may keep (``SIDECAR_FIELDS``), each of
-    its type and bounded - an address in a text left out of it. Nothing
-    else: no address, no login, no account."""
+    its type and bounded - an address in a text left out of it, a source's
+    name that holds a login left out whole. Nothing else: no address, no
+    login, no account."""
     out: dict[str, Any] = {}
     for k, v in (meta or {}).items():
         want = SIDECAR_FIELDS.get(str(k))
@@ -385,7 +408,7 @@ def clean_meta(meta: dict | None) -> dict:
             continue
         if str in types:
             text = _clean_text(v)
-            if text:
+            if text and not (str(k) == "source_name" and _name_holds_login(text)):
                 out[str(k)] = text
         elif number:
             # A number the provider wrote as text ("5400", "7.4").
@@ -524,10 +547,9 @@ class Job:
             v = d.get(k)
             return v[:limit] if isinstance(v, str) else ""
 
-        try:
-            added = float(d.get("added") or 0)
-        except (TypeError, ValueError):
-            added = 0.0
+        # A hand-edited queue's 1e999, NaN or 400 digits: no time (num.py),
+        # never an error that stops the downloads - and the window - opening.
+        added = number(d.get("added"), 0.0, lo=0, hi=_NUMBER_MAX["added"])
         return cls(id=text("id", 40) or uuid.uuid4().hex[:12], kind=d["kind"], source=src[:200],
                    stream_id=sid[:200], key=text("key", 200) or sid[:200],
                    title=text("title", 500), ext=text("ext", 10),
@@ -570,8 +592,9 @@ class Item:
 
     @property
     def added(self) -> float:
-        v = self.info.get("added")
-        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
+        """When it was downloaded (a Unix time), 0 for not known - never an
+        error, whatever its *info* holds."""
+        return number(self.info.get("added"), 0.0, lo=0, hi=_NUMBER_MAX["added"])
 
     def _beside(self, key: str) -> str:
         name = _file_name(self.info.get(key))
@@ -648,6 +671,12 @@ def series_row(item: Item) -> dict:
 def read_sidecar(path: str) -> dict | None:
     """A sidecar's fields, None for a file that is not one (too large, not
     JSON, of no kind or source this app writes)."""
+    data = _sidecar_data(path)
+    return None if data is None else _sidecar_info(data)
+
+
+def _sidecar_data(path: str) -> dict | None:
+    """A sidecar's JSON as it is in the file, None for one that is not one."""
     try:
         fd = os.open(path, os.O_RDONLY | _nofollow())
     except OSError:
@@ -668,14 +697,22 @@ def read_sidecar(path: str) -> dict | None:
     for k in ("source", "stream_id"):
         if not isinstance(data.get(k), str) or not data[k]:
             return None
+    return data
+
+
+def _sidecar_info(data: dict) -> dict:
+    """What the app reads of a sidecar's JSON *data* (read_sidecar)."""
     info = clean_meta(data)
     for k in ("kind", "source", "stream_id", "key", "title", "file", "poster", "series_poster"):
         if isinstance(data.get(k), str):
             info[k] = data[k][:500]
-    for k in ("added", "size", "format"):
-        v = data.get(k)
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            info[k] = v
+    for k, most in _NUMBER_MAX.items():
+        # A damaged or edited sidecar's 1e999, NaN or 400 digits (JSON
+        # allows each) is no number: left out, never an error where the
+        # downloads are listed, sorted or grouped (rule 5).
+        n = number(data.get(k), None, lo=0, hi=most)
+        if n is not None:
+            info[k] = int(n) if n.is_integer() else n
     return info
 
 
@@ -732,9 +769,8 @@ def keep_episodes(folder: str, source: Any, series_id: Any, rows: Iterable[Any])
             break
     if not kept:
         return False
-    data = json.dumps({"format": FORMAT, "source": str(source)[:200],
-                       "series_id": str(series_id)[:200], "episodes": kept},
-                      ensure_ascii=False).encode("utf-8")
+    data = _json_bytes({"format": FORMAT, "source": str(source)[:200],
+                        "series_id": str(series_id)[:200], "episodes": kept})
     if len(data) > EPISODES_FILE_MAX:
         return False
     path = episodes_file(folder, source, series_id)
@@ -908,7 +944,11 @@ class Downloads:
         jobs: list[Job] = []
         seen: set[tuple[str, str, str]] = set()
         for d in raw if isinstance(raw, list) else []:
-            job = Job.from_dict(d)
+            try:
+                job = Job.from_dict(d)
+            except Exception as e:      # one damaged entry never stops the window
+                log.warning("downloads: a queued download not read (%s)", type(e).__name__)
+                continue
             if job is not None and job.ident not in seen:
                 seen.add(job.ident)
                 jobs.append(job)
@@ -1018,9 +1058,18 @@ class Downloads:
             return list(self._items.values())
 
     def find(self, source: Any, kind: str, stream_id: Any) -> Item | None:
-        """The downloaded file of a title, while it is there."""
+        """The downloaded file of a title, as the folder's last read found
+        it (no look at the disk: any thread may ask, the window's too)."""
         with self._lock:
             return self._items.get(_ident(source, kind, stream_id))
+
+    def forget(self, source: Any, kind: str, stream_id: Any) -> None:
+        """A downloaded title whose file was not there as it was to play:
+        no longer listed. Its sidecar and poster are left as they are - a
+        share may only be away -, so the folder's next read finds it again."""
+        with self._lock:
+            if self._items.pop(_ident(source, kind, stream_id), None) is not None:
+                self._bump()
 
     @property
     def scanned(self) -> bool:
@@ -1771,7 +1820,7 @@ class Downloads:
             if sp:
                 info["series_poster"] = sp
         try:
-            _write_file(final + SIDECAR, json.dumps(info, ensure_ascii=False).encode("utf-8"))
+            _write_file(final + SIDECAR, _json_bytes(info))
         except OSError as e:
             log.warning("downloads: %s has no sidecar (%s)", for_log(job.title), e)
         return Item(final, size, read_sidecar(final + SIDECAR) or info)
@@ -1850,9 +1899,19 @@ class Downloads:
 
     @staticmethod
     def _item_of(sidecar: str) -> Item | None:
-        info = read_sidecar(sidecar)
-        if info is None:
+        data = _sidecar_data(sidecar)
+        if data is None:
             return None
+        info = _sidecar_info(data)
+        if data.get("source_name") and "source_name" not in info:
+            # Written before a source's name with a login in it was left out
+            # (a test build's): written again without it.
+            try:
+                _write_file(sidecar, _json_bytes(info))
+                log.info("downloads: a sidecar's source name held a login - written again "
+                         "without it")
+            except OSError as e:
+                log.debug("downloads: a sidecar not written again: %s", e)
         video = sidecar[:-len(SIDECAR)]
         if os.path.islink(video):
             return None

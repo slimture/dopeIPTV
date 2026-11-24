@@ -80,3 +80,49 @@ def test_the_window_title_and_history_say_an_episode_with_its_series_once():
     assert w._shown_title("SVT1", "live", {}) == "SVT1"
     extra = _CastMixin._history_extra(w, "episode", ep, title, ctx)
     assert extra["name"] == "Jorden runt på 6 steg · S2 E3 · Kairo"
+
+
+# -- a source named by its address with the login in it (up to 1.6.12) -------------------
+
+def test_an_older_releases_name_with_a_login_goes_by_the_host():
+    """Up to 1.6.12 a source the person gave no name was named by all
+    between "//" and the next "/" of its address - the login with it."""
+    from dopeiptv.core.names import holds_login, old_source_name, renamed
+    server = "http://kund:hemligt@line.example.com:8080/get.php"
+    assert old_source_name(server) == "kund:hemligt@line.example.com:8080"
+    assert holds_login("kund:hemligt@line.example.com:8080") and holds_login("kund@line.example")
+    assert holds_login("line.example?username=kund&password=x")
+    assert not holds_login("line.example.com:8080") and not holds_login("TV @ Home")
+    assert not holds_login("Pirat") and not holds_login("lists.example?type=m3u")
+    assert renamed(old_source_name(server), server) == "line.example.com:8080"
+    query = "http://line.example?username=kund&password=hemligt"
+    assert renamed(old_source_name(query), query) == "line.example"
+    # A name of the person's own, or one with no login, stays as it is.
+    assert renamed("Pirat", server) is None
+    assert renamed("line.example.com:8080", server) is None
+    assert renamed("kund:hemligt@line.example.com:8080", "http://other.example/") is None
+    # No host to name it by: what is left without the login - or nothing.
+    assert renamed("u:p@", "http://u:p@/x") == ""
+
+
+def test_the_sources_are_renamed_once_and_an_import_too():
+    from dopeiptv.core.stores import PlaylistStore
+    s = _S()
+    server = "http://kund:hemligt@line.example.com:8080"
+    s.setValue("playlists", json.dumps([
+        {"id": "a1", "name": "kund:hemligt@line.example.com:8080", "kind": "xtream",
+         "server": server, "username": "kund", "password": "hemligt"},
+        {"id": "b2", "name": "Mine", "kind": "m3u", "server": "http://u:p@lists.example/a.m3u"}]))
+    store = PlaylistStore(s)
+    assert store.rename_login_names() == 1
+    a, b = store.playlists()
+    assert a["name"] == "line.example.com:8080" and a["server"] == server
+    assert (a["username"], a["password"]) == ("kund", "hemligt"), "the login itself kept"
+    assert b["name"] == "Mine"
+    assert [p["name"] for p in json.loads(s.value("playlists"))] == ["line.example.com:8080", "Mine"]
+    assert PlaylistStore(s).rename_login_names() == 0, "once"
+    # An older release's export names it so too.
+    new = PlaylistStore(_S())
+    assert new.import_data([{"name": "kund:hemligt@line.example.com:8080", "kind": "m3u",
+                             "server": "http://kund:hemligt@line.example.com:8080/a.m3u"}]) == 1
+    assert new.playlists()[0]["name"] == "line.example.com:8080"

@@ -15,8 +15,10 @@ ui/downloads_place.py draws their place).
   server mode - whenever the account's limit is full or not known: it
   stops before their connection opens where the app knows of it
   (``_dl_before_play`` from the player's guard, ``_dl_make_room`` from
-  mw_connections and a recording coming due) and is held while they run
-  (``_dl_hold_reason``, every second), then goes on by itself. One the
+  mw_connections and a recording coming due; those waiting are held then
+  too, ``_dl_give_way``) and is held while they run (``_dl_hold_reason``,
+  every second - a channel waiting for the app's reconnect as the player,
+  ``_dl_player_waiting``), then goes on by itself. One the
   person let run beside them (``Job.go_ahead``) counts as a connection of
   its own (``_dl_uses``, kind "download").
 * **What it shows**: the job in the notices (ui/notices.py: its progress,
@@ -24,7 +26,10 @@ ui/downloads_place.py draws their place).
   when one failed (why, in the person's words: ``WHY_KEYS``); the
   Downloaded pill on the Movies and Series places' cards, a series page's
   episodes and Mine's films (``_dl_pills``); "Downloaded · 1.4 GB" with
-  Delete download under the poster (``_dl_detail_show``); the Downloaded
+  Delete download under the poster (``_dl_detail_show``) - each as the
+  folder's last read found it, never a look at the disk while painting
+  (``_dl_find``; the file is looked at once, as it plays: ``_dl_on_disk``);
+  the Downloaded
   place (``_place_dl_show``): what downloads and waits on top, then the
   films and the series with their downloaded episodes, sort, All / Movies
   / Series, Grid / List.
@@ -64,6 +69,7 @@ from ..i18n import tr
 from .downloads_place import SECTIONS, DownloadsPlace
 from .list_place import PlaceCard, line_of
 from .media_cards import Card
+from .mw_source_label import NO_SOURCE_KINDS
 from .notices import hub_of
 
 #: The place's posters or rows, and its order - this computer's.
@@ -269,10 +275,12 @@ class _DownloadsMixin:
     def _dl_crowded(self, source: str, uses: list[Use] | None = None) -> bool:
         """Whether one more connection to *source*'s account - the
         download's - would go over its limit, or with none known whether
-        something else of the app's uses it now."""
+        something else of the app's uses it now (a channel waiting for the
+        app's reconnect too: _dl_player_waiting)."""
         try:
-            listed, key = self._conn_by_account(self._conn_uses() if uses is None else uses,
-                                                source)
+            if uses is None:
+                uses = list(self._conn_uses()) + self._dl_player_waiting()
+            listed, key = self._conn_by_account(uses, source)
             own = connections.own_count(listed, key) + self._conn_served(source)
             cap = self._conn_cap(key)
             if cap:
@@ -281,6 +289,31 @@ class _DownloadsMixin:
         except Exception as e:      # counting must never stand in the way
             log.debug("downloads: the account's connections not counted: %s", e)
             return False
+
+    def _dl_player_waiting(self) -> list[Use]:
+        """The player's connection while a channel waits for the app's
+        reconnect - no address in the player for its 0.3 s, 1.5 s or 15 s
+        (main_window: its Stop still has something to stop, _stoppable), yet
+        it opens the channel again by itself: counted as held, so no
+        download takes the account in the gap (one connection). None once
+        nothing will (a failure said for good, _diag_shown), for what is no
+        source's (a station, a web page) or a file."""
+        p = getattr(self, "player", None)
+        stoppable = getattr(self, "_stoppable", None)
+        try:
+            if p is None or not callable(stoppable) or not stoppable() \
+                    or getattr(p, "current_url", None) or getattr(self, "_diag_shown", False):
+                return []
+            if getattr(getattr(p, "_dvr", None), "streaming", False):
+                return []               # its buffer's connection: counted as it is
+            lp = getattr(self, "_last_playback", None) or {}
+            url = str(lp.get("url") or "")
+            if not connections.is_network(url) or lp.get("kind") in NO_SOURCE_KINDS:
+                return []
+            return [Use("player", self._conn_player_source(), url)]
+        except Exception as e:      # counting must never stand in the way
+            log.debug("downloads: the player's wait not counted: %s", e)
+            return []
 
     def _dl_uses(self) -> list[Use]:
         """The connection a download the person let run beside the rest holds
@@ -311,6 +344,36 @@ class _DownloadsMixin:
         except Exception:
             return False
 
+    def _dl_waiting_on_account(self, source: str) -> list[dl.Job]:
+        """The downloads waiting on *source*'s account (the source in use
+        when "") that give way: the last beat may have let one run, and it
+        would start any moment."""
+        d = getattr(self, "downloads", None)
+        if d is None:
+            return []
+        acc = self._conn_accounts()
+        src = str(source or self._conn_source())
+        want = acc.get(src, src)
+        return [j for j in d.jobs() if j.state == dl.WAITING and not j.go_ahead
+                and acc.get(j.source, j.source) == want]
+
+    def _dl_give_way(self, source: str, uses: list[Use]) -> dl.Job | None:
+        """Another connection of the app's to *source*'s account about to
+        open beside *uses*: every download there that gives way held first
+        - the running one stopped, those waiting kept from starting until
+        the next beat says again (a beat up to a second old let them run) -
+        unless a known limit has room for it too. The running one stopped,
+        or None."""
+        cur = self._dl_on_account(source)
+        stopped = None
+        for job in ([cur] if cur is not None else []) + self._dl_waiting_on_account(source):
+            if self._dl_room_for(job, uses):
+                continue
+            self.downloads.hold_now(job.id)
+            if cur is not None and job.id == cur.id:
+                stopped = cur
+        return stopped
+
     def _dl_before_play(self, url: str) -> bool:
         """The player about to open *url* (its guard, mw_recording): a
         download on the account gives way first - with its limit full or not
@@ -318,29 +381,22 @@ class _DownloadsMixin:
         the playback (True)."""
         if not connections.is_network(url):
             return True
-        cur = self._dl_on_account("")
-        if cur is None:
-            return True
         uses = list(self._conn_uses(free_player=True))
         uses.append(Use("player", self._conn_source(), str(url)))
-        if self._dl_room_for(cur, uses):
-            return True
-        self.downloads.hold_now(cur.id)
-        log.info("downloads: %s waits while the player plays", for_log(cur.title))
-        self._show_toast(tr("dl_waits_for_play"), 5000)
+        cur = self._dl_give_way("", uses)
+        if cur is not None:
+            log.info("downloads: %s waits while the player plays", for_log(cur.title))
+            self._show_toast(tr("dl_waits_for_play"), 5000)
         return True
 
     def _dl_make_room(self, source: str | None = None) -> None:
         """Another of the app's is about to open a connection to *source*'s
         account (a multiview cell, a cast, a test, a recording): a download
         there gives way now unless a known limit has room for both."""
-        cur = self._dl_on_account(str(source or ""))
-        if cur is None:
-            return
         uses = list(self._conn_uses())
         uses.append(Use("player", str(source or self._conn_source())))
-        if not self._dl_room_for(cur, uses):
-            self.downloads.hold_now(cur.id)
+        cur = self._dl_give_way(str(source or ""), uses)
+        if cur is not None:
             log.info("downloads: %s gives way to another connection", for_log(cur.title))
 
     def _dl_private_on(self) -> None:
@@ -566,17 +622,30 @@ class _DownloadsMixin:
     def _dl_find(self, kind: str, row: Any, key: Any = None,
                  source: str | None = None) -> dl.Item | None:
         """The downloaded file of a title of the source in use (or
-        *source*), while it is there."""
+        *source*), as the folder's last read found it - what the pills, the
+        menus and the column under the poster say, painted many times over:
+        never a look at the disk here (a share that stops answering would
+        hold the window). Its file is looked at only as it plays
+        (_dl_on_disk)."""
         d = getattr(self, "downloads", None)
         if d is None or kind not in dl.KINDS:
             return None
         sid = self._dl_stream_id(kind, row, key)
         if not sid:
             return None
-        hit = d.find(source if source is not None else self._dl_active(), kind, sid)
-        if hit is None or not os.path.isfile(hit.path):
-            return None
-        return hit
+        return d.find(source if source is not None else self._dl_active(), kind, sid)
+
+    def _dl_on_disk(self, item: dl.Item) -> bool:
+        """Whether *item*'s file is there, as it is about to play: one look
+        on the window's thread - the person asked for that very file, as
+        Local files and Recordings look at theirs. One that is not there is
+        no longer listed (its files left as they are: a share may only be
+        away; the folder's next read finds it again)."""
+        if os.path.isfile(item.path):
+            return True
+        log.info("downloads: %s - its file is not there", for_log(item.title))
+        self.downloads.forget(item.source, item.kind, item.stream_id)
+        return False
 
     def _dl_job_for(self, kind: str, row: Any) -> dl.Job | None:
         d = getattr(self, "downloads", None)
@@ -881,6 +950,8 @@ class _DownloadsMixin:
         given = {**dict(zip(self._START_ARGS, args, strict=False)), **kw}
         item = given.get("item")
         hit = None if given.get("catchup") else self._dl_find(kind, item, key)
+        if hit is not None and not self._dl_on_disk(hit):
+            hit = None                  # gone: from the source, as any title
         if hit is None:
             self._start_playback(url, title, icon_url, key, kind, *args, **kw)
             return
@@ -929,7 +1000,7 @@ class _DownloadsMixin:
         """A downloaded title from the place: of the source in use as that
         title (an episode with its series' downloaded episodes as the queue
         autoplay goes on with), another source's as a file of its own."""
-        if not os.path.isfile(item.path):
+        if not self._dl_on_disk(item):
             self._show_toast(tr("dl_missing"), 4000)
             return
         row = dl.as_row(item)
