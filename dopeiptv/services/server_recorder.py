@@ -50,7 +50,7 @@ from __future__ import annotations
 import threading
 import time
 from functools import partial
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 
@@ -206,7 +206,9 @@ class ServerRecorder(QObject):
         self.rec.may_open = self._may_open
         self.rec.address_for = self._address_for
         self.rec.open_shared = self._open_shared
-        self._found.connect(self._schedule, Qt.ConnectionType.QueuedConnection)
+        # Through Any: PyQt6's stubs differ between versions on connect's type
+        # (as services/media_session.py does).
+        cast(Any, self._found).connect(self._schedule, Qt.ConnectionType.QueuedConnection)
         # The sources' names for the page, read here (the settings are this
         # thread's) and kept for the server's threads.
         self._names: dict[str, str] = {}
