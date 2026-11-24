@@ -199,7 +199,6 @@ class ServerRecorder(QObject):
         self._box: dict[str, tuple[float, bool]] = {}
         self._planning = False
         self._window = False
-        self._lock = threading.Lock()
         self._left: set[str] = set()
         self.rec = RecordingManager(settings, self, claims=claims)
         self.rec.defer = self._window_runs
