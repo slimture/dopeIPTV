@@ -202,6 +202,7 @@
 "tests/test_places.py": 7.0,
 "tests/test_plain_labels.py": 0.0,
 "tests/test_playback_left_behind.py": 0.8,
+"tests/test_playback_path.py": 1.0,
 "tests/test_player_command.py": 1.0,
 "tests/test_player_guard.py": 13.0,
 "tests/test_player_interactions.py": 0.5,
