@@ -794,6 +794,9 @@ class _SourceStrip(QWidget):
     _MARGINS = (12, 8, 6, 8)
     _GAP = 10
     _BUTTON_GAP = 6
+    #: The form laid out (_fit): the words' and buttons' directions, the
+    #: words' stretch, the buttons' alignment.
+    _form: tuple = ()
 
     def __init__(self) -> None:
         super().__init__()
@@ -831,7 +834,8 @@ class _SourceStrip(QWidget):
         self.leave.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add = QPushButton(objectName="Primary")
         self.add.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._buttons.addStretch(1)
+        # No stretch to put them at the row's end (_fit aligns them there): a
+        # box layout turns its own stretch upright as it turns.
         self._buttons.addWidget(self.leave)
         self._buttons.addWidget(self.add)
         self._box.addLayout(self._buttons)
@@ -862,11 +866,7 @@ class _SourceStrip(QWidget):
         width = self.width()
         narrow = 0 < width < self.NARROW
         D = QBoxLayout.Direction
-        changed = False
-        want = D.TopToBottom if narrow else D.LeftToRight
-        if self._box.direction() != want:
-            self._box.setDirection(want)
-            changed = True
+        A = Qt.AlignmentFlag
         # The buttons' row as wide as the room under the words: else Add
         # your own source on top, Leave the demo under it.
         left, _top, right, _bottom = self._MARGINS
@@ -875,18 +875,26 @@ class _SourceStrip(QWidget):
         if not self.leave.isHidden():
             need += self._BUTTON_GAP + self.leave.sizeHint().width()
         stack = narrow and need > room
-        want_buttons = D.BottomToTop if stack else D.LeftToRight
-        if self._buttons.direction() != want_buttons:
-            self._buttons.setDirection(want_buttons)
-            changed = True
-        top = Qt.AlignmentFlag.AlignTop if narrow else Qt.AlignmentFlag.AlignVCenter
-        self.text.setAlignment(top | Qt.AlignmentFlag.AlignLeading)
-        self._row.setAlignment(self.away, top)
-        if changed:
+        # Beside the buttons the words take the row's room; over them nothing
+        # stretches - a stretch in an upright box made the strip take up to
+        # half the pane from the list, the room under its words. The buttons
+        # at the row's end, stacked as wide as the strip.
+        form = (D.TopToBottom if narrow else D.LeftToRight, D.BottomToTop if stack else D.LeftToRight,
+                0 if narrow else 1, A.AlignTrailing if narrow and not stack else A(0))
+        if form != self._form:
+            self._form = form
+            self._box.setDirection(form[0])
+            self._buttons.setDirection(form[1])
+            self._box.setStretchFactor(self.text, form[2])
+            self._box.setAlignment(self._buttons, form[3])
             # The height asked again for the new form (a word-wrapped label
             # keeps the height of its old width otherwise).
+            self._buttons.invalidate()
             self._box.invalidate()
             self.updateGeometry()
+        top = A.AlignTop if narrow else A.AlignVCenter
+        self.text.setAlignment(top | A.AlignLeading)
+        self._row.setAlignment(self.away, top)
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt's name
         super().resizeEvent(event)

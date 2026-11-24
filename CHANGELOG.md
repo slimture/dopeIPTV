@@ -164,6 +164,12 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- The strip under the list while there is no source of one's own (the
+  demo's word) stood up to half the pane tall on the narrowest middle pane,
+  where its buttons go under its words: the room between its words and its
+  buttons, the list beside it squeezed. Its words' stretch, and the buttons'
+  own turned upright as they stacked, made it grow with the pane; it is as
+  tall as its words and buttons now, the wide form as it was.
 - The first-run guide could lose the keyboard to the channel list behind it
   when the app's own start showed the TV place a moment after Get started
   was pressed (on a slower computer): Enter then went to the list. A place
