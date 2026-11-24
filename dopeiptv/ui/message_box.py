@@ -517,6 +517,19 @@ def choose(parent: QWidget | None, title: str, text: str,
                              default=default, escape=escape, stacked=stacked))
 
 
+def enter_index(options: Sequence[tuple[str, str]]) -> int:
+    """What Enter answers among *options* (words, role): the first, unless
+    the first does what cannot be undone (``DANGER``) - then the safer
+    ``PRIMARY`` choice, else the first that is no danger. A quick Enter
+    never stops a recording or deletes a download."""
+    roles = [role for _words, role in options]
+    if not roles or roles[0] != DANGER:
+        return 0
+    if PRIMARY in roles:
+        return roles.index(PRIMARY)
+    return next((i for i, role in enumerate(roles) if role != DANGER), 0)
+
+
 # -- values asked for -------------------------------------------------------------------
 
 def _value_dialog(parent: QWidget | None, title: str, label: str) -> MessageDialog:

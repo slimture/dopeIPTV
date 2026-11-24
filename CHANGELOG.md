@@ -150,6 +150,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   presses in the accent and a destructive one in red, mirrored right to left.
   Qt's stock boxes, with the desktop's icons and a plain grey layout, are
   gone (`ui/message_box.py`).
+- Enter never stops a recording or deletes a download: in "Stop the
+  recording?", another channel while one records and "Delete download?" it
+  answers the safe choice (keep recording, keep watching, Cancel), the one
+  TV mode's question opens on too. Stop and Delete take a click.
 
 ### Fixed
 

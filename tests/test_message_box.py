@@ -187,6 +187,51 @@ def test_buttons_side_by_side_when_they_fit_else_one_under_another(app):
         d.deleteLater()
 
 
+def test_enter_never_answers_what_stops_or_deletes(app):
+    """Stop the recording? Delete the download? A quick Enter keeps it."""
+    pick = message_box.enter_index
+    assert pick([("Stop recording", "danger"), ("Keep recording", "primary")]) == 1
+    assert pick([("Stop and switch", "danger"), ("Go on in the background", "normal"),
+                 ("Keep watching", "primary")]) == 2
+    assert pick([("Delete", "danger"), ("Delete all", "danger"), ("Cancel", "normal")]) == 2
+    # The first stays what Enter answers whenever it does nothing for good.
+    assert pick(OPTIONS) == 0
+    assert pick([("Cancel", "normal"), ("Play", "primary")]) == 0
+    assert pick([("Keep dopeIPTV open", "primary"), ("Close anyway", "danger")]) == 0
+    assert pick([("Delete", "danger")]) == 0 and pick([]) == 0
+
+
+def test_enter_on_the_recordings_questions_keeps_the_recording(app):
+    """The window's own questions, pressed for real: "Stop the recording?"
+    and another channel while the one on screen records from its buffer -
+    Enter keeps recording; only the Stop button stops."""
+    from types import SimpleNamespace
+
+    from dopeiptv.ui.mw_recording import _RecordingMixin
+
+    class Host(QWidget):
+        _choice_dialog = _RecordingMixin._choice_dialog
+        _rec_ask_stop = _RecordingMixin._rec_ask_stop
+        _guard_buffer_switch = _RecordingMixin._guard_buffer_switch
+        _with_conn_warning = _RecordingMixin._with_conn_warning
+
+    done: list = []
+    host = Host()
+    host.rec = SimpleNamespace(
+        jobs=[{"id": "a", "status": "recording", "title": "News"}],
+        cancel=lambda jid: done.append(("cancel", jid)),
+        finish_all_inplayer=lambda why: done.append(("finish", why)),
+        keep_in_background=lambda jid: done.append(("background", jid)))
+    host.client = SimpleNamespace(max_connections=1)
+    _answer(ENTER)
+    assert host._rec_ask_stop("a") is False and done == []
+    _answer(ENTER)
+    assert host._guard_buffer_switch(host.rec.jobs[0], "SVT2") is False and done == []
+    _answer(lambda w: w.buttons()[0].click())
+    assert host._rec_ask_stop("a") is True and done == [("cancel", "a")]
+    host.deleteLater()
+
+
 def test_a_danger_button_is_filled_only_with_no_primary_beside_it(app):
     alone = MessageDialog(None, "T", "W", options=[("No", "normal"), ("Delete", "danger")])
     beside = MessageDialog(None, "T", "W", options=[("Delete", "danger"), ("Keep", "primary")])
@@ -199,9 +244,10 @@ def test_a_danger_button_is_filled_only_with_no_primary_beside_it(app):
 
 
 def test_the_window_s_choice_keeps_its_hooks_and_its_check_box(app):
-    """mw_recording's _choice_dialog is drawn here: the first option is
-    what Enter answers, "Don't show this again" kept with the answer; the
-    phone's and TV mode's hooks still ask instead."""
+    """mw_recording's _choice_dialog is drawn here: Enter answers the first
+    option unless it stops or deletes something - then the safer choice -,
+    "Don't show this again" kept with the answer; the phone's and TV mode's
+    hooks still ask instead."""
     from PyQt6.QtCore import QSettings
 
     from dopeiptv.ui.mw_recording import _RecordingMixin
@@ -209,13 +255,18 @@ def test_the_window_s_choice_keeps_its_hooks_and_its_check_box(app):
     host.settings = QSettings("dopeiptv-test", "message-box")
     host.settings.clear()
     seen: list = []
-    _answer(lambda w: w.findChild(QCheckBox).setChecked(True), ENTER, seen=seen)
+    opened: list = []
+    _answer(lambda w: opened.append(w.focusWidget().text()),
+            lambda w: w.findChild(QCheckBox).setChecked(True), ENTER, seen=seen)
     got = _RecordingMixin._choice_dialog(host, "Recording", "Stop it?",
                                          [("Stop", "danger"), ("Keep", "primary")],
                                          dont_ask_setting="mb_test_dont_ask")
-    assert got == 0 and host.settings.value("mb_test_dont_ask") == "true"
+    assert got == 1 and opened == ["Keep"]
+    assert host.settings.value("mb_test_dont_ask") == "true"
     assert isinstance(seen[0], MessageDialog) and seen[0]._mark.kind == message_box.WARNING
     host.settings.clear()
+    _answer(ENTER)
+    assert _RecordingMixin._choice_dialog(host, "T", "W", OPTIONS) == 0
     _answer(ESC)
     assert _RecordingMixin._choice_dialog(host, "T", "W", [("A", "normal")]) is None
     host._tv_on = True

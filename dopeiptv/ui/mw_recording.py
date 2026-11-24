@@ -234,8 +234,10 @@ class _RecordingMixin(_TimeshiftMixin):
                        dont_ask_setting: str | None = None) -> int | None:
         """A compact, themed confirmation dialog (ui/message_box.py). *options*
         is a list of (label, kind) where kind is "primary"/"normal"/"danger";
-        returns the index of the clicked option, or None if dismissed. The
-        first option is what Enter answers as it opens. When
+        returns the index of the clicked option, or None if dismissed. Enter
+        answers the first option as it opens - never one that stops or
+        deletes something: then the safer choice (message_box.enter_index;
+        TV mode's question opens on it too). When
         *dont_ask_setting* is given, a "Don't show this again" checkbox is
         added; ticking it and choosing an option stores "true" under that key
         (so a caller can suppress the prompt next time; it's resettable in
@@ -253,8 +255,8 @@ class _RecordingMixin(_TimeshiftMixin):
             return tv_ask(title, message, options, dont_ask_setting)
         kind = (message_box.WARNING if any(k == message_box.DANGER for _l, k in options)
                 else message_box.QUESTION)
-        d = message_box.MessageDialog(self, title, message, kind=kind,
-                                      options=options, default=0, escape=None)
+        d = message_box.MessageDialog(self, title, message, kind=kind, options=options,
+                                      default=message_box.enter_index(options), escape=None)
         dont = d.add_check(tr("dont_show_again")) if dont_ask_setting else None
         idx = message_box.run(d)
         if dont is not None and dont.isChecked() and idx is not None:
