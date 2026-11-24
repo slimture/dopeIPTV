@@ -1,0 +1,1119 @@
+{
+ "after_web": {
+  "args": [
+   "http://192.0.2.1/live/u/p/1.ts",
+   0.0,
+   {
+    "buffer_key": "live:1",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/1.ts",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "One"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "set",
+    "tls-verify",
+    false
+   ],
+   [
+    "set",
+    "tls-ca-file",
+    ""
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://192.0.2.1/live/u/p/1.ts"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "live": {
+  "args": [
+   "http://192.0.2.1/live/u/p/1.ts",
+   0.0,
+   {
+    "buffer_key": "live:1",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/1.ts",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "One"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://192.0.2.1/live/u/p/1.ts"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "live_buffer": {
+  "args": [
+   "http://192.0.2.1/live/u/p/2.ts",
+   0.0,
+   {
+    "buffer_key": "live:2",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/2.ts",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "Two"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    ""
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://127.0.0.1:41000/live.ts?t=x"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "movie_resume": {
+  "args": [
+   "http://192.0.2.1/movie/u/p/9.mp4",
+   600.0,
+   {
+    "buffer_key": "movie:9",
+    "local_buffer": false,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": false,
+  "current": "http://192.0.2.1/movie/u/p/9.mp4",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "Film"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    "50MiB"
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "600.0"
+   ],
+   [
+    "play",
+    "http://192.0.2.1/movie/u/p/9.mp4"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "muted": {
+  "args": [
+   "http://192.0.2.1/live/u/p/1.ts",
+   0.0,
+   {
+    "buffer_key": "live:1",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/1.ts",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "mute",
+    true
+   ],
+   [
+    "set",
+    "volume",
+    0.0
+   ],
+   [
+    "set",
+    "ao",
+    "null"
+   ],
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "One"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "set",
+    "tls-verify",
+    false
+   ],
+   [
+    "set",
+    "tls-ca-file",
+    ""
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    true
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://192.0.2.1/live/u/p/1.ts"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "no_core": {
+  "args": [
+   "http://192.0.2.1/live/u/p/1.ts",
+   0.0,
+   {
+    "buffer_key": "live:1",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": null,
+  "ok": false,
+  "ops": [],
+  "refusal": ""
+ },
+ "no_stream": {
+  "args": [
+   "http://192.0.2.1/live/u/p/1.ts",
+   0.0,
+   {
+    "buffer_key": "live:1",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/1.ts",
+  "ok": false,
+  "ops": [],
+  "refusal": ""
+ },
+ "rtsp": {
+  "args": [
+   "rtsp://192.168.1.5:554/?src=1&freq=11494",
+   0.0,
+   {
+    "buffer_key": "live:sat",
+    "local_buffer": false,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": false,
+  "current": "rtsp://192.168.1.5:554/?src=1&freq=11494",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "SAT"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    "50MiB"
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    ""
+   ],
+   [
+    "set",
+    "tls-verify",
+    false
+   ],
+   [
+    "set",
+    "tls-ca-file",
+    ""
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "rtsp://192.168.1.5:554/?src=1&freq=11494"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "subs_off_live": {
+  "args": [
+   "http://192.0.2.1/live/u/p/1.ts",
+   0.0,
+   {
+    "buffer_key": "live:1",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": "http://192.0.2.1/live/u/p/1.ts",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "One"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "set",
+    "sid",
+    "no"
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://192.0.2.1/live/u/p/1.ts"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "tracks": {
+  "args": [
+   "http://192.0.2.1/movie/u/p/9.mp4",
+   0.0,
+   {
+    "buffer_key": "movie:9",
+    "local_buffer": false,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": false,
+  "current": "http://192.0.2.1/movie/u/p/9.mp4",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "Film"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    "50MiB"
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    "@BRIDGE@"
+   ],
+   [
+    "set",
+    "aid",
+    2
+   ],
+   [
+    "set",
+    "sid",
+    3
+   ],
+   [
+    "set",
+    "sub-visibility",
+    true
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "append",
+    "@TMP@/film.srt"
+   ],
+   [
+    "set",
+    "sid",
+    "auto"
+   ],
+   [
+    "set",
+    "sub-forced-events-only",
+    false
+   ],
+   [
+    "set",
+    "sub-visibility",
+    true
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "play",
+    "http://192.0.2.1/movie/u/p/9.mp4"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ },
+ "unchecked": {
+  "args": [
+   "https://example.com/live/1.m3u8",
+   0.0,
+   {
+    "buffer_key": "live:tls",
+    "local_buffer": true,
+    "outside": false,
+    "own_buffer": true,
+    "web": false
+   }
+  ],
+  "buffer": true,
+  "current": null,
+  "ok": false,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "TLS"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    125829120
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "command",
+    "stop"
+   ]
+  ],
+  "refusal": "This player cannot check this stream's certificate, so it was not opened."
+ },
+ "web": {
+  "args": [
+   "https://www.youtube.com/watch?v=x",
+   0.0,
+   {
+    "buffer_key": "web:https://www.youtube.com/watch?v=x",
+    "local_buffer": false,
+    "outside": false,
+    "own_buffer": true,
+    "web": true
+   }
+  ],
+  "buffer": false,
+  "current": "https://www.youtube.com/watch?v=x",
+  "ok": true,
+  "ops": [
+   [
+    "set",
+    "vid",
+    "auto"
+   ],
+   [
+    "set",
+    "aid",
+    "auto"
+   ],
+   [
+    "set",
+    "force-media-title",
+    "Clip"
+   ],
+   [
+    "set",
+    "cache",
+    "yes"
+   ],
+   [
+    "set",
+    "cache-secs",
+    10.0
+   ],
+   [
+    "set",
+    "cache-on-disk",
+    "no"
+   ],
+   [
+    "set",
+    "demuxer-max-back-bytes",
+    "50MiB"
+   ],
+   [
+    "set",
+    "hwdec",
+    "no"
+   ],
+   [
+    "set",
+    "http-proxy",
+    ""
+   ],
+   [
+    "set",
+    "tls-verify",
+    true
+   ],
+   [
+    "set",
+    "tls-ca-file",
+    "/etc/ssl/certs/ca-certificates.crt"
+   ],
+   [
+    "command",
+    "change-list",
+    "sub-files",
+    "clr",
+    ""
+   ],
+   [
+    "set",
+    "volume",
+    70.0
+   ],
+   [
+    "set",
+    "mute",
+    false
+   ],
+   [
+    "set",
+    "ao",
+    ""
+   ],
+   [
+    "pause",
+    false
+   ],
+   [
+    "set",
+    "start",
+    "none"
+   ],
+   [
+    "command",
+    "loadfile",
+    "https://www.youtube.com/watch?v=x",
+    "replace",
+    "-1",
+    "demuxer-lavf-o=,demuxer-lavf-analyzeduration=0,demuxer-lavf-probesize=5000000,cache-secs=3600000,network-timeout=60"
+   ],
+   [
+    "pause",
+    false
+   ]
+  ],
+  "refusal": ""
+ }
+}
