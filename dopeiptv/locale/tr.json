@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Öncekileri göster",
   "card_view_switch_a11y": "Görünüm",
   "card_sort_a11y": "Sıralama: {order}",
+  "sa_results_a11y": "Sonuçlar",
+  "about_notes_a11y": "Sürüm notları",
   "card_continue": "Devam et",
   "card_popular": "Şu an popüler",
   "card_grid": "Izgara",

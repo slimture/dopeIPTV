@@ -18,7 +18,7 @@ import time
 
 from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QAbstractItemView, QListWidgetItem
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QListWidgetItem
 
 from ..core.log import log
 from ..core.stores import catalogue_cats, kept_place, lock_hides
@@ -481,6 +481,19 @@ class _ListsMixin:
 
         run_async(self.pool, fn, done, fail)
 
+    def _category_entered(self, item) -> None:
+        """Enter on a category: what a click on it does - the "+ Add folder"
+        row's picker, and a category's own click (the Guide following it,
+        a series' page or the Search page giving way to its list)."""
+        if item is None:
+            return
+        if self.mode == "local" and item.data(Qt.ItemDataRole.UserRole) == "__add__":
+            self._local_add_folder()
+            return
+        for clicked in (self._guide_category_clicked, self._sp_category_clicked,
+                        self._search_category_clicked):
+            clicked(item)
+
     def _category_changed(self, cur, _prev=None) -> None:
         if not cur:
             return
@@ -489,9 +502,13 @@ class _ListsMixin:
         self._cat_changed_at = time.monotonic()
         cat = cur.data(Qt.ItemDataRole.UserRole)
         if self.mode == "local" and cat == "__add__":
-            # The "+ Add folder" row is a button, not a category: open the
-            # picker (it rebuilds the list and selects the new folder).
-            self._local_add_folder()
+            # The "+ Add folder" row is a button, not a category: a click
+            # opens the picker (it rebuilds the list and selects the new
+            # folder). The keyboard only comes to rest on it - Tab into the
+            # list, the arrows - and Enter opens it (_category_entered): a
+            # file window thrown up by a key that only moved was a trap.
+            if QApplication.mouseButtons() != Qt.MouseButton.NoButton:
+                self._local_add_folder()
             return
         locked = False
         if cat is not None:

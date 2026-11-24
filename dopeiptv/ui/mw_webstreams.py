@@ -82,6 +82,8 @@ class _WebStreamsMixin:
         lay.addWidget(hint)
         edit = QLineEdit()
         edit.setPlaceholderText("https://www.twitch.tv/…")
+        edit.setAccessibleName(tr("open_address_title"))
+        edit.setAccessibleDescription(tr("open_address_hint"))
         clip = (QGuiApplication.clipboard().text() or "").strip()
         if stream_url_ok(clip) and len(clip) < 2000 and " " not in clip:
             edit.setText(clip)

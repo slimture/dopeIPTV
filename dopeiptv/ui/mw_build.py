@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from . import a11y
 from .app_menu import MENUS, lay_out, open_website
 from .channel_list import (
     CategoryColorDelegate, ChannelDelegate, ChannelListModel, ChannelListView,
@@ -160,6 +161,7 @@ class _BuildMixin(_BuildDetailMixin):
         # widgets and wipes their own backgrounds (it silently blanked the
         # Guide/Settings action buttons' fill).
         self._side_scroll.setObjectName("SideScroll")
+        a11y.unfocused(self._side_scroll)       # Tab goes to its entries
         self._side_scroll.setStyleSheet(
             "QScrollArea#SideScroll { background: transparent; border: 0; }")
         self._side_scroll.viewport().setObjectName("SideViewport")
@@ -325,6 +327,7 @@ class _BuildMixin(_BuildDetailMixin):
         self.cat_solo_btn.setAutoRaise(True)
         self.cat_solo_btn.setFixedSize(22, 18)
         self.cat_solo_btn.setToolTip(tr("tooltip_solo_category"))
+        self.cat_solo_btn.setAccessibleName(tr("tooltip_solo_category"))
         # A search toggle that reveals the category search box only when you
         # want it, so it doesn't take a permanent row in the sidebar.
         self.cat_search_btn = QToolButton(objectName="SectionToggle")
@@ -355,6 +358,8 @@ class _BuildMixin(_BuildDetailMixin):
         self._cat_search_timer.timeout.connect(self._run_category_search)
         self._search_index_cache: dict = {}
         self.cat_list = FolderDropList(objectName="CatList")
+        self.cat_list.setAccessibleName(tr("tv_categories"))
+        a11y.show_current(self.cat_list)        # Tab in: the row the keyboard is on, shown
         self.cat_list.can_drop = self._fav_drop_allowed
         self.cat_list.on_drop = self._fav_drop_on_folder
         self.cat_list.setItemDelegate(CategoryColorDelegate(self.cat_list))
@@ -380,6 +385,7 @@ class _BuildMixin(_BuildDetailMixin):
         self.cat_list.itemDoubleClicked.connect(self._guide_category_double_clicked)
         self.cat_list.itemClicked.connect(self._sp_category_clicked)
         self.cat_list.itemClicked.connect(self._search_category_clicked)
+        self.cat_list.entered.connect(self._category_entered)     # Enter: the keyboard's click
         self.cat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cat_list.customContextMenuRequested.connect(self._cat_menu)
         sl.addWidget(self.cat_list, 1)
@@ -496,6 +502,7 @@ class _BuildMixin(_BuildDetailMixin):
     def _build_list_controls(self, ml: QVBoxLayout) -> None:
         self.search = QLineEdit(objectName="Search")
         self.search.setPlaceholderText(tr("list_filter_placeholder"))
+        self.search.setAccessibleName(tr("list_filter_placeholder"))     # _sync_search_hint's
         self.search.setClearButtonEnabled(True)
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
@@ -514,9 +521,11 @@ class _BuildMixin(_BuildDetailMixin):
              ("large", tr("option_large")), ("xlarge", tr("option_xlarge"))],
             self.settings.value("view_density", "medium"))
         self.size_box.setObjectName("InlineCombo")
+        self.size_box.setAccessibleName(tr("label_size"))
         self.size_box.currentIndexChanged.connect(self._inline_view_changed)
         self.sort_box = self._combo(self._sort_options(), "global")
         self.sort_box.setObjectName("InlineCombo")
+        self.sort_box.setAccessibleName(tr("label_sort"))
         self.sort_box.setToolTip(tr("sort_scope_tip"))
         self.sort_box.currentIndexChanged.connect(self._inline_view_changed)
         self.grid_btn = QPushButton(tr("btn_grid"), objectName="InlineToggle")
@@ -535,6 +544,7 @@ class _BuildMixin(_BuildDetailMixin):
             QIcon(self._action_pixmap("sizepick", 15, P["text2"])))
         self._size_menu_btn.setIconSize(QSize(15, 15))
         self._size_menu_btn.setToolTip(tr("label_size"))
+        self._size_menu_btn.setAccessibleName(tr("label_size"))
         self._size_menu_btn.setFixedWidth(30)
         self._size_menu_btn.setPopupMode(
             QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -543,6 +553,7 @@ class _BuildMixin(_BuildDetailMixin):
             QIcon(self._action_pixmap("sort", 15, P["text2"])))
         self._sort_menu_btn.setIconSize(QSize(15, 15))
         self._sort_menu_btn.setToolTip(tr("label_sort"))
+        self._sort_menu_btn.setAccessibleName(tr("label_sort"))
         self._sort_menu_btn.setFixedWidth(30)
         self._sort_menu_btn.setPopupMode(
             QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -564,6 +575,7 @@ class _BuildMixin(_BuildDetailMixin):
         self.side_btn.setCheckable(True)
         self.side_btn.setChecked(True)
         self.side_btn.setToolTip(tr("tooltip_toggle_sidebar"))
+        self.side_btn.setAccessibleName(a11y.without_key(tr("tooltip_toggle_sidebar")))
         self.side_btn.setFixedWidth(34)
         self.side_btn.toggled.connect(self._on_side_toggle)
         # Focus mode: hide this whole list column to give the player the room,
@@ -577,6 +589,7 @@ class _BuildMixin(_BuildDetailMixin):
             QIcon(self._action_pixmap("focus", 16, P["text2"])))
         self.focus_btn.setIconSize(QSize(16, 16))
         self.focus_btn.setToolTip(tr("tooltip_hide_list"))
+        self.focus_btn.setAccessibleName(a11y.without_key(tr("tooltip_hide_list")))
         self.focus_btn.setFixedWidth(34)
         self.focus_btn.clicked.connect(lambda: self._set_focus_mode(True))
         ctl.addWidget(self.side_btn)
@@ -602,6 +615,7 @@ class _BuildMixin(_BuildDetailMixin):
         # column first, which read as a folder, not a control).
         self.local_view_btn = QPushButton(objectName="InlineToggle")
         self.local_view_btn.setCheckable(True)
+        self.local_view_btn.setText(tr("local_view_folders"))   # _sync_local_view_btn's
         self.local_view_btn.hide()
         self.local_view_btn.clicked.connect(self._local_toggle_view)
         # Rescan beside it: the folder or the library read from the disk
@@ -656,6 +670,7 @@ class _BuildMixin(_BuildDetailMixin):
         ml.addWidget(self.clear_history_btn)
 
         self.listw = ChannelListView(objectName="Channels")
+        a11y.show_current(self.listw)
         self.list_model = ChannelListModel()
         self.listw.setModel(self.list_model)
         # Catch-all: whenever the model is repopulated with rows (from any of
@@ -669,6 +684,8 @@ class _BuildMixin(_BuildDetailMixin):
         self.delegate = ChannelDelegate(
             self, self.settings.value("view_density", "medium"))
         self.listw.setItemDelegate(self.delegate)
+        # Each row read as it is painted (a screen reader asks the model).
+        self.list_model.describe = self.delegate.words_for
         self.listw.setSelectionMode(
             QAbstractItemView.SelectionMode.SingleSelection)
         self.listw.setSelectionBehavior(
@@ -700,7 +717,7 @@ class _BuildMixin(_BuildDetailMixin):
         # Subtle "Update available" link in the status row - shown only when a
         # newer release is out, clicking opens About. Lives here (not as an
         # overlay toast) so it's quiet and always available while it lasts.
-        self.update_status_btn = QPushButton("")
+        self.update_status_btn = a11y.words_later(QPushButton(""))     # the update's own words
         self.update_status_btn.setFlat(True)
         self.update_status_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.update_status_btn.setStyleSheet(

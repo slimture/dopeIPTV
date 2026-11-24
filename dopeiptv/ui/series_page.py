@@ -32,9 +32,10 @@ from PyQt6.QtWidgets import (
 
 from ..core import series_view as sv
 from ..i18n import tr
+from . import a11y
 from .series_cards import (
     EpisodeDelegate, EpisodeModel, EpisodeState, EpisodeView, ImageSource, _c, _cover,
-    row_height, wrap_lines,
+    episode_a11y, row_height, wrap_lines,
 )
 from .theme import P, corner_radius
 
@@ -206,7 +207,7 @@ class SeriesHeader(QWidget):
         col.addWidget(self.more_plot, 0, Qt.AlignmentFlag.AlignLeading)
         play_row = QHBoxLayout()
         play_row.setSpacing(10)
-        self.play_btn = QPushButton()
+        self.play_btn = a11y.words_later(QPushButton())      # shown with its words (Play S1 E1)
         self.play_btn.setObjectName("Primary")
         self.play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.play_btn.clicked.connect(self.primary)
@@ -569,6 +570,7 @@ class SeriesPage(QWidget):
         lay.addLayout(note_row)
         self.view = EpisodeView()
         self.model = EpisodeModel(self.view)
+        self.model.describe = self._episode_words
         self.view.setModel(self.model)
         self.view.selectionModel().currentChanged.connect(
             lambda _c, _p: self.picked.emit(self.view.current_item()))
@@ -747,6 +749,13 @@ class SeriesPage(QWidget):
             self._reveal(self.view.visualRect(idx))
 
     # -- inside ----------------------------------------------------------------------
+
+    def _episode_words(self, ep: dict) -> str:
+        key = sv.episode_key(ep)
+        playing = bool(key) and key == self.playing_key
+        from .media_cards import on_tv      # media_cards imports series_cards
+        return episode_a11y(ep, self.states.get(key) or EpisodeState(), playing,
+                            bool(key) and key == self.next_key, playing and on_tv())
 
     def _play(self, ep) -> None:
         key = sv.episode_key(ep or {})

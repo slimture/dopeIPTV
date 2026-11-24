@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.workers import run_async
 from ..i18n import tr
+from . import a11y
 from ..providers.cast_bridge import normalise_quality, probe_tracks
 from ..providers.chromecast import ChromecastManager, cast_import_error
 
@@ -191,6 +192,7 @@ class CastDialog(QDialog):
         lay.addWidget(self.status)
 
         self.list = QListWidget()
+        self.list.setAccessibleName(tr("cast_title"))         # the TVs to cast to
         self.list.setMinimumWidth(MIN_LIST_W)
         self.list.itemDoubleClicked.connect(lambda _i: self._cast())
         lay.addWidget(self.list, 1)
@@ -244,6 +246,8 @@ class CastDialog(QDialog):
         # ceiling it does not need.
         self.kind_label = QLabel("")
         self.kind_box = QComboBox()
+        # Named after the device once one is picked (it shows only then).
+        a11y.words_later(self.kind_box)
         for key in ("original", "hd", "oldest"):
             self.kind_box.addItem(tr(f"cast_kind_{key}"), key)
         self.kind_label.hide()
@@ -259,6 +263,7 @@ class CastDialog(QDialog):
             cap = QLabel(label)
             cap.setMinimumWidth(80)
             row.addWidget(cap)
+            box.setAccessibleName(label)
             box.addItem(tr("cast_reading_tracks"), None)
             box.setEnabled(False)
             row.addWidget(box, 1)
@@ -512,6 +517,7 @@ class CastDialog(QDialog):
         want = normalise_quality(str(self.window.settings.value(
             self._quality_key(item.text()), "original") or "original"))
         self.kind_label.setText(tr("cast_device_kind", name=item.text()))
+        self.kind_box.setAccessibleName(self.kind_label.text())
         self.kind_box.blockSignals(True)
         at = self.kind_box.findData(want)
         self.kind_box.setCurrentIndex(at if at >= 0 else 0)

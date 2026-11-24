@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Показати попередні",
   "card_view_switch_a11y": "Вигляд",
   "card_sort_a11y": "Сортування: {order}",
+  "sa_results_a11y": "Результати",
+  "about_notes_a11y": "Примітки до випуску",
   "card_continue": "Продовжити",
   "card_popular": "Зараз популярне",
   "card_grid": "Сітка",

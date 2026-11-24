@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Afficher les précédents",
   "card_view_switch_a11y": "Affichage",
   "card_sort_a11y": "Tri : {order}",
+  "sa_results_a11y": "Résultats",
+  "about_notes_a11y": "Notes de version",
   "card_continue": "Reprendre",
   "card_popular": "Populaire en ce moment",
   "card_grid": "Grille",

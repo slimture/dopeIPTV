@@ -129,6 +129,7 @@ def show_about(win: Any, *, parent: QWidget | None = None) -> None:
     status.setStyleSheet(f"color:{P['muted']}; font-size:12px;")
     lay.addWidget(status)
     notes = QTextBrowser()
+    notes.setAccessibleName(tr("about_notes_a11y"))
     notes.setOpenExternalLinks(True)
     # Roomier + a sensible minimum so the release notes are actually
     # readable when an update is offered (it scrolls past the max).

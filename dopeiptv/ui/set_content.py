@@ -48,6 +48,7 @@ def build_sources(ctx: SettingsContext) -> None:
     add_playlist = ctx.add_playlist
     pl_list = ReorderList()
     pl_list.setObjectName("PlaylistList")
+    pl_list.setAccessibleName(tr("tab_playlists"))
     pl_list.setItemDelegate(PlaylistDelegate(tr("pl_in_use"), KIND_NAMES, pl_list))
     pl_list.setMouseTracking(True)
     # Each row opens its source's page: a click on its › (or a

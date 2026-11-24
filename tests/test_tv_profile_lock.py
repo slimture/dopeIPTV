@@ -126,8 +126,14 @@ class _Locked(_TvMixin):
         self.done.append("picker")
 
 
-def test_no_tv_key_gets_past_who_is_watching():
+def test_no_tv_key_gets_past_who_is_watching(monkeypatch):
     w = _Locked()
+    # A remote's key goes to a window or dialog that is up (_tv_input): one
+    # an earlier test in the same process left active is not this window's
+    # (tests/test_together.py did, when the suite's parts put them together).
+    from PyQt6.QtWidgets import QApplication
+    for name in ("activeWindow", "activeModalWidget", "activePopupWidget"):
+        monkeypatch.setattr(QApplication, name, staticmethod(lambda: None))
     for action in ("digit_5", "ok", "vol_up", "mute", "play", "play_pause", "picture", "stop"):
         w._tv_action(action)
     assert w.done == [] and w.player.done == []

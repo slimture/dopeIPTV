@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import time
+from typing import Callable
 
 from PyQt6.QtCore import (
     QAbstractListModel, QEvent, QItemSelectionModel, QLocale, QMimeData, QModelIndex,
-    QPointF, QRect, QRectF, QSize, Qt, QTimer,
+    QPointF, QRect, QRectF, QSize, Qt, QTimer, pyqtSignal,
 )
 from PyQt6.QtGui import (
     QColor, QDrag, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QPixmap,
@@ -18,10 +19,11 @@ from PyQt6.QtWidgets import (
 
 from ..core.log import log
 from ..i18n import tr
+from .a11y import keyboard_ring
 from .theme import P, corner_radius, on_accent
 from .widgets import plain_text
 from .category_flags import category_flag, flag_icon
-from .media_cards import Pictures
+from .media_cards import Pictures, then_text
 from .tv_place import (
     DENSITIES as TV_DENSITIES, TvRow, guide_now, guide_now_next, heading_of, name_need, paint_tv_row,
     tv_row_height,
@@ -98,6 +100,7 @@ class CategoryColorDelegate(QStyledItemDelegate):
             painter.fillRect(option.rect, bg)
             painter.restore()
         super().paint(painter, option, index)
+        keyboard_ring(painter, option)
 
 
 class FolderDropList(QListWidget):
@@ -105,7 +108,12 @@ class FolderDropList(QListWidget):
     from the middle list: dropped on a folder, they move there.
 
     *can_drop(row_data)* says whether a row is a valid target for what is
-    being dragged; *on_drop(row_data)* performs the move."""
+    being dragged; *on_drop(row_data)* performs the move.
+
+    Enter or Return on a row says ``entered`` - the keyboard's click (the
+    arrows only move the current row, as a click's press does)."""
+
+    entered = pyqtSignal(object)
 
     def __init__(self, *a, **kw) -> None:
         super().__init__(*a, **kw)
@@ -115,6 +123,11 @@ class FolderDropList(QListWidget):
         self.setAcceptDrops(True)
         self.viewport().setAcceptDrops(True)
         self.setDropIndicatorShown(False)
+
+    def keyPressEvent(self, e) -> None:      # noqa: N802 - Qt hook
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and self.currentItem() is not None:
+            self.entered.emit(self.currentItem())
+        super().keyPressEvent(e)
 
     def _target_row(self, e) -> int:
         item = self.itemAt(e.position().toPoint())
@@ -495,6 +508,9 @@ class ChannelListModel(QAbstractListModel):
         self._items: list = []
         self.kind: str = "live"
         self.uniform = True
+        #: A row's words for a screen reader - the delegate's, which knows
+        #: what it paints (``ChannelDelegate.words_for``); else its name.
+        self.describe: Callable[[dict, str], str] | None = None
 
     def rowCount(self, parent=QModelIndex()) -> int:
         return len(self._items)
@@ -506,6 +522,15 @@ class ChannelListModel(QAbstractListModel):
         if role == Qt.ItemDataRole.UserRole:
             return it
         if role == Qt.ItemDataRole.DisplayRole:
+            return it.get("name") or it.get("title") or "?"
+        if role == Qt.ItemDataRole.AccessibleTextRole:
+            if it.get("_header"):
+                return str(it["_header"])
+            if self.describe is not None:
+                try:
+                    return self.describe(it, self.kind)
+                except Exception:
+                    log.debug("channel list: a row's words", exc_info=True)
             return it.get("name") or it.get("title") or "?"
         if role == Qt.ItemDataRole.ToolTipRole:
             # Where a row is, when it says (a Local files search's match) -
@@ -693,6 +718,54 @@ class ChannelDelegate(QStyledItemDelegate):
                     return True
         return super().helpEvent(event, view, option, index)
 
+    def words_for(self, it: dict, kind: str) -> str:
+        """What a screen reader says for a row: the words it paints - its
+        number where it shows one, its name as the lists show it (renamed,
+        never the provider's when the person renamed it), what is on from
+        the guide in memory, its line, and its marks (playing, a favourite,
+        watched, on Watch later, new, how far)."""
+        w = self.window
+        kind = it.get("_ekind") or kind
+        name = w.channel_display_name(it)
+        parts: list[str] = []
+        live_like = kind in ("live", "fav") or (kind == "history" and it.get("_kind") == "live")
+        tv = not self.grid and kind == "live"
+        if tv:
+            if heading_of(name) is not None:
+                return name
+            num = it.get("num") if self.tv_numbers else ""
+        elif live_like and not self.grid:
+            num = w._chno_shown(it) if kind == "fav" else it.get("num")
+        else:
+            num = ""
+        parts.append(f"{num} {name}".strip() if num else name)
+        if tv:
+            nn = self._now_next(it)[0]
+            if nn is not None and nn.title:
+                parts.append(tr("epg_now_prefix", title=nn.title))
+            parts.append(then_text(nn))
+        elif kind in ("live", "fav") and not self.grid:
+            now = w.xmltv.now_for(it)
+            if now:
+                parts.append(tr("epg_now_prefix", title=now[0]))
+        if not tv and it.get("_sub"):
+            parts.append(str(it["_sub"]))
+        if self._is_playing(it, kind):
+            parts.append(tr("pill_playing"))
+        if w.is_favorite_item(it, kind):
+            parts.append(tr("sp_favorite"))
+        if not tv:
+            if w.watched_source(it, kind):
+                parts.append(tr("pill_seen"))
+            if w.is_item_on_watchlist(it, kind):
+                parts.append(tr("sp_watch_later"))
+            if it.get("_new"):
+                parts.append(tr("pill_new"))
+            pct = it.get("_progress_pct")
+            if isinstance(pct, (int, float)) and 0 < pct < 100:
+                parts.append(tr("card_progress_a11y", n=round(pct)))
+        return ", ".join(str(p) for p in parts if p)
+
     def forget_guide(self) -> None:
         """A guide came in or changed: what is on asked again."""
         self._nn.clear()
@@ -796,6 +869,10 @@ class ChannelDelegate(QStyledItemDelegate):
         return QSize(0, self.row_h)
 
     def paint(self, painter, option, index) -> None:
+        self._paint_row(painter, option, index)
+        keyboard_ring(painter, option)
+
+    def _paint_row(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole)
         if it and it.get("_header"):
             self._paint_header(painter, option, it["_header"])

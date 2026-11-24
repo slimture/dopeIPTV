@@ -558,13 +558,17 @@ assert w._status_playing("Vegas Nordic") == tr("status_playing_from", title="Veg
                                                 source="Nordic")
 assert w._search_page_showing()
 # Down goes on into the next group, past its heading; Up from the first
-# row goes back to the field, Tab between the two.
+# row goes back to the field, Tab from it to the results, Shift+Tab back -
+# and Tab from the results on out of the page: never kept on it.
 QTest.keyClick(page.view, Qt.Key.Key_Down)
 assert page.current_hit() is not None and page.current_hit().group == "programmes"
-QTest.keyClick(page.view, Qt.Key.Key_Tab)
+QTest.keyClick(page.view, Qt.Key.Key_Backtab)
 assert page.field.hasFocus()
 QTest.keyClick(page.field, Qt.Key.Key_Tab)
 assert page.view.hasFocus()
+QTest.keyClick(page.view, Qt.Key.Key_Tab)
+assert not page.view.hasFocus() and not page.field.hasFocus()
+page.view.setFocus()
 page.view.setCurrentIndex(page.model.index(page.view.first_row(), 0))
 QTest.keyClick(page.view, Qt.Key.Key_Up)
 assert page.field.hasFocus()

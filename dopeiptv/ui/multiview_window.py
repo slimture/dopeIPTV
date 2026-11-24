@@ -69,6 +69,7 @@ class _MultiviewWindow(WindowChanges, QWidget):
         self._close_host = self.cells[cols - 1].video   # top-right cell
         self._close_btn = _CloseButton(self._close_host)
         self._close_btn.setToolTip(tr("mv_close"))
+        self._close_btn.setAccessibleName(tr("mv_close"))      # a drawn ✕
         self._close_btn.clicked.connect(self.close)
         self._close_btn.hide()
         self._overlay_timer = QTimer(self)

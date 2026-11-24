@@ -166,6 +166,7 @@ class TvTile(QAbstractButton):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAccessibleName(title)
+        self.setAccessibleDescription(sub)      # the line under it (what is on)
         ring = px(self.RING)
         if kind in ("key", "option", "tab"):
             self.setFixedSize(self._img_w + 2 * ring, self._img_h + 2 * ring)
@@ -176,6 +177,7 @@ class TvTile(QAbstractButton):
     def set_text(self, title: str, sub: str = "") -> None:
         self.title, self.sub = title, sub
         self.setAccessibleName(title)
+        self.setAccessibleDescription(sub)
         self.update()
 
     def set_pixmap(self, pm: QPixmap | None) -> None:

@@ -2991,6 +2991,8 @@
   "card_scroll_back": "前を表示",
   "card_view_switch_a11y": "表示",
   "card_sort_a11y": "並べ替え: {order}",
+  "sa_results_a11y": "結果",
+  "about_notes_a11y": "リリースノート",
   "card_continue": "続きから",
   "card_popular": "いま人気",
   "card_grid": "グリッド",

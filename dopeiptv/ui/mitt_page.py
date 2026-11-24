@@ -57,6 +57,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import tr
+from . import a11y
 from . import media_cards as mc
 from .media_cards import Card, ChannelRow, NowNext
 from .theme import P, corner_radius
@@ -283,7 +284,7 @@ def _state(option, view, index) -> tuple[bool, bool, bool, bool]:
     rtl = option.direction == Qt.LayoutDirection.RightToLeft
     hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
     selected = bool(option.state & QStyle.StateFlag.State_Selected)
-    focus = selected and view.hasFocus() and index == view.currentIndex()
+    focus = view.hasFocus() and index == view.currentIndex()     # chosen or not
     return rtl, hover, selected, focus
 
 
@@ -1303,7 +1304,7 @@ class _SectionHead(QWidget):
         self.note.hide()
         lay.addWidget(self.title, 0, Qt.AlignmentFlag.AlignVCenter)
         lay.addWidget(self.note, 1, Qt.AlignmentFlag.AlignVCenter)
-        self.button = QPushButton("")
+        self.button = a11y.words_later(QPushButton(""))       # set_button's
         self.button.setObjectName("MittSectionBtn")
         self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.button.hide()
@@ -1453,7 +1454,7 @@ class MittPage(QWidget):
         self.timeline = TimelineView(None)
         self.timeline.setAccessibleName(tr("nav_history"))
         self.heads["history"] = _SectionHead(tr("nav_history"))
-        self.history_more = QPushButton(tr("card_scroll_on"))
+        self.history_more = a11y.words_later(QPushButton(tr("card_scroll_on")))
         self.history_more.setObjectName("MittSectionBtn")
         self.history_more.setCursor(Qt.CursorShape.PointingHandCursor)
         self.history_more.clicked.connect(lambda: self.more.emit("history"))
@@ -1497,6 +1498,7 @@ class MittPage(QWidget):
         self.folder_head = _SectionHead("")
         fl.addWidget(self.folder_head)
         self.folder_items = FolderItemsView(posters)
+        self.folder_items.setAccessibleName(tr("mitt_tab_folders"))
         fl.addWidget(self.folder_items)
         self.folder_empty = QLabel("")
         self.folder_empty.setWordWrap(True)
@@ -1656,6 +1658,7 @@ class MittPage(QWidget):
     def set_folder_items(self, title: str, note: str, cards: Sequence[Card],
                          empty: str, reorder: bool) -> None:
         self.folder_head.title.setText(title)
+        self.folder_items.setAccessibleName(title or tr("mitt_tab_folders"))
         self.folder_head.set_note(note)
         self.folder_head.setVisible(bool(title))
         self.folder_items.set_items(cards)

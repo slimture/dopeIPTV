@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Eerdere tonen",
   "card_view_switch_a11y": "Weergave",
   "card_sort_a11y": "Sortering: {order}",
+  "sa_results_a11y": "Resultaten",
+  "about_notes_a11y": "Release-opmerkingen",
   "card_continue": "Verder kijken",
   "card_popular": "Nu populair",
   "card_grid": "Raster",

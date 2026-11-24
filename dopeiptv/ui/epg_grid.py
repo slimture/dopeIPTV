@@ -317,6 +317,7 @@ class EpgGrid(QWidget):
         self.scope_lbl.setObjectName("GuideScope")
         top.addWidget(self.scope_lbl)
         self.filter = QLineEdit(placeholderText=tr("epg_filter_channels"))
+        self.filter.setAccessibleName(tr("epg_filter_channels"))
         self.filter.setObjectName("Search")
         self.filter.setClearButtonEnabled(True)
         # Bound methods, not lambdas, for every signal of this guide's own
@@ -445,6 +446,11 @@ class EpgGrid(QWidget):
         self.view.horizontalScrollBar().valueChanged.connect(self._pin)
         self.view.verticalScrollBar().valueChanged.connect(self._pin)
         self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        # A screen reader cannot see the board's blocks (QGraphicsItems have
+        # no accessible side): the view is called by the programme the
+        # arrows rest on, its info line's words (_apply_selection), and a
+        # name that changes on the focus is read out.
+        self.view.setAccessibleName(tr("nav_guide"))
         outer.addWidget(self.view, 1)
 
         # Programme description panel: fed from the XMLTV desc of whatever
@@ -611,6 +617,7 @@ class EpgGrid(QWidget):
                          (self.reminders_btn, "reminders_title"),
                          (self.rec_sched_btn, "rec_scheduled_title")):
             btn.setText("" if compact else tr(key))
+            btn.setAccessibleName(tr(key))          # its words when they give way to its icon
             if compact:
                 btn.setFixedWidth(30)
                 btn.setToolTip(tr("rec_manage_scheduled")
@@ -2276,6 +2283,7 @@ class EpgGrid(QWidget):
             # no programme to describe.
             self.info.setText(f"{data['channel'].get('name') or '?'} · "
                               + tr("epg_no_guide_available"))
+            self.view.setAccessibleName(self.info.text())
             self.desc.hide()
             return
         day = datetime.fromtimestamp(p["start_timestamp"])
@@ -2293,6 +2301,7 @@ class EpgGrid(QWidget):
             f"{data['channel'].get('name') or '?'} · {date_tag}"
             f"{start}–{stop} ({tr('opt_minutes', n=mins)})  "
             f"{p.get('title') or ''}{tag}")
+        self.view.setAccessibleName(self.info.text().replace("⟲", "").strip())
         d = (p.get("description") or "").strip()
         if d:
             self.desc.setText(d)

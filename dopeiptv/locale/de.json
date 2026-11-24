@@ -2991,6 +2991,8 @@
   "card_scroll_back": "Vorherige zeigen",
   "card_view_switch_a11y": "Ansicht",
   "card_sort_a11y": "Sortierung: {order}",
+  "sa_results_a11y": "Ergebnisse",
+  "about_notes_a11y": "Versionshinweise",
   "card_continue": "Weiterschauen",
   "card_popular": "Gerade beliebt",
   "card_grid": "Raster",
