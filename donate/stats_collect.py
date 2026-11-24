@@ -782,30 +782,57 @@ def day_id(state: dict, day: str, vid: str) -> str:
     return hmac.new(key, f"day|{day}|{vid}".encode(), hashlib.sha256).hexdigest()[:12]
 
 
+#: A sealed mark: a 12-byte nonce, the 6-byte mark under a pad from
+#: HMAC-SHA256 of the month's key, and a 10-byte tag over both (encrypt then
+#: MAC, the two kept apart by their labels). An older seal - a 6-byte nonce
+#: and no tag, written before 1.7.0's review - is still read until its visits
+#: go (VISITS_DAYS).
+SEAL_NONCE = 12
+SEAL_TAG = 10
+
+
+def _pad(key: bytes, nonce: bytes) -> bytes:
+    return hmac.new(key, b"w|" + nonce, hashlib.sha256).digest()[:6]
+
+
+def _tag(key: bytes, nonce: bytes, body: bytes) -> bytes:
+    return hmac.new(key, b"t|" + nonce + body, hashlib.sha256).digest()[:SEAL_TAG]
+
+
 def seal(state: dict, day: str, vid: str) -> tuple:
     """The visitor's mark, sealed with its month's key for the visit kept:
     ("w", "e") - random to anyone without the key (a new nonce each time,
     so two visits of one visitor look nothing alike), the mark again to
-    this service while the key is kept (unseal). "e" names the key."""
+    this service while the key is kept (unseal), and a tag that a seal
+    changed on the disk fails. "e" names the key."""
     keys = _keys(state, day)
     month = _month(day)
+    key = keys.key(month)
     if not re.fullmatch(r"[0-9a-f]{12}", vid or ""):
         vid = hashlib.sha256((vid or "").encode()).hexdigest()[:12]     # a mark of long before
-    nonce = secrets.token_bytes(6)
-    pad = hmac.new(keys.key(month), b"w|" + nonce, hashlib.sha256).digest()[:6]
-    body = bytes(a ^ b for a, b in zip(bytes.fromhex(vid), pad, strict=True))
-    return (nonce + body).hex(), keys.kid(month)
+    nonce = secrets.token_bytes(SEAL_NONCE)
+    body = bytes(a ^ b for a, b in zip(bytes.fromhex(vid), _pad(key, nonce), strict=True))
+    return (nonce + body + _tag(key, nonce, body)).hex(), keys.kid(month)
 
 
 def unseal(keys: MonthKeys, day: str, w, e) -> str:
-    """The mark a visit kept was sealed with, or "" once its key is gone."""
+    """The mark a visit kept was sealed with, or "" once its key is gone -
+    or when its tag does not match (a seal changed on the disk)."""
     month = _month(day)
     key = keys.known(month)
-    if not key or not isinstance(w, str) or not re.fullmatch(r"[0-9a-f]{24}", w) or keys.kid(month) != e:
+    if not key or not isinstance(w, str) or keys.kid(month) != e:
         return ""
-    raw = bytes.fromhex(w)
-    pad = hmac.new(key, b"w|" + raw[:6], hashlib.sha256).digest()[:6]
-    return bytes(a ^ b for a, b in zip(raw[6:], pad, strict=True)).hex()
+    if re.fullmatch(r"[0-9a-f]{%d}" % (2 * (SEAL_NONCE + 6 + SEAL_TAG)), w):
+        raw = bytes.fromhex(w)
+        nonce, body, tag = raw[:SEAL_NONCE], raw[SEAL_NONCE:SEAL_NONCE + 6], raw[SEAL_NONCE + 6:]
+        if not hmac.compare_digest(tag, _tag(key, nonce, body)):
+            return ""
+    elif re.fullmatch(r"[0-9a-f]{24}", w):
+        raw = bytes.fromhex(w)
+        nonce, body = raw[:6], raw[6:]
+    else:
+        return ""
+    return bytes(a ^ b for a, b in zip(body, _pad(key, nonce), strict=True)).hex()
 
 
 def _first(state: dict, kind: str, day: str, marks: list, mark: str) -> bool:

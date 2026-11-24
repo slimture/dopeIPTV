@@ -197,7 +197,7 @@ CODE: dict[str, list[dict]] = {
     ],
     "website": [
         {"id": "visitor", "repo": "site", "path": "donate/stats_collect.py",
-         "names": ["MonthKeys", "_hash", "day_id", "seal", "unseal", "at_rest", "swap_state"],
+         "names": ["MonthKeys", "_hash", "day_id", "SEAL_NONCE", "SEAL_TAG", "_pad", "_tag", "seal", "unseal", "at_rest", "swap_state"],
          # Nothing counted while swap keeps what it is given: the stop, and
          # where a run makes it before any key or line is touched.
          "with": [{"repo": "site", "path": "donate/stats_collect.py", "names": ["SWAP_HELD", "_swap_holds"]},

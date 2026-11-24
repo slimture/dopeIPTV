@@ -205,6 +205,31 @@ def test_no_address_and_no_key_is_ever_written():
     assert sc.unseal(sc.MonthKeys(date.today()), now.date().isoformat(), visit["w"], visit["e"]) == ""
 
 
+def test_a_sealed_mark_has_a_long_nonce_and_a_tag_and_an_older_seal_still_opens():
+    """An outside review of 1.7.0: a mark was sealed with a 6-byte nonce and
+    no tag. Now 12 bytes and a tag - a seal changed on the disk opens to
+    nothing -, and a visit sealed the old way is still read until it goes."""
+    import hashlib
+    import hmac
+    import secrets
+    from datetime import date
+    sc, _dir = _module()
+    state = {"_keys": sc.MonthKeys(date(2026, 11, 19))}
+    vid = sc._hash(state, "2026-11-19", IP, UA)
+    w, e = sc.seal(state, "2026-11-19", vid)
+    assert len(w) == 2 * (sc.SEAL_NONCE + 6 + sc.SEAL_TAG)
+    assert sc.unseal(state["_keys"], "2026-11-19", w, e) == vid
+    for at in (0, 2 * sc.SEAL_NONCE, len(w) - 1):            # the nonce, the mark, the tag
+        flipped = w[:at] + ("0" if w[at] != "0" else "1") + w[at + 1:]
+        assert sc.unseal(state["_keys"], "2026-11-19", flipped, e) == ""
+    key = state["_keys"].key("2026-11")
+    nonce = secrets.token_bytes(6)
+    pad = hmac.new(key, b"w|" + nonce, hashlib.sha256).digest()[:6]
+    old = (nonce + bytes(a ^ b for a, b in zip(bytes.fromhex(vid), pad))).hex()
+    assert sc.unseal(state["_keys"], "2026-11-19", old, e) == vid
+    assert sc.unseal(state["_keys"], "2026-11-19", old + "00", e) == ""
+
+
 def test_a_visit_kept_names_its_visitor_for_its_day_alone():
     from datetime import date
     sc, _dir = _module()
