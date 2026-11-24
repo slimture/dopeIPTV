@@ -108,6 +108,7 @@ from .mw_downloads import _DownloadsMixin
 from .mw_place_radio import _PlaceRadioMixin
 from .mw_place_series import _PlaceSeriesMixin
 from .mw_search_all import _SearchAllMixin
+from .mw_every_source import _EverySourceMixin
 from .mw_stats import _StatsMixin
 from .mw_search import _SearchMixin
 from .mw_shortcuts import _ShortcutsMixin
@@ -137,7 +138,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
                  _PlaceRecMixin, _PlaceRadioMixin, _DownloadsMixin,
                  _PopoutMixin, _MultiviewMixin, _PlacesMixin, _PlaceLookMixin, _PopularMixin,
                  _GuideMixin,
-                 _SeriesPageMixin, _PlaceFilmsMixin, _PlaceSeriesMixin, _SearchAllMixin, _MittMixin,
+                 _SeriesPageMixin, _PlaceFilmsMixin, _PlaceSeriesMixin, _SearchAllMixin,
+                 _EverySourceMixin, _MittMixin,
                  _MprisMixin,
                  _FollowMixin, _PaneFollowMixin, _PlaceTvMixin, _SubtitlesMixin, _CastMixin, _CastWatchMixin, _AirPlayMixin, _DonateMixin,
                  _BoxMixin, _CommandsMixin, _PrivacyMixin, _FailoverMixin,
@@ -489,8 +491,9 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         # line follow every change the avatar does (mw_source_label).
         self._update_source_label()
         # ...and the Search page lets go of what it read of a source removed
-        # or edited since.
+        # or edited since; Every source is offered with two of them or more.
         self._search_sources_changed()
+        self._xs_sources_changed()
         store = self.playlist_store
         pl = store.get(store.active_id) if (store and store.active_id) else None
         name = ((pl or {}).get("name") or (pl or {}).get("server") or "")
@@ -1586,6 +1589,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
     def play_item(self, it, player=None, external: bool = False) -> None:
         if not it or it.get("_header"):
             return
+        # Another source's channel in Every source: from that source, the
+        # source in use left as it is (mw_every_source) - never an address
+        # of the source in use made from it.
+        if it.get("_xs"):
+            self._xs_play(it)
+            return
         # A Continue-watching episode row plays straight from its stored series
         # context (it isn't reachable through the normal series drill-down).
         if it.get("_kind") == "episode" and it.get("_series_ctx") is not None:
@@ -1807,6 +1816,11 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         it = self.list_model.item_at(self.listw.currentIndex().row())
         if (not it or self.series_ctx or not self.player
                 or self.playback_mode() != "embedded"):
+            return
+        if it.get("_xs"):
+            # Another source's channel (Every source): as it plays when
+            # picked - from its own source, through the usual path.
+            self._xs_play(it)
             return
         kind = self._content_kind()
         # Preview live channels: the TV / Favorites channel lists, plus live
@@ -2512,7 +2526,7 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
         may not, nor when a running cast takes it instead."""
         # A kids profile plays only what its lists may show, however it was
         # asked (mw_profiles).
-        if not self._kids_may_play(kind, item):
+        if not self._kids_may_play(kind, item, key):
             return False
         if not self._guard_stream_switch(url, title):
             return False

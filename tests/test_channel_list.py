@@ -118,7 +118,7 @@ def test_a_section_heading_is_no_row_to_pick_and_lays_the_list_out_anew(app):
     assert resets == [1] and m.uniform is False, "a heading's height differs: laid out row by row"
     assert m.flags(m.index(1)) == Qt.ItemFlag.NoItemFlags
     assert m.flags(m.index(0)) & Qt.ItemFlag.ItemIsSelectable
-    assert m.data(m.index(1)) == "?" and m.item_at(1) == {"_header": "Today"}
+    assert m.data(m.index(1)) == "Today" and m.item_at(1) == {"_header": "Today"}
     assert m.item_at(-1) is None and m.item_at(99) is None
     assert m.data(m.index(99)) is None
 

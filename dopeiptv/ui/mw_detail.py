@@ -224,6 +224,10 @@ class _DetailMixin:
                         and not self._rmb_selecting
                         and not self._extending_selection()):
                     self._preview_timer.start(350)
+            elif it.get("_xs"):
+                # Another source's channel (Every source): its programmes
+                # from its own guide, never the one in use's (mw_every_source).
+                self._xs_detail(it)
         # In History / Watch Later, defer to the snapshot's _kind so
         # a movie row fetches movie info and a series row fetches
         # series info - same as the main Movies / Series views.

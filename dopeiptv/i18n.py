@@ -1259,6 +1259,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "cat_all": {"en": "All"},
     "cat_continue": {"en": "Continue watching"},
     "cat_recent": {"en": "Recently added"},
+    "cat_every_source": {"en": "Every source"},
     "cat_following": {"en": "Following"},
     "pill_new_episode": {"en": "New episode"},
     "place_sort_updated": {"en": "Recently updated"},

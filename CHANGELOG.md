@@ -20,9 +20,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   the panel's corner closes it, beside Esc and a click elsewhere.
   History's Copy list copies what the list shows (its filter too), its
   tooltip saying so; a right click on a row copies that one.
+- **Every source in one channel list**: with two sources or more, TV's categories
+  have **Every source** under All - the live channels of all your sources in one
+  list, under each source's name, as each source's own lists show them (hidden,
+  locked and adult categories, and channels hidden by hand, stay out; a kids
+  profile sees only what it may). A channel of another source plays from it
+  without switching to it, and the list stays where it is. What is on comes
+  from the guides already on this computer; no guide is downloaded and nothing
+  streams for it until you play a channel.
 
 ### Fixed
 
+- A kids profile can play a channel of another source found by the search
+  across sources: it was shown, but refused when played.
 - While the welcome shows, the notices wait behind it: a question, a
   message or the activity panel no longer drew over the welcome (with the
   sidebar folded to its icons); they show as it closes.

@@ -14,6 +14,12 @@ What a source's lists leave out (services/failover.Shown, per kind) and
 what a kids profile never sees are left out before anything is matched.
 Nothing here opens a stream: a play address is asked for only when a hit
 is played (``play_address``).
+
+The TV place's "Every source" (core/every_source.py, ui/mw_every_source.py)
+reads its channels here too, the same once a session: ``channels`` asks a
+source for its live lists alone (a full catalogue made since, or before,
+takes them from what was read), and ``now_table`` another source's guide
+around now from its copy on disk - never a download.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from typing import Any
 
+from ..core import every_source as es
 from ..core import search_all as sa
 from ..core.log import log
 from .failover import Shown
@@ -111,18 +118,26 @@ def _read(client: Any, mode: str, list_fn: str, cats_fn: str
     return rows, cats, ""
 
 
+#: Every group of rows a catalogue has.
+_GROUPS = tuple(g for g, *_rest in _LISTS)
+
+
 def build_catalogue(plan: Plan, client: Any,
                     read: Callable[[Any, str, str, str], tuple[list, list | None, str]]
-                    | None = None) -> sa.Catalogue:
+                    | None = None, groups: Iterable[str] = _GROUPS) -> sa.Catalogue:
     """(worker) The source's channels, films and series as its lists show
     them - and, for a kids profile, without what is for adults. *read*: one
-    kind of its lists (``_read`` by default)."""
+    kind of its lists (``_read`` by default); *groups*: only these are
+    asked for (the rest is empty)."""
     read = read or _read
-    found: dict[str, list[dict]] = {}
+    wanted = frozenset(groups)
+    found: dict[str, list[dict]] = {g: [] for g in _GROUPS}
     names: dict[str, dict[str, str]] = {}
     renamed: dict[str, dict[str, str]] = {}
     partial = ""
     for group, mode, list_fn, cats_fn, ident in _LISTS:
+        if group not in wanted:
+            continue
         rows, cats, why = read(client, mode, list_fn, cats_fn)
         partial = partial or why
         shown = plan.shown.get(mode) or Shown()
@@ -189,6 +204,12 @@ class Sources:
         self._busy: dict[str, threading.Lock] = {}
         self._clients: dict[str, tuple[str, Any]] = {}
         self._cats: dict[str, tuple[tuple, sa.Catalogue]] = {}
+        # A source's channels alone (Every source), under the key they were
+        # made for - a full catalogue for the same key stands in for them.
+        self._chans: dict[str, tuple[tuple, sa.Catalogue]] = {}
+        # A source's guide around now (Every source): (key, table or None,
+        # when) - the key the plan's and the copy on disk's.
+        self._now: dict[str, tuple[tuple, es.NowTable | None, float]] = {}
         # A source's lists as read, per kind, while it is as it was: a
         # catalogue made for another key (a profile, the lock) filters
         # these again instead of asking the source once more.
@@ -285,6 +306,107 @@ class Sources:
                 have[1][mode] = got
         return got
 
+    # -- channels alone (Every source) ----------------------------------------------
+
+    def channels_ready(self, plan: Plan) -> sa.Catalogue | None:
+        """The source's channels as its lists show them, made for the plan's
+        key - a full catalogue's (the Search page's), else the channels'
+        own - or None while there are none."""
+        with self._lock:
+            full = self._cats.get(plan.source.id)
+            own = self._chans.get(plan.source.id)
+        if full is not None and full[0] == plan.key:
+            return full[1]
+        if own is not None and own[0] == plan.key:
+            return own[1]
+        return None
+
+    def channels(self, plan: Plan) -> sa.Catalogue:
+        """(worker) The source's channels as its lists show them: its live
+        lists asked for once while the source is as it was (its films and
+        series never, for this), a portal's only as loaded before. A source
+        that cannot be read gives none (FAILED)."""
+        pid = plan.source.id
+        with self._busy_for(pid):
+            have = self.channels_ready(plan)
+            if have is not None:
+                return have
+            with self._lock:
+                gen = self._gen.get(pid, 0)
+            try:
+                client = plan.client if plan.client is not None else self.client(plan.playlist)
+                cat = build_catalogue(plan, client, partial(self._read_kept, plan, gen),
+                                      groups=("channels",))
+            except Exception as e:
+                log.info("every source: a source could not be read (%s)", type(e).__name__)
+                cat = sa.Catalogue(plan.source, partial=sa.FAILED)
+            with self._lock:
+                if gen == self._gen.get(pid, 0):
+                    self._chans[pid] = (plan.key, cat)
+                    self._sigs[pid] = signature(plan.playlist)
+            log.info("every source: %s - %d channels%s", plan.source.kind, len(cat.channels),
+                     f" (only in part: {cat.partial})" if cat.partial else "")
+            return cat
+
+    def now_in(self, plan: Plan, now: float | None = None) -> es.NowTable | None:
+        """The source's guide around now as it is in, for the plan's key."""
+        now = time.time() if now is None else now
+        with self._lock:
+            got = self._now.get(plan.source.id)
+        if got is None or got[0][0] != plan.key or now - got[2] >= GUIDE_FRESH_SECS:
+            return None
+        return got[1]
+
+    def now_looked_for(self, plan: Plan, now: float | None = None) -> bool:
+        """(the window's thread) Whether the source's guide around now was
+        looked for as it is now: a table in, or none on disk then."""
+        now = time.time() if now is None else now
+        key = self._disk_key(plan.source.id)
+        with self._lock:
+            got = self._now.get(plan.source.id)
+        return (got is not None and got[0] == (plan.key, key)
+                and now - got[2] < GUIDE_FRESH_SECS)
+
+    def now_table(self, plan: Plan, cat: sa.Catalogue, now: float | None = None
+                  ) -> es.NowTable | None:
+        """(worker) Another source's guide around now over *cat*'s channels,
+        by the keys they play under (core/every_source.play_key): from the
+        copy this computer has on disk - never a download, never the
+        window's guide (the source in use's rows are drawn from that) - one
+        guide from disk read at a time and let go once its table is made.
+        None without one (remembered until the copy on disk changes)."""
+        now = time.time() if now is None else now
+        pid = plan.source.id
+        with self._busy_for(pid):
+            key = self._disk_key(pid)
+            with self._lock:
+                got = self._now.get(pid)
+                gen = self._gen.get(pid, 0)
+            if got is not None and got[0] == (plan.key, key) and now - got[2] < GUIDE_FRESH_SECS:
+                return got[1]
+            table: es.NowTable | None = None
+            try:
+                if key is not None:
+                    with self._guide_lock:
+                        g = self._open_guide(str(key[1]))
+                        if g.load_cached():
+                            table = es.NowTable(
+                                cat.channels, lambda ch: es.play_key(pid, ch.get("stream_id")),
+                                g.schedule, now)
+                        del g
+            except Exception as e:
+                log.info("every source: a guide could not be read (%s)", type(e).__name__)
+                table = None
+            with self._lock:
+                if gen != self._gen.get(pid, 0):
+                    return table            # the source was let go meanwhile
+                self._now[pid] = ((plan.key, key), table, now)
+                self._sigs[pid] = signature(plan.playlist)
+            if table is not None:
+                log.info("every source: a guide around now - %d channels%s", len(table),
+                         " (cut short)" if table.cut else "")
+            return table
+
     # -- guides ---------------------------------------------------------------------
 
     def _guide_key(self, plan: Plan) -> tuple | None:
@@ -294,7 +416,11 @@ class Sources:
         if plan.guide is not None:
             loaded = getattr(plan.guide, "is_loaded", None)
             return ("memory", id(plan.guide)) if callable(loaded) and loaded() else None
-        path = self._guide_path(plan.source.id)
+        return self._disk_key(plan.source.id)
+
+    def _disk_key(self, pid: str) -> tuple | None:
+        """The source's guide on disk and when it was written; None without."""
+        path = self._guide_path(pid)
         try:
             return ("disk", path, os.stat(path).st_mtime)
         except OSError:
@@ -370,11 +496,16 @@ class Sources:
 
     # -- letting go -----------------------------------------------------------------
 
+    def _stores(self) -> tuple[dict, ...]:
+        """Everything kept per source."""
+        return (self._clients, self._cats, self._chans, self._guides, self._now,
+                self._rows, self._sigs)
+
     def forget(self, keep: Iterable[str] = ()) -> None:
         """Everything of the sources not in *keep* let go (removed ones)."""
         ids = set(keep)
         with self._lock:
-            for store in (self._clients, self._cats, self._guides, self._rows, self._sigs):
+            for store in self._stores():
                 for pid in [p for p in store if p not in ids]:
                     store.pop(pid, None)
 
@@ -386,7 +517,8 @@ class Sources:
         with self._lock:
             gone = set()
             for pid in (set(self._busy) | set(self._clients) | set(self._cats)
-                        | set(self._guides) | set(self._rows)):
+                        | set(self._guides) | set(self._rows) | set(self._chans)
+                        | set(self._now)):
                 sig = signatures.get(pid)
                 had = [self._sigs.get(pid)] + [h[0] for h in (self._clients.get(pid),
                                                               self._rows.get(pid)) if h]
@@ -394,7 +526,7 @@ class Sources:
                     gone.add(pid)
             for pid in gone:
                 self._gen[pid] = self._gen.get(pid, 0) + 1
-                for store in (self._clients, self._cats, self._guides, self._rows, self._sigs):
+                for store in self._stores():
                     store.pop(pid, None)
 
     def release_guides(self) -> int:
@@ -412,6 +544,5 @@ class Sources:
         """One source's catalogue and guide week made anew next time (its
         lists were refreshed)."""
         with self._lock:
-            self._cats.pop(pid, None)
-            self._guides.pop(pid, None)
-            self._rows.pop(pid, None)
+            for store in (self._cats, self._chans, self._guides, self._now, self._rows):
+                store.pop(pid, None)

@@ -500,6 +500,13 @@ class ChannelListView(QListView):
         self.setViewportMargins(left_pad, 0, 0, 0)
 
 
+def _odd_height(it: dict) -> bool:
+    """A row that is not as tall as the rows round it: a section header -
+    but not a source's heading in Every source (``_tv_head``), which is
+    painted as tall as a channel's row (ChannelDelegate)."""
+    return bool(it.get("_header")) and not it.get("_tv_head")
+
+
 class ChannelListModel(QAbstractListModel):
     """Flat data model for the channel/movie/episode list."""
 
@@ -511,6 +518,8 @@ class ChannelListModel(QAbstractListModel):
         #: A row's words for a screen reader - the delegate's, which knows
         #: what it paints (``ChannelDelegate.words_for``); else its name.
         self.describe: Callable[[dict, str], str] | None = None
+        #: Whether a header row is among them (one not counted as a row).
+        self.headed = False
 
     def rowCount(self, parent=QModelIndex()) -> int:
         return len(self._items)
@@ -522,7 +531,7 @@ class ChannelListModel(QAbstractListModel):
         if role == Qt.ItemDataRole.UserRole:
             return it
         if role == Qt.ItemDataRole.DisplayRole:
-            return it.get("name") or it.get("title") or "?"
+            return it.get("name") or it.get("title") or it.get("_header") or "?"
         if role == Qt.ItemDataRole.AccessibleTextRole:
             if it.get("_header"):
                 return str(it["_header"])
@@ -546,8 +555,10 @@ class ChannelListModel(QAbstractListModel):
         # Every row as tall as the next unless a section header is among
         # them: the view then lays the list out without asking each row
         # for its size - 80,000 films took 0.65 s on the GUI thread, now
-        # 0.1 s (see ChannelListView.reset).
-        self.uniform = not any(it.get("_header") for it in items)
+        # 0.1 s (see ChannelListView.reset). Every source's headings are as
+        # tall as its rows (_odd_height).
+        self.uniform = not any(_odd_height(it) for it in items)
+        self.headed = any(it.get("_header") for it in items)
         self.endResetModel()
 
     def append_items(self, items: list) -> None:
@@ -564,12 +575,13 @@ class ChannelListModel(QAbstractListModel):
         if not items:
             return
         at = max(0, min(at, len(self._items)))
-        if self.uniform and any(it.get("_header") for it in items):
+        if self.uniform and any(_odd_height(it) for it in items):
             self.set_items(self._items[:at] + list(items) + self._items[at:],
                            self.kind)
             return
         self.beginInsertRows(QModelIndex(), at, at + len(items) - 1)
         self._items[at:at] = items
+        self.headed = self.headed or any(it.get("_header") for it in items)
         self.endInsertRows()
 
     def remove_rows(self, rows) -> None:
@@ -695,6 +707,8 @@ class ChannelDelegate(QStyledItemDelegate):
         name_of = getattr(self.window, "channel_display_name", None)
         names = []
         for it in items[:self.NAME_ROWS]:
+            if it.get("_header"):
+                continue
             try:
                 name = name_of(it) if callable(name_of) else str(it.get("name") or "")
             except Exception:
@@ -711,9 +725,12 @@ class ChannelDelegate(QStyledItemDelegate):
         if event is not None and event.type() == QEvent.Type.ToolTip and self.tv_rows(model):
             it = model.item_at(index.row()) if hasattr(model, "item_at") else None
             name_of = getattr(self.window, "channel_display_name", None)
-            if isinstance(it, dict) and not it.get("_tip"):
+            if isinstance(it, dict) and not it.get("_tip") and not it.get("_header"):
                 name = name_of(it) if callable(name_of) else str(it.get("name") or "")
                 if name and heading_of(name) is None:
+                    if it.get("_xs"):
+                        # Another source's channel (Every source): which one.
+                        name += "\n" + tr("sa_from_source", source=str(it.get("_xs_name") or ""))
                     QToolTip.showText(event.globalPos(), plain_text(name), view)
                     return True
         return super().helpEvent(event, view, option, index)
@@ -773,19 +790,28 @@ class ChannelDelegate(QStyledItemDelegate):
 
     def _now_next(self, it: dict):
         """(now and next, the guide's time) for *it*, from the guide in
-        memory only - kept per channel for the minute."""
-        x = getattr(self.window, "xmltv", None)
+        memory only - kept per channel for the minute. A row of another
+        source (Every source) from that source's own (the window's
+        ``_guide_for_row``), never the one in use's."""
+        main = getattr(self.window, "xmltv", None)
+        guide_of = getattr(self.window, "_guide_for_row", None)
+        x = guide_of(it) if callable(guide_of) else main
         if x is None:
             return None, 0.0
         try:
             loaded = bool(x.is_loaded()) if hasattr(x, "is_loaded") else True
         except Exception:
             loaded = False
-        stamp = (int(time.time() // 60), id(x), loaded)
+        try:
+            main_loaded = bool(main.is_loaded()) if main is not None else False
+        except Exception:
+            main_loaded = False
+        stamp = (int(time.time() // 60), id(main), main_loaded)
         if stamp != self._nn_stamp:
             self._nn.clear()
             self._nn_stamp = stamp
-        key = (it.get("stream_id"), it.get("epg_channel_id"), it.get("name"))
+        key = (id(x), loaded, it.get("_key"), it.get("stream_id"), it.get("epg_channel_id"),
+               it.get("name"))
         if key in self._nn:
             nn = self._nn[key]
         else:
@@ -798,8 +824,12 @@ class ChannelDelegate(QStyledItemDelegate):
     def _paint_tv(self, painter, option, index, it: dict) -> None:
         w = self.window
         kind = "live"
-        name = w.channel_display_name(it)
-        row = TvRow(name=name, playing=self._is_playing(it, kind), heading=heading_of(name))
+        # A source's heading in Every source; else a channel - or a
+        # provider's heading "channel" (core/guide_rows).
+        own_head = it.get("_header") if it.get("_tv_head") else None
+        name = str(own_head) if own_head else w.channel_display_name(it)
+        row = TvRow(name=name, playing=False if own_head else self._is_playing(it, kind),
+                    heading=name if own_head else heading_of(name), strong=bool(own_head))
         if row.heading is None:
             row.tint_fg, row.tint_bg = w.item_tint(it, kind)
             num = it.get("num")
@@ -860,7 +890,10 @@ class ChannelDelegate(QStyledItemDelegate):
         it = index.data(Qt.ItemDataRole.UserRole)
         if it and it.get("_header"):
             # Headers only appear in list mode (combined views force it),
-            # where they are a full-width row.
+            # where they are a full-width row - a source's in Every source
+            # as tall as a channel's (the list stays one of uniform rows).
+            if it.get("_tv_head") and self.tv_rows(index.model()):
+                return QSize(0, self.tv_row_h())
             return QSize(0, self._header_h())
         if self.grid:
             return QSize(self.cell_w, self.cell_h)
@@ -874,7 +907,8 @@ class ChannelDelegate(QStyledItemDelegate):
 
     def _paint_row(self, painter, option, index) -> None:
         it = index.data(Qt.ItemDataRole.UserRole)
-        if it and it.get("_header"):
+        if (it and it.get("_header")
+                and not (it.get("_tv_head") and self.tv_rows(index.model()))):
             self._paint_header(painter, option, it["_header"])
         elif self.grid:
             self._paint_grid(painter, option, index)
@@ -887,7 +921,10 @@ class ChannelDelegate(QStyledItemDelegate):
                 if not self._tv_failed:
                     self._tv_failed = True
                     log.exception("channel list: a TV row could not be painted")
-                self._paint_list(painter, option, index)
+                if it.get("_header"):
+                    self._paint_header(painter, option, it["_header"])
+                else:
+                    self._paint_list(painter, option, index)
         else:
             self._paint_list(painter, option, index)
 

@@ -171,6 +171,9 @@ class _SourceLabelMixin:
             title = str((getattr(self, "_last_playback", None) or {}).get("title") or "")
             if title:
                 return self._status_playing(title)
+        showing = getattr(self, "_xs_showing", None)
+        if callable(showing) and showing():
+            return text                 # Every source: no one source to name
         pl = self._active_source()
         if pl is None or self._source_total() < 2:
             return text

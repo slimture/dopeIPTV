@@ -8,6 +8,7 @@ from __future__ import annotations
 from functools import partial
 
 from .dialogs import ContentManagerDialog
+from ..core.every_source import CATEGORY as XS_CATEGORY
 from ..core.stores import FAV_DEFAULT_GROUP
 from ..i18n import tr
 from .tmdb_match import TmdbMatchDialog
@@ -62,6 +63,13 @@ class _ContextMenuMixin:
                 or (it.get("_kind") or it.get("_ekind")) in ("radio", "web")):
             self._radio_context_menu(pos, it, at=at)
             return
+        # Another source's channel in Every source: a menu of its own - none
+        # of the source in use's actions apply to it (mw_every_source).
+        if it.get("_xs"):
+            self._xs_menu(it, at)
+            return
+        if it.get("_tv_head"):
+            return                      # a source's heading there: no menu
         self._list_item_menu(row, it, at)
 
     def _list_item_menu(self, row: int, it: dict, at) -> None:
@@ -708,7 +716,9 @@ class _ContextMenuMixin:
 
         if self.mode not in ("live", "vod", "series"):
             return
-        if data is not None:
+        # Every source is no category of the source's: nothing to rename,
+        # hide or lock (its guide and the source's own entries stay).
+        if data is not None and data != XS_CATEGORY:
             cid = data
             m.addAction(tr("ctx_rename_category"),
                         lambda: self._rename_category(cid))
