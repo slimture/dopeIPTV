@@ -11,8 +11,17 @@ its own, driven as a person would:
   strip that says it is the demo, nothing of it in the settings - and left
   for a source of one's own through that strip: nothing of it behind;
 - just my files and radio: Local files, not asked again, the strip on TV;
-- Arabic in a small window: every page mirrored, inside the card, every
-  control named.
+- Arabic and Hebrew in a small window: every page mirrored, inside the
+  card, every control named - and the notices' bell at the sidebar's foot
+  once the guide goes;
+- the notices while the guide is up: a note, a message and a decision
+  posted draw nothing over it and take no keys from it, the guide's own
+  errors stay in it, the panel does not open over it, Esc is the guide's
+  (or the open panel's first, never both); and after every way out of the
+  guide - connect, the demo, a backup's or a sync's sources, skipped - the
+  bell at the sidebar's foot, its panel and ✕, the decision that waited, a
+  job on the line folding back to the bell, Tab from the source to
+  Settings to the bell. No message box anywhere.
 
 The servers are the tests' own on 127.0.0.1 (tests/test_welcome_paths.py,
 which drives every kind and every failure through the guide alone)."""
@@ -35,8 +44,14 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QSettings, Qt
 QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp())
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QAbstractButton, QApplication, QLabel, QLineEdit, QWidget
+from PyQt6.QtWidgets import QAbstractButton, QApplication, QLabel, QLineEdit, QMessageBox, QWidget
 app = QApplication.instance() or QApplication([])
+# Every message box the app would show, kept - there must be none.
+boxes = []
+for name in ("critical", "warning", "information", "question"):
+    setattr(QMessageBox, name, staticmethod(lambda *a, _n=name, **k: boxes.append((_n, a[2:3]))
+                                            or QMessageBox.StandardButton.Ok))
+QMessageBox.exec = lambda self: boxes.append(("exec", self.text())) or 0
 
 from dopeiptv import i18n
 from dopeiptv.core import privacy
@@ -51,6 +66,13 @@ from tests.test_welcome_paths import Served, playlist, xtream_panel
 
 SCENARIO = sys.argv[1]
 i18n.set_language("en")
+from dopeiptv.ui import mw_busy
+toasts = []
+_toast = mw_busy._BusyMixin._show_toast
+def _kept_toast(self, text, duration_ms=0):
+    toasts.append((text, self._welcome is not None and self._welcome.isVisible()))
+    return _toast(self, text, duration_ms)
+mw_busy._BusyMixin._show_toast = _kept_toast
 mw.launch_player = lambda *a, **k: None                       # never a real player
 path = os.path.join(tempfile.mkdtemp(), "s.ini")
 s = QSettings(path, QSettings.Format.IniFormat)
@@ -107,7 +129,54 @@ def list_names():
 
 
 ov = w._welcome
+hub = w.notices
 settle(lambda: ov.isVisible() and ov._stack.currentIndex() == PAGE_WELCOME, what="the guide")
+assert hub.held                          # the notices wait while it covers the window
+
+
+def nothing_over_the_guide(what):
+    # What the notices draw on the window itself (the stand-ins, the panel)
+    # is hidden; the foot's own are under the guide, which covers them.
+    for name in ("_activity_float", "_decision_float", "_notice_panel"):
+        assert getattr(w, name).isHidden(), (what, name)
+    for name in ("_decision_card", "_activity_line"):
+        assert getattr(w, name).isHidden(), (what, name)
+    # The bell stays in the foot, under the guide (raised over the window's
+    # content), never over it.
+    assert w.centralWidget().isAncestorOf(w._notice_bell) and ov.isVisible()
+    assert ov.parentWidget() is w and w.children().index(ov) > w.children().index(w.centralWidget())
+
+
+def foot_after(what):
+    # Out of the guide: the bell in the sidebar's foot, its panel and ✕, a
+    # job on the line folding back to the bell, Tab from the source to
+    # Settings to the bell.
+    bell, line, panel = w._notice_bell, w._activity_line, w._notice_panel
+    settle(lambda: not ov.isVisible() and not hub.held, what=what + ": the notices back")
+    settle(lambda: bell.isVisible(), what=what + ": the bell")
+    assert w._side_foot.isAncestorOf(bell), what
+    # (No avatar with no source of one's own - the demo, files and radio,
+    # skipped: Settings then the bell.)
+    avatar = w._playlist_btn
+    assert avatar.isVisible() == (store.active() is not None), what
+    if avatar.isVisible():
+        avatar.setFocus(Qt.FocusReason.TabFocusReason)
+        app.processEvents()
+        key(Qt.Key.Key_Tab)
+    else:
+        w._settings_btn.setFocus(Qt.FocusReason.TabFocusReason)
+        app.processEvents()
+    assert QApplication.focusWidget() is w._settings_btn, (what, a11y.describe(QApplication.focusWidget()))
+    key(Qt.Key.Key_Tab)
+    assert QApplication.focusWidget() is bell, (what, a11y.describe(QApplication.focusWidget()))
+    QTest.mouseClick(bell, Qt.MouseButton.LeftButton)
+    settle(lambda: panel.isVisible(), what=what + ": the panel")
+    QTest.mouseClick(panel.close_btn, Qt.MouseButton.LeftButton)
+    settle(lambda: panel.isHidden(), what=what + ": its close button")
+    tok = hub.start("Loading the list", kind="list")
+    settle(lambda: line.isVisible(), what=what + ": the job on the line")
+    hub.finish(tok)
+    settle(lambda: line.isHidden() and bell.isVisible(), 20, what + ": folded to the bell")
 assert ov.geometry() == w.rect() or ov.geometry().contains(w.centralWidget().geometry()), ov.geometry()
 
 
@@ -168,6 +237,7 @@ if SCENARIO == "xtream_keys":
     # Back from nowhere: Esc on the window does not bring the guide back.
     key(Qt.Key.Key_Escape)
     assert not ov.isVisible()
+    foot_after("connected")
 
 elif SCENARIO == "m3u_sv":
     combo = ov._lang_combo
@@ -202,6 +272,7 @@ elif SCENARIO == "m3u_sv":
 elif SCENARIO == "demo":
     QTest.mouseClick(ov._w_demo, Qt.MouseButton.LeftButton)
     settle(lambda: not ov.isVisible(), what="the guide gone")
+    foot_after("the demo")
     assert isinstance(w.client, DemoClient) and w.windowTitle().startswith(tr("demo_title"))
     assert privacy.keeping_nothing()
     settle(lambda: w.list_model.rowCount() == 6, what="every channel on All")
@@ -288,15 +359,104 @@ elif SCENARIO == "files":
     assert w._source_strip_text.text() == tr("onb_strip_none")
     QTest.mouseClick(w._source_strip_btn, Qt.MouseButton.LeftButton)
     settle(lambda: ov.isVisible() and ov._stack.currentIndex() == PAGE_CHOOSE)
+    settle(lambda: hub.held)
+    ov.dismiss()
+    foot_after("files and radio")
 
-elif SCENARIO == "small_ar":
+elif SCENARIO == "bring":
+    # A sync's or a backup's sources landed (mw_onboarding._wizard_load):
+    # the guide goes and the app uses one.
+    srv = Served(xtream_panel())
+    pl = store.add({"name": "Brought", "kind": "xtream", "server": srv.base,
+                    "username": "anna", "password": "s3cret pw"})
+    w._wizard_load([pl])
+    settle(lambda: not ov.isVisible())
+    settle(lambda: isinstance(w.client, XtreamClient) and w.list_model.rowCount() == 12, 20,
+           "the brought source's channels")
+    foot_after("brought")
+
+elif SCENARIO == "notices":
+    settle(lambda: QApplication.focusWidget() is ov._w_next, what="Get started has the keys")
+    w._show_action_toast("Port 3673 is taken", 15000, lambda: None, decide=True)
+    w._error("boom")
+    hub.note("Copied")
+    w._show_toast("A passing word")
+    idle(0.6)
+    nothing_over_the_guide("posted")
+    assert QApplication.focusWidget() is ov._w_next, a11y.describe(QApplication.focusWidget())
+    assert len(hub.decisions()) == 1 and hub.note_text() == ""
+    # Nothing opens the panel over it: the menu's way in, the bell's.
+    w._notices_open_history()
+    w._notices_open_panel()
+    idle(0.2)
+    assert w._notice_panel.isHidden()
+    w._set_sidebar_collapsed(True)              # the rail: its stand-ins are the window's
+    idle(0.3)
+    nothing_over_the_guide("the rail")
+    w._set_sidebar_collapsed(False)
+    idle(0.2)
+    # The guide's own errors stay in it, as words of its own.
+    said = len(hub.messages())
+    key(Qt.Key.Key_Return)
+    settle(lambda: ov._stack.currentIndex() == PAGE_CHOOSE)
+    key(Qt.Key.Key_Return)
+    settle(lambda: ov._stack.currentIndex() == PAGE_FORM)
+    ov._server.clear()
+    ov._user.clear()
+    ov._pw.clear()
+    ov._server.setFocus()
+    key(Qt.Key.Key_Return)
+    assert ov._c_err.isVisible() and ov._c_err.text() == tr("onb_fill_all")
+    closed = Served({})
+    port = closed.server_address[1]
+    closed.shutdown()
+    closed.server_close()
+    for field, text in ((ov._server, f"http://127.0.0.1:{port}"), (ov._user, "anna"),
+                        (ov._pw, "pw")):
+        field.setText(text)
+    QTest.mouseClick(ov._c_connect, Qt.MouseButton.LeftButton)
+    settle(lambda: ov._stack.currentIndex() == PAGE_WORK and not ov._trying, 20, "the try")
+    assert ov._k_text.isVisible() and ov._k_title.text() == tr("onb_fail_title")
+    assert len(hub.messages()) == said, [m.text for m in hub.messages()]
+    nothing_over_the_guide("a failed try")
+    assert ov.isAncestorOf(QApplication.focusWidget())
+    # Esc: the guide's - it goes, and the notices come back with it.
+    key(Qt.Key.Key_Escape)
+    settle(lambda: not ov.isVisible(), what="Esc")
+    settle(lambda: w._decision_card.isVisible(), what="the decision that waited")
+    assert w._decision_card.text() == "Port 3673 is taken"
+    assert w._notice_bell.badge() >= 1
+    foot_after("skipped")
+    # The panel open, then the guide: the panel goes, and one Esc closes
+    # the guide alone.
+    QTest.mouseClick(w._notice_bell, Qt.MouseButton.LeftButton)
+    settle(lambda: w._notice_panel.isVisible())
+    w.show_welcome(PAGE_CHOOSE)
+    settle(lambda: ov.isVisible() and w._notice_panel.isHidden(), what="the panel gone")
+    assert ov.isAncestorOf(QApplication.focusWidget())
+    key(Qt.Key.Key_Escape)
+    settle(lambda: not ov.isVisible())
+    assert w._notice_panel.isHidden()
+    # The panel open by itself: Esc closes it, and nothing else.
+    QTest.mouseClick(w._notice_bell, Qt.MouseButton.LeftButton)
+    settle(lambda: w._notice_panel.isVisible())
+    full = w.isFullScreen()
+    key(Qt.Key.Key_Escape)
+    settle(lambda: w._notice_panel.isHidden(), what="Esc on the panel")
+    assert not ov.isVisible() and w.isFullScreen() == full
+    # What was said while the guide was up went through the notices, none
+    # as a popup of its own.
+    assert ("A passing word", True) in toasts, toasts
+
+elif SCENARIO in ("small_ar", "small_he"):
+    lang = SCENARIO.split("_")[1]
     w.resize(640, 480)
     settle(lambda: w.width() <= 1100)
     combo = ov._lang_combo
-    combo.setCurrentIndex(combo.findData("ar"))
+    combo.setCurrentIndex(combo.findData(lang))
     app.processEvents()
     idle(0.2)
-    assert i18n.current_language() == "ar"
+    assert i18n.current_language() == lang
     assert QApplication.layoutDirection() == Qt.LayoutDirection.RightToLeft
     assert ov.isRightToLeft()
     assert ov._w_next.text() == tr("onb_get_started")
@@ -333,9 +493,28 @@ elif SCENARIO == "small_ar":
     inside(PAGE_WORK, "work, failed")
     ov._work_back()
     inside(PAGE_BRING, "bring")
-    # The cards' words in Arabic, and the title read right to left.
+    # The cards' words in the language, the card no wider than the window.
     assert ov._cards[IPTV].words()[0] == tr("onb_choose_iptv")
     assert ov._card.width() <= w.width()
+    # The bell waits under the guide, and is at the foot once it goes -
+    # mirrored: before Settings, as the avatar is after it.
+    nothing_over_the_guide("a small window")
+    ov.dismiss()
+    foot_after("right to left")
+    bell, gear = w._notice_bell, w._settings_btn
+    at = lambda x: x.mapTo(w, x.rect().topLeft())
+    if w._sidebar_collapsed:                 # the icon rail: the bell under Settings
+        assert at(bell).x() == at(gear).x() and at(bell).y() > at(gear).y(), (at(bell), at(gear))
+    else:
+        assert at(bell).x() < at(gear).x(), (at(bell), at(gear))
+    # And with room: the sidebar open, the bell before Settings, mirrored.
+    w.resize(1100, 760)
+    w._set_sidebar_collapsed(False)
+    settle(lambda: not w._sidebar_collapsed and bell.isVisible())
+    idle(0.2)
+    assert at(bell).x() < at(gear).x() and abs(at(bell).y() - at(gear).y()) <= 1, (at(bell), at(gear))
+
+assert not boxes, boxes
 
 print("WELCOME_WINDOW_OK", SCENARIO, flush=True)
 os._exit(0)
@@ -351,7 +530,8 @@ def _env(tmp_path) -> dict:
     return env
 
 
-@pytest.mark.parametrize("scenario", ["xtream_keys", "m3u_sv", "demo", "files", "small_ar"])
+@pytest.mark.parametrize("scenario", ["xtream_keys", "m3u_sv", "demo", "files", "bring",
+                                      "notices", "small_ar", "small_he"])
 def test_the_guide_in_the_window(tmp_path, scenario):
     out = subprocess.run([sys.executable, "-c", _CHILD, scenario], cwd=_REPO_ROOT,
                          env=_env(tmp_path), capture_output=True, text=True, timeout=240)

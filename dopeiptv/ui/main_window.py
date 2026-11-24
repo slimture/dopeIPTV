@@ -975,7 +975,12 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
     def _on_escape(self) -> None:
         """Single Escape handler so the key is never ambiguous: dismiss the
         onboarding wizard if it's up, else leave the Guide page if it shows,
-        otherwise leave fullscreen."""
+        otherwise leave fullscreen. The notices' panel open closes first,
+        and alone."""
+        panel = getattr(self, "_notice_panel", None)
+        if panel is not None and not panel.isHidden():
+            panel.close_panel()
+            return
         if self._welcome is not None and self._welcome.isVisible():
             self._welcome.dismiss()
             return
