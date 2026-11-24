@@ -53,18 +53,47 @@ def test_demo_client_same_interface_as_xtream():
     assert not missing, f"DemoClient missing: {sorted(missing)}"
 
 
-def test_demo_client_serves_live_channels_only():
+def test_the_demo_serves_channels_a_guide_and_films_of_its_own():
+    """The demo (providers/demo.py): live test streams, open films on a
+    loop and a test pattern as channels, each with a logo the app draws and
+    a guide made here; the films under Movies with posters drawn and their
+    credit; no series, no "Recently added". Its only addresses on the
+    network are its streams', all in one table."""
+    import time
+
+    from dopeiptv.core import drawn_art
+    from dopeiptv.providers import demo, demo_streams
+    from dopeiptv.providers.epg import XmltvGuide
     c = DemoClient()
     cats = c.live_categories()
-    assert len(cats) == 1
-    streams = c.live_streams(cats[0]["category_id"])
-    assert len(streams) == len(DemoClient.STREAMS) >= 4
-    # Each channel resolves to its real public HLS url; ids are 1-based.
-    for i, s in enumerate(streams, start=1):
-        assert s["stream_id"] == i
-        url = c.live_url(s["stream_id"])
-        assert url.startswith("https://") and url == DemoClient.STREAMS[i - 1][1]
-    # No movies/series/EPG - inherited empty from OfflineClient.
-    assert c.vod_categories() == [] and c.series_categories() == []
-    assert c.xmltv() == b""
-    assert c.live_url("nope") == ""
+    assert [x["category_id"] for x in cats] == ["demo-live", "demo-loop", "demo-test"]
+    rows = c.live_streams()
+    assert 6 <= len(rows) <= 8 and len({r["stream_id"] for r in rows}) == len(rows)
+    for r in rows:
+        assert r["category_id"] in {x["category_id"] for x in cats}
+        assert r in c.live_streams(r["category_id"])
+        assert drawn_art.is_drawn(r["stream_icon"])
+        url = c.live_url(r["stream_id"])
+        assert url.startswith("https://") and url in demo_streams.STREAMS.values()
+    assert c.live_url("nope") == "" and c.live_url(999) == ""
+    films = c.vod_streams()
+    assert [f["name"] for f in films] == ["Big Buck Bunny", "Sintel", "Tears of Steel"]
+    assert c.vod_categories()[0]["category_id"] == films[0]["category_id"]
+    for f in films:
+        assert drawn_art.parse(f["stream_icon"]).kind == "poster"
+        assert c.vod_url(f["stream_id"]) in demo_streams.FILMS.values()
+        info = c.vod_info(f["stream_id"])["info"]
+        assert "Blender Foundation" in info["plot"] and info["releasedate"] == f["year"]
+    assert c.vod_info(999) == {} and c.series_categories() == [] and c.series_list() == []
+    assert c.lists_recent is False
+    # Its guide, made here: every channel has a programme now and next.
+    g = XmltvGuide(c)
+    assert g.has_source() and g.ensure_loaded()
+    for r in rows:
+        now = g.listings_for(r, limit=2)
+        assert len(now) == 2 and now[0]["start_timestamp"] <= time.time() < now[0]["stop_timestamp"]
+    assert demo.guide(1_800_000_000) == demo.guide(1_800_000_000 + 59)     # the same for the hour
+    # The retired Bitmovin host is gone; these are the hosts it reaches.
+    assert demo_streams.hosts() == ["cdn.bitmovin.com", "cph-p2p-msl.akamaized.net",
+                                    "demo.unified-streaming.com", "devstreaming-cdn.apple.com",
+                                    "test-streams.mux.dev"]

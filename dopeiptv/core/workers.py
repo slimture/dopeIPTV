@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from . import picture_files
+from . import drawn_art, picture_files
 from .log import log
 
 # A browser-style User-Agent for image fetches. python-requests'
@@ -813,6 +813,10 @@ class LogoLoader(QObject):
             # the app's own pictures are, a plain file, of a picture's size
             # (core/picture_files.py): "/dev/zero" was read until the
             # memory was gone.
+            # A picture the app draws itself (the demo's logos and posters,
+            # core/drawn_art.py): drawn here, nothing fetched or read.
+            if drawn_art.is_drawn(u):
+                return u, drawn_art.render(u, fit)
             local = picture_files.local_path(u)
             if local is not None:
                 data = picture_files.read(local)

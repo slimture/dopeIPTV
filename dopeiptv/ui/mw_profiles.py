@@ -390,7 +390,9 @@ class _ProfilesMixin:
         points, reminders, followed series - each pinned to the profile."""
         from ..services.reminders import ReminderStore
         from ..services.resume import ResumeStore
-        s = self._own(self.settings)
+        # The demo's are in memory, gone as it is left (mw_onboarding).
+        passing = self._passing_settings()
+        s = passing or self._own(self.settings)
         self.favs = FavoriteStore(s, f"favorites_{pid}" if pid else "favorites")
         self.favs.on_change = self._favorites_changed
         # Flat, single-group favourites for movies and series - the split
@@ -401,9 +403,9 @@ class _ProfilesMixin:
         self.series_favs = FavoriteStore(
             s, f"series_favorites_{pid}" if pid else "series_favorites", id_key="series_id")
         self.history = HistoryStore(s, f"history_{pid}" if pid else "history")
-        self.resume = ResumeStore(self._own(self._resume_settings), pid)
+        self.resume = ResumeStore(passing or self._own(self._resume_settings), pid)
         self.reminders = ReminderStore(s, pid)
-        self.followed = FollowedSeriesStore(self._own(self._follow_settings), pid)
+        self.followed = FollowedSeriesStore(passing or self._own(self._follow_settings), pid)
 
     def _build_radio_web_favs(self) -> None:
         s = self._own(self.settings)
@@ -418,7 +420,7 @@ class _ProfilesMixin:
         s = self._own(self.settings)
         self.trakt = TraktClient(s)
         self.simkl = SimklClient(s)
-        cache = self._own(self._cache_settings)
+        cache = self._passing_settings() or self._own(self._cache_settings)
         self.watched = WatchedStore(cache)
         self.watchlist = WatchlistStore(cache)
 
