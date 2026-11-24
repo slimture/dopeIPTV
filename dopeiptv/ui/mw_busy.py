@@ -132,15 +132,25 @@ class _BusyMixin:
         self._notices_place()
 
     def _notices_held(self) -> bool:
-        """The video fills the screen, TV mode shows, or the picture is
-        popped out: nothing drawn."""
-        pop = getattr(self, "_popout_win", None)
-        try:
-            popped = pop is not None and pop.isVisible()
-        except RuntimeError:            # deleted under us
-            popped = False
+        """The video fills the screen, TV mode shows, the picture is popped
+        out or the welcome covers the window: nothing drawn - a decision or
+        a message waits for it to go, never over it nor under it."""
+        def shown(name: str) -> bool:
+            w = getattr(self, name, None)
+            try:
+                return w is not None and w.isVisible()
+            except RuntimeError:        # deleted under us
+                return False
         return bool(getattr(self, "_player_fs", False) or getattr(self, "_tv_on", False)
-                    or popped)
+                    or shown("_popout_win") or shown("_welcome"))
+
+    def _notices_watch(self, widget: QWidget) -> None:
+        """The notices placed again as *widget* shows, hides or changes size
+        (the welcome: held while it covers the window, back as it goes)."""
+        follow = getattr(self, "_notice_follow", None)
+        if follow is not None and widget is not None:
+            follow.watch(widget)
+            follow.poke()
 
     def _notices_sidebar_shown(self) -> bool:
         cs = getattr(self, "_center_stack", None)
@@ -269,7 +279,10 @@ class _BusyMixin:
 
     def _notices_open_from(self, anchor: QWidget, tab: str | None = None) -> None:
         """The panel from *anchor*: beside the icon rail when the anchor is in
-        it, the bell's lined up with the sidebar's foot."""
+        it, the bell's lined up with the sidebar's foot. Nothing while the
+        notices are held (the welcome, full screen, TV mode)."""
+        if self._notices_held():
+            return
         in_side = anchor in (self._activity_line, self._notice_bell,
                              getattr(self, "_playlist_btn", None))
         rail = bool(getattr(self, "_sidebar_collapsed", False)) and in_side

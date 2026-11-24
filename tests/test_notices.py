@@ -1025,6 +1025,41 @@ c = colours()
 assert c["surface"] in panel.styleSheet() and panel.styleSheet() != before[0]
 assert c["line_bg"] in card.styleSheet() and card.styleSheet() != before[1]
 assert c["float_bg"] in fc.styleSheet() and fc.styleSheet() != before[2]
+# The welcome over the window: nothing of the notices over it or opened by
+# itself; a decision and a message wait, a note goes, all back as it goes.
+hub.clear()
+for m in hub.decisions():
+    hub.dismiss(m.id)
+pump(5)
+w.show_welcome()
+pump(10)
+ov = w._welcome
+assert ov.isVisible() and hub.held
+w._show_action_toast("Port 3673 is taken", 15000, lambda: None, decide=True)
+w._error("boom")
+hub.note("Copied")
+pump(10)
+assert card.isHidden() and fc.isHidden() and line.isHidden() and w._activity_float.isHidden()
+assert hub.note_text() == "" and len(hub.decisions()) == 1
+w._set_sidebar_collapsed(True)
+pump(10)
+assert fc.isHidden() and line.isHidden() and w._activity_float.isHidden()
+w._set_sidebar_collapsed(False)
+w._notices_open_history()
+bell.click()
+pump(5)
+assert panel.isHidden()
+ov.dismiss()
+pump(15)
+assert not ov.isVisible() and not hub.held
+assert card.isVisible() and card.text() == "Port 3673 is taken"
+assert bell.isVisible() and bell.badge() == 1
+bell.click()
+pump(5)
+assert panel.isVisible()
+panel.close_btn.click()
+pump(5)
+assert panel.isHidden()
 print("NOTICES_WINDOW_OK")
 """
 

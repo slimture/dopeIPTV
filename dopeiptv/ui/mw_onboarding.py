@@ -139,11 +139,17 @@ class _OnboardingMixin:
             self._welcome.restore_asked.connect(self._wizard_restore)
             self._welcome.quit_asked.connect(self._wizard_quit)
             self._welcome.connect_cancelled.connect(self._wizard_connect_cancel)
+            watch = getattr(self, "_notices_watch", None)
+            if watch is not None:
+                watch(self._welcome)
             if page != PAGE_WELCOME:
                 self._welcome.reset(page)
         else:
             self._welcome.reset(page)
         self._welcome.cover()
+        follow = getattr(self, "_notice_follow", None)
+        if follow is not None:
+            follow.poke()           # the notices held while it covers the window
         self._update_provider_hint()
 
     def _wizard_language(self, code: str) -> None:

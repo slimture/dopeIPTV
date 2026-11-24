@@ -23,6 +23,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- While the welcome shows, the notices wait behind it: a question, a
+  message or the activity panel no longer drew over the welcome (with the
+  sidebar folded to its icons); they show as it closes.
+- Server mode: a device let in by its address was refused when it came
+  over IPv6 on Python 3.12.3 and older (Ubuntu 24.04's own).
 - Watching a series, the window's title said the series' name over and
   over ("Show · Show · Show · S2 * E3 - Show - S02E03"): Continue watching
   put the series in front of the episode, and each time it was played from
