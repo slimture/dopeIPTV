@@ -19,7 +19,7 @@ from typing import Any
 from PyQt6.QtCore import QMetaType, QObject, QTimer
 
 from ..core.log import log
-from .media_session import MediaHost, art_for_bus, clean_snapshot
+from .media_session import MediaHost, art_for_bus, clean_snapshot, poll_ms
 
 BUS_NAME = "org.mpris.MediaPlayer2.dopeiptv"
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
@@ -352,6 +352,8 @@ class MprisService(QObject):
             log.debug("mpris: snapshot failed: %s", e)
             return
         old = self.snap
+        if self._timer.interval() != poll_ms(new):
+            self._timer.setInterval(poll_ms(new))
         if new["track"] != self._track_key:
             self._track_key = new["track"]
             self._track_no += 1

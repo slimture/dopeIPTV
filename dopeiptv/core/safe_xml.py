@@ -49,6 +49,28 @@ _DOCTYPE = re.compile(r"<!DOCTYPE", re.I)
 _STOP = re.compile(r"[\"'\[\]>]|<!--|<\?")
 
 
+#: The XML declaration's encoding, in the first bytes of a document an
+#: ASCII-compatible encoding opens (UTF-16 and -32 say theirs with a BOM).
+_DECLARED = re.compile(rb'\A(?:\xef\xbb\xbf)?\s{0,64}<\?xml\b[^>]{0,256}?\bencoding\s{0,8}=\s{0,8}(["\'])([^"\'>]{0,64})\1')
+
+
+def declared_encoding_ok(head: bytes) -> bool:
+    """Whether the encoding *head*'s XML declaration names (if it names one)
+    is a text encoding a codec here reads - "rot13", "hex", "zlib" or one
+    nobody has are none. Judged here rather than left to expat, whose
+    answer changed between its versions (a LookupError, or the declaration
+    "not well-formed" before it got to the name)."""
+    m = _DECLARED.match(head[:512])
+    if m is None:
+        return True
+    name = m.group(2).decode("ascii", "replace").strip()
+    try:
+        info = codecs.lookup(name)
+    except LookupError:
+        return False
+    return bool(getattr(info, "_is_text_encoding", True))
+
+
 class _Root(Exception):
     """The root element began: the prolog, the only place for a DTD, is over."""
 
@@ -63,6 +85,11 @@ class Prolog:
         self.what = what
         self.done = False
         self._p = expat.ParserCreate(encoding)
+        # The document's own declaration names its encoding (none given):
+        # judged as the first bytes come (declared_encoding_ok).
+        self._own_encoding = encoding is None
+        self._head_seen = False
+        self._head = b""
         self._p.StartDoctypeDeclHandler = self._doctype
         self._p.EntityDeclHandler = self._entity
         self._p.StartElementHandler = self._root
@@ -80,6 +107,18 @@ class Prolog:
     def feed(self, data: bytes, final: bool = False) -> bool:
         if self.done:
             return True
+        if not self._head_seen:
+            # The first bytes held back until the declaration can be judged
+            # (its end, the first ">", 512 bytes or the last slice): sliced
+            # or whole, a document gets the same answer.
+            self._head += bytes(data)
+            if not (final or len(self._head) >= 512 or b">" in self._head):
+                return False
+            self._head_seen = True
+            data, self._head = self._head, b""
+            if self._own_encoding and not declared_encoding_ok(data[:512]):
+                self.done = True
+                raise ValueError(f"{self.what} declares an encoding no reader has; refusing to parse")
         try:
             view = memoryview(data)
             for i in range(0, len(view), _STEP):

@@ -158,6 +158,7 @@ files = [
     "dopeiptv/core/downloads.py",
     "dopeiptv/core/num.py",
     "dopeiptv/core/names.py",
+    "dopeiptv/core/safe_json.py",
     "dopeiptv/core/viewing_stats.py",
     "dopeiptv/core/donate_rhythm.py",
     "dopeiptv/core/profiles.py",

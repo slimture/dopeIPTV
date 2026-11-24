@@ -365,7 +365,12 @@ def to_json(obj: Any) -> str:
             return [mark(v) for v in o]
         return o
 
-    text = json.dumps(mark(obj))
+    try:
+        text = json.dumps(mark(obj))
+    except RecursionError:
+        # Nested deeper than json.dumps writes (Python 3.12's json reads
+        # such documents): as text, nesting deeper than any answer is.
+        return "[" * 5000 + "]" * 5000
     for i, raw in enumerate(raws):
         text = text.replace(f'"@@RAW{i}@@"', raw, 1)
     return text
@@ -434,11 +439,16 @@ def json_value(rng: random.Random, obj: Any) -> Any:
     """What a reader gets from a mutated *obj* once it is parsed - as an
     answer's json() gives it (nesting deeper than Python reads never gets
     that far: json() says it is no JSON)."""
+    from dopeiptv.core.safe_json import deeper_than
     for _ in range(5):
         try:
-            return json.loads(to_json(mutate_json(rng, obj)))
+            got = json.loads(to_json(mutate_json(rng, obj)))
         except (ValueError, RecursionError):
             continue
+        # json() refuses a document nested deeper than any answer is
+        # (core/safe_json) - from Python 3.12 json itself reads far deeper.
+        if not deeper_than(got):
+            return got
     return obj
 
 

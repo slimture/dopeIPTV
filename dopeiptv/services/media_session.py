@@ -30,6 +30,15 @@ from ..core.log import log
 # How often the window is asked what is playing; a change the window
 # reports at once (refresh) does not wait for it.
 POLL_MS = 1000
+#: How often while nothing plays: the window says at once when a stream
+#: starts, pauses or stops (mw_mpris), so a slower look costs nothing - a
+#: timer a second for nothing kept a laptop awake (tests/test_perf_idle.py).
+IDLE_POLL_MS = 4000
+
+
+def poll_ms(snap: dict[str, Any]) -> int:
+    """How long until the next look, for what plays now."""
+    return IDLE_POLL_MS if snap.get("status") == "Stopped" else POLL_MS
 # A move of the position that playing time does not explain is a seek.
 SEEK_JUMP_S = 2.0
 # The system's skip buttons go as far as the player's own (back 10, on 30).
@@ -339,6 +348,8 @@ class PolledSession(QObject):
             return
         old = self.snap
         self.snap = new
+        if self._timer.interval() != poll_ms(new):
+            self._timer.setInterval(poll_ms(new))
         what = changes(old, new)
         if self._seeked(old, new, "meta" in what):
             what.add("position")

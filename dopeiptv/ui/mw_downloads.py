@@ -73,6 +73,10 @@ SORT_KEY = "downloads_sort"
 NEWEST, NAME, LARGEST = "newest", "name", "largest"
 SORT_WORDS = {NEWEST: "rec_sort_newest", NAME: "sort_az", LARGEST: "rec_sort_largest"}
 TICK_MS = 1000
+#: The beat while nothing is queued, the folder read and nothing to save:
+#: a timer a second for nothing kept a laptop awake (tests/test_perf_idle.py).
+#: Whatever queues or resumes one beats at once (_dl_tick), so no one waits.
+IDLE_TICK_MS = 30_000
 #: For this long after the window opens nothing downloads: the app's own
 #: start (the channel the player opens again) comes first.
 START_GRACE_S = 15.0
@@ -218,6 +222,10 @@ class _DownloadsMixin:
             if d.version != self._dl_seen:
                 self._dl_seen = d.version
                 self._dl_changed(jobs)
+            busy = bool(jobs) or bool(d.dirty) or not d.scanned
+            want = TICK_MS if busy else IDLE_TICK_MS
+            if self._dl_timer is not None and self._dl_timer.interval() != want:
+                self._dl_timer.setInterval(want)
         except Exception:
             log.exception("downloads: the beat failed")
 
@@ -558,6 +566,7 @@ class _DownloadsMixin:
                 self._show_toast(tr("profile_kids_not_here"), 4000)
             return []
         self._dl_ask_room(made)
+        self._dl_tick()                 # the beat back to every second
         if len(made) == 1:
             self._show_toast(tr("dl_queued", title=made[0].title), 3000)
         else:

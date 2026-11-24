@@ -28,6 +28,15 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   controls and History; names are kept once, and a title whose parts
   repeat - a channel's, a film's, a local file's, an older History row's -
   is said once everywhere.
+- With Python 3.12 (what the released builds run) an answer nested
+  thousands deep came through to the readers - 3.11's own json had stopped
+  it - and a Plex tune answer's reader could go over Python's recursion
+  limit. Every answer is now held to one depth (200) whatever Python
+  reads, and that reader walks without recursion. An XML document's
+  declared encoding is judged by the app itself, the same on every expat.
+- Idle, the app woke less: the media controls look at what plays every
+  4 s while nothing does (the window tells them at once when a stream
+  starts), and the downloads' beat runs only while something is queued.
 - Muting a video made the picture stall for a moment: the player swapped
   its sound output there and then and reloaded it, and the picture, kept
   in time by the sound, waited. Muting now only mutes; the quiet output

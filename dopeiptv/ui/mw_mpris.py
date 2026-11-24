@@ -60,11 +60,14 @@ class _MprisMixin:
                            activated=lambda n=name: self._media_key(n))
             sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self._mpris = None
-        # The player says at once when it pauses or stops; the service's own
-        # poll would otherwise tell the desktop up to a second late.
+        # The player says at once when a stream starts, pauses or stops; the
+        # service's own poll - every few seconds while nothing plays
+        # (media_session.IDLE_POLL_MS) - would otherwise tell the desktop late.
         if self.player is not None:
             for signal in (self.player.paused_changed, self.player.stopped,
-                           self.player.finished):
+                           self.player.finished, self.player.first_frame,
+                           self.player.stream_info_changed,
+                           self.player.audio_only_changed):
                 signal.connect(self._mpris_refresh_soon)
         if self.settings.value("mpris", "true") == "true":
             if sys.platform.startswith("linux"):
