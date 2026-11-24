@@ -419,25 +419,37 @@ class _EverySourceMixin:
         it = self.__dict__.pop("_xs_texts_want", None)
         if it is None or not self._xs_showing():
             return
-        cur = self._xs_current()
         pid, key = str(it.get("_xs") or ""), str(it.get("_key") or "")
-        if not cur or str(cur.get("_key") or "") != key or str(cur.get("_xs") or "") != pid:
+        if self._xs_still_picked(it) is None:
             return                          # another row picked since
         row = self._xs_original(it)
         if row is None:
             return
         delay = self._xs_delay_for(pid)
         run_async(self._sa_pool(0), partial(self._sa_store().texts, pid, dict(row), key, delay),
-                  partial(self._xs_texts_in, pid, key), partial(self._xs_texts_failed, pid))
+                  partial(self._xs_texts_in, it), partial(self._xs_texts_failed, pid))
 
-    def _xs_texts_in(self, pid: str, key: str, _listings: Any = None) -> None:
+    def _xs_still_picked(self, it: dict) -> dict | None:
+        """Row *it* as it is picked now - the list's current row when that
+        is it; the list laid out anew meanwhile with none picked (a source
+        or the categories read again), *it* while the column under the video
+        still shows it. None once another row is picked or shown."""
+        pid, key = str(it.get("_xs") or ""), str(it.get("_key") or "")
+        cur = self._xs_current()
+        if cur:
+            if str(cur.get("_key") or "") != key or str(cur.get("_xs") or "") != pid:
+                return None
+            row = cur
+        else:
+            row = it
+        return row if self._current_key == self._item_key(row) else None
+
+    def _xs_texts_in(self, it: dict, _listings: Any = None) -> None:
         if not self._xs_showing():
             return
-        cur = self._xs_current()
-        if not cur or str(cur.get("_key") or "") != key or str(cur.get("_xs") or "") != pid \
-                or self._current_key != self._item_key(cur):
-            return
-        self._xs_listings(cur)
+        row = self._xs_still_picked(it)
+        if row is not None:
+            self._xs_listings(row)
 
     def _xs_texts_failed(self, _pid: str, _err: Any = None) -> None:
         log.info("every source: a programme's words were not read")
