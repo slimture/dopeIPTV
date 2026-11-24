@@ -282,6 +282,11 @@ def test_welcome_offers_media_servers_and_connects_with_the_token(app, fake):
     w = WelcomeOverlay(parent, settings=None,
                        on_connect=lambda *a: connected.append(a), on_explore=lambda: None,
                        on_language_change=lambda c: None, on_demo=lambda: None)
+    # Up over its window, as the app shows it: a sign-in that ends while the
+    # guide is closed connects nothing (test_welcome_exits).
+    parent.resize(900, 700)
+    parent.show()
+    w.cover()
     w._cards["media"].click()                     # "Media server"
     combo = w._conn_kind
     assert combo.findData("jellyfin") >= 0 and combo.findData("plex") >= 0
