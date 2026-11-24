@@ -32,6 +32,7 @@
 - "Settings › Picture & sound…" in the player's menu showed as "Picture_sound".
 - After an AppImage update the window could come up beside its pinned dock icon.
 - The cast window no longer makes GNOME's pointer spin as it opens.
+- The notifications panel takes at most 40 % of the window; the rest scrolls.
 - A series marked watched as a whole now shows every episode as watched.
 - The first-run guide no longer comes up over TV mode, loses the keyboard to the list behind it, or plays a file opened at the first start under itself.
 - One damaged download file can no longer hide every download.

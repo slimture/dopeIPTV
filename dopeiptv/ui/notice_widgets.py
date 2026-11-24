@@ -669,12 +669,18 @@ class ActivityPanel(QFrame):
     (HistoryView). A child of the window over everything (it shows in a grab
     of the window); Esc or a click elsewhere closes it. It opens on Now
     while anything is there, else on History, and goes over to History when
-    Now empties. Opening it marks the messages read."""
+    Now empties. Opening it marks the messages read. It is never taller than
+    `ROOM_SHARE` of the window (`room`): what does not fit scrolls, on either
+    tab."""
 
     W = 340
     #: Its width on the History tab (a line of time and words wants more).
     W_HISTORY = 380
     MAX_ROWS = 8
+    #: The most of the window's height it takes, and the least it is given
+    #: on a low window (never more than the window itself).
+    ROOM_SHARE = 0.40
+    ROOM_LEAST = 200
 
     def __init__(self, hub: NoticeHub, parent: QWidget) -> None:
         super().__init__(parent)
@@ -711,7 +717,9 @@ class ActivityPanel(QFrame):
         self.close_btn.clicked.connect(self.close_panel)
         tabs.addWidget(self.close_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         lay.addLayout(tabs)
+        self._tabs = tabs
         self._now = QWidget()
+        self._now.setObjectName("NoticeHistBody")
         now = QVBoxLayout(self._now)
         now.setContentsMargins(0, 0, 0, 0)
         now.setSpacing(10)
@@ -742,7 +750,16 @@ class ActivityPanel(QFrame):
         self._nothing.setObjectName("NoticeRowBody")
         self._nothing.setWordWrap(True)
         now.addWidget(self._nothing)
-        lay.addWidget(self._now)
+        # Now in a scroll area of its own: many jobs and long messages scroll
+        # within the panel's room rather than run off the window.
+        self._now_scroll = QScrollArea()
+        self._now_scroll.setObjectName("NoticeHistScroll")
+        self._now_scroll.setWidgetResizable(True)
+        self._now_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._now_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._now_scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._now_scroll.setWidget(self._now)
+        lay.addWidget(self._now_scroll)
         self.history = HistoryView(hub, self)
         lay.addWidget(self.history)
         self.history.hide()
@@ -780,7 +797,7 @@ class ActivityPanel(QFrame):
         hist = self._tab == "history"
         self.tab_now.setChecked(not hist)
         self.tab_history.setChecked(hist)
-        self._now.setVisible(not hist)
+        self._now_scroll.setVisible(not hist)
         self.history.setVisible(hist)
         self._w = self.W_HISTORY if hist else self.W
         self.setFixedWidth(self._w)
@@ -894,10 +911,50 @@ class ActivityPanel(QFrame):
         lay.addWidget(w)
         w.show()
 
+    def room(self) -> int:
+        """The tallest the panel may be: `ROOM_SHARE` of the window it is
+        over, at least `ROOM_LEAST`, never more than the window itself."""
+        parent = self.parentWidget()
+        h = parent.height() if parent is not None else 600
+        most = max(1, h - 16)
+        return min(most, max(self.ROOM_LEAST, int(h * self.ROOM_SHARE)))
+
+    def chrome(self) -> int:
+        """The panel's height besides its tab's own: margins, the tabs, the
+        room between them."""
+        lay = self.layout()
+        if lay is None:
+            return 0
+        m = lay.contentsMargins()
+        return m.top() + m.bottom() + self._tabs.sizeHint().height() + lay.spacing()
+
+    def _fit_now(self) -> None:
+        """Now as tall as its rows, up to the room left; past it it scrolls."""
+        body = self._now.layout()
+        if body is None:
+            return
+        body.invalidate()
+        body.activate()
+        inner = self._w - 28
+        cap = max(60, self.room() - self.chrome())
+
+        def need_at(width: int) -> int:
+            if body.hasHeightForWidth():
+                return body.totalHeightForWidth(width)
+            return self._now.sizeHint().height()
+
+        need = need_at(inner)
+        if need > cap:
+            need = need_at(inner - self._now_scroll.verticalScrollBar().sizeHint().width())
+        self._now_scroll.setFixedHeight(max(1, min(need, cap)))
+
     def _fit(self) -> None:
         """As tall as its rows are at its own width: adjustSize alone sizes a
         wrapped line for the width it would like, wider than W, and a long
-        message was cut off at the top and the foot."""
+        message was cut off at the top and the foot. Never taller than its
+        room: the tab's list scrolls instead."""
+        if self._tab == "now":
+            self._fit_now()
         lay = self.layout()
         if lay is not None:
             lay.invalidate()            # a row gone, a tab changed: smaller too
@@ -945,6 +1002,10 @@ class ActivityPanel(QFrame):
         super().keyPressEvent(e)
 
     def eventFilter(self, obj, event) -> bool:   # noqa: N802 - Qt hook
+        if (event.type() == QEvent.Type.Resize and obj is self.parentWidget()
+                and not self.isHidden()):
+            # The window resized under it: its room changed with it.
+            QTimer.singleShot(0, self._place)
         if event.type() == QEvent.Type.MouseButtonPress and not self.isHidden():
             gp = event.globalPosition().toPoint()
             inside = self.rect().contains(self.mapFromGlobal(gp))
@@ -971,7 +1032,8 @@ class HistoryView(QWidget):
         ("info", ("info",), "notice_hist_notes"),
         ("done", ("done", "cancelled"), "rec_status_done"),
     )
-    #: The tallest the list gets before it scrolls, and the most rows drawn.
+    #: The tallest the list gets before it scrolls where no panel gives it its
+    #: room (ActivityPanel.room), and the most rows drawn.
     MAX_H = 380
     MAX_SHOWN = 300
 
@@ -1002,6 +1064,7 @@ class HistoryView(QWidget):
             self.chips[key] = b
         chips.addStretch(1)
         v.addLayout(chips)
+        self._chips = chips
         self.scroll = QScrollArea()
         self.scroll.setObjectName("NoticeHistScroll")
         self.scroll.setWidgetResizable(True)
@@ -1032,6 +1095,7 @@ class HistoryView(QWidget):
         foot.addWidget(self.copy_btn)
         foot.addWidget(self.clear_btn)
         v.addLayout(foot)
+        self._foot = foot
         hub.history_changed.connect(self._changed)
 
     @staticmethod
@@ -1057,6 +1121,16 @@ class HistoryView(QWidget):
             panel = self.parentWidget()
             if isinstance(panel, ActivityPanel) and not panel.isHidden():
                 panel._place()
+
+    def _most(self) -> int:
+        """The list's tallest: the panel's room less the panel's own chrome
+        and this view's chips and buttons (MAX_H without a panel)."""
+        panel = self.parentWidget()
+        if not isinstance(panel, ActivityPanel):
+            return self.MAX_H
+        spacing = self.layout().spacing() if self.layout() is not None else 0
+        own = self._chips.sizeHint().height() + self._foot.sizeHint().height() + 2 * spacing
+        return max(40, panel.room() - panel.chrome() - own)
 
     def refresh(self) -> None:
         """The rows drawn again from the hub's history, as the chip says."""
@@ -1084,7 +1158,7 @@ class HistoryView(QWidget):
             # a hidden widget's guess, which wraps every line and is far taller).
             width = ActivityPanel.W_HISTORY - 28 - self.scroll.verticalScrollBar().sizeHint().width()
             need = self._rows.totalHeightForWidth(width - 6)
-            self.scroll.setFixedHeight(max(40, min(self.MAX_H, need + 2)))
+            self.scroll.setFixedHeight(max(40, min(self._most(), need + 2)))
             self.scroll.verticalScrollBar().setValue(0)
         # Its own layout measured anew now: the panel asks its height next,
         # and a cached one is the list as it was before this.

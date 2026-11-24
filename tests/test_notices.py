@@ -584,6 +584,50 @@ def test_a_long_message_fits_the_panel_whole(app):
     assert all(r.findChildren(QLabel)[0].height() >= 14 for r in rows)
 
 
+def test_the_panel_takes_at_most_its_share_of_the_window_and_scrolls_the_rest(app):
+    """Eight long messages and some work ran the panel off a low window: it
+    is never taller than 40 % of the window now, on either tab - what does
+    not fit scrolls - and a taller window gives it more room."""
+    host = _host(app)
+    host.resize(900, 700)
+    app.processEvents()
+    hub = _hub()
+    line = ActivityLine(hub, host)
+    line.setGeometry(16, 640, 240, ActivityLine.H)
+    panel = ActivityPanel(hub, host)
+    words = ("Error: The Apple TV has not reached this Mac. If macOS asked whether "
+             "dopeIPTV may accept incoming connections, allow it (System Settings -> "
+             "Network -> Firewall -> Options), and check that the Apple TV is on the "
+             "same network. Message number ")
+    for n in range(12):
+        hub.post(words + str(n), level="error")
+    for n in range(3):
+        hub.start(f"Downloading episode {n}", key=f"dl{n}", mine=True)
+    panel.open_at(line)
+    app.processEvents()
+    assert panel.room() == int(700 * ActivityPanel.ROOM_SHARE)
+    assert panel.height() <= panel.room(), (panel.height(), panel.room())
+    assert panel.geometry().top() >= 8 and panel.geometry().bottom() <= host.height()
+    assert panel._now_scroll.verticalScrollBar().maximum() > 0          # the rest scrolls
+    panel.show_tab("history")
+    app.processEvents()
+    assert panel.height() <= panel.room(), (panel.height(), panel.room())
+    assert panel.history.scroll.verticalScrollBar().maximum() > 0
+    host.resize(900, 1300)                                              # more room
+    app.processEvents()
+    app.processEvents()
+    assert panel.room() == int(1300 * ActivityPanel.ROOM_SHARE)
+    assert panel.height() <= panel.room()
+    panel.show_tab("now")
+    app.processEvents()
+    assert panel.height() <= panel.room()
+    panel.close_panel()
+    host.resize(900, 300)                                               # a low window
+    app.processEvents()
+    assert panel.room() == ActivityPanel.ROOM_LEAST
+    host.close()
+
+
 def test_an_address_in_what_is_said_shows_its_host_alone_and_no_login(app):
     """An error from the provider quoted the address it failed on - the
     login in its query and all - in the panel, and kept it in what was said."""

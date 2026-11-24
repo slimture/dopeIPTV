@@ -180,6 +180,10 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- The activity panel grew as tall as its messages and work, and with many
+  long ones ran off a low window. It takes at most 40 % of the window now
+  (at least 200 px, never more than the window), and what does not fit
+  scrolls - on Now as on History - as the window is resized too.
 - The strip under the list while there is no source of one's own (the
   demo's word) stood up to half the pane tall on the narrowest middle pane,
   where its buttons go under its words: the room between its words and its
