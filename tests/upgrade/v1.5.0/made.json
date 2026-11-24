@@ -1,0 +1,66 @@
+{
+  "done": [
+    "favorite",
+    "history",
+    "resume",
+    "follow",
+    "pin"
+  ],
+  "expect": {
+    "folder": "Upgrade",
+    "history": {
+      "key": "101",
+      "kind": "live",
+      "title": "Upgrade Channel",
+      "url": "http://provider.invalid:8080/live/olduser/oldpass/101.ts"
+    },
+    "m3u": {
+      "kind": "m3u",
+      "name": "Upgrade M3U",
+      "server": "http://lists.invalid/list.m3u"
+    },
+    "pin": "4321",
+    "resume": {
+      "dur": 3600.0,
+      "group": "vod",
+      "item": {
+        "container_extension": "mp4",
+        "name": "Upgrade Film",
+        "stream_id": 9001
+      },
+      "key": "9001",
+      "pos": 600.0
+    },
+    "series": {
+      "name": "Upgrade Series",
+      "series_id": 77
+    },
+    "values": {
+      "audio_lang": "eng",
+      "language": "sv",
+      "live_rewind_minutes": "10",
+      "nerd_enabled": "true",
+      "nerd_user_agent": "kodi",
+      "sub_lang": "swe",
+      "theme": "nord"
+    },
+    "xtream": {
+      "kind": "xtream",
+      "name": "Upgrade Xtream",
+      "password": "oldpass",
+      "server": "http://provider.invalid:8080",
+      "username": "olduser"
+    }
+  },
+  "failed": {},
+  "favorite": {
+    "name": "Big Buck Bunny",
+    "stream_id": 1
+  },
+  "ids": {
+    "m3u": "b931fe7e",
+    "xtream": "b42bf692"
+  },
+  "tag": "v1.5.0",
+  "version": "1.5.0"
+}

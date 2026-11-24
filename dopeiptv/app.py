@@ -346,6 +346,50 @@ def _move_m3u_ids(settings, store) -> None:
         log.warning("m3u ids: not moved: %s", e)
 
 
+def _settings_at_start():
+    """The settings as this start reads them, an older app's carried over -
+    the steps main() takes before the window (tests/test_upgrade.py starts
+    today's app on what each older release left by these same steps)."""
+    # The settings as the profile in use sees them (core/profiles.py): its
+    # own favorites, history, look... under its name, the household's as
+    # they are.
+    from .core import profiles
+    settings = profiles.ProfileSettings(ORG, ORG)
+    # The supporter key and its icon switch are gone (1.6.11): what an older
+    # app kept of them is removed from the settings file; 1.6.10's heart
+    # switch, turned on by hand, is the picker's heart (app_icon.carry_over).
+    from .ui import app_icon as _icon
+    _icon.carry_over(settings)
+    for gone in ("supporter_key", "supporter_icon"):
+        try:
+            if settings.contains(gone):
+                settings.remove(gone)
+        except Exception as e:
+            log.warning("settings: %s not removed: %s", gone, e)
+    return settings
+
+
+def _profiles_at_start(settings, first_name: str) -> None:
+    """The first start with profiles makes everything so far the first
+    profile's (copied - the old keys stay for a downgrade); then the one
+    used last is the one in use, before anything reads its settings.
+    *first_name*: that profile's name, in the app's language."""
+    from . import __version__
+    from .core import profiles
+    profiles.start(settings, _profile_files(), first_name, __version__)
+
+
+def _sources_at_start(settings) -> PlaylistStore:
+    """The sources, an M3U source's channels on stable ids before any store
+    or client reads them, and this install's id at the media servers."""
+    store = PlaylistStore(settings)
+    _move_m3u_ids(settings, store)
+    # This install's id at Jellyfin, Emby and Plex, before the first client.
+    from .providers import mediaserver
+    mediaserver.install_device_store(settings)
+    return store
+
+
 def _profile_files() -> list:
     """The three files beside the app's settings that hold a profile's own
     keys too (resume positions, followed series, the watched marks' cache),
@@ -636,22 +680,7 @@ def main() -> int:
     # this system wants it (ui/app_icon.platform_icon: Apple's and GNOME's
     # margin, a retina Dock's size) and set for every window; on Linux also
     # written into the XDG icon theme, where Wayland takes it from.
-    # The settings as the profile in use sees them (core/profiles.py): its
-    # own favorites, history, look... under its name, the household's as
-    # they are.
-    from .core import profiles
-    settings = profiles.ProfileSettings(ORG, ORG)
-    # The supporter key and its icon switch are gone (1.6.11): what an older
-    # app kept of them is removed from the settings file; 1.6.10's heart
-    # switch, turned on by hand, is the picker's heart (app_icon.carry_over).
-    from .ui import app_icon as _icon
-    _icon.carry_over(settings)
-    for gone in ("supporter_key", "supporter_icon"):
-        try:
-            if settings.contains(gone):
-                settings.remove(gone)
-        except Exception as e:
-            log.warning("settings: %s not removed: %s", gone, e)
+    settings = _settings_at_start()
     from .ui import app_icon
     try:
         look = app_icon.chosen(settings)
@@ -661,11 +690,7 @@ def main() -> int:
     app_icon.show(look, theme_icons=sys.platform.startswith("linux"))
     from .i18n import is_rtl, set_language, tr as _tr
     set_language(settings.value("language", "en"))
-    # The first start with profiles makes everything so far the first
-    # profile's (copied - the old keys stay for a downgrade); then the one
-    # used last is the one in use, before anything reads its settings.
-    from . import __version__
-    profiles.start(settings, _profile_files(), _tr("profile_me"), __version__)
+    _profiles_at_start(settings, _tr("profile_me"))
     from .ui.qt_i18n import apply_qt_language
     apply_qt_language(app)          # Qt's own buttons and dialogs too
     # Right-to-left languages (Arabic, Persian) mirror the whole UI.
@@ -688,11 +713,7 @@ def main() -> int:
             log.warning("Embedded playback disabled: %s", reason)
         else:
             log.info("Embedded playback: enabled")
-    store = PlaylistStore(settings)
-    _move_m3u_ids(settings, store)
-    # This install's id at Jellyfin, Emby and Plex, before the first client.
-    from .providers import mediaserver
-    mediaserver.install_device_store(settings)
+    store = _sources_at_start(settings)
 
     # Open the window IMMEDIATELY - no splash, no blocking authenticate.
     # The client is built from the stored playlist and credentials are

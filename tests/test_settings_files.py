@@ -148,7 +148,11 @@ def test_the_window_s_start_narrows_them_before_the_restore_writes_them():
     src = (ROOT / "dopeiptv" / "app.py").read_text(encoding="utf-8")
     body = src[src.index("def main() -> int:"):]
     assert body.index("settings_files.protect()") < body.index("_put_restore_in_place()")
-    assert body.index("settings_files.protect()") < body.index("profiles.ProfileSettings(ORG, ORG)")
+    # The settings are made in _settings_at_start (tests/test_upgrade.py
+    # starts the app by the same steps), which main() calls after protect().
+    assert body.index("settings_files.protect()") < body.index("_settings_at_start()")
+    made = src[src.index("def _settings_at_start():"):src.index("def _profiles_at_start(")]
+    assert "profiles.ProfileSettings(ORG, ORG)" in made
 
 
 # -- a drive that keeps no permissions: the app starts, and says so once ------------

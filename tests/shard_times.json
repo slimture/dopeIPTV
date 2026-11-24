@@ -330,6 +330,7 @@
 "tests/test_tv_record.py": 0.1,
 "tests/test_update_channel.py": 0.0,
 "tests/test_updates.py": 0.0,
+"tests/test_upgrade.py": 18.0,
 "tests/test_url_rewrite.py": 3.4,
 "tests/test_version.py": 0.0,
 "tests/test_video_macos.py": 1.7,

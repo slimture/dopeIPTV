@@ -199,6 +199,14 @@ Platform notes that are easy to forget:
    downloads near the top; nothing is lost - each tag's
    `RELEASE_NOTES.md` and `CHANGELOG.md` have it all.
 5. The website picks up the new release by itself within 15 minutes.
+6. Add the new tag to `RELEASES` in `tools/upgrade_fixtures.py` and run
+   `python3 tools/upgrade_fixtures.py vx.y.z` on `testing`: it starts that
+   release's own code (from its tag) offscreen, uses it as a person would
+   and keeps what it left on disk in `tests/upgrade/vx.y.z/`. Commit the
+   folder; `tests/test_upgrade.py` then starts every later app on it - the
+   sources with their logins, the profile, favourites, History, a resume
+   point, a followed series, the PIN, and a second start that moves nothing
+   more.
 
 Write release notes for people who use the app: what they can now do and
 where to find it, in plain words. The changelog can be technical.
