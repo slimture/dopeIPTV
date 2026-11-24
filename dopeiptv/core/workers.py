@@ -468,6 +468,10 @@ def _ignore_result(_result: object) -> None:
     """on_done for work that is done for its side effect."""
 
 
+#: The image cache folders a loader has set out to prune this session.
+_PRUNED: set[str] = set()
+
+
 class LogoLoader(QObject):
     """Asynchronous image downloader with in-memory cache.
 
@@ -538,7 +542,11 @@ class LogoLoader(QObject):
         # once per session, off the GUI thread. 0 disables (tests drive
         # _prune_disk_cache directly).
         self.disk_budget = int(disk_budget)
-        if self.disk_dir is not None and self.disk_budget > 0:
+        # Once per folder, not per loader: the window's logos and posters
+        # share one cache, and each had walked all of it (docs/PERFORMANCE.md).
+        folder = str(self.disk_dir) if self.disk_dir is not None else ""
+        if folder and self.disk_budget > 0 and folder not in _PRUNED:
+            _PRUNED.add(folder)
             # Deferred a few seconds so the prune's directory walk never
             # competes with the startup burst (EPG cache load, first list
             # fetch) and short-lived sessions skip it entirely. Parented
