@@ -2685,14 +2685,20 @@ class EmbeddedPlayer(TeletextSubsMixin, StreamInfoMixin, LoadingMixin,
         self._apply_mute_icon()
 
     def _quiet_output(self, m, reload: bool) -> None:
-        """While muted the player opens no sound output of its own (mpv's
-        null output keeps the time): a stream to the system's sound server
-        for every channel, even muted, made it renegotiate, and another
-        program's sound (Spotify) crackled at each change. Unmuted, the
-        system's own output again - *reload*: for the stream playing now."""
+        """While muted the player opens no sound output of its own for the
+        next stream (mpv's null output keeps the time): a stream to the
+        system's sound server for every channel, even muted, made it
+        renegotiate, and another program's sound (Spotify) crackled at each
+        change. Muting what plays now only mutes it - the output it has
+        stays open: swapping it there (an ao-reload) restarted the sound,
+        and the picture, kept in time by the sound, stalled for a moment.
+        Unmuted, the system's own output again - *reload*: for the stream
+        playing now, which a stream that started muted needs."""
         want = QUIET_AO if getattr(self, "_muted", False) else ""
         if getattr(self, "_ao_now", "") == want:
             return
+        if want == QUIET_AO and reload and getattr(m, "path", None) is not None:
+            return                       # muted now: mute alone, no reload
         try:
             if want == QUIET_AO:
                 self._ao_user = ao_text(m["ao"])

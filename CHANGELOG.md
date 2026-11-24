@@ -28,6 +28,11 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   controls and History; names are kept once, and a title whose parts
   repeat - a channel's, a film's, a local file's, an older History row's -
   is said once everywhere.
+- Muting a video made the picture stall for a moment: the player swapped
+  its sound output there and then and reloaded it, and the picture, kept
+  in time by the sound, waited. Muting now only mutes; the quiet output
+  that keeps another program's sound (Spotify) from crackling at every
+  channel change is used from the next stream on, as before.
 - "Settings › Picture & sound…" in the player's right-click menu (and
   every such link) showed as "Picture_sound": Qt read the "&" as a
   shortcut's mark.
