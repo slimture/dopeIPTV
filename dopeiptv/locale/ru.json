@@ -3213,5 +3213,7 @@
   "expiry_soon": "Ваш аккаунт в {name} истекает {date}.",
   "expiry_today": "Ваш аккаунт в {name} истекает сегодня.",
   "expiry_past": "Срок действия вашего аккаунта в {name} истёк {date}.",
-  "expiry_open": "Аккаунт…"
+  "expiry_open": "Аккаунт…",
+  "set_themes_all": "Все темы ({n})",
+  "set_themes_fewer": "Свернуть темы"
 }

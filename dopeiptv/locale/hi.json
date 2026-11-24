@@ -3213,5 +3213,7 @@
   "expiry_soon": "{name} पर आपका खाता {date} को समाप्त हो रहा है।",
   "expiry_today": "{name} पर आपका खाता आज समाप्त हो रहा है।",
   "expiry_past": "{name} पर आपका खाता {date} को समाप्त हो गया।",
-  "expiry_open": "खाता…"
+  "expiry_open": "खाता…",
+  "set_themes_all": "सभी थीम ({n})",
+  "set_themes_fewer": "कम थीम"
 }

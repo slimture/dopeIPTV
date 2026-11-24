@@ -3213,5 +3213,7 @@
   "expiry_soon": "החשבון שלך ב־{name} יפוג ב־{date}.",
   "expiry_today": "החשבון שלך ב־{name} יפוג היום.",
   "expiry_past": "החשבון שלך ב־{name} פג ב־{date}.",
-  "expiry_open": "חשבון…"
+  "expiry_open": "חשבון…",
+  "set_themes_all": "כל ערכות הנושא ({n})",
+  "set_themes_fewer": "פחות ערכות נושא"
 }

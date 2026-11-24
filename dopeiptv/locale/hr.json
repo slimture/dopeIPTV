@@ -3213,5 +3213,7 @@
   "expiry_soon": "Vaš račun kod {name} istječe {date}.",
   "expiry_today": "Vaš račun kod {name} istječe danas.",
   "expiry_past": "Vaš račun kod {name} istekao je {date}.",
-  "expiry_open": "Račun…"
+  "expiry_open": "Račun…",
+  "set_themes_all": "Sve teme ({n})",
+  "set_themes_fewer": "Manje tema"
 }

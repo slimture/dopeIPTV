@@ -3213,5 +3213,7 @@
   "expiry_soon": "Sua conta em {name} vence em {date}.",
   "expiry_today": "Sua conta em {name} vence hoje.",
   "expiry_past": "Sua conta em {name} venceu em {date}.",
-  "expiry_open": "Conta…"
+  "expiry_open": "Conta…",
+  "set_themes_all": "Todos os temas ({n})",
+  "set_themes_fewer": "Menos temas"
 }

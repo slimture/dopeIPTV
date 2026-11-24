@@ -3213,5 +3213,7 @@
   "expiry_soon": "Votre compte chez {name} expire le {date}.",
   "expiry_today": "Votre compte chez {name} expire aujourd’hui.",
   "expiry_past": "Votre compte chez {name} a expiré le {date}.",
-  "expiry_open": "Compte…"
+  "expiry_open": "Compte…",
+  "set_themes_all": "Tous les thèmes ({n})",
+  "set_themes_fewer": "Moins de thèmes"
 }

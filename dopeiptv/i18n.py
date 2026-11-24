@@ -1348,6 +1348,8 @@ _STRINGS: dict[str, dict[str, str]] = {
     "icon_retro": {"en": "Retro TV"},
     "set_themes_dark": {"en": "Dark themes"},
     "set_themes_light": {"en": "Light themes"},
+    "set_themes_all": {"en": "All themes ({n})"},
+    "set_themes_fewer": {"en": "Fewer themes"},
     "set_card_lists": {"en": "Lists"},
     "set_page_playback_sub": {"en": "What happens when you pick something to watch."},
     "set_card_behaviour": {"en": "Behaviour"},

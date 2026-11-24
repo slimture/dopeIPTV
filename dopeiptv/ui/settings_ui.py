@@ -34,7 +34,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractSpinBox, QButtonGroup, QCheckBox, QFrame,
     QHBoxLayout, QLabel, QLayout, QLineEdit, QListWidget, QListWidgetItem,
-    QPushButton, QScrollArea, QSizePolicy, QSlider, QSpinBox, QStackedWidget,
+    QPushButton, QScrollArea, QSizePolicy, QSlider, QSpinBox, QSplitter, QStackedWidget,
     QStyle, QStyleOptionViewItem,
     QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
@@ -553,13 +553,23 @@ class SettingsNav(QListWidget):
 
 
 class SettingsShell(QWidget):
-    """Search + sidebar on the left, the pages on the right."""
+    """Search + sidebar on the left, the pages on the right. The sidebar is
+    dragged wider or narrower by its edge (``side_moved`` says how wide)."""
+
+    #: The sidebar's width as it opens, and how narrow and wide it is let be.
+    SIDE_W, SIDE_MIN, SIDE_MAX = 232, 180, 420
+    side_moved = pyqtSignal(int)
 
     def __init__(self, search_placeholder: str, no_match: str) -> None:
         super().__init__()
         h = QHBoxLayout(self)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(0)
+        self.split = QSplitter(Qt.Orientation.Horizontal)
+        self.split.setObjectName("SettingsSplit")
+        self.split.setChildrenCollapsible(False)
+        self.split.setHandleWidth(5)
+        h.addWidget(self.split)
         side = QFrame()
         side.setObjectName("SettingsSide")
         sv = QVBoxLayout(side)
@@ -572,11 +582,17 @@ class SettingsShell(QWidget):
         sv.addWidget(self.search)
         self.nav = SettingsNav()
         sv.addWidget(self.nav, 1)
-        side.setFixedWidth(232)
-        h.addWidget(side)
+        side.setMinimumWidth(self.SIDE_MIN)
+        side.setMaximumWidth(self.SIDE_MAX)
+        self.side = side
+        self.split.addWidget(side)
         self.stack = QStackedWidget()
         self.stack.setObjectName("SettingsPages")
-        h.addWidget(self.stack, 1)
+        self.split.addWidget(self.stack)
+        self.split.setStretchFactor(0, 0)
+        self.split.setStretchFactor(1, 1)
+        self.set_side_width(self.SIDE_W)
+        self.split.splitterMoved.connect(lambda *_a: self.side_moved.emit(self.side_width()))
         self._none = QLabel(no_match)
         self._none.setObjectName("SettingsHint")
         self._none.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -954,6 +970,17 @@ class SettingsShell(QWidget):
             page.body.show()
             page.show_path(False)
 
+    def side_width(self) -> int:
+        sizes = self.split.sizes()
+        return sizes[0] if sizes and sizes[0] > 0 else self.side.width()
+
+    def set_side_width(self, width: int) -> None:
+        """The sidebar *width* pixels wide, within SIDE_MIN..SIDE_MAX; the
+        pages take the rest."""
+        w = max(self.SIDE_MIN, min(self.SIDE_MAX, int(width)))
+        total = max(self.split.width(), w + 1)
+        self.split.setSizes([w, max(1, total - w)])
+
     def show_page(self, key: str | None) -> None:
         item = self._items.get(key or "")
         if item is not None and not item.isHidden():
@@ -1148,6 +1175,9 @@ def settings_style() -> str:
         line = p['border'] if contrast else _mix(p['text'], p['bg'], 0.12)
     return rounded(f"""
 #SettingsSide {{ background: {p['side']}; border-right: 1px solid {p['border']}; }}
+QSplitter#SettingsSplit::handle {{ background: {p['bg']}; }}
+QSplitter#SettingsSplit::handle:hover,
+QSplitter#SettingsSplit::handle:pressed {{ background: {p['border_in']}; }}
 QListWidget#SettingsNav {{ background: transparent; border: none; outline: none; }}
 QListWidget#SettingsNav::item {{
     border-radius: 8px; padding: 0 10px; margin: 1px 0; color: {p['text2']};
@@ -2190,6 +2220,177 @@ class ChoicePicker(QWidget):
     def refresh(self) -> None:
         for tile in self.tiles:
             tile.update()
+
+
+class FoldButton(QAbstractButton):
+    """Words in the accent with a chevron after them - down while what it
+    folds is folded, up while it is out. Drawn here, so it reads the same
+    on every theme and mirrors right to left."""
+
+    PAD, CHEVRON = 8, 12
+
+    def __init__(self, text: str = "") -> None:
+        super().__init__()
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setText(text)
+
+    def setText(self, text: str | None) -> None:
+        super().setText(text)
+        self.setAccessibleName(text or "")
+        self.updateGeometry()
+        self.update()
+
+    def _font(self) -> QFont:
+        f = QFont(self.font())
+        f.setWeight(QFont.Weight.DemiBold)
+        return f
+
+    def sizeHint(self) -> QSize:
+        fm = QFontMetrics(self._font())
+        return QSize(fm.horizontalAdvance(self.text()) + 2 * self.PAD + self.CHEVRON + 8,
+                     max(30, fm.height() + 12))
+
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()
+
+    def enterEvent(self, event) -> None:
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, _event) -> None:
+        pr = QPainter(self)
+        pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        if self.underMouse() or self.isDown():
+            pr.setPen(Qt.PenStyle.NoPen)
+            pr.setBrush(QColor(P["hover"]))
+            pr.drawRoundedRect(r, corner_radius(7), corner_radius(7))
+        if self.hasFocus() and self.focusPolicy() != Qt.FocusPolicy.NoFocus:
+            pr.setBrush(Qt.BrushStyle.NoBrush)
+            pr.setPen(QPen(QColor(P["accent"]), 1.5))
+            pr.drawRoundedRect(r.adjusted(1, 1, -1, -1), corner_radius(6), corner_radius(6))
+        colour = QColor(P["accent_hi"] if self.underMouse() else P["accent"])
+        rtl = self.layoutDirection() == Qt.LayoutDirection.RightToLeft
+        text_w = self.width() - 2 * self.PAD - self.CHEVRON - 6
+        text_x = self.PAD + (self.CHEVRON + 6 if rtl else 0)
+        f = self._font()
+        pr.setFont(f)
+        pr.setPen(colour)
+        flags = Qt.AlignmentFlag.AlignVCenter | (
+            Qt.AlignmentFlag.AlignRight if rtl else Qt.AlignmentFlag.AlignLeft)
+        pr.drawText(QRectF(text_x, 0, text_w, self.height()), int(flags),
+                    QFontMetrics(f).elidedText(self.text(), Qt.TextElideMode.ElideRight,
+                                               max(0, text_w)))
+        cx = self.PAD + self.CHEVRON / 2 if rtl else self.width() - self.PAD - self.CHEVRON / 2
+        cy, d = self.height() / 2, 3.6
+        pen = QPen(colour, 1.7)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pr.setPen(pen)
+        up = -1 if self.isChecked() else 1
+        pr.drawPolyline([QPointF(cx - d, cy - up * d / 2), QPointF(cx, cy + up * d / 2),
+                         QPointF(cx + d, cy - up * d / 2)])
+
+
+class FoldedPicker(QWidget):
+    """A ChoicePicker of many tiles kept folded (the themes): folded, the
+    tile chosen stands alone beside a button that folds every one out;
+    out, they are the picker itself - one choice among all of them - under
+    the button that folds them in again. A search for one of the tiles'
+    names folds them out (``searched``) and in again once it is gone."""
+
+    def __init__(self, picker: ChoicePicker, chosen: _Choice, more: str, less: str) -> None:
+        super().__init__()
+        self.picker, self.chosen = picker, chosen
+        self._more, self._less = more, less
+        self._by_search = False
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(10)
+        top = QHBoxLayout()
+        top.setContentsMargins(0, 0, 0, 0)
+        top.setSpacing(14)
+        chosen.setCheckable(True)
+        chosen.setChecked(True)
+        chosen.clicked.connect(self._chosen_clicked)
+        top.addWidget(chosen, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.button = FoldButton()
+        self.button.toggled.connect(lambda on: self.set_open(on))
+        top.addWidget(self.button, 0, Qt.AlignmentFlag.AlignVCenter)
+        top.addStretch(1)
+        v.addLayout(top)
+        v.addWidget(picker)
+        picker.picked.connect(self._picked)
+        self._show_chosen(picker.value())
+        self.set_open(False)
+        sp = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sp.setHeightForWidth(True)
+        self.setSizePolicy(sp)
+
+    def is_open(self) -> bool:
+        return self.button.isChecked()
+
+    def set_open(self, on: bool, by_search: bool = False) -> None:
+        self._by_search = bool(on and by_search)
+        if self.button.isChecked() != on:
+            self.button.blockSignals(True)
+            self.button.setChecked(on)
+            self.button.blockSignals(False)
+        self.button.setText(self._less if on else self._more)
+        set_shown(self.picker, on)
+        set_shown(self.chosen, not on)
+        self.updateGeometry()
+
+    def searched(self, needle: str) -> None:
+        """Out while a search names one of the tiles; in again after, if
+        the search was what folded them out."""
+        terms = _words(needle or "")
+        named = bool(terms) and any(all_found(terms, findable(t.text()))
+                                    for t in self.picker.tiles)
+        if named and not self.is_open():
+            self.set_open(True, by_search=True)
+        elif not named and self._by_search:
+            self.set_open(False)
+
+    def refresh(self) -> None:
+        """The chosen tile drawn as its twin in the picker is (the accent)."""
+        twin = next((t for t in self.picker.tiles if t.key == self.chosen.key), None)
+        if twin is not None and hasattr(twin, "accent"):
+            self.chosen.accent = twin.accent      # type: ignore[attr-defined]
+        self.chosen.update()
+
+    def _chosen_clicked(self) -> None:
+        self.chosen.setChecked(True)
+        self.set_open(True)
+
+    def _picked(self, key: str) -> None:
+        self._show_chosen(key)
+        self._by_search = False         # a pick keeps them out as they are
+
+    def _show_chosen(self, key: str) -> None:
+        twin = next((t for t in self.picker.tiles if t.key == key), None)
+        if twin is None:
+            return
+        self.chosen.key = key
+        self.chosen.setText(twin.text())
+        self.chosen.setToolTip(twin.text())
+        self.chosen.setAccessibleName(twin.text())
+        self.refresh()
+
+    def hasHeightForWidth(self) -> bool:
+        return self.is_open()
+
+    def heightForWidth(self, width: int) -> int:
+        # Folded, nothing in it wraps: its height is its size hint's (the
+        # layout says -1 with the picker hidden, which read as no room).
+        h = self.layout().heightForWidth(width)
+        return h if h > 0 else self.sizeHint().height()
 
 
 # -- chips -------------------------------------------------------------------

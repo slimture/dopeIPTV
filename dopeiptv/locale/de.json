@@ -3213,5 +3213,7 @@
   "expiry_soon": "Dein Konto bei {name} läuft am {date} ab.",
   "expiry_today": "Dein Konto bei {name} läuft heute ab.",
   "expiry_past": "Dein Konto bei {name} ist am {date} abgelaufen.",
-  "expiry_open": "Konto…"
+  "expiry_open": "Konto…",
+  "set_themes_all": "Alle Designs ({n})",
+  "set_themes_fewer": "Weniger Designs"
 }

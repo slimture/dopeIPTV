@@ -3213,5 +3213,7 @@
   "expiry_soon": "Akun Anda di {name} berakhir pada {date}.",
   "expiry_today": "Akun Anda di {name} berakhir hari ini.",
   "expiry_past": "Akun Anda di {name} telah berakhir pada {date}.",
-  "expiry_open": "Akun…"
+  "expiry_open": "Akun…",
+  "set_themes_all": "Semua tema ({n})",
+  "set_themes_fewer": "Lebih sedikit tema"
 }

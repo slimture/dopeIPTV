@@ -3213,5 +3213,7 @@
   "expiry_soon": "{name} のアカウントは {date} に期限切れになります。",
   "expiry_today": "{name} のアカウントは今日で期限切れになります。",
   "expiry_past": "{name} のアカウントは {date} に期限切れになりました。",
-  "expiry_open": "アカウント…"
+  "expiry_open": "アカウント…",
+  "set_themes_all": "すべてのテーマ ({n})",
+  "set_themes_fewer": "テーマを折りたたむ"
 }

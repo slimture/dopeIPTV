@@ -31,7 +31,8 @@ from ..core.workers import (
     clear_directory, default_image_cache_dir, dir_size_bytes, run_async)
 from ..i18n import tr
 from .settings_ui import (
-    Chip, ChipGroups, ChoicePicker, ColorDot, IconTile, ThemeTile, after_shown, hbox,
+    Chip, ChipGroups, ChoicePicker, ColorDot, FoldedPicker, IconTile, ThemeTile, after_shown,
+    hbox,
 )
 from .theme import (
     ACCENT_CUSTOM, ACCENT_THEME, ACCENTS, P, THEME_ORDER,
@@ -301,6 +302,11 @@ def build_appearance(ctx: SettingsContext) -> None:
                 (tr("set_themes_light"),
                  [k for k in THEME_ORDER if is_light(k)])],
         fill=True)
+    # Folded: the theme chosen on its own, and a button that folds all of
+    # them out - more than two dozen tiles otherwise fill the page.
+    folded = FoldedPicker(themes, ThemeTile(themes.value(), ""),
+                          tr("set_themes_all", n=len(themes.tiles)),
+                          tr("set_themes_fewer"))
     accent_keys = [ACCENT_THEME, *ACCENTS, ACCENT_CUSTOM]
     accents = ChoicePicker(
         [ColorDot(key, tr(f"accent_{key}"),
@@ -332,6 +338,7 @@ def build_appearance(ctx: SettingsContext) -> None:
         for dot in accents.tiles:
             dot.theme = shown
         themes.refresh()
+        folded.refresh()
         accents.refresh()
 
     def restyle() -> None:
@@ -389,12 +396,15 @@ def build_appearance(ctx: SettingsContext) -> None:
         hv = QVBoxLayout(holder)
         hv.setContentsMargins(0, 0, 0, 0)
         hv.addWidget(theme_mark, 0, Qt.AlignmentFlag.AlignRight)
-        hv.addWidget(themes)
+        hv.addWidget(folded)
         c.widget(holder, " ".join([tr("setting_theme")]
                                   + [t.text() for t in themes.tiles]))
     else:
-        c.widget(themes, " ".join([tr("setting_theme")]
+        c.widget(folded, " ".join([tr("setting_theme")]
                                   + [t.text() for t in themes.tiles]))
+    # A search for a theme by its name folds them out to show it.
+    shell.search.textChanged.connect(folded.searched)
+    folded.searched(shell.search.text())
     c.row(tr("setting_accent_color"), accents,
           tr("misc_theme_applies_immediately"), stretch_control=True,
           badge=own())

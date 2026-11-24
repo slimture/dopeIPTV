@@ -3213,5 +3213,7 @@
   "expiry_soon": "Akaunti yako kwa {name} inaisha tarehe {date}.",
   "expiry_today": "Akaunti yako kwa {name} inaisha leo.",
   "expiry_past": "Akaunti yako kwa {name} iliisha tarehe {date}.",
-  "expiry_open": "Akaunti…"
+  "expiry_open": "Akaunti…",
+  "set_themes_all": "Mandhari yote ({n})",
+  "set_themes_fewer": "Mandhari machache"
 }

@@ -3213,5 +3213,7 @@
   "expiry_soon": "Tài khoản của bạn tại {name} hết hạn vào {date}.",
   "expiry_today": "Tài khoản của bạn tại {name} hết hạn hôm nay.",
   "expiry_past": "Tài khoản của bạn tại {name} đã hết hạn vào {date}.",
-  "expiry_open": "Tài khoản…"
+  "expiry_open": "Tài khoản…",
+  "set_themes_all": "Tất cả giao diện ({n})",
+  "set_themes_fewer": "Thu gọn giao diện"
 }

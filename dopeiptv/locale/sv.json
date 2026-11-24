@@ -3213,5 +3213,7 @@
   "expiry_soon": "Ditt konto hos {name} går ut {date}.",
   "expiry_today": "Ditt konto hos {name} går ut i dag.",
   "expiry_past": "Ditt konto hos {name} gick ut {date}.",
-  "expiry_open": "Konto…"
+  "expiry_open": "Konto…",
+  "set_themes_all": "Alla teman ({n})",
+  "set_themes_fewer": "Färre teman"
 }

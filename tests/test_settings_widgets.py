@@ -12,8 +12,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 from dopeiptv.ui.settings_ui import (  # noqa: E402
-    Chip, ChipGroups, ChoicePicker, DurationSpin, SettingsPage, SizeSpin,
-    Stepper, ThemeTile, ValueSlider, size_text,
+    Chip, ChipGroups, ChoicePicker, DurationSpin, FoldedPicker, SettingsPage, SettingsShell,
+    SizeSpin, Stepper, ThemeTile, ValueSlider, size_text,
 )
 from dopeiptv.ui.theme import THEME_ORDER  # noqa: E402
 
@@ -115,6 +115,83 @@ def test_themes_in_groups_are_still_one_choice():
     [t for t in tiles if t.key == "latte"][0].click()
     assert picker.value() == "latte"
     assert sum(t.isChecked() for t in tiles) == 1
+
+
+def _folded(current="nord"):
+    tiles = [ThemeTile(k, k.title()) for k in THEME_ORDER]
+    picker = ChoicePicker(tiles, current, groups=[("Dark", list(THEME_ORDER))], fill=True)
+    return FoldedPicker(picker, ThemeTile(picker.value(), ""), f"All themes ({len(tiles)})",
+                        "Fewer themes"), tiles
+
+
+def test_the_themes_are_folded_with_the_one_chosen_beside_the_button():
+    folded, tiles = _folded()
+    folded.resize(700, 400)
+    folded.show()
+    app.processEvents()
+    # Folded: the chosen theme alone, under its own name, and the button.
+    assert not folded.is_open() and folded.picker.isHidden()
+    assert folded.chosen.isVisible() and folded.chosen.key == "nord"
+    assert folded.chosen.text() == "Nord" and folded.chosen.isChecked()
+    assert folded.button.text() == f"All themes ({len(tiles)})"
+    assert folded.heightForWidth(700) >= ThemeTile.H, "a folded row is no row at all"
+    # Out: every tile, the chosen one checked; the button folds them in.
+    folded.button.click()
+    assert folded.is_open() and folded.picker.isVisible() and folded.chosen.isHidden()
+    assert folded.button.text() == "Fewer themes"
+    assert folded.heightForWidth(700) > 2 * ThemeTile.H
+    [t for t in tiles if t.key == "latte"][0].click()
+    assert folded.picker.value() == "latte"
+    assert folded.chosen.key == "latte" and folded.chosen.text() == "Latte"
+    folded.button.click()
+    assert not folded.is_open() and folded.chosen.isVisible()
+    # The chosen tile clicked folds them out (and stays chosen).
+    folded.chosen.click()
+    assert folded.is_open() and folded.chosen.isChecked()
+    folded.hide()
+
+
+def test_a_search_for_a_theme_by_name_folds_them_out_and_in_again():
+    folded, _tiles = _folded()
+    folded.searched("drac")
+    assert folded.is_open()
+    folded.searched("")
+    assert not folded.is_open()
+    folded.searched("accent")                 # no theme's name: as it was
+    assert not folded.is_open()
+    # Folded out by hand, a search going away leaves them out.
+    folded.button.click()
+    folded.searched("nord")
+    folded.searched("")
+    assert folded.is_open()
+
+
+def test_the_settings_sidebar_is_dragged_within_its_bounds():
+    shell = SettingsShell("Search", "Nothing")
+    shell.resize(1000, 600)
+    shell.show()
+    app.processEvents()
+    assert shell.side_width() == SettingsShell.SIDE_W
+    moved = []
+    shell.side_moved.connect(moved.append)
+    shell.split.moveSplitter(320, 1)
+    app.processEvents()
+    assert shell.side_width() == 320 and moved and moved[-1] == 320
+    shell.split.moveSplitter(900, 1)          # never past its widest
+    app.processEvents()
+    assert shell.side_width() == SettingsShell.SIDE_MAX
+    shell.split.moveSplitter(20, 1)           # nor narrower than its narrowest
+    app.processEvents()
+    assert shell.side_width() == SettingsShell.SIDE_MIN
+    shell.set_side_width(10_000)
+    app.processEvents()
+    assert shell.side_width() == SettingsShell.SIDE_MAX
+    # The page beside it takes what is left, and a resize leaves the side be.
+    shell.set_side_width(300)
+    shell.resize(1200, 600)
+    app.processEvents()
+    assert shell.side_width() == 300
+    shell.hide()
 
 
 def test_filled_tiles_reach_both_edges():

@@ -67,6 +67,7 @@ from ..providers.client import make_client
 from ..core import connections
 from ..core import places as _places
 from ..core.log import log
+from ..core.num import whole
 from . import about, set_content, set_services, set_system, set_watch
 from .theme import P, THEMES, apply_theme, build_style, effective_theme
 from .settings_ui import Chip, SettingsPage, SettingsShell, page_icon, settings_style
@@ -199,6 +200,10 @@ GROUPS = (
     ("set_sec_system", ("general", "privacy", "appearance", "shortcuts", "profiles",
                         "parental", "advanced")),
 )
+
+#: How wide the Settings window's sidebar was dragged (SettingsShell): this
+#: computer's layout, never synced or in a backup.
+SIDE_KEY = "settings_side_w"
 
 #: Each everyday page's title by its key: a menu's way to it reads
 #: "Settings › <title>…" (settings_link_text).
@@ -1084,6 +1089,10 @@ class _SettingsMixin:
         # tabs that set the dialog's width (and, translated, overflowed it).
         shell = SettingsShell(tr("set_search"), tr("set_search_none"))
         outer.addWidget(shell, 1)
+        # Its sidebar as wide as it was dragged last - this computer's
+        # layout, never synced or in a backup.
+        shell.set_side_width(whole(self.settings.value(SIDE_KEY), shell.SIDE_W))
+        shell.side_moved.connect(lambda w: self.settings.setValue(SIDE_KEY, w))
 
         def page(key: str, title: str, subtitle: str,
                  icon: str, tint: str | None = None, nav: str = "") -> SettingsPage:

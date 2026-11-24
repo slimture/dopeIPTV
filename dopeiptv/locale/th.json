@@ -3213,5 +3213,7 @@
   "expiry_soon": "บัญชีของคุณที่ {name} จะหมดอายุในวันที่ {date}",
   "expiry_today": "บัญชีของคุณที่ {name} จะหมดอายุวันนี้",
   "expiry_past": "บัญชีของคุณที่ {name} หมดอายุแล้วเมื่อวันที่ {date}",
-  "expiry_open": "บัญชี…"
+  "expiry_open": "บัญชี…",
+  "set_themes_all": "ธีมทั้งหมด ({n})",
+  "set_themes_fewer": "ย่อธีม"
 }

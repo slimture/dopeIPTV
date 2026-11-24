@@ -3213,5 +3213,7 @@
   "expiry_soon": "Ο λογαριασμός σας στο {name} λήγει στις {date}.",
   "expiry_today": "Ο λογαριασμός σας στο {name} λήγει σήμερα.",
   "expiry_past": "Ο λογαριασμός σας στο {name} έληξε στις {date}.",
-  "expiry_open": "Λογαριασμός…"
+  "expiry_open": "Λογαριασμός…",
+  "set_themes_all": "Όλα τα θέματα ({n})",
+  "set_themes_fewer": "Λιγότερα θέματα"
 }

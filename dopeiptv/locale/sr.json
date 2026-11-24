@@ -3213,5 +3213,7 @@
   "expiry_soon": "Vaš nalog kod {name} ističe {date}.",
   "expiry_today": "Vaš nalog kod {name} ističe danas.",
   "expiry_past": "Vaš nalog kod {name} je istekao {date}.",
-  "expiry_open": "Nalog…"
+  "expiry_open": "Nalog…",
+  "set_themes_all": "Sve teme ({n})",
+  "set_themes_fewer": "Manje tema"
 }

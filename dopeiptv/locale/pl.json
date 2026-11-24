@@ -3213,5 +3213,7 @@
   "expiry_soon": "Twoje konto w {name} wygasa {date}.",
   "expiry_today": "Twoje konto w {name} wygasa dzisiaj.",
   "expiry_past": "Twoje konto w {name} wygasło {date}.",
-  "expiry_open": "Konto…"
+  "expiry_open": "Konto…",
+  "set_themes_all": "Wszystkie motywy ({n})",
+  "set_themes_fewer": "Mniej motywów"
 }

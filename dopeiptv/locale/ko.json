@@ -3213,5 +3213,7 @@
   "expiry_soon": "{name} 계정이 {date}에 만료됩니다.",
   "expiry_today": "{name} 계정이 오늘 만료됩니다.",
   "expiry_past": "{name} 계정이 {date}에 만료되었습니다.",
-  "expiry_open": "계정…"
+  "expiry_open": "계정…",
+  "set_themes_all": "모든 테마 ({n})",
+  "set_themes_fewer": "테마 접기"
 }

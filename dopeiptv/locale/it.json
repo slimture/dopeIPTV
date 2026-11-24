@@ -3213,5 +3213,7 @@
   "expiry_soon": "Il tuo account su {name} scade il {date}.",
   "expiry_today": "Il tuo account su {name} scade oggi.",
   "expiry_past": "Il tuo account su {name} è scaduto il {date}.",
-  "expiry_open": "Account…"
+  "expiry_open": "Account…",
+  "set_themes_all": "Tutti i temi ({n})",
+  "set_themes_fewer": "Meno temi"
 }

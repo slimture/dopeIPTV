@@ -3213,5 +3213,7 @@
   "expiry_soon": "{name} hesabınızın süresi {date} tarihinde doluyor.",
   "expiry_today": "{name} hesabınızın süresi bugün doluyor.",
   "expiry_past": "{name} hesabınızın süresi {date} tarihinde doldu.",
-  "expiry_open": "Hesap…"
+  "expiry_open": "Hesap…",
+  "set_themes_all": "Tüm temalar ({n})",
+  "set_themes_fewer": "Daha az tema"
 }

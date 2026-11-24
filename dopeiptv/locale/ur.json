@@ -3213,5 +3213,7 @@
   "expiry_soon": "{name} پر آپ کا اکاؤنٹ {date} کو ختم ہو رہا ہے۔",
   "expiry_today": "{name} پر آپ کا اکاؤنٹ آج ختم ہو رہا ہے۔",
   "expiry_past": "{name} پر آپ کا اکاؤنٹ {date} کو ختم ہو گیا۔",
-  "expiry_open": "اکاؤنٹ…"
+  "expiry_open": "اکاؤنٹ…",
+  "set_themes_all": "تمام تھیمز ({n})",
+  "set_themes_fewer": "کم تھیمز"
 }

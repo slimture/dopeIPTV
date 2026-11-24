@@ -3213,5 +3213,7 @@
   "expiry_soon": "ينتهي حسابك لدى {name} في {date}.",
   "expiry_today": "ينتهي حسابك لدى {name} اليوم.",
   "expiry_past": "انتهى حسابك لدى {name} في {date}.",
-  "expiry_open": "الحساب…"
+  "expiry_open": "الحساب…",
+  "set_themes_all": "كل السمات ({n})",
+  "set_themes_fewer": "سمات أقل"
 }

@@ -3213,5 +3213,7 @@
   "expiry_soon": "Je account bij {name} verloopt op {date}.",
   "expiry_today": "Je account bij {name} verloopt vandaag.",
   "expiry_past": "Je account bij {name} is verlopen op {date}.",
-  "expiry_open": "Account…"
+  "expiry_open": "Account…",
+  "set_themes_all": "Alle thema's ({n})",
+  "set_themes_fewer": "Minder thema's"
 }

@@ -3213,5 +3213,7 @@
   "expiry_soon": "你在 {name} 的账户将于 {date} 到期。",
   "expiry_today": "你在 {name} 的账户今天到期。",
   "expiry_past": "你在 {name} 的账户已于 {date} 到期。",
-  "expiry_open": "账户…"
+  "expiry_open": "账户…",
+  "set_themes_all": "全部主题（{n}）",
+  "set_themes_fewer": "收起主题"
 }

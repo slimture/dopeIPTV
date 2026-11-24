@@ -359,6 +359,32 @@ def live(self):
 QDialog.exec = live
 w.open_settings()
 
+# 11. The sidebar dragged wider opens that wide the next time; the themes
+# open folded, the one chosen beside the button that folds them out.
+def drag_side(self):
+    from dopeiptv.ui.settings_ui import FoldedPicker
+    shell = self.findChild(SettingsShell)
+    self.resize(1040, 680)
+    self.show()
+    app.processEvents()
+    assert s.value("settings_side_w") is None
+    shell.split.moveSplitter(310, 1)
+    app.processEvents()
+    assert s.value("settings_side_w") in (310, "310"), s.value("settings_side_w")
+    built(self)
+    folded = self.findChild(FoldedPicker)
+    assert folded is not None and not folded.is_open()
+    assert folded.chosen.key == s.value("theme")
+    self.hide()
+    return 0
+QDialog.exec = drag_side
+w.open_settings()
+def reopened(self):
+    assert self.findChild(SettingsShell).side_width() == 310
+    return 0
+QDialog.exec = reopened
+w.open_settings()
+
 print("SETTINGS_OK", flush=True)
 """
 

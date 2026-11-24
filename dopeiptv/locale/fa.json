@@ -3213,5 +3213,7 @@
   "expiry_soon": "حساب شما در {name} در {date} منقضی می‌شود.",
   "expiry_today": "حساب شما در {name} امروز منقضی می‌شود.",
   "expiry_past": "حساب شما در {name} در {date} منقضی شد.",
-  "expiry_open": "حساب…"
+  "expiry_open": "حساب…",
+  "set_themes_all": "همه زمینه‌ها ({n})",
+  "set_themes_fewer": "زمینه‌های کمتر"
 }
