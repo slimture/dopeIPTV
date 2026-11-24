@@ -20,6 +20,7 @@ from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QAbstractItemView, QListWidgetItem
 
+from ..core.every_source import CATEGORY as XS_CATEGORY
 from ..core.log import log
 from ..core.stores import catalogue_cats, kept_place, lock_hides
 from ..core.workers import run_async
@@ -372,6 +373,12 @@ class _ListsMixin:
             all_item = QListWidgetItem(tr("cat_all"))
             all_item.setData(Qt.ItemDataRole.UserRole, None)
             self.cat_list.addItem(all_item)
+            # Every source's channels in one list, with two sources or more
+            # (mw_every_source) - right under this source's All.
+            if self.mode == "live":
+                every = self._xs_category_item()
+                if every is not None:
+                    self.cat_list.addItem(every)
             # A synthetic "Continue watching" category, shown when there are
             # partly-watched titles of this section's kind (movies under
             # Movies, episodes under Series).
@@ -695,6 +702,11 @@ class _ListsMixin:
                 [("fav_movies", "vod", "vod", movies),
                  ("fav_series", "series", "series", series)],
                 "watched")
+            return
+        if category_id == XS_CATEGORY and self.mode == "live":
+            # Every source's channels in one list (mw_every_source): each
+            # source's lists read off the window's thread, once a session.
+            self._xs_load()
             return
         if category_id == "__continue__" and self.mode in ("vod", "series"):
             # Synthetic category: partly-watched titles of this section's kind
@@ -1230,6 +1242,9 @@ class _ListsMixin:
             return
         # In a folder of Local files it looks through the subfolders too.
         if self.mode == "local" and self._local_search_hook():
+            return
+        # Every source: each source's rows under its heading (mw_every_source).
+        if self.mode == "live" and self._xs_filter_hook():
             return
         text = self.search.text().lower().strip()
         kind = self._content_kind()

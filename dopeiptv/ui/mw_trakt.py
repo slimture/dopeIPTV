@@ -589,6 +589,9 @@ class _TraktMixin:
         right store: channels, movies (stream_id) or series (series_id)."""
         if not item:
             return False
+        if item.get("_xs"):
+            # Another source's channel (Every source): its own source's star.
+            return self._xs_is_favorite(item)
         if kind == "history":
             hk = item.get("_kind")
             kind = {"movie": "vod", "series": "series"}.get(hk, hk)

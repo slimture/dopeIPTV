@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..core import nerd
+from ..core.every_source import play_key
 from ..core.log import log
 from ..core.privacy import for_log
 from ..core.workers import run_async
@@ -117,7 +118,8 @@ class _FailoverMixin:
         self._failover_url = url
         self._failover_named = named
         self._failover_row = dict(row)
-        self._failover_key = f"failover:{pl.get('id')}:{row.get('stream_id')}"
+        # Its row in Every source has this key too: the list marks it playing.
+        self._failover_key = play_key(pl.get("id"), row.get("stream_id"))
         self._start_playback(url, title or str(row.get("name") or "dopeIPTV"),
                              row.get("stream_icon"), self._failover_key, "live", record=False)
 

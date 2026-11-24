@@ -240,6 +240,9 @@ dopeiptv/
                        local socket of the user's own)
     search_all.py      One search across every source: rows as the lists show
                        them, a guide's week compact, four groups ranked
+    every_source.py    One channel list across every source: another source's
+                       row (no id of the source in use's), the sections under
+                       their headings, another source's guide around now
     mitt.py            Mine's content: entries out of the stores, the filter,
                        favourites by habit, the queue's order, History by day
     places.py          The app's places (Mine, TV, Movies, Series, Guide,
@@ -335,7 +338,8 @@ dopeiptv/
                        (PyObjC's AVFoundation, AVKit, AppKit)
     notify.py          Desktop notifications (org.freedesktop.Notifications)
     search_sources.py  The search across sources: each source's client, lists
-                       (a portal's only as loaded) and guide from disk, once
+                       (a portal's only as loaded) and guide from disk, once -
+                       Every source's channels and guide around now too
     popular.py         Popular right now: TMDB's chart of the week matched
                        against the provider's catalogue (Movies' and Series' tops)
     failover.py        Failover: a live channel that will not play found in
@@ -534,6 +538,9 @@ dopeiptv/
     mw_search_all.py   The Search page in the middle pane: one search across
                        every source, a hit played or opened through the
                        window's path (another source's channel without a switch)
+    mw_every_source.py Every source in the TV place: every source's channels in
+                       one list, read off the window's thread, another source's
+                       played from it without a switch
     search_page.py     The Search page itself: field, chips, grouped results
     series_page.py     The series page itself: header, season chips, the list
     series_cards.py    Its episode cards: model, painted card, keys, lazy pictures

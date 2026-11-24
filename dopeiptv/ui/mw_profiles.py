@@ -234,12 +234,16 @@ class _ProfilesMixin:
         keep = self._kids_keep(mode)
         return rows if keep is None else [r for r in rows if keep(r)]
 
-    def _kids_may_play(self, kind: str, item: Any) -> bool:
+    def _kids_may_play(self, kind: str, item: Any, key: Any = None) -> bool:
         """The one door every playback goes through for a kids profile
         (_start_playback): what its lists may show, and nothing else -
         whichever way it was asked (a list, the phone, the remote API, Home
         Assistant, a link, a drop). A row the app cannot tell about (no
-        item, no category) is not played. Said once in a note."""
+        item, no category) is not played. A channel of another source played
+        without switching to it (*key* its failover key: Every source, the
+        Search page, failover) only when that source's own lists, as read for
+        this profile, hold it (mw_every_source._other_source_listed). Said
+        once in a note."""
         if not self._profile_kids():
             return True
         ok = False
@@ -251,6 +255,11 @@ class _ProfilesMixin:
                                      "radio": "radio"}.get(kind, kind))
             keep = self._kids_keep("live")
             ok = keep is None or keep(row)
+        elif (kind == "live" and item is None and key is not None
+              and key == getattr(self, "_failover_key", None)):
+            listed = getattr(self, "_other_source_listed", None)
+            ok = bool(callable(listed) and listed(getattr(self, "_failover_source", None),
+                                                  getattr(self, "_failover_row", None)))
         if not ok:
             log.info("profiles: a kids profile does not play this (%s)", kind)
             self._show_toast(tr("profile_kids_not_here"), 4000)

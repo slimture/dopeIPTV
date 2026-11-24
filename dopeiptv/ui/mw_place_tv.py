@@ -258,7 +258,9 @@ class _PlaceTvMixin:
             top.set_count("")               # its categories on their way
         else:
             model = self.list_model
-            n = model.rowCount() if model.uniform else sum(
+            # Every source's headings are as tall as its rows (uniform) and
+            # no channels: not counted.
+            n = model.rowCount() if model.uniform and not getattr(model, "headed", False) else sum(
                 1 for r in range(model.rowCount()) if not (model.item_at(r) or {}).get("_header"))
             # The count alone: the sort's button names the order.
             top.set_count(self._count_text("live", n))

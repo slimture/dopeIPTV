@@ -131,7 +131,8 @@ class TvRow:
     the guide's own time for its bar, *playing* here or on a TV, *health*
     stream health's colour (None: no dot), *tuner* a box's quiet ring,
     *info* the technical line, *tint_fg* / *tint_bg* the row's own colours,
-    *heading* the provider's section heading this "channel" is."""
+    *heading* the provider's section heading this "channel" is - *strong*
+    for a source's own heading in Every source (its name and count)."""
     name: str = ""
     number: str = ""
     logo: QPixmap | None = None
@@ -146,6 +147,7 @@ class TvRow:
     tint_fg: str = ""
     tint_bg: str = ""
     heading: str | None = None
+    strong: bool = False
 
 
 _fonts: dict[tuple[int, int], QFont] = {}
@@ -273,7 +275,7 @@ def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, densi
         paint_row_ground(p, rect, row, count, rtl, r.playing, hover, selected,
                          "" if selected else r.tint_bg)
         if r.heading:
-            _paint_heading(p, rect, r.heading, rtl)
+            _paint_heading(p, rect, r.heading, rtl, r.strong)
             return {"heading": rect}
         parts = channel_parts(rect, density, rtl, name_w, numbers=numbers)
         align = _aligned(rtl)
@@ -318,15 +320,24 @@ def paint_tv_row(p: QPainter, rect: QRect, row: int, count: int, r: TvRow, densi
         p.restore()
 
 
-def _paint_heading(p: QPainter, rect: QRect, text: str, rtl: bool) -> None:
-    f = QFont(_font(LINE_PX, BOLD))
-    f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.8)
-    p.setFont(f)
-    p.setPen(colour("muted"))
+def _paint_heading(p: QPainter, rect: QRect, text: str, rtl: bool,
+                   strong: bool = False) -> None:
+    """A provider's heading in its muted capitals - a source's own
+    (*strong*) as its name is written, in the row's title type."""
+    if strong:
+        f = QFont(_font(TITLE_PX, BOLD))
+        p.setFont(f)
+        p.setPen(colour("text"))
+    else:
+        f = QFont(_font(LINE_PX, BOLD))
+        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.8)
+        p.setFont(f)
+        p.setPen(colour("muted"))
+        text = text.upper()
     box = rect.adjusted(CH_PAD_X, 0, -CH_PAD_X, 0)
     fm = QFontMetrics(f)
     p.drawText(box, int(_aligned(rtl)), fm.elidedText(
-        text.upper(), Qt.TextElideMode.ElideRight, box.width()))
+        text, Qt.TextElideMode.ElideRight, box.width()))
 
 
 def _paint_name(p: QPainter, name_r: QRect, r: TvRow, rtl: bool, selected: bool,

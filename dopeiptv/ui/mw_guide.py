@@ -274,7 +274,10 @@ class _GuideMixin:
         if not global_scope and self.mode == "live" and self.all_items:
             cat = self.cat_list.currentItem()
             title = cat.text() if cat else "All"
-            chans = kids(self.all_items)
+            # Every source: the guide is the source in use's - its channels
+            # alone (mw_every_source).
+            own = getattr(self, "_xs_own_rows", None)
+            chans = kids(own(self.all_items) if callable(own) else self.all_items)
             return ("live", src, title, _lineup_sig(chans)), title, chans
         # In Favorites, scope the guide to the favorite CHANNELS shown (a
         # folder, or all of them) - movies/series have no EPG. Other Trakt/

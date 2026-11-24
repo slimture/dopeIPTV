@@ -5,6 +5,24 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+### Added
+
+- **Every source in one channel list**: with two sources or more, TV's categories
+  have **Every source** under All - the live channels of all your sources in one
+  list, under each source's name, as each source's own lists show them (hidden,
+  locked and adult categories, and channels hidden by hand, stay out; a kids
+  profile sees only what it may). A channel of another source plays from it
+  without switching to it, and the list stays where it is. What is on comes
+  from the guides already on this computer; no guide is downloaded and nothing
+  streams for it until you play a channel.
+
+### Fixed
+
+- A kids profile can play a channel of another source found by the search
+  across sources: it was shown, but refused when played.
+
 ## [1.6.12]
 
 ### Security
