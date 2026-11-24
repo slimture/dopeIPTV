@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "이 컴퓨터의 다른 계정이 {folder} 폴더를 변경할 수 있어 업데이트를 그곳에 두지 않습니다. dopeIPTV를 본인 전용 폴더로 옮기거나 새 버전을 직접 다운로드하세요.",
   "private_kept_title": "아직 디스크에 기록 중",
   "private_kept_body": "녹화 또는 캐스트가 아직 이 채널을 디스크에 기록하고 있습니다. 지금 중지하거나 끝날 때까지 두세요. 비공개로 시청하는 동안 이 채널의 다른 것은 남기지 않습니다.",
-  "private_kept_stop": "중지"
+  "private_kept_stop": "중지",
+  "set_link_remote": "원격 제어 및 자동화의 Nerd 설정 {n}개",
+  "set_page_tv": "TV 모드와 리모컨",
+  "set_page_tv_sub": "소파에서 보는 전체 화면 레이아웃과 이를 조작하는 리모컨, 컨트롤러, 휴대폰입니다.",
+  "set_page_privacy": "개인정보 및 데이터",
+  "set_page_privacy_sub": "시청한 내용 중 앱이 보관하는 것과 모든 설정을 하나의 파일로.",
+  "set_card_this_computer": "이 컴퓨터",
+  "set_phone_hint": "휴대폰을 리모컨으로: 카메라로 코드를 스캔하면 브라우저에 페이지가 열립니다. 설치할 것은 없습니다.",
+  "set_phone_rec_ask": "휴대폰이 녹화하기 전에 묻기",
+  "set_phone_rec_ask_hint": "휴대폰의 녹화는 먼저 묻습니다. 그곳의 \"다시 표시하지 않기\"는 이 설정을 끄고, 여기서 다시 켤 수 있습니다."
 }

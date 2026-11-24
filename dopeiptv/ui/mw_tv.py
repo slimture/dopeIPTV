@@ -2,7 +2,7 @@
 a remote.
 
 On and off from the View menu, its key (Ctrl+Shift+T), ``--tv`` and
-"Start in TV mode" (Settings > General). On, the window fills the screen
+"Start in TV mode" (Settings > TV mode and remotes). On, the window fills the screen
 with its own page (ui/tv_mode.py) in the central stack; a title plays
 through the window's own path (play_live_channel, _start_playback - the
 VPN guard, the connection count and the rest apply as everywhere), and
@@ -1381,7 +1381,7 @@ class _TvMixin:
         the words, and OK."""
         self._tv_ask(title, text, [(tr("common_ok"), "primary")])
 
-    # -- Settings > General ------------------------------------------------------------------------
+    # -- Settings > TV mode and remotes ------------------------------------------------------------
 
     @staticmethod
     def tv_inputs_text() -> str:

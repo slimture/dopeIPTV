@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "这台电脑上的其他账户可以更改文件夹 {folder}，因此不会把更新放在那里。请把 dopeIPTV 移到你自己的文件夹，或手动下载新版本。",
   "private_kept_title": "仍在写入磁盘",
   "private_kept_body": "一个录制或投屏仍在把这个频道写入磁盘。现在停止它，或让它完成——私密观看期间不会保留这个频道的其他任何内容。",
-  "private_kept_stop": "停止"
+  "private_kept_stop": "停止",
+  "set_link_remote": "远程控制与自动化的 {n} 项 Nerd 设置",
+  "set_page_tv": "电视模式和遥控器",
+  "set_page_tv_sub": "适合在沙发上观看的全屏界面，以及操控它的遥控器、手柄和手机。",
+  "set_page_privacy": "隐私和数据",
+  "set_page_privacy_sub": "应用会保留哪些观看内容，以及把所有设置存成一个文件。",
+  "set_card_this_computer": "这台电脑",
+  "set_phone_hint": "把手机当遥控器：用相机扫描二维码，浏览器中就会打开一个页面。无需安装任何东西。",
+  "set_phone_rec_ask": "手机录制前先询问",
+  "set_phone_rec_ask_hint": "手机上的录制会先询问。在那里选择“不再显示”会关闭此项，在这里可以重新打开。"
 }

@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Outras contas deste computador podem alterar a pasta {folder}, então a atualização não é colocada lá. Mova o dopeIPTV para uma pasta só sua ou baixe a nova versão manualmente.",
   "private_kept_title": "Ainda gravando no disco",
   "private_kept_body": "Uma gravação ou transmissão ainda está gravando este canal no disco. Pare agora ou deixe terminar - nada mais deste canal é guardado enquanto você assiste em privado.",
-  "private_kept_stop": "Parar"
+  "private_kept_stop": "Parar",
+  "set_link_remote": "{n} ajustes do Nerd para controle remoto e automação",
+  "set_page_tv": "Modo TV e controles",
+  "set_page_tv_sub": "A tela cheia para o sofá, e os controles remotos, controles de jogo e o celular que a comandam.",
+  "set_page_privacy": "Privacidade e dados",
+  "set_page_privacy_sub": "O que o app guarda do que você assiste, e todas as suas configurações em um arquivo.",
+  "set_card_this_computer": "Este computador",
+  "set_phone_hint": "Seu celular como controle: escaneie um código com a câmera e uma página abre no navegador. Nada para instalar.",
+  "set_phone_rec_ask": "Perguntar antes de o celular gravar",
+  "set_phone_rec_ask_hint": "Gravar no celular pergunta antes. \"Não mostrar isso novamente\" lá desativa isto, e aqui você ativa de novo."
 }

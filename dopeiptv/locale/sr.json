@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Drugi nalozi na ovom računaru mogu da menjaju fasciklu {folder}, pa se ažuriranje ne stavlja tamo. Premesti dopeIPTV u svoju fasciklu ili ručno preuzmi novu verziju.",
   "private_kept_title": "Još se upisuje na disk",
   "private_kept_body": "Snimak ili emitovanje još upisuje ovaj kanal na disk. Zaustavi ga sada ili ga pusti da završi - ništa drugo sa ovog kanala se ne čuva dok gledaš privatno.",
-  "private_kept_stop": "Zaustavi"
+  "private_kept_stop": "Zaustavi",
+  "set_link_remote": "Nerd podešavanja za daljinsko upravljanje i automatiku: {n}",
+  "set_page_tv": "TV režim i daljinski upravljači",
+  "set_page_tv_sub": "Prikaz preko celog ekrana za kauč, i daljinski upravljači, kontroleri i telefon koji njime upravljaju.",
+  "set_page_privacy": "Privatnost i podaci",
+  "set_page_privacy_sub": "Šta aplikacija čuva o onome što gledate, i sva vaša podešavanja u jednoj datoteci.",
+  "set_card_this_computer": "Ovaj računar",
+  "set_phone_hint": "Telefon kao daljinski: skenirajte kod kamerom i u pregledaču se otvara stranica. Ništa za instaliranje.",
+  "set_phone_rec_ask": "Pitaj pre nego što telefon snima",
+  "set_phone_rec_ask_hint": "Snimanje na telefonu prvo pita. \"Ne prikazuj ovo ponovo\" tamo ovo isključuje, a ovde ga ponovo uključujete."
 }

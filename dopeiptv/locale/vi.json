@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Các tài khoản khác trên máy tính này có thể thay đổi thư mục {folder}, nên bản cập nhật không được đặt ở đó. Hãy chuyển dopeIPTV sang một thư mục của riêng bạn, hoặc tải phiên bản mới về thủ công.",
   "private_kept_title": "Vẫn đang ghi ra ổ đĩa",
   "private_kept_body": "Một bản ghi hoặc lượt truyền vẫn đang ghi kênh này ra ổ đĩa. Dừng ngay bây giờ, hoặc để nó chạy xong - không có gì khác của kênh này được giữ lại khi bạn xem riêng tư.",
-  "private_kept_stop": "Dừng lại"
+  "private_kept_stop": "Dừng lại",
+  "set_link_remote": "{n} cài đặt Nerd cho điều khiển từ xa và tự động hóa",
+  "set_page_tv": "Chế độ TV và điều khiển",
+  "set_page_tv_sub": "Giao diện toàn màn hình cho ghế sofa, cùng điều khiển, tay cầm và điện thoại dùng để điều khiển nó.",
+  "set_page_privacy": "Quyền riêng tư và dữ liệu",
+  "set_page_privacy_sub": "Những gì ứng dụng giữ lại về nội dung bạn xem, và mọi cài đặt trong một tệp.",
+  "set_card_this_computer": "Máy tính này",
+  "set_phone_hint": "Điện thoại làm điều khiển: quét mã bằng camera và một trang mở ra trong trình duyệt. Không cần cài đặt gì.",
+  "set_phone_rec_ask": "Hỏi trước khi điện thoại ghi hình",
+  "set_phone_rec_ask_hint": "Ghi hình trên điện thoại sẽ hỏi trước. \"Không hiển thị lại điều này\" ở đó tắt mục này, và bạn bật lại ở đây."
 }

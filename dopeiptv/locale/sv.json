@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Andra konton på den här datorn kan ändra mappen {folder}, så uppdateringen läggs inte där. Flytta dopeIPTV till en egen mapp, eller ladda ner den nya versionen för hand.",
   "private_kept_title": "Skrivs fortfarande till disken",
   "private_kept_body": "En inspelning eller cast skriver fortfarande kanalen till disken. Stoppa den nu, eller låt den gå klart - inget annat av kanalen sparas medan du tittar privat.",
-  "private_kept_stop": "Stoppa"
+  "private_kept_stop": "Stoppa",
+  "set_link_remote": "{n} Nerd-inställningar för fjärrstyrning och automation",
+  "set_page_tv": "TV-läge och fjärrkontroller",
+  "set_page_tv_sub": "Helskärmsläget för soffan, och fjärrkontrollerna, handkontrollerna och mobilen som styr det.",
+  "set_page_privacy": "Integritet och data",
+  "set_page_privacy_sub": "Vad appen sparar om det du tittar på, och alla dina inställningar i en fil.",
+  "set_card_this_computer": "Den här datorn",
+  "set_phone_hint": "Mobilen som fjärrkontroll: skanna en kod med kameran så öppnas en sida i webbläsaren. Inget att installera.",
+  "set_phone_rec_ask": "Fråga innan mobilen spelar in",
+  "set_phone_rec_ask_hint": "Spela in på mobilen frågar först. \"Visa inte det här igen\" där stänger av det här, och här slår du på det igen."
 }

@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Akun lain di komputer ini bisa mengubah folder {folder}, jadi pembaruan tidak ditaruh di sana. Pindahkan dopeIPTV ke folder milik Anda sendiri, atau unduh versi baru secara manual.",
   "private_kept_title": "Masih ditulis ke disk",
   "private_kept_body": "Sebuah rekaman atau cast masih menulis saluran ini ke disk. Hentikan sekarang, atau biarkan selesai - tidak ada lagi dari saluran ini yang disimpan selama menonton secara pribadi.",
-  "private_kept_stop": "Hentikan"
+  "private_kept_stop": "Hentikan",
+  "set_link_remote": "{n} pengaturan Nerd untuk kendali jarak jauh dan otomatisasi",
+  "set_page_tv": "Mode TV dan remote",
+  "set_page_tv_sub": "Tampilan layar penuh untuk di sofa, serta remote, kontroler, dan ponsel yang mengendalikannya.",
+  "set_page_privacy": "Privasi dan data",
+  "set_page_privacy_sub": "Apa yang disimpan aplikasi dari tontonan Anda, dan semua pengaturan dalam satu berkas.",
+  "set_card_this_computer": "Komputer ini",
+  "set_phone_hint": "Ponsel sebagai remote: pindai kode dengan kameranya dan sebuah halaman terbuka di peramban. Tidak ada yang perlu dipasang.",
+  "set_phone_rec_ask": "Tanya sebelum ponsel merekam",
+  "set_phone_rec_ask_hint": "Rekam di ponsel bertanya dulu. \"Jangan tampilkan ini lagi\" di sana mematikan ini, dan di sini Anda menyalakannya kembali."
 }

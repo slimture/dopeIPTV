@@ -1,5 +1,5 @@
-"""Settings' SYSTEM pages: General, Appearance, Keyboard shortcuts,
-Profiles, Parental lock and Advanced (their rows and keys:
+"""Settings' SYSTEM pages: General, Privacy and data, Appearance, Keyboard
+shortcuts, Profiles, Parental lock and Advanced (their rows and keys:
 docs/SETTINGS_MAP.md).
 
 Each ``build_<page>(ctx)`` fills its page the first time it is needed
@@ -7,7 +7,8 @@ Each ``build_<page>(ctx)`` fills its page the first time it is needed
 the page stores and applies, if anything, as
 ``ctx.page_commits[<page key>]``: commit(put, changed, final), run by
 open_settings' commit. *ctx* is the Settings window's SettingsContext
-(ui/mw_settings.py): General shares the backup with Sources through it.
+(ui/mw_settings.py): Privacy and data shares the backup with Sources
+through it.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from PyQt6 import sip
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QColorDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
+    QColorDialog, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
     QWidget,
 )
 
@@ -42,14 +43,13 @@ if TYPE_CHECKING:
 
 
 def build_general(ctx: SettingsContext) -> None:
-    """General: the language, where the app opens, privacy, updates, the
-    backup, the system's media controls, TV mode, supporting the app and
-    About."""
+    """General: the language, where the app opens, updates, this computer
+    (its menu entry or Start-menu shortcut, the system's media controls),
+    feedback and tips, and About. Privacy and the backup are on Privacy and
+    data, TV mode on its own page (WATCH)."""
     win, d, general = ctx.win, ctx.dialog, ctx.pages["general"]
     shell, is_on, flag, nerd_switch = ctx.shell, ctx.is_on, ctx.flag, ctx.nerd_switch
     link_cards = ctx.link_cards
-    store, export_playlists = ctx.store, ctx.export_playlists
-    import_playlists = ctx.import_playlists
     from ..i18n import LANGUAGES, current_language
     # A normal dropdown: click to open, scroll inside the popup.
     # _combo() caps the popup at 14 rows, scrolls per pixel and
@@ -70,16 +70,6 @@ def build_general(ctx: SettingsContext) -> None:
     c = general.card(tr("set_card_start"))
     c.row(tr("set_start_place"), start_box, tr("set_start_place_hint"),
           search="start startup open launch home mine")
-    # Privacy: private viewing lasts until the app closes, so it is
-    # not stored (an untouched window still writes nothing).
-    from ..core import privacy as _privacy
-    c = general.card(tr("set_card_privacy"))
-    private_box = c.toggle(tr("private_menu"), _privacy.private(), tr("private_hint"))
-    private_box.toggled.connect(win.set_private_viewing)
-    clear_btn = QPushButton(tr("clear_btn"))
-    clear_btn.clicked.connect(lambda: win.open_clear_history())
-    c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
-          search="history incognito private recently viewed")
     c = general.card(tr("set_card_updates"))
     from ..core import build_check as _build
     if not _build.allowed():
@@ -93,62 +83,17 @@ def build_general(ctx: SettingsContext) -> None:
         win._update_channel())
     c.row(tr("setting_update_channel"), channel_box,
           tr("setting_update_channel_hint"))
-    # Everything a person would miss on a new computer, in one file
-    # (it was the playlists only, on the Playlists page).
-    export_btn = QPushButton(tr("backup_btn"))
-    import_btn = QPushButton(tr("restore_btn"))
-    c = general.card(tr("set_card_backup"))
-    c.row(tr("set_backup_label"), hbox(export_btn, import_btn,
-                                       stretch=False),
-          tr("set_backup_hint"),
-          search="export import backup restore playlists json")
-    # An optional password for the next backup made: never stored, and
-    # emptied once the file is written. Empty, the file is as it always was.
-    backup_pw = QLineEdit()
-    backup_pw.setEchoMode(QLineEdit.EchoMode.Password)
-    backup_pw.setPlaceholderText(tr("set_backup_pw_none"))
-    backup_pw.setAccessibleName(tr("set_backup_pw"))
-    backup_again = QLineEdit()
-    backup_again.setEchoMode(QLineEdit.EchoMode.Password)
-    backup_again.setPlaceholderText(tr("set_backup_pw_again"))
-    backup_again.setAccessibleName(tr("set_backup_pw_again"))
-    backup_again.setEnabled(False)
-    c.row(tr("set_backup_pw"), hbox(backup_pw, backup_again, stretch=False),
-          tr("set_backup_pw_hint"), stretch_control=True,
-          search="password encrypt encrypted lock protect backup")
-    c.note(tr("backup_note"))
-
-    def backup_pw_typed(text: str) -> None:
-        # The repeat only for a password; emptied with it.
-        backup_again.setEnabled(bool(text) and bool(store))
-        if not text:
-            backup_again.clear()
-
-    def back_up() -> None:
-        password = backup_pw.text()
-        if password != backup_again.text():
-            QMessageBox.warning(d, tr("backup_title"), tr("backup_pw_mismatch"))
-            backup_again.setFocus()
-            backup_again.selectAll()
-            return
-        if export_playlists(password) and password:
-            backup_pw.clear()
-
-    backup_pw.textChanged.connect(backup_pw_typed)
-    export_btn.clicked.connect(back_up)
-    import_btn.clicked.connect(import_playlists)
-    if not store:
-        export_btn.setEnabled(False)
-        import_btn.setEnabled(False)
-        backup_pw.setEnabled(False)
-    # Only where an entry is actually missing: a .deb or a Flatpak
-    # has one already, and offering to add a second would be
-    # nonsense.
+    # This computer: the app in the desktop's menu (Linux; only where an
+    # entry is actually missing: a .deb or a Flatpak has one already, and
+    # offering to add a second would be nonsense) or a portable Windows
+    # build's Start-menu shortcut, and the system's media controls. One
+    # section: there were two called "System", here and on Advanced.
     desktop_box = None
     mpris_box = None
+    this_pc = None
     if sys.platform.startswith("linux"):
         from ..core import desktop_entry as _de
-        c = general.card(tr("set_card_system"))
+        c = this_pc = general.card(tr("set_card_this_computer"))
         if _de.is_installed() or _de.can_offer():
             desktop_box = c.toggle(tr("setting_desktop_entry"),
                                    _de.is_installed(),
@@ -160,26 +105,29 @@ def build_general(ctx: SettingsContext) -> None:
         # Transport Controls, where this build has the bridge to them.
         from ..services import media_session as _ms
         if _ms.supported():
-            c = general.card(tr("set_card_system"))
+            c = this_pc = general.card(tr("set_card_this_computer"))
             mpris_box = c.toggle(
                 tr("setting_media_controls"), is_on("mpris", "true"),
                 tr("setting_media_controls_hint_mac"
                    if sys.platform == "darwin"
                    else "setting_media_controls_hint_win"))
-    # TV mode (mw_tv): the window as a 10-foot interface, from a remote.
-    c = general.card(tr("tv_mode"))
-    tv_open_btn = QPushButton(tr("tv_open"))
-    tv_open_btn.clicked.connect(lambda _c=False: (d.accept(), QTimer.singleShot(0, win.enter_tv_mode)))
-    c.row(tr("tv_mode"), tv_open_btn, tr("tv_mode_hint"),
-          search="tv 10-foot sofa couch remote htpc fullscreen kodi")
-    tv_start_box = c.toggle(tr("tv_start_in"), is_on("tv_mode_start", "false"),
-                            tr("tv_start_hint"))
-    tv_inputs_box = c.toggle(tr("tv_inputs"), is_on("tv_inputs", "true"),
-                             tr("tv_inputs_hint"))
-    tv_found = QLabel(win.tv_inputs_text())
-    tv_found.setWordWrap(True)
-    c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
-          search="lirc gamepad controller joystick cec remote evdev sdl")
+    if sys.platform == "win32":
+        # A portable Windows build: Start-menu and desktop shortcuts so it
+        # feels installed. Each is just a .lnk file (no registry), easy to
+        # delete. It was under Advanced › Maintenance.
+        if this_pc is None:
+            this_pc = general.card(tr("set_card_this_computer"))
+        win_sc_btn = QPushButton(tr("win_shortcut_btn"))
+
+        def _make_win_shortcut() -> None:
+            from ..core.platform_windows import create_shortcut
+            made = create_shortcut()
+            win._flash_status(tr("win_shortcut_done") if made
+                              else tr("win_shortcut_fail"))
+
+        win_sc_btn.clicked.connect(_make_win_shortcut)
+        this_pc.row(tr("win_shortcut_hint"), win_sc_btn,
+                    search="start menu shortcut desktop lnk")
     # Feedback, a tip: feedback and its answers and - last and quiet -
     # whether the app asks for a tip now and then.
     c = general.card(tr("set_feedback_tip_card"))
@@ -248,11 +196,6 @@ def build_general(ctx: SettingsContext) -> None:
             win.settings.setValue("update_check_ts", "0")
             win.settings.setValue("update_banner_dismissed", "")
             QTimer.singleShot(0, win._maybe_check_updates)
-        # Written once switched: an untouched window stores nothing.
-        for tv_key, tv_box, tv_default in (("tv_mode_start", tv_start_box, "false"),
-                                           ("tv_inputs", tv_inputs_box, "true")):
-            if tv_box.isChecked() != is_on(tv_key, tv_default):
-                put(tv_key, flag(tv_box))
         if mpris_box is not None:
             put("mpris", flag(mpris_box))
             if "mpris" in changed:
@@ -267,6 +210,80 @@ def build_general(ctx: SettingsContext) -> None:
             if "desktop_entry" in changed:
                 win._apply_desktop_entry(desktop_box.isChecked())
     ctx.page_commits["general"] = commit_general
+
+
+def build_privacy(ctx: SettingsContext) -> None:
+    """Privacy and data: private viewing and clearing recent history -
+    what the app keeps of what is watched - and the backup, every setting
+    in one file; a row that leads to Sync, on its own page under SERVICES."""
+    win, d, page = ctx.win, ctx.dialog, ctx.pages["privacy"]
+    store, export_playlists = ctx.store, ctx.export_playlists
+    import_playlists = ctx.import_playlists
+    # Private viewing lasts until the app closes, so it is not stored (an
+    # untouched window still writes nothing).
+    from ..core import privacy as _privacy
+    c = page.card(tr("set_card_privacy"))
+    private_box = c.toggle(tr("private_menu"), _privacy.private(), tr("private_hint"))
+    private_box.toggled.connect(win.set_private_viewing)
+    clear_btn = QPushButton(tr("clear_btn"))
+    clear_btn.clicked.connect(lambda: win.open_clear_history())
+    c.row(tr("clear_menu"), clear_btn, tr("clear_hint"),
+          search="history incognito private recently viewed")
+    # Everything a person would miss on a new computer, in one file
+    # (it was the playlists only, on the Playlists page).
+    export_btn = QPushButton(tr("backup_btn"))
+    import_btn = QPushButton(tr("restore_btn"))
+    c = page.card(tr("set_card_backup"))
+    c.row(tr("set_backup_label"), hbox(export_btn, import_btn,
+                                       stretch=False),
+          tr("set_backup_hint"),
+          search="export import backup restore playlists json")
+    # An optional password for the next backup made: never stored, and
+    # emptied once the file is written. Empty, the file is as it always was.
+    backup_pw = QLineEdit()
+    backup_pw.setEchoMode(QLineEdit.EchoMode.Password)
+    backup_pw.setPlaceholderText(tr("set_backup_pw_none"))
+    backup_pw.setAccessibleName(tr("set_backup_pw"))
+    backup_again = QLineEdit()
+    backup_again.setEchoMode(QLineEdit.EchoMode.Password)
+    backup_again.setPlaceholderText(tr("set_backup_pw_again"))
+    backup_again.setAccessibleName(tr("set_backup_pw_again"))
+    backup_again.setEnabled(False)
+    c.row(tr("set_backup_pw"), hbox(backup_pw, backup_again, stretch=False),
+          tr("set_backup_pw_hint"), stretch_control=True,
+          search="password encrypt encrypted lock protect backup")
+    c.note(tr("backup_note"))
+
+    def backup_pw_typed(text: str) -> None:
+        # The repeat only for a password; emptied with it.
+        backup_again.setEnabled(bool(text) and bool(store))
+        if not text:
+            backup_again.clear()
+
+    def back_up() -> None:
+        password = backup_pw.text()
+        if password != backup_again.text():
+            QMessageBox.warning(d, tr("backup_title"), tr("backup_pw_mismatch"))
+            backup_again.setFocus()
+            backup_again.selectAll()
+            return
+        if export_playlists(password) and password:
+            backup_pw.clear()
+
+    backup_pw.textChanged.connect(backup_pw_typed)
+    export_btn.clicked.connect(back_up)
+    import_btn.clicked.connect(import_playlists)
+    if not store:
+        export_btn.setEnabled(False)
+        import_btn.setEnabled(False)
+        backup_pw.setEnabled(False)
+    # The same settings on every computer is a service of dopeiptv.org's,
+    # with a page of its own: one setting, one place - this row leads there.
+    rtl = ctx.rtl
+    c.link(tr("sync_title"), tr("set_page_sync_sub"),
+           f"{tr('set_grp_accounts')} {'‹' if rtl else '›'} {tr('sync_nav')}",
+           lambda: ctx.shell.show_page("sync"),
+           search="sync synchronise computers")
 
 
 def build_appearance(ctx: SettingsContext) -> None:
@@ -640,27 +657,15 @@ def build_advanced(ctx: SettingsContext) -> None:
         win._flash_status(tr("ts_reset_done"))
 
     ts_reset_btn.clicked.connect(reset_ts)
-    # Portable Windows build: let the user add Start-menu/desktop
-    # shortcuts so it feels installed. Each is just a .lnk file (no
-    # registry), easy to delete. Hidden on Linux/macOS.
-    if sys.platform == "win32":
-        win_sc_btn = QPushButton(tr("win_shortcut_btn"))
-
-        def _make_win_shortcut() -> None:
-            from ..core.platform_windows import create_shortcut
-            made = create_shortcut()
-            win._flash_status(tr("win_shortcut_done") if made
-                               else tr("win_shortcut_fail"))
-
-        win_sc_btn.clicked.connect(_make_win_shortcut)
-        c.row(tr("win_shortcut_hint"), win_sc_btn)
     nerd_link(maint, "set_link_diag",
               [tr("nerd_log_level"), tr("nerd_log_file"),
                tr("nerd_card_view"), tr("nerd_card_health")], "diag")
     after_shown(d, refresh_cache_label)
     x11_box = None
     if sys.platform.startswith("linux"):
-        c = adv.card(tr("set_card_system"))
+        # Wayland or X11: Linux's alone ("System" too was the name of a
+        # section on General).
+        c = adv.card("Linux")
         x11_box = c.toggle(tr("setting_force_x11"),
                            is_on("force_x11", "false"),
                            tr("setting_force_x11_hint"))

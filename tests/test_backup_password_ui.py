@@ -241,13 +241,13 @@ type(w)._backup_without_password_ok = lambda self, parent: asked_plain.append(1)
 def run(self):
     shell = self.findChild(SettingsShell)
     shell.build_all()
-    general = next(p for p in shell.pages if p.key == "general")
-    fields = {f.accessibleName(): f for f in general.findChildren(QLineEdit)}
+    privacy = next(p for p in shell.pages if p.key == "privacy")
+    fields = {f.accessibleName(): f for f in privacy.findChildren(QLineEdit)}
     pw, again = fields[tr("set_backup_pw")], fields[tr("set_backup_pw_again")]
     assert pw.echoMode() == QLineEdit.EchoMode.Password == again.echoMode()
     assert pw.isEnabled() and not again.isEnabled()          # the repeat only for a password
-    back = next(b for b in general.findChildren(QPushButton) if b.text() == tr("backup_btn"))
-    restore = next(b for b in general.findChildren(QPushButton) if b.text() == tr("restore_btn"))
+    back = next(b for b in privacy.findChildren(QPushButton) if b.text() == tr("backup_btn"))
+    restore = next(b for b in privacy.findChildren(QPushButton) if b.text() == tr("restore_btn"))
     # Two that differ: said, nothing written.
     pw.setText(PW)
     assert again.isEnabled()

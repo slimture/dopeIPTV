@@ -1,5 +1,6 @@
 """Settings' WATCH pages: Playback, Picture and sound, Guide, Multiview,
-Recording and Casting (their rows and keys: docs/SETTINGS_MAP.md).
+Recording, Casting and TV mode and remotes (their rows and keys:
+docs/SETTINGS_MAP.md).
 
 Each ``build_<page>(ctx)`` fills its page the first time it is needed
 (SettingsShell.ensure_built), never as the window opens, and leaves what
@@ -13,7 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6 import sip
-from PyQt6.QtCore import QLocale, Qt
+from PyQt6.QtCore import QLocale, Qt, QTimer
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
     QComboBox, QFileDialog, QLabel, QListWidget, QListWidgetItem, QPushButton,
@@ -93,10 +94,6 @@ def build_playback(ctx: SettingsContext) -> None:
     upcoming_box = c.toggle(
         tr("set_upcoming_prompt"),
         win.settings.value("hide_upcoming_prompt", "false") != on)
-    # Night mode: the player's menu and its key turn it on too, live.
-    # A card of its own held this one row.
-    night_box = c.toggle(tr("night_mode"), night_mode.enabled(win.settings),
-                         tr("night_mode_hint"))
     c = play.card(tr("set_card_stream_buffer"))
     c.row(tr("setting_stream_format"), fmt_box)
     c.row(tr("setting_network_buffer"), buf_box)
@@ -196,12 +193,6 @@ def build_playback(ctx: SettingsContext) -> None:
         put("autoplay_next_episode", flag(autoplay_next_box))
         put("nextup_lead_secs", nextup_box.currentData())
         put("auto_reconnect_live", flag(autorecon_box))
-        # These two only when switched: off and never set is no
-        # setting.
-        if night_box.isChecked() != night_mode.enabled(win.settings):
-            put(night_mode.KEY, flag(night_box))
-        if night_mode.KEY in changed and win.player:
-            win.player.set_night_mode(night_box.isChecked())
         put("cache_secs", buf_box.currentData())
         put("live_rewind_minutes", rewind_box.currentData())
         put("live_rewind_disk", flag(rewind_disk_box))
@@ -213,7 +204,8 @@ def build_playback(ctx: SettingsContext) -> None:
 def build_audio(ctx: SettingsContext) -> None:
     """Picture and sound on one page (they were two pages of four and five
     rows, both about how a stream plays): the audio and subtitle languages,
-    the subtitles' look, the picture and its decoding."""
+    night mode for the sound, the subtitles' look, the picture and its
+    decoding."""
     win, audio = ctx.win, ctx.pages["audio"]
     is_on, flag, own, nerd_link = ctx.is_on, ctx.flag, ctx.own, ctx.nerd_link
     LANGS = [
@@ -236,6 +228,10 @@ def build_audio(ctx: SettingsContext) -> None:
     c = subs_card = audio.card(tr("sec_audio_subs"))
     c.row(tr("setting_audio_lang"), alang_box, tr("set_next_stream_note"),
           badge=own())
+    # Night mode for the sound, beside its language (it was on Playback):
+    # the player's menu and its key turn it on too, live.
+    night_box = c.toggle(tr("night_mode"), night_mode.enabled(win.settings),
+                         tr("night_mode_hint"))
     c.row(tr("setting_subtitles"), sub_box, badge=own())
     subs_on = lambda: sub_box.currentData() != "off"  # noqa: E731
     c.shown_if(c.row(tr("setting_sub_lang"), slang_box,
@@ -312,6 +308,11 @@ def build_audio(ctx: SettingsContext) -> None:
 
     def commit_audio(put, changed: set, final: bool) -> None:
         put("audio_lang", alang_box.currentData())
+        # Only when switched: off and never set is no setting.
+        if night_box.isChecked() != night_mode.enabled(win.settings):
+            put(night_mode.KEY, flag(night_box))
+        if night_mode.KEY in changed and win.player:
+            win.player.set_night_mode(night_box.isChecked())
         put("sub_mode", sub_box.currentData())
         put("sub_lang", slang_box.currentData())
         put("sub_lang2", slang2_box.currentData())
@@ -715,3 +716,53 @@ def build_casting(ctx: SettingsContext) -> None:
             put("cast_pause_gb", f"{cast_pause_box.value() / 1000:g}")
         put("cast_keep_buffer", flag(cast_buffer_box))
     ctx.page_commits["casting"] = commit_casting
+
+
+def build_tv(ctx: SettingsContext) -> None:
+    """TV mode and what controls it: the 10-foot layout (mw_tv) - opened,
+    started with - the remotes and game controllers it reads, and the
+    phone as a remote (mw_phone), asked before it records; the remote API
+    and Home Assistant are Nerd's (one row leads there). TV mode was a
+    section of General, the phone remote only in the View menu."""
+    win, d, page = ctx.win, ctx.dialog, ctx.pages["tv"]
+    is_on, flag, nerd_link = ctx.is_on, ctx.flag, ctx.nerd_link
+    c = page.card(tr("tv_mode"))
+    tv_open_btn = QPushButton(tr("tv_open"))
+    tv_open_btn.clicked.connect(
+        lambda _c=False: (d.accept(), QTimer.singleShot(0, win.enter_tv_mode)))
+    c.row(tr("tv_mode"), tv_open_btn, tr("tv_mode_hint"),
+          search="tv 10-foot sofa couch remote htpc fullscreen kodi")
+    tv_start_box = c.toggle(tr("tv_start_in"), is_on("tv_mode_start", "false"),
+                            tr("tv_start_hint"))
+    tv_inputs_box = c.toggle(tr("tv_inputs"), is_on("tv_inputs", "true"),
+                             tr("tv_inputs_hint"))
+    tv_found = QLabel(win.tv_inputs_text())
+    tv_found.setWordWrap(True)
+    c.row(tr("tv_inputs_found"), tv_found, tr("tv_inputs_found_hint"),
+          search="lirc gamepad controller joystick cec remote evdev sdl")
+    # The phone as a remote: its window (turned on there, the code, a new
+    # address), and whether a recording it starts is asked about first -
+    # the phone's "Don't show this again" turns that off, and this is the
+    # way back.
+    from .mw_phone_rec import REC_ASK_KEY
+    c = page.card(tr("phone_title"))
+    phone_btn = QPushButton(tr("common_open"))
+    phone_btn.setAccessibleName(tr("phone_menu"))
+    phone_btn.clicked.connect(
+        lambda _c=False: (d.accept(), QTimer.singleShot(0, win.open_phone_remote)))
+    c.row(tr("phone_title"), phone_btn, tr("set_phone_hint"),
+          search="phone mobile remote qr code browser")
+    rec_ask_box = c.toggle(tr("set_phone_rec_ask"), is_on(REC_ASK_KEY, "true"),
+                           tr("set_phone_rec_ask_hint"))
+    nerd_link(c, "set_link_remote",
+              [tr("nerd_card_remote"), tr("nerd_card_hooks"), tr("nerd_card_mqtt"),
+               tr("nerd_card_server")], "serve")
+
+    def commit_tv(put, changed: set, final: bool) -> None:
+        # Written once switched: an untouched window stores nothing.
+        for key, box, default in (("tv_mode_start", tv_start_box, "false"),
+                                  ("tv_inputs", tv_inputs_box, "true"),
+                                  (REC_ASK_KEY, rec_ask_box, "true")):
+            if box.isChecked() != is_on(key, default):
+                put(key, flag(box))
+    ctx.page_commits["tv"] = commit_tv

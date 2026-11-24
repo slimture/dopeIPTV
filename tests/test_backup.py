@@ -591,9 +591,9 @@ w.close = lambda: closed.append(1) or True
 def run(self):
     shell = self.findChild(SettingsShell)
     shell.build_all()                   # each page is built as it is needed
-    general = next(p for p in shell.pages if p.key == "general")
+    privacy = next(p for p in shell.pages if p.key == "privacy")
     plists = next(p for p in shell.pages if p.key == "playlists")
-    mine = {b.text(): b for b in general.findChildren(QPushButton)}
+    mine = {b.text(): b for b in privacy.findChildren(QPushButton)}
     assert tr("backup_btn") in mine and tr("restore_btn") in mine, list(mine)
     assert tr("backup_btn") not in [b.text() for b in plists.findChildren(QPushButton)]
     # Back up: one file, everything but what stays out.

@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Inne konta na tym komputerze mogą zmieniać folder {folder}, więc aktualizacja nie jest tam umieszczana. Przenieś dopeIPTV do własnego folderu albo pobierz nową wersję ręcznie.",
   "private_kept_title": "Wciąż zapisywane na dysk",
   "private_kept_body": "Nagranie lub przesyłanie wciąż zapisuje ten kanał na dysk. Zatrzymaj je teraz albo pozwól mu się skończyć - nic więcej z tego kanału nie jest zachowywane podczas prywatnego oglądania.",
-  "private_kept_stop": "Zatrzymaj"
+  "private_kept_stop": "Zatrzymaj",
+  "set_link_remote": "Ustawienia Nerd dla zdalnego sterowania i automatyzacji: {n}",
+  "set_page_tv": "Tryb TV i piloty",
+  "set_page_tv_sub": "Widok pełnoekranowy na kanapę oraz piloty, kontrolery i telefon, które nim sterują.",
+  "set_page_privacy": "Prywatność i dane",
+  "set_page_privacy_sub": "Co aplikacja zachowuje z tego, co oglądasz, i wszystkie ustawienia w jednym pliku.",
+  "set_card_this_computer": "Ten komputer",
+  "set_phone_hint": "Telefon jako pilot: zeskanuj kod aparatem, a w przeglądarce otworzy się strona. Nic do instalowania.",
+  "set_phone_rec_ask": "Pytaj, zanim telefon zacznie nagrywać",
+  "set_phone_rec_ask_hint": "Nagrywanie w telefonie najpierw pyta. \"Nie pokazuj tego ponownie\" tam to wyłącza, a tutaj włączasz je z powrotem."
 }

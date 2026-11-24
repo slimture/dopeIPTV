@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Akaunti nyingine kwenye kompyuta hii zinaweza kubadilisha folda {folder}, kwa hiyo sasisho haliwekwi hapo. Hamisha dopeIPTV kwenye folda yako mwenyewe, au pakua toleo jipya kwa mkono.",
   "private_kept_title": "Bado inaandikwa kwenye diski",
   "private_kept_body": "Rekodi au utumaji bado unaandika chaneli hii kwenye diski. Isimamishe sasa, au iache imalize - hakuna kingine cha chaneli hii kinachohifadhiwa unapotazama faraghani.",
-  "private_kept_stop": "Simamisha"
+  "private_kept_stop": "Simamisha",
+  "set_link_remote": "Mipangilio {n} ya Nerd kwa udhibiti wa mbali na otomatiki",
+  "set_page_tv": "Hali ya TV na rimoti",
+  "set_page_tv_sub": "Mpangilio wa skrini nzima kwa kutazama kitandani, na rimoti, vidhibiti na simu vinavyouendesha.",
+  "set_page_privacy": "Faragha na data",
+  "set_page_privacy_sub": "Kile programu inachohifadhi kuhusu unachotazama, na mipangilio yako yote katika faili moja.",
+  "set_card_this_computer": "Kompyuta hii",
+  "set_phone_hint": "Simu kama rimoti: changanua msimbo kwa kamera na ukurasa utafunguka kwenye kivinjari chake. Hakuna cha kusakinisha.",
+  "set_phone_rec_ask": "Uliza kabla simu haijarekodi",
+  "set_phone_rec_ask_hint": "Rekodi kwenye simu huuliza kwanza. \"Usionyeshe hii tena\" huko huzima hili, na hapa unaliwasha tena."
 }

@@ -124,7 +124,7 @@ class SettingsContext:
     #: add_playlist(prefill=None): the quick form, then the new source's
     #: page.
     add_playlist: Callable[..., None]
-    #: General's backup: saved - export_playlists(password=""), whether it
+    #: The backup (Privacy and data): saved - export_playlists(password=""), whether it
     #: was written - and restored (Sources' list follows).
     export_playlists: Callable[..., bool]
     import_playlists: Callable[[], None]
@@ -492,7 +492,7 @@ class _SettingsMixin:
         return box.clickedButton() is plain
 
     def _backup_save(self, parent, password: str = "") -> bool:
-        """Settings > General > Backup: everything to one file - with
+        """Settings > Privacy and data > Backup: everything to one file - with
         *password*, encrypted with it (core/backup.lock) on a thread of its
         own while a small window says so. Whether it was written."""
         from datetime import date
@@ -536,7 +536,7 @@ class _SettingsMixin:
         return True
 
     def _backup_restore(self, parent, playlists_added) -> None:
-        """Settings > General > Backup: a backup back - over everything, as
+        """Settings > Privacy and data > Backup: a backup back - over everything, as
         the app next starts, or its playlists beside the ones here now."""
         from ..core import backup
         from .dialogs import RestoreBackupDialog, pick_backup, stage_backup
@@ -929,6 +929,10 @@ class _SettingsMixin:
                    tr("set_page_recording_sub"), "rec")
         casting = page("casting", tr("set_page_casting"),
                        tr("set_page_casting_sub"), "cast")
+        # TV mode and what controls it - the remotes, the game controllers
+        # and the phone: it was a section of General.
+        tv_page = page("tv", tr("set_page_tv"), tr("set_page_tv_sub"),
+                       "tv", nav=tr("tv_mode"))
         playlists = page("playlists", tr("set_page_sources"),
                          tr("set_page_playlists_sub"), "stack")
         # Mine's own (the place that holds favourites, Watch later and
@@ -950,6 +954,11 @@ class _SettingsMixin:
                             tr("set_page_integrations_sub"), "plug")
         general = page("general", tr("set_page_general"),
                        tr("set_page_general_sub"), "gear")
+        # What the app keeps of what is watched, and everything in one
+        # file: private viewing, clearing history and the backup were
+        # sections of General.
+        privacy_page = page("privacy", tr("set_page_privacy"),
+                            tr("set_page_privacy_sub"), "shield")
         look = page("appearance", tr("set_page_appearance"),
                     tr("set_page_appearance_sub"), "palette")
         # A whole feature of its own (every action's key), for everyone: it
@@ -1020,7 +1029,7 @@ class _SettingsMixin:
             for chip in d.findChildren(Chip):
                 chip.refresh()
 
-        # -- the sources: shared by Sources, General's backup and Nerd's boxes --
+        # -- the sources: shared by Sources, the backup and Nerd's boxes ----
         store = self.playlist_store
 
         def sources_changed(pid) -> None:
@@ -1123,6 +1132,7 @@ class _SettingsMixin:
         mv.set_builder(lambda: set_watch.build_multiview(ctx))
         rec.set_builder(lambda: set_watch.build_recording(ctx))
         casting.set_builder(lambda: set_watch.build_casting(ctx))
+        tv_page.set_builder(lambda: set_watch.build_tv(ctx))
         playlists.set_builder(lambda: set_content.build_sources(ctx))
         mine.set_builder(lambda: set_content.build_mine(ctx))
         loc.set_builder(lambda: set_content.build_local(ctx))
@@ -1131,6 +1141,7 @@ class _SettingsMixin:
         sync_page.set_builder(lambda: set_services.build_sync(ctx))
         integrations.set_builder(lambda: set_services.build_integrations(ctx))
         general.set_builder(lambda: set_system.build_general(ctx))
+        privacy_page.set_builder(lambda: set_system.build_privacy(ctx))
         look.set_builder(lambda: set_system.build_appearance(ctx))
         keys_page.set_builder(lambda: set_system.build_shortcuts(ctx))
         prof_page.set_builder(lambda: set_system.build_profiles(ctx))
@@ -1202,12 +1213,13 @@ class _SettingsMixin:
         # around it, the app itself - and Nerd, in its own colour.
         shell.arrange([
             (tr("set_grp_watch"), ["playback", "audio", "guide", "multiview",
-                                   "recording", "casting"]),
+                                   "recording", "casting", "tv"]),
             (tr("set_grp_content"), ["playlists", "mine", "local",
                                      "metadata"]),
             (tr("set_grp_accounts"), ["history", "sync", "integrations"]),
-            (tr("set_sec_system"), ["general", "appearance", "shortcuts",
-                                    "profiles", "parental", "advanced"]),
+            (tr("set_sec_system"), ["general", "privacy", "appearance",
+                                    "shortcuts", "profiles", "parental",
+                                    "advanced"]),
             (tr("nerd_page"), ["nerd", *(p.key for p in nerd_pages.values())],
              nerd_tint),
         ])

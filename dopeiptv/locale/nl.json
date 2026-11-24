@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "Andere accounts op deze computer kunnen de map {folder} wijzigen, dus de update wordt daar niet neergezet. Verplaats dopeIPTV naar een eigen map of download de nieuwe versie handmatig.",
   "private_kept_title": "Wordt nog naar de schijf geschreven",
   "private_kept_body": "Een opname of cast schrijft dit kanaal nog naar de schijf. Stop hem nu of laat hem afmaken - verder wordt er van dit kanaal niets bewaard terwijl je privé kijkt.",
-  "private_kept_stop": "Stoppen"
+  "private_kept_stop": "Stoppen",
+  "set_link_remote": "{n} Nerd-instellingen voor bediening op afstand en automatie",
+  "set_page_tv": "Tv-modus en afstandsbedieningen",
+  "set_page_tv_sub": "De schermvullende weergave voor op de bank, en de afstandsbedieningen, controllers en telefoon die hem bedienen.",
+  "set_page_privacy": "Privacy en gegevens",
+  "set_page_privacy_sub": "Wat de app bewaart van wat je kijkt, en al je instellingen in één bestand.",
+  "set_card_this_computer": "Deze computer",
+  "set_phone_hint": "Je telefoon als afstandsbediening: scan een code met de camera en er opent een pagina in de browser. Niets te installeren.",
+  "set_phone_rec_ask": "Vragen voordat de telefoon opneemt",
+  "set_phone_rec_ask_hint": "Opnemen op de telefoon vraagt eerst. \"Dit niet meer tonen\" daar zet dit uit, en hier zet je het weer aan."
 }

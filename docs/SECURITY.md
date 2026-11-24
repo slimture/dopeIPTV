@@ -386,8 +386,8 @@ mode's playlist** carries its token, which watches but changes nothing: [below](
 The design behind a backup's optional password, with its test vectors
 (AGENTS.md rule 9; its line on the transparency page belongs to the
 `website` branch's `tools/transparency.py`). A person
-may give the backup a password where it is made (Settings > General >
-Backup, a field and its repeat). Without one the file leaves every login
+may give the backup a password where it is made (Settings > Privacy and
+data > Backup, a field and its repeat). Without one the file leaves every login
 out (`without_logins`, above), and a plain or an old file restores as
 before.
 

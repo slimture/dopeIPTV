@@ -3200,5 +3200,14 @@
   "upd_err_folder_shared": "D'autres comptes de cet ordinateur peuvent modifier le dossier {folder} : la mise à jour n'y est donc pas placée. Déplacez dopeIPTV dans un dossier à vous, ou téléchargez la nouvelle version à la main.",
   "private_kept_title": "Encore écrit sur le disque",
   "private_kept_body": "Un enregistrement ou une diffusion écrit encore cette chaîne sur le disque. Arrêtez-le maintenant ou laissez-le finir : rien d'autre de cette chaîne n'est gardé pendant que vous regardez en privé.",
-  "private_kept_stop": "Arrêter"
+  "private_kept_stop": "Arrêter",
+  "set_link_remote": "{n} réglages Nerd pour le pilotage à distance et les automatismes",
+  "set_page_tv": "Mode TV et télécommandes",
+  "set_page_tv_sub": "L'affichage plein écran pour le canapé, et les télécommandes, manettes et le téléphone qui le pilotent.",
+  "set_page_privacy": "Confidentialité et données",
+  "set_page_privacy_sub": "Ce que l'app garde de ce que vous regardez, et tous vos réglages dans un seul fichier.",
+  "set_card_this_computer": "Cet ordinateur",
+  "set_phone_hint": "Votre téléphone comme télécommande : scannez un code avec l'appareil photo et une page s'ouvre dans son navigateur. Rien à installer.",
+  "set_phone_rec_ask": "Demander avant que le téléphone enregistre",
+  "set_phone_rec_ask_hint": "Enregistrer sur le téléphone demande d'abord. \"Ne plus afficher ceci\" là-bas le désactive, et ici vous le réactivez."
 }

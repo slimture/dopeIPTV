@@ -239,8 +239,10 @@ def layout(self):
     rows = [(nav.item(i).data(0x0100), nav.item(i).flags())
             for i in range(nav.count())]
     keys = [k for k, _f in rows if k]
-    assert keys[:6] == ["playback", "audio", "guide", "multiview", "recording", "casting"], keys
-    assert keys[6:10] == ["playlists", "mine", "local", "metadata"], keys
+    assert keys[:7] == ["playback", "audio", "guide", "multiview", "recording", "casting",
+                        "tv"], keys
+    assert keys[7:11] == ["playlists", "mine", "local", "metadata"], keys
+    assert keys[14:17] == ["general", "privacy", "appearance"], keys
     nerd_pages = ["nerd_net", "nerd_boxes", "nerd_player", "nerd_serve", "nerd_diag"]
     assert keys[-6:] == ["nerd"] + nerd_pages, keys
     at = {k: i for i, (k, _f) in enumerate(rows) if k}
@@ -292,8 +294,8 @@ def layout(self):
     shell.search.setText("trakt")
     shown_heads = [nav.item(i).text() for i in heads
                    if not nav.item(i).isHidden()]
-    # Watch history's Trakt card, and General's privacy row (private
-    # viewing tells Trakt nothing) - no other group.
+    # Watch history's Trakt card, and Privacy and data's privacy row
+    # (private viewing tells Trakt nothing) - no other group.
     assert shown_heads == [tr("set_grp_accounts").upper(), tr("set_sec_system").upper()], shown_heads
     # Found, each page says where it is.
     hist = page["history"]
@@ -309,6 +311,16 @@ def layout(self):
     assert tr("set_card_cast") in card_titles("casting")
     assert tr("set_card_cast") not in card_titles("playback") + card_titles("recording")
     assert tr("set_card_caches") in card_titles("advanced")
+    # Night mode with the sound's language, TV mode on its own page, the
+    # backup and privacy on theirs - not on Playback and General.
+    assert any(l.text() == tr("night_mode") for l in page["audio"].findChildren(QLabel))
+    assert not any(l.text() == tr("night_mode") for l in page["playback"].findChildren(QLabel))
+    assert tr("tv_mode") in card_titles("tv") and tr("phone_title") in card_titles("tv")
+    assert tr("set_card_backup") in card_titles("privacy")
+    assert tr("set_card_privacy") in card_titles("privacy")
+    for gone in (tr("tv_mode"), tr("set_card_backup"), tr("set_card_privacy"), tr("set_card_system")):
+        assert gone not in card_titles("general"), gone
+    assert tr("set_card_system") not in card_titles("advanced")
     assert tr("set_card_caches") not in card_titles("local")
     assert "OpenSubtitles.com" in card_titles("integrations")
     assert "OpenSubtitles.com" not in card_titles("audio")

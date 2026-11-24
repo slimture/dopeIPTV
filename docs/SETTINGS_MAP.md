@@ -24,7 +24,7 @@ has two profiles or more.
 
 **Playback** (`playback`)
 - Behaviour: `show_stream_info`, `autoplay_preview`, `autoplay_next_episode`, `nextup_lead_secs`,
-  `auto_reconnect_live`, `hide_upcoming_prompt` (inverted), `night_mode`
+  `auto_reconnect_live`, `hide_upcoming_prompt` (inverted)
 - Stream and buffer: `stream_format`, `cache_secs`; link → Nerd › Player
   (channel start, buffer memory, HLS, low latency)
 - YouTube, Twitch and similar sites: `ytdlp_managed`; which yt-dlp is used,
@@ -34,7 +34,8 @@ has two profiles or more.
 - (only without the embedded player) why playback opens in mpv
 
 **Picture & sound** (`audio`)
-- Audio & subtitles: `audio_lang`, `sub_mode`, `sub_lang`, `sub_lang2`, `sub_live` (subtitles on live channels too, or films and series alone) (this profile's; the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
+- Audio & subtitles: `audio_lang`, `night_mode` (night mode for the sound;
+  it was on Playback), `sub_mode`, `sub_lang`, `sub_lang2`, `sub_live` (subtitles on live channels too, or films and series alone) (this profile's; the language picks a teletext subtitle page too; the page chosen per channel in the player's menu is `teletext_pages`, no row)
 - How subtitles look: `sub_scale`, `sub_color`, `sub_background`
 - Video: `aspect_mode`, `video_deinterlace`, `video_sharpen`, `video_tonemapping`
 - Decoding: `hwdec_mode`; `video_own_thread` (the picture drawn on a thread
@@ -74,6 +75,16 @@ Kodi rows belong here
   window ("Add a device by address…", `cast_added_devices`) and the Kodis
   added by hand (`kodi_devices`), each with Remove (adding is in the cast
   window, where the device is tried); link → Nerd › Network (other networks)
+
+**TV mode and remotes** (`tv`; "TV mode" in the sidebar) - TV mode was a
+section of General, the phone remote only in the View menu
+- TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
+  LIRC), the remotes and controllers found
+- Phone remote: its window (turned on there, the code, a new address - its
+  own keys `phone_remote`, `phone_remote_token`, no row), `phone_rec_ask`
+  (the phone asks before it records; its "Don't show this again" writes the
+  same key, the household's); link → Nerd › Remote and automation (remote
+  API, webhooks, MQTT, server for the home)
 
 ## CONTENT
 
@@ -176,19 +187,21 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
 - Language: `language`
 - Start: `start_place` (where you left off - each profile's own
   `last_place` / `last_list_place`, no row - or always on Mine)
-- Privacy: private viewing (until the app closes, not stored), clear recent history
 - Updates: `check_updates`, `update_channel`
-- Backup: back up, restore; a password for the backup and its repeat
-  (optional, never stored - emptied once the file is written; with one the
-  file is encrypted, and a restore asks for it)
-- System: `desktop_entry` (Linux), `mpris` (the system's media controls)
-- TV mode: Open TV mode, `tv_mode_start`, `tv_inputs` (game controllers and
-  LIRC), the remotes and controllers found
+- This computer: `desktop_entry` (Linux), the Start-menu shortcut (Windows,
+  an action; it was under Advanced › Maintenance), `mpris` (the system's
+  media controls) - one section: there were two called "System"
 - Feedback and tips: feedback and its answers, ask for a tip now and then (`donate_ask`; the
   household's - its rhythm and snooze are `donate_until`, `donate_period`,
   `donate_first_seen`, not settings)
 - (no heading) About dopeIPTV with the version, a link row that opens About
   over Settings (no key; found as "about", "version", "update")
+
+**Privacy and data** (`privacy`) - both sections were General's
+- Privacy: private viewing (until the app closes, not stored), clear recent history
+- Backup: back up, restore; a password for the backup and its repeat
+  (optional, never stored - emptied once the file is written; with one the
+  file is encrypted, and a restore asks for it); link → Services › Sync
 
 **Appearance** (`appearance`)
 - Theme: `theme`, `accent` (+ `accent_custom`), `theme_follow_system`,
@@ -224,10 +237,10 @@ its own (`ui/profiles_ui.py`, `ui/mw_profiles.py`)
 - PIN: `parental_pin_hash` + `parental_salt` (set, remove), lock now
 
 **Advanced** (`advanced`)
-- Maintenance: reset broken .ts streams, Start-menu shortcut (Windows);
+- Maintenance: reset broken .ts streams;
   link → Nerd › Diagnostics (log detail, log file, stats for nerds, stream health)
 - Caches: the image cache, the local files' caches
-- System (Linux): `force_x11`
+- Linux: `force_x11`
 - Reset: reset all settings
 
 ## NERD

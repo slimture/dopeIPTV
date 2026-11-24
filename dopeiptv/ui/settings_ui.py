@@ -1431,7 +1431,7 @@ def _draw_own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
     if kind not in ("palette", "play", "subtitles", "picture", "lock",
                     "wrench", "image", "trakt", "nerd", "network", "box",
                     "knobs", "channels", "remote", "cast", "sync", "plug",
-                    "pulse", "keyboard", "person"):
+                    "pulse", "keyboard", "person", "shield"):
         return None
     scale = 3
     pm = QPixmap(s * scale, s * scale)
@@ -1506,6 +1506,21 @@ def _draw_own_icon(kind: str, s: int, colour: str) -> QPixmap | None:
         arc.arcTo(QRectF(f * 0.32, f * 0.12, f * 0.36, f * 0.36), 180, -180)
         arc.lineTo(f * 0.68, f * 0.44)
         pr.drawPath(arc)
+    elif kind == "shield":                  # a shield with a check in it
+        shield = QPainterPath()
+        shield.moveTo(f * 0.5, f * 0.1)
+        shield.lineTo(f * 0.82, f * 0.22)
+        shield.lineTo(f * 0.82, f * 0.46)
+        shield.cubicTo(f * 0.82, f * 0.68, f * 0.68, f * 0.82, f * 0.5, f * 0.9)
+        shield.cubicTo(f * 0.32, f * 0.82, f * 0.18, f * 0.68, f * 0.18, f * 0.46)
+        shield.lineTo(f * 0.18, f * 0.22)
+        shield.closeSubpath()
+        pr.drawPath(shield)
+        tick = QPainterPath()
+        tick.moveTo(f * 0.36, f * 0.5)
+        tick.lineTo(f * 0.46, f * 0.6)
+        tick.lineTo(f * 0.65, f * 0.4)
+        pr.drawPath(tick)
     elif kind == "nerd":                    # a pair of glasses
         # Inside the same 0.1-0.9 box as the other icons, centred: temples
         # out to the edges made it wider and lower than its neighbours.
