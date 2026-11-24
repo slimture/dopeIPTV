@@ -36,7 +36,7 @@ from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..core.nerd import is_home_host
 from ..i18n import LocalizedError, tr
-from .boxes import USER_AGENT, build_xmltv, normalize_server
+from .boxes import USER_AGENT, build_xmltv, items, normalize_server, rows_of
 from .mediaserver import (
     PRODUCT, MediaServerClient, as_dict, device_id, iso_time, ticks, to_int,
 )
@@ -345,8 +345,8 @@ class JellyfinClient(MediaServerClient):
         js = self._route("views").json()
         rows = js.get("Items") if isinstance(js, dict) else None
         out = []
-        for v in rows or []:
-            if isinstance(v, dict) and v.get("Id"):
+        for v in rows_of(rows):
+            if v.get("Id"):
                 out.append((str(v["Id"]), str(v.get("Name") or ""), str(v.get("CollectionType") or "")))
         return out
 
@@ -365,7 +365,7 @@ class JellyfinClient(MediaServerClient):
         tags = as_dict(it.get("ImageTags"))
         icon = self.image(iid, tags.get("Primary"))
         backs = [self.image(iid, t, "Backdrop/0", 720)
-                 for t in (it.get("BackdropImageTags") or [])[:1]]
+                 for t in items(it.get("BackdropImageTags"))[:1]]
         return icon, [b for b in backs if b]
 
     def _film(self, it: dict, library: str) -> dict:
@@ -374,7 +374,7 @@ class JellyfinClient(MediaServerClient):
         return {"key": iid, "title": it.get("Name"), "category": library, "url": self.stream_url(iid),
                 "icon": icon, "backdrop": backdrop, "added": iso_time(it.get("DateCreated")),
                 "ext": str(it.get("Container") or "mkv").split(",")[0],
-                "plot": it.get("Overview"), "genre": ", ".join(str(g) for g in it.get("Genres") or []),
+                "plot": it.get("Overview"), "genre": ", ".join(str(g) for g in items(it.get("Genres"))),
                 "year": it.get("ProductionYear"), "released": str(it.get("PremiereDate") or "")[:10],
                 "secs": ticks(it.get("RunTimeTicks")), "rating": it.get("CommunityRating"),
                 "official": it.get("OfficialRating"), "tmdb": self._tmdb(it), **self._user_data(it)}
@@ -385,7 +385,7 @@ class JellyfinClient(MediaServerClient):
         return {"key": str(it.get("Id") or ""), "title": it.get("Name"), "category": library,
                 "icon": icon, "backdrop": backdrop, "added": iso_time(it.get("DateCreated")),
                 "updated": iso_time(it.get("DateLastMediaAdded")), "plot": it.get("Overview"),
-                "genre": ", ".join(str(g) for g in it.get("Genres") or []),
+                "genre": ", ".join(str(g) for g in items(it.get("Genres"))),
                 "year": it.get("ProductionYear"), "released": str(it.get("PremiereDate") or "")[:10],
                 "rating": it.get("CommunityRating"), "played": bool(ud.get("Played")),
                 "tmdb": self._tmdb(it)}
@@ -441,8 +441,8 @@ class JellyfinClient(MediaServerClient):
             "box_radio", name=tr("box_channels"))
         out: list[dict] = []
         fav_rows: list[dict] = []
-        for ch in rows or []:
-            if not isinstance(ch, dict) or not ch.get("Id"):
+        for ch in rows_of(rows):
+            if not ch.get("Id"):
                 continue
             cid = str(ch["Id"])
             tags = as_dict(ch.get("ImageTags"))
@@ -472,8 +472,8 @@ class JellyfinClient(MediaServerClient):
             log.info("%s: no recordings (%s)", self.LOG_NAME, type(e).__name__)
             return []
         out = []
-        for it in (js.get("Items") if isinstance(js, dict) else None) or []:
-            if not isinstance(it, dict) or not it.get("Id"):
+        for it in rows_of(js.get("Items") if isinstance(js, dict) else None):
+            if not it.get("Id"):
                 continue
             iid = str(it["Id"])
             title, sub = str(it.get("Name") or ""), str(it.get("EpisodeTitle") or "")
@@ -496,8 +496,8 @@ class JellyfinClient(MediaServerClient):
             log.info("%s: no resume list (%s)", self.LOG_NAME, type(e).__name__)
             return []
         out = []
-        for it in (js.get("Items") if isinstance(js, dict) else None) or []:
-            if not isinstance(it, dict) or not it.get("Id"):
+        for it in rows_of(js.get("Items") if isinstance(js, dict) else None):
+            if not it.get("Id"):
                 continue
             kind = str(it.get("Type") or "")
             if kind == "Episode" and it.get("SeriesId"):
@@ -512,13 +512,13 @@ class JellyfinClient(MediaServerClient):
                         "EnableImageTypes": "Primary", "ImageTypeLimit": "1"},
                        timeout=self.LIST_TIMEOUT)
         rows = js.get("Items") if isinstance(js, dict) else None
-        return [self._episode(it) for it in rows or [] if isinstance(it, dict) and it.get("Id")]
+        return [self._episode(it) for it in rows_of(rows) if it.get("Id")]
 
     def _details(self, key: str) -> dict:
         it = self._route("item", ident=key, params={"Fields": "People,Genres,Studios,Overview"}).json()
         if not isinstance(it, dict):
             return {}
-        people = [p for p in it.get("People") or [] if isinstance(p, dict) and p.get("Name")]
+        people = [p for p in rows_of(it.get("People")) if p.get("Name")]
         return {"cast": ", ".join(str(p["Name"]) for p in people if p.get("Type") == "Actor"),
                 "director": ", ".join(str(p["Name"]) for p in people if p.get("Type") == "Director")}
 
@@ -535,7 +535,7 @@ class JellyfinClient(MediaServerClient):
                              "AutoOpenLiveStream": True, "IsPlayback": True})
         sources = js.get("MediaSources") if isinstance(js, dict) else None
         ms = as_dict(sources[0]) if isinstance(sources, list) and sources else {}
-        session = str((js or {}).get("PlaySessionId") or uuid.uuid4().hex)
+        session = str(as_dict(js).get("PlaySessionId") or uuid.uuid4().hex)
         if ms.get("SupportsDirectStream") or ms.get("SupportsDirectPlay"):
             params = {"static": "true", "MediaSourceId": str(ms.get("Id") or cid),
                       "PlaySessionId": session, "DeviceId": self.device}
@@ -567,14 +567,13 @@ class JellyfinClient(MediaServerClient):
         while start < 200_000:
             js = self.json("/LiveTv/Programs", dict(params, StartIndex=str(start), Limit=str(page)),
                            timeout=(6.0, 120.0))
-            rows = js.get("Items") if isinstance(js, dict) else None
-            rows = [r for r in rows or [] if isinstance(r, dict)]
+            rows = rows_of(js.get("Items") if isinstance(js, dict) else None)
             for p in rows:
                 events.append({"channel": str(p.get("ChannelId") or ""), "start": iso_time(p.get("StartDate")),
                                "stop": iso_time(p.get("EndDate")), "title": str(p.get("Name") or ""),
                                "subtitle": str(p.get("EpisodeTitle") or ""),
                                "desc": str(p.get("Overview") or ""),
-                               "category": ", ".join(str(g) for g in p.get("Genres") or [])})
+                               "category": ", ".join(str(g) for g in items(p.get("Genres")))})
             total = js.get("TotalRecordCount") if isinstance(js, dict) else None
             start += len(rows)
             if progress and isinstance(total, int) and total:
@@ -623,7 +622,7 @@ def parse_discovery(data: bytes, ip: str, flavor: str) -> dict | None:
     an address of its own: the one that answered is the one to use then."""
     try:
         js = json.loads(data.decode("utf-8", "replace"))
-    except ValueError:
+    except (ValueError, RecursionError):    # a datagram of "[[[[..." from anyone on the network
         return None
     if not isinstance(js, dict) or not (js.get("Address") or js.get("Id")):
         return None

@@ -135,7 +135,7 @@ class MythTVClient(BoxClient):
                 continue
             number = str(ch.get("ChanNum") or "")
             self._callsigns[cid] = str(ch.get("CallSign") or "")
-            base[cid] = {"key": cid, "name": ch.get("ChannelName") or ch.get("CallSign") or number or cid,
+            base[cid] = {"key": cid, "name": str(ch.get("ChannelName") or ch.get("CallSign") or number or cid),
                          "category": everything, "url": "", "no_live": True,
                          "icon": self._abs(str(ch.get("IconURL") or "")), "epg_id": cid,
                          "num": _int(number.replace("_", ".").split(".")[0]) if number else 0}

@@ -35,6 +35,9 @@ USER_AGENT = "dopeIPTV/1.0"
 # mark emphasis in names ("\x86News\x87").
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 _C1 = re.compile(r"[\x80-\x9f]")
+#: And in what the app writes itself (a guide of a box's events): what XML
+#: cannot hold at all, a lone surrogate among it.
+_NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 _DECL = re.compile(r"^\s*<\?xml[^>]*\?>", re.S)
 _ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding=[\"']([A-Za-z0-9._-]+)")
 
@@ -63,10 +66,17 @@ def parse_xml(content: bytes) -> ET.Element:
     declared = m.group(1).decode("ascii", "replace") if m else "utf-8"
     text = None
     for enc in dict.fromkeys((declared, "utf-8")):
+        if safe_xml.slow_codec(enc):
+            continue
         try:
             text = content.decode(enc)
+            # A codec that escapes (unicode_escape) can make a lone
+            # surrogate, which no XML holds; idna and punycode raise a plain
+            # UnicodeError (tests/test_fuzz_boxes.py).
+            text.encode("utf-8")
             break
-        except (LookupError, UnicodeDecodeError):
+        except (LookupError, UnicodeError):
+            text = None
             continue
     if text is None:
         text = content.decode("utf-8", errors="replace")
@@ -78,18 +88,54 @@ def parse_xml(content: bytes) -> ET.Element:
     return ET.fromstring(text)
 
 
+def items(value: Any) -> list:
+    """*value* as the list an answer meant it to be: a list as it is,
+    anything else (a number, an object, null) none. ``value or []`` let a
+    number through, and iterating it raised (tests/test_fuzz_boxes.py)."""
+    return value if isinstance(value, list) else []
+
+
+def rows_of(value: Any) -> list[dict]:
+    """The objects of a list an answer gave (items), nothing else."""
+    return [r for r in items(value) if isinstance(r, dict)]
+
+
 def child_text(el: ET.Element, tag: str, lines: bool = False) -> str:
     found = el.find(tag)
     return clean_text(found.text if found is not None else "", lines)
 
 
+class Taken(set[int]):
+    """The ids stable_id handed out, and where a run of them ends: ``after``
+    maps a taken id to one further on with every id between them taken."""
+
+    def __init__(self, ids: Any = ()) -> None:
+        super().__init__(ids)
+        self.after: dict[int, int] = {}
+
+
 def stable_id(key: str, taken: set[int]) -> int:
     """A channel's id from what names it on the box (a service reference,
     a uuid, a guide number), the same on every load: favourites, history
-    and reminders keep pointing at the right channel."""
-    sid = (zlib.crc32(key.encode("utf-8")) & 0x7FFFFFFF) or 1
-    while sid in taken:
-        sid = sid % 0x7FFFFFFF + 1
+    and reminders keep pointing at the right channel. Two that hash alike
+    take the next free id. With *taken* a Taken, that id is found through
+    its runs (shortened as they are walked), not by trying each id in turn:
+    channels a box names to hash alike (CRC-32 is easily steered) took a
+    step for every one before them, each time (tests/test_fuzz_boxes.py).
+    The ids are the same either way."""
+    sid = (zlib.crc32(key.encode("utf-8", "surrogatepass")) & 0x7FFFFFFF) or 1
+    after = getattr(taken, "after", None)
+    if after is None:
+        while sid in taken:
+            sid = sid % 0x7FFFFFFF + 1
+    else:
+        walked = []
+        while sid in taken:
+            walked.append(sid)
+            sid = after.get(sid) or sid % 0x7FFFFFFF + 1
+        for w in walked:
+            after[w] = sid
+        after[sid] = sid % 0x7FFFFFFF + 1
     taken.add(sid)
     return sid
 
@@ -104,9 +150,13 @@ def normalize_server(text: str, default_port: int) -> str:
     typed_scheme = "://" in s
     if not typed_scheme:
         s = "http://" + s
-    u = urlsplit(s)
+    try:
+        u = urlsplit(s)
+        port = u.port
+    except ValueError:
+        return ""           # "[", a port of letters: no box's address
     netloc = u.netloc
-    if not typed_scheme and u.port is None and default_port not in (80, 0):
+    if not typed_scheme and port is None and default_port not in (80, 0):
         netloc = f"{netloc}:{default_port}"
     return urlunsplit((u.scheme or "http", netloc, u.path.rstrip("/"), "", ""))
 
@@ -127,12 +177,19 @@ def xmltv_time(stamp: int) -> str:
     return datetime.fromtimestamp(stamp, timezone.utc).strftime("%Y%m%d%H%M%S +0000")
 
 
+def _xml(text: str) -> str:
+    """*text* as XML holds it: without what no XML document may carry."""
+    return _NOT_XML.sub("", text)
+
+
 def build_xmltv(channels: list[tuple[str, str]], events: list[dict]) -> bytes:
     """XMLTV from (id, name) channels and events with channel, start, stop
-    (unix), title and optionally subtitle, desc and category."""
+    (unix), title and optionally subtitle, desc and category. What XML
+    cannot hold - a control character a box's text had (a JSON answer's
+    \\u0000) - is left out: one such title made the whole guide unreadable."""
     out = ['<?xml version="1.0" encoding="UTF-8"?>\n<tv generator-info-name="dopeIPTV">']
     for cid, name in channels:
-        out.append(f"<channel id={quoteattr(cid)}><display-name>{escape(name)}</display-name></channel>")
+        out.append(f"<channel id={quoteattr(_xml(cid))}><display-name>{escape(_xml(name))}</display-name></channel>")
     seen: set[tuple[str, int]] = set()
     for ev in sorted(events, key=lambda e: (e["channel"], e["start"])):
         key = (ev["channel"], ev["start"])
@@ -144,13 +201,13 @@ def build_xmltv(channels: list[tuple[str, str]], events: list[dict]) -> bytes:
         except (OverflowError, OSError, ValueError):
             continue                    # a time no calendar has: that one left out
         parts = [f'<programme start="{start}" stop="{stop}" '
-                 f'channel={quoteattr(ev["channel"])}><title>{escape(ev["title"])}</title>']
+                 f'channel={quoteattr(_xml(ev["channel"]))}><title>{escape(_xml(ev["title"]))}</title>']
         if ev.get("subtitle"):
-            parts.append(f"<sub-title>{escape(ev['subtitle'])}</sub-title>")
+            parts.append(f"<sub-title>{escape(_xml(ev['subtitle']))}</sub-title>")
         if ev.get("desc"):
-            parts.append(f"<desc>{escape(ev['desc'])}</desc>")
+            parts.append(f"<desc>{escape(_xml(ev['desc']))}</desc>")
         if ev.get("category"):
-            parts.append(f"<category>{escape(ev['category'])}</category>")
+            parts.append(f"<category>{escape(_xml(ev['category']))}</category>")
         parts.append("</programme>")
         out.append("".join(parts))
     out.append("</tv>\n")
@@ -359,7 +416,7 @@ class BoxClient(OfflineClient):
         return {"user_info": {"auth": 1}}
 
     def _take(self, channels: list[dict], recordings: list[dict]) -> None:
-        taken: set[int] = set()
+        taken = Taken()
         ids: dict[str, int] = {}
         rows: list[dict] = []
         by_id: dict[int, dict] = {}
@@ -391,7 +448,7 @@ class BoxClient(OfflineClient):
             by_id.setdefault(sid, row)
         recs: list[dict] = []
         rec_by_id: dict[int, dict] = {}
-        rtaken: set[int] = set()
+        rtaken = Taken()
         for rec in recordings:
             key = str(rec.get("key") or rec.get("url") or "")
             if not key or not rec.get("url"):

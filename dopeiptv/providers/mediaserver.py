@@ -29,6 +29,7 @@ Neutral items, as a kind hands them over:
 
 from __future__ import annotations
 
+import math
 import queue
 import re
 import threading
@@ -41,7 +42,7 @@ from urllib.parse import parse_qs, urlsplit
 from ..core._lazy_requests import requests
 from ..core.log import log, register_secrets
 from ..i18n import LocalizedError, tr
-from .boxes import RECORDINGS, BoxClient, _hms, clean_text, stable_id
+from .boxes import RECORDINGS, BoxClient, Taken, _hms, clean_text, stable_id
 
 DEVICE_KEY = "media_device_id"
 PRODUCT = "dopeIPTV"
@@ -86,11 +87,14 @@ def device_id() -> str:
 
 
 def ticks(value: Any) -> float:
-    """Seconds from .NET ticks (Jellyfin, Emby: 10,000,000 a second)."""
+    """Seconds from .NET ticks (Jellyfin, Emby: 10,000,000 a second); 0 for
+    none that is a finite number (JSON's 1e400 is infinity, and int() of
+    it raised further on - tests/test_fuzz_boxes.py)."""
     try:
-        return max(0.0, float(value or 0) / 10_000_000)
+        secs = float(value or 0) / 10_000_000
     except (TypeError, ValueError, OverflowError):
         return 0.0
+    return secs if math.isfinite(secs) and secs > 0 else 0.0
 
 
 def iso_time(text: Any) -> int:
@@ -118,11 +122,14 @@ def as_dict(value: Any) -> dict:
 
 
 def to_int(value: Any) -> int | None:
+    """A positive whole number a server says, or None - also for one past
+    any id, time or size (a resume point of 10**400 ms made OverflowError
+    where it became seconds: tests/test_fuzz_boxes.py)."""
     try:
         n = int(str(value).strip())
     except (TypeError, ValueError):
         return None
-    return n if n > 0 else None
+    return n if 0 < n < 1 << 63 else None
 
 
 def query_of(url: str) -> dict[str, str]:
@@ -244,7 +251,7 @@ class MediaServerClient(BoxClient):
         self._show_by_id: dict[int, dict] = {}
         self._show_libraries: list[tuple[str, str]] = []
         self._ep_ids: dict[str, int] = {}
-        self._ep_taken: set[int] = set()
+        self._ep_taken = Taken()
         self._episodes: dict[int, dict] = {}
         self._series_cache: dict[int, tuple[float, dict]] = {}
         self._resume_rows: list[dict] = []
@@ -414,13 +421,15 @@ class MediaServerClient(BoxClient):
         key = str(item["key"])
         secs = float(item.get("secs") or 0)
         plot = clean_text(item.get("plot"), lines=True)
+        # A season or a number that is no whole number - 1e400 is infinity,
+        # and int() of it raised (tests/test_fuzz_boxes.py) - is none.
         try:
             season = int(item.get("season") or 0)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             season = 0
         try:
             number = int(item.get("episode") or 0)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             number = 0
         row: dict[str, Any] = {
             "id": self._episode_id(key), "episode_num": number,
@@ -445,7 +454,7 @@ class MediaServerClient(BoxClient):
         return row
 
     def _take_media(self, cat: dict) -> None:
-        taken = set(self._rec_by_id)
+        taken = Taken(self._rec_by_id)
         ids: dict[str, int] = {}
         movies: list[dict] = []
         by_id: dict[int, dict] = {}
@@ -461,7 +470,7 @@ class MediaServerClient(BoxClient):
             by_key[key] = row
         shows: list[dict] = []
         show_by_id: dict[int, dict] = {}
-        staken: set[int] = set()
+        staken = Taken()
         sids: dict[str, int] = {}
         for item in cat.get("series") or []:
             key = str(item.get("key") or "")
