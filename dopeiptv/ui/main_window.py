@@ -1252,6 +1252,8 @@ class MainWindow(WindowChanges, _SettingsMixin, _TraktMixin, _RecordingMixin,
             # fresh - no forced network reload. A manual Refresh or the auto-
             # refresh time setting still drives a real re-fetch.
             self.refresh_playlist(force=False)
+            # Its account running out: said from this login's answer.
+            self._expiry_check(pl, _auth)
             if then is not None:
                 then()
 

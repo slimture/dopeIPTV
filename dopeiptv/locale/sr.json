@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Ovaj računar",
   "set_phone_hint": "Telefon kao daljinski: skenirajte kod kamerom i u pregledaču se otvara stranica. Ništa za instaliranje.",
   "set_phone_rec_ask": "Pitaj pre nego što telefon snima",
-  "set_phone_rec_ask_hint": "Snimanje na telefonu prvo pita. \"Ne prikazuj ovo ponovo\" tamo ovo isključuje, a ovde ga ponovo uključujete."
+  "set_phone_rec_ask_hint": "Snimanje na telefonu prvo pita. \"Ne prikazuj ovo ponovo\" tamo ovo isključuje, a ovde ga ponovo uključujete.",
+  "expiry_soon": "Vaš nalog kod {name} ističe {date}.",
+  "expiry_today": "Vaš nalog kod {name} ističe danas.",
+  "expiry_past": "Vaš nalog kod {name} je istekao {date}.",
+  "expiry_open": "Nalog…"
 }

@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "这台电脑",
   "set_phone_hint": "把手机当遥控器：用相机扫描二维码，浏览器中就会打开一个页面。无需安装任何东西。",
   "set_phone_rec_ask": "手机录制前先询问",
-  "set_phone_rec_ask_hint": "手机上的录制会先询问。在那里选择“不再显示”会关闭此项，在这里可以重新打开。"
+  "set_phone_rec_ask_hint": "手机上的录制会先询问。在那里选择“不再显示”会关闭此项，在这里可以重新打开。",
+  "expiry_soon": "你在 {name} 的账户将于 {date} 到期。",
+  "expiry_today": "你在 {name} 的账户今天到期。",
+  "expiry_past": "你在 {name} 的账户已于 {date} 到期。",
+  "expiry_open": "账户…"
 }

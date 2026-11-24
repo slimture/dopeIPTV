@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Cet ordinateur",
   "set_phone_hint": "Votre téléphone comme télécommande : scannez un code avec l'appareil photo et une page s'ouvre dans son navigateur. Rien à installer.",
   "set_phone_rec_ask": "Demander avant que le téléphone enregistre",
-  "set_phone_rec_ask_hint": "Enregistrer sur le téléphone demande d'abord. \"Ne plus afficher ceci\" là-bas le désactive, et ici vous le réactivez."
+  "set_phone_rec_ask_hint": "Enregistrer sur le téléphone demande d'abord. \"Ne plus afficher ceci\" là-bas le désactive, et ici vous le réactivez.",
+  "expiry_soon": "Votre compte chez {name} expire le {date}.",
+  "expiry_today": "Votre compte chez {name} expire aujourd’hui.",
+  "expiry_past": "Votre compte chez {name} a expiré le {date}.",
+  "expiry_open": "Compte…"
 }

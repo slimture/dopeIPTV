@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Este computador",
   "set_phone_hint": "Seu celular como controle: escaneie um código com a câmera e uma página abre no navegador. Nada para instalar.",
   "set_phone_rec_ask": "Perguntar antes de o celular gravar",
-  "set_phone_rec_ask_hint": "Gravar no celular pergunta antes. \"Não mostrar isso novamente\" lá desativa isto, e aqui você ativa de novo."
+  "set_phone_rec_ask_hint": "Gravar no celular pergunta antes. \"Não mostrar isso novamente\" lá desativa isto, e aqui você ativa de novo.",
+  "expiry_soon": "Sua conta em {name} vence em {date}.",
+  "expiry_today": "Sua conta em {name} vence hoje.",
+  "expiry_past": "Sua conta em {name} venceu em {date}.",
+  "expiry_open": "Conta…"
 }

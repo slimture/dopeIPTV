@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Ovo računalo",
   "set_phone_hint": "Mobitel kao daljinski: skenirajte kod kamerom i u pregledniku se otvara stranica. Ništa za instalirati.",
   "set_phone_rec_ask": "Pitaj prije nego mobitel snima",
-  "set_phone_rec_ask_hint": "Snimanje na mobitelu najprije pita. \"Ne prikazuj ovo ponovno\" ondje to isključuje, a ovdje ga ponovno uključujete."
+  "set_phone_rec_ask_hint": "Snimanje na mobitelu najprije pita. \"Ne prikazuj ovo ponovno\" ondje to isključuje, a ovdje ga ponovno uključujete.",
+  "expiry_soon": "Vaš račun kod {name} istječe {date}.",
+  "expiry_today": "Vaš račun kod {name} istječe danas.",
+  "expiry_past": "Vaš račun kod {name} istekao je {date}.",
+  "expiry_open": "Račun…"
 }

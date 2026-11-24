@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Este ordenador",
   "set_phone_hint": "Tu móvil como mando: escanea un código con la cámara y se abre una página en su navegador. Nada que instalar.",
   "set_phone_rec_ask": "Preguntar antes de que el móvil grabe",
-  "set_phone_rec_ask_hint": "Grabar en el móvil pregunta primero. \"No volver a mostrar esto\" allí lo desactiva, y aquí lo vuelves a activar."
+  "set_phone_rec_ask_hint": "Grabar en el móvil pregunta primero. \"No volver a mostrar esto\" allí lo desactiva, y aquí lo vuelves a activar.",
+  "expiry_soon": "Tu cuenta en {name} caduca el {date}.",
+  "expiry_today": "Tu cuenta en {name} caduca hoy.",
+  "expiry_past": "Tu cuenta en {name} caducó el {date}.",
+  "expiry_open": "Cuenta…"
 }

@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Deze computer",
   "set_phone_hint": "Je telefoon als afstandsbediening: scan een code met de camera en er opent een pagina in de browser. Niets te installeren.",
   "set_phone_rec_ask": "Vragen voordat de telefoon opneemt",
-  "set_phone_rec_ask_hint": "Opnemen op de telefoon vraagt eerst. \"Dit niet meer tonen\" daar zet dit uit, en hier zet je het weer aan."
+  "set_phone_rec_ask_hint": "Opnemen op de telefoon vraagt eerst. \"Dit niet meer tonen\" daar zet dit uit, en hier zet je het weer aan.",
+  "expiry_soon": "Je account bij {name} verloopt op {date}.",
+  "expiry_today": "Je account bij {name} verloopt vandaag.",
+  "expiry_past": "Je account bij {name} is verlopen op {date}.",
+  "expiry_open": "Account…"
 }

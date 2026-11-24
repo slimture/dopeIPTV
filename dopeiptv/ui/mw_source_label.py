@@ -5,16 +5,20 @@ source in the status line under the list, what plays from another source
 said so there ("Playing: X - from Pirat"), and its name in TV mode's header
 beside the clock. Every way the source changes - the menu, a profile, sync,
 a source added, renamed or removed in Settings - goes through
-_update_playlist_btn, which updates all of it."""
+_update_playlist_btn, which updates all of it. And its account running out,
+said after its login (_expiry_check, core/expiry.py)."""
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from PyQt6 import sip
-from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import QDateTime, QLocale, QPoint
 from PyQt6.QtWidgets import QMenu
 
+from ..core import expiry
+from ..core.log import log
 from ..i18n import tr
 from .source_page import KIND_NAMES
 
@@ -207,3 +211,37 @@ class _SourceLabelMixin:
             return
         if self._list_readout is not None and self._list_readout[0] == getattr(self, "mode", ""):
             self._set_list_status(self._list_readout[1])
+
+    # -- the account running out ----------------------------------------------------------
+
+    def _expiry_check(self, pl: dict | None, answer: Any) -> None:
+        """After a source's login (*answer*: what its authenticate gave):
+        its account ending within a week, or ended, said once a day with the
+        way to its account in Settings - from the login's own answer, no
+        request of its own. Never to a kids profile: the account is the
+        household's."""
+        try:
+            ui = answer.get("user_info") if isinstance(answer, dict) else None
+            ends = expiry.expires_at(ui)
+            if ends is None or not pl or not pl.get("id"):
+                return
+            kids = getattr(self, "_profile_kids", None)
+            if callable(kids) and kids():
+                return
+            pid, now = str(pl.get("id")), time.time()
+            told = expiry.read_told(self.settings.value(expiry.KEY, ""))
+            what = expiry.to_tell(ends, now, told.get(pid))
+            if what is None:
+                return
+            day = QLocale().toString(QDateTime.fromSecsSinceEpoch(int(ends)).date(),
+                                     QLocale.FormatType.ShortFormat)
+            text = tr("expiry_" + what, name=source_name(pl),
+                      days=expiry.days_left(ends, now), date=day)
+            from .notices import hub_of
+            opener = getattr(self, "open_settings_at", None)
+            hub_of(self).post(text, level="warning", key=f"expiry:{pid}",
+                              action=(lambda: opener("sources")) if callable(opener) else None,
+                              action_label=tr("expiry_open"))
+            self.settings.setValue(expiry.KEY, expiry.write_told(told, pid, now))
+        except Exception as e:      # noqa: BLE001 - a nicety: never in a login's way
+            log.debug("account expiry: not said: %s", e)

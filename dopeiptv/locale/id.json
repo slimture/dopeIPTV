@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Komputer ini",
   "set_phone_hint": "Ponsel sebagai remote: pindai kode dengan kameranya dan sebuah halaman terbuka di peramban. Tidak ada yang perlu dipasang.",
   "set_phone_rec_ask": "Tanya sebelum ponsel merekam",
-  "set_phone_rec_ask_hint": "Rekam di ponsel bertanya dulu. \"Jangan tampilkan ini lagi\" di sana mematikan ini, dan di sini Anda menyalakannya kembali."
+  "set_phone_rec_ask_hint": "Rekam di ponsel bertanya dulu. \"Jangan tampilkan ini lagi\" di sana mematikan ini, dan di sini Anda menyalakannya kembali.",
+  "expiry_soon": "Akun Anda di {name} berakhir pada {date}.",
+  "expiry_today": "Akun Anda di {name} berakhir hari ini.",
+  "expiry_past": "Akun Anda di {name} telah berakhir pada {date}.",
+  "expiry_open": "Akun…"
 }

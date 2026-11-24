@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Bu bilgisayar",
   "set_phone_hint": "Telefonunuz kumanda olsun: kamerayla bir kodu tarayın, tarayıcısında bir sayfa açılır. Kurulacak bir şey yok.",
   "set_phone_rec_ask": "Telefon kayda başlamadan önce sor",
-  "set_phone_rec_ask_hint": "Telefondaki Kaydet önce sorar. Oradaki \"Bunu tekrar gösterme\" bunu kapatır, buradan yeniden açarsınız."
+  "set_phone_rec_ask_hint": "Telefondaki Kaydet önce sorar. Oradaki \"Bunu tekrar gösterme\" bunu kapatır, buradan yeniden açarsınız.",
+  "expiry_soon": "{name} hesabınızın süresi {date} tarihinde doluyor.",
+  "expiry_today": "{name} hesabınızın süresi bugün doluyor.",
+  "expiry_past": "{name} hesabınızın süresi {date} tarihinde doldu.",
+  "expiry_open": "Hesap…"
 }

@@ -73,6 +73,7 @@
 "tests/test_epg_load.py": 2.5,
 "tests/test_events.py": 16.6,
 "tests/test_exclusive_bind.py": 0.2,
+"tests/test_expiry.py": 0.3,
 "tests/test_failover.py": 1.7,
 "tests/test_fav_bulk.py": 0.8,
 "tests/test_feature_pairs.py": 5.0,

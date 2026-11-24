@@ -766,10 +766,11 @@ def main() -> int:
     if not welcome:
         import threading
         auth_err: list = [None]
+        auth_ok: list = [None]
 
         def _do_auth():
             try:
-                client.authenticate()
+                auth_ok[0] = client.authenticate()
             except Exception as exc:
                 auth_err[0] = exc
 
@@ -781,6 +782,9 @@ def main() -> int:
                 QTimer.singleShot(500, _check_auth)
                 return
             e = auth_err[0]
+            if e is None:
+                # Its account running out: said from this login's answer.
+                w._expiry_check(pl, auth_ok[0])
             # Nerd: the source's pinned server showed another certificate.
             if e is not None:
                 from .ui.cert_trust import offer_review

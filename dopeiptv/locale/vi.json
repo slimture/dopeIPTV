@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Máy tính này",
   "set_phone_hint": "Điện thoại làm điều khiển: quét mã bằng camera và một trang mở ra trong trình duyệt. Không cần cài đặt gì.",
   "set_phone_rec_ask": "Hỏi trước khi điện thoại ghi hình",
-  "set_phone_rec_ask_hint": "Ghi hình trên điện thoại sẽ hỏi trước. \"Không hiển thị lại điều này\" ở đó tắt mục này, và bạn bật lại ở đây."
+  "set_phone_rec_ask_hint": "Ghi hình trên điện thoại sẽ hỏi trước. \"Không hiển thị lại điều này\" ở đó tắt mục này, và bạn bật lại ở đây.",
+  "expiry_soon": "Tài khoản của bạn tại {name} hết hạn vào {date}.",
+  "expiry_today": "Tài khoản của bạn tại {name} hết hạn hôm nay.",
+  "expiry_past": "Tài khoản của bạn tại {name} đã hết hạn vào {date}.",
+  "expiry_open": "Tài khoản…"
 }

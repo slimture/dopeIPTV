@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Ten komputer",
   "set_phone_hint": "Telefon jako pilot: zeskanuj kod aparatem, a w przeglądarce otworzy się strona. Nic do instalowania.",
   "set_phone_rec_ask": "Pytaj, zanim telefon zacznie nagrywać",
-  "set_phone_rec_ask_hint": "Nagrywanie w telefonie najpierw pyta. \"Nie pokazuj tego ponownie\" tam to wyłącza, a tutaj włączasz je z powrotem."
+  "set_phone_rec_ask_hint": "Nagrywanie w telefonie najpierw pyta. \"Nie pokazuj tego ponownie\" tam to wyłącza, a tutaj włączasz je z powrotem.",
+  "expiry_soon": "Twoje konto w {name} wygasa {date}.",
+  "expiry_today": "Twoje konto w {name} wygasa dzisiaj.",
+  "expiry_past": "Twoje konto w {name} wygasło {date}.",
+  "expiry_open": "Konto…"
 }

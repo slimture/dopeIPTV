@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Dieser Computer",
   "set_phone_hint": "Das Handy als Fernbedienung: einen Code mit der Kamera scannen, und im Browser öffnet sich eine Seite. Nichts zu installieren.",
   "set_phone_rec_ask": "Fragen, bevor das Handy aufnimmt",
-  "set_phone_rec_ask_hint": "Aufnehmen auf dem Handy fragt zuerst. \"Das nicht mehr anzeigen\" dort schaltet das aus, hier schaltest du es wieder ein."
+  "set_phone_rec_ask_hint": "Aufnehmen auf dem Handy fragt zuerst. \"Das nicht mehr anzeigen\" dort schaltet das aus, hier schaltest du es wieder ein.",
+  "expiry_soon": "Dein Konto bei {name} läuft am {date} ab.",
+  "expiry_today": "Dein Konto bei {name} läuft heute ab.",
+  "expiry_past": "Dein Konto bei {name} ist am {date} abgelaufen.",
+  "expiry_open": "Konto…"
 }

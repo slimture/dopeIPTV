@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "이 컴퓨터",
   "set_phone_hint": "휴대폰을 리모컨으로: 카메라로 코드를 스캔하면 브라우저에 페이지가 열립니다. 설치할 것은 없습니다.",
   "set_phone_rec_ask": "휴대폰이 녹화하기 전에 묻기",
-  "set_phone_rec_ask_hint": "휴대폰의 녹화는 먼저 묻습니다. 그곳의 \"다시 표시하지 않기\"는 이 설정을 끄고, 여기서 다시 켤 수 있습니다."
+  "set_phone_rec_ask_hint": "휴대폰의 녹화는 먼저 묻습니다. 그곳의 \"다시 표시하지 않기\"는 이 설정을 끄고, 여기서 다시 켤 수 있습니다.",
+  "expiry_soon": "{name} 계정이 {date}에 만료됩니다.",
+  "expiry_today": "{name} 계정이 오늘 만료됩니다.",
+  "expiry_past": "{name} 계정이 {date}에 만료되었습니다.",
+  "expiry_open": "계정…"
 }

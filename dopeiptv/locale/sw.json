@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Kompyuta hii",
   "set_phone_hint": "Simu kama rimoti: changanua msimbo kwa kamera na ukurasa utafunguka kwenye kivinjari chake. Hakuna cha kusakinisha.",
   "set_phone_rec_ask": "Uliza kabla simu haijarekodi",
-  "set_phone_rec_ask_hint": "Rekodi kwenye simu huuliza kwanza. \"Usionyeshe hii tena\" huko huzima hili, na hapa unaliwasha tena."
+  "set_phone_rec_ask_hint": "Rekodi kwenye simu huuliza kwanza. \"Usionyeshe hii tena\" huko huzima hili, na hapa unaliwasha tena.",
+  "expiry_soon": "Akaunti yako kwa {name} inaisha tarehe {date}.",
+  "expiry_today": "Akaunti yako kwa {name} inaisha leo.",
+  "expiry_past": "Akaunti yako kwa {name} iliisha tarehe {date}.",
+  "expiry_open": "Akaunti…"
 }

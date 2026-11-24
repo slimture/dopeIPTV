@@ -3209,5 +3209,9 @@
   "set_card_this_computer": "Den här datorn",
   "set_phone_hint": "Mobilen som fjärrkontroll: skanna en kod med kameran så öppnas en sida i webbläsaren. Inget att installera.",
   "set_phone_rec_ask": "Fråga innan mobilen spelar in",
-  "set_phone_rec_ask_hint": "Spela in på mobilen frågar först. \"Visa inte det här igen\" där stänger av det här, och här slår du på det igen."
+  "set_phone_rec_ask_hint": "Spela in på mobilen frågar först. \"Visa inte det här igen\" där stänger av det här, och här slår du på det igen.",
+  "expiry_soon": "Ditt konto hos {name} går ut {date}.",
+  "expiry_today": "Ditt konto hos {name} går ut i dag.",
+  "expiry_past": "Ditt konto hos {name} gick ut {date}.",
+  "expiry_open": "Konto…"
 }
