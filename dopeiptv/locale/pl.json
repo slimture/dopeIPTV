@@ -1001,7 +1001,7 @@
   "series_where": "Kanał",
   "series_where_this": "Tylko {channel}",
   "series_where_any": "Dowolny kanał",
-  "series_hint": "Każda nadchodząca emisja w przewodniku jest planowana, gdy tylko się pojawi, z zapasem z Ustawienia → Nagrywanie. Aplikacja musi działać, gdy nagrywanie się rozpoczyna.",
+  "series_hint": "Każda nadchodząca emisja w przewodniku jest planowana, gdy tylko się pojawi, z zapasem z Ustawienia → Nagrywanie. Aplikacja musi działać, gdy nagrywanie się rozpoczyna. Gdy okno jest zamknięte, aplikacja nagrywa je jako serwer: dopeiptv --server.",
   "series_added": "Dodano nagrywanie serialu: {title}",
   "series_scheduled_n": "Nagrania seriali: zaplanowano {n}",
   "set_card_series": "Nagrania seriali",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Nagraj mimo to",
   "rec_started_to": "Nagrywanie {title} {length} → {folder}",
   "rec_folder_default": "(folder nagrań)",
-  "rec_schedule_hint": "Zapisywane w {folder} — miejsce zmienisz w Ustawienia → Nagrywanie. Aplikacja musi działać, gdy nagrywanie się rozpoczyna.",
+  "rec_schedule_hint": "Zapisywane w {folder} — miejsce zmienisz w Ustawienia → Nagrywanie. Aplikacja musi działać, gdy nagrywanie się rozpoczyna. Gdy okno jest zamknięte, aplikacja nagrywa je jako serwer: dopeiptv --server.",
   "rec_scheduled_for": "{title} — nagrywanie zaplanowane od {when}",
   "rec_delete_failed": "Nie udało się usunąć: {error}",
   "ts_programme": "program",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Ten komputer",
   "set_phone_hint": "Telefon jako pilot: zeskanuj kod aparatem, a w przeglądarce otworzy się strona. Nic do instalowania.",
   "set_phone_rec_ask": "Pytaj, zanim telefon zacznie nagrywać",
-  "set_phone_rec_ask_hint": "Nagrywanie w telefonie najpierw pyta. \"Nie pokazuj tego ponownie\" tam to wyłącza, a tutaj włączasz je z powrotem."
+  "set_phone_rec_ask_hint": "Nagrywanie w telefonie najpierw pyta. \"Nie pokazuj tego ponownie\" tam to wyłącza, a tutaj włączasz je z powrotem.",
+  "rec_by_server": "nagrywa serwer",
+  "rec_by_other_app": "nagrywa dopeIPTV na innym komputerze",
+  "srv_rec_by_app": "nagrywa okno aplikacji"
 }

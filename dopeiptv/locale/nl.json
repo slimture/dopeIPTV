@@ -1001,7 +1001,7 @@
   "series_where": "Zender",
   "series_where_this": "Alleen {channel}",
   "series_where_any": "Elke zender",
-  "series_hint": "Elke komende uitzending in de gids wordt ingepland zodra die verschijnt, met de marge uit Instellingen → Opname. De app moet draaien wanneer een opname begint.",
+  "series_hint": "Elke komende uitzending in de gids wordt ingepland zodra die verschijnt, met de marge uit Instellingen → Opname. De app moet draaien wanneer een opname begint. Met het venster dicht neemt de app ze als server op: dopeiptv --server.",
   "series_added": "Serie-opname toegevoegd: {title}",
   "series_scheduled_n": "Serie-opnames: {n} ingepland",
   "set_card_series": "Serie-opnames",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Toch opnemen",
   "rec_started_to": "{title} wordt {length} opgenomen → {folder}",
   "rec_folder_default": "(Map voor opnames)",
-  "rec_schedule_hint": "Wordt opgeslagen in {folder} – wijzig de plek via Instellingen → Opname. De app moet draaien wanneer de opname begint.",
+  "rec_schedule_hint": "Wordt opgeslagen in {folder} – wijzig de plek via Instellingen → Opname. De app moet draaien wanneer de opname begint. Met het venster dicht neemt de app de opname als server op: dopeiptv --server.",
   "rec_scheduled_for": "{title} wordt opgenomen vanaf {when}",
   "rec_delete_failed": "Kan niet verwijderen: {error}",
   "ts_programme": "programma",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Deze computer",
   "set_phone_hint": "Je telefoon als afstandsbediening: scan een code met de camera en er opent een pagina in de browser. Niets te installeren.",
   "set_phone_rec_ask": "Vragen voordat de telefoon opneemt",
-  "set_phone_rec_ask_hint": "Opnemen op de telefoon vraagt eerst. \"Dit niet meer tonen\" daar zet dit uit, en hier zet je het weer aan."
+  "set_phone_rec_ask_hint": "Opnemen op de telefoon vraagt eerst. \"Dit niet meer tonen\" daar zet dit uit, en hier zet je het weer aan.",
+  "rec_by_server": "opgenomen door de server",
+  "rec_by_other_app": "opgenomen door dopeIPTV op een andere computer",
+  "srv_rec_by_app": "opgenomen door het app-venster"
 }

@@ -271,5 +271,7 @@ class _PhoneRecMixin:
                 continue
             out.append({"id": str(j.get("id") or ""), "title": str(j.get("title") or ""),
                         "channel": str(j.get("channel") or ""), "status": status,
-                        "start": float(j.get("start") or 0), "held": bool(j.get("_held"))})
+                        "start": float(j.get("start") or 0),
+                        # Held here: the phone's Record anyway (not the server's).
+                        "held": bool(j.get("_held")) and not j.get("_elsewhere")})
         return out

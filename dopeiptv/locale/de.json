@@ -1001,7 +1001,7 @@
   "series_where": "Sender",
   "series_where_this": "Nur {channel}",
   "series_where_any": "Jeder Sender",
-  "series_hint": "Jede kommende Ausstrahlung im Programmführer wird eingeplant, sobald sie erscheint – mit dem Vor- und Nachlauf aus Einstellungen → Aufnahme. Die App muss laufen, wenn eine Aufnahme beginnt.",
+  "series_hint": "Jede kommende Ausstrahlung im Programmführer wird eingeplant, sobald sie erscheint – mit dem Vor- und Nachlauf aus Einstellungen → Aufnahme. Die App muss laufen, wenn eine Aufnahme beginnt. Bei geschlossenem Fenster nimmt die App sie als Server auf: dopeiptv --server.",
   "series_added": "Serienaufnahme hinzugefügt: {title}",
   "series_scheduled_n": "Serienaufnahmen: {n} eingeplant",
   "set_card_series": "Serienaufnahmen",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Trotzdem aufnehmen",
   "rec_started_to": "{title} wird {length} aufgenommen → {folder}",
   "rec_folder_default": "(Aufnahmeordner)",
-  "rec_schedule_hint": "Gespeichert unter {folder} – den Ort änderst du unter Einstellungen → Aufnahme. Die App muss laufen, wenn die Aufnahme beginnt.",
+  "rec_schedule_hint": "Gespeichert unter {folder} – den Ort änderst du unter Einstellungen → Aufnahme. Die App muss laufen, wenn die Aufnahme beginnt. Bei geschlossenem Fenster nimmt die App sie als Server auf: dopeiptv --server.",
   "rec_scheduled_for": "{title} wird ab {when} aufgenommen",
   "rec_delete_failed": "Löschen fehlgeschlagen: {error}",
   "ts_programme": "Sendung",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Dieser Computer",
   "set_phone_hint": "Das Handy als Fernbedienung: einen Code mit der Kamera scannen, und im Browser öffnet sich eine Seite. Nichts zu installieren.",
   "set_phone_rec_ask": "Fragen, bevor das Handy aufnimmt",
-  "set_phone_rec_ask_hint": "Aufnehmen auf dem Handy fragt zuerst. \"Das nicht mehr anzeigen\" dort schaltet das aus, hier schaltest du es wieder ein."
+  "set_phone_rec_ask_hint": "Aufnehmen auf dem Handy fragt zuerst. \"Das nicht mehr anzeigen\" dort schaltet das aus, hier schaltest du es wieder ein.",
+  "rec_by_server": "nimmt der Server auf",
+  "rec_by_other_app": "nimmt dopeIPTV auf einem anderen Computer auf",
+  "srv_rec_by_app": "nimmt das App-Fenster auf"
 }

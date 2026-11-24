@@ -1001,7 +1001,7 @@
   "series_where": "Canal",
   "series_where_this": "Solo {channel}",
   "series_where_any": "Cualquier canal",
-  "series_hint": "Cada emisión próxima de la guía se programa en cuanto aparece, con el margen de Ajustes → Grabación. La app debe estar abierta cuando empiece una grabación.",
+  "series_hint": "Cada emisión próxima de la guía se programa en cuanto aparece, con el margen de Ajustes → Grabación. La app debe estar abierta cuando empiece una grabación. Con la ventana cerrada, la app las graba como servidor: dopeiptv --server.",
   "series_added": "Grabación de serie añadida: {title}",
   "series_scheduled_n": "Grabaciones de series: {n} programadas",
   "set_card_series": "Grabaciones de series",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Grabar de todos modos",
   "rec_started_to": "Grabando {title} {length} → {folder}",
   "rec_folder_default": "(Carpeta de grabaciones)",
-  "rec_schedule_hint": "Se guarda en {folder}: cambia la ubicación en Ajustes → Grabación. La app debe estar abierta cuando empiece la grabación.",
+  "rec_schedule_hint": "Se guarda en {folder}: cambia la ubicación en Ajustes → Grabación. La app debe estar abierta cuando empiece la grabación. Con la ventana cerrada, la app la graba como servidor: dopeiptv --server.",
   "rec_scheduled_for": "{title} se grabará desde {when}",
   "rec_delete_failed": "No se pudo borrar: {error}",
   "ts_programme": "programa",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Este ordenador",
   "set_phone_hint": "Tu móvil como mando: escanea un código con la cámara y se abre una página en su navegador. Nada que instalar.",
   "set_phone_rec_ask": "Preguntar antes de que el móvil grabe",
-  "set_phone_rec_ask_hint": "Grabar en el móvil pregunta primero. \"No volver a mostrar esto\" allí lo desactiva, y aquí lo vuelves a activar."
+  "set_phone_rec_ask_hint": "Grabar en el móvil pregunta primero. \"No volver a mostrar esto\" allí lo desactiva, y aquí lo vuelves a activar.",
+  "rec_by_server": "la graba el servidor",
+  "rec_by_other_app": "la graba dopeIPTV en otro ordenador",
+  "srv_rec_by_app": "la graba la ventana de la app"
 }

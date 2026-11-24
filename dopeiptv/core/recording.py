@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -45,6 +46,12 @@ def piped(url: str) -> bool:
         return False
     return (parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
             and not parts.path.lower().endswith((".m3u8", ".m3u")))
+
+
+def connections_network(url: str) -> bool:
+    """A recording of *url* holds a connection to a provider (core/connections)."""
+    from .connections import is_network
+    return is_network(url)
 
 
 def live_address(url: str) -> bool:
@@ -245,12 +252,36 @@ def format_size(nbytes: float) -> str:
 SCRAMBLED = "the box cannot decrypt this channel"
 
 
+#: What a job keeps only while this process runs - never in the settings.
+_TRANSIENT = ("proc", "recorder", "_asking", "_held", "_go_ahead", "_feed", "_classic",
+              "_alias", "_listed", "_elsewhere", "_claim_state", "_claim_info", "_opening",
+              "_since", "_own", "_from_claim", "_after_ran", "_was_elsewhere")
+#: What a later edit of a scheduled job changes (``edited`` says when).
+_EDITABLE = ("start", "stop", "title", "folder", "prog_start", "prog_stop", "url",
+             "edited")
+
+
+def _stamp_of(j: dict) -> float:
+    try:
+        return float(j.get("edited") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 class RecordingManager(QObject):
     """Records live streams to local files.
 
     Uses ffmpeg (stream copy, no re-encode) when available, otherwise
     mpv's --stream-record.  Scheduled-but-not-yet-started jobs survive
     an app restart (persisted via QSettings).
+
+    With *claims* (core/rec_claims.py) it shares the scheduled jobs with
+    the other recorder of this household - the window and ``dopeiptv
+    --server`` (services/server_recorder.py) may both run: the list of jobs
+    is read again when the other wrote it and merged as it is written
+    (``_merge``), a job is recorded by whoever claims it as it comes due
+    (``_claim``), a job the other records shows here as recording - by it
+    (``_elsewhere``) - and a stop asked here reaches it (``cancel``).
     """
 
     jobs_changed = pyqtSignal()
@@ -286,10 +317,33 @@ class RecordingManager(QObject):
     VIDEO_EXTS: set[str] = {".ts", ".mp4", ".mkv", ".avi", ".mov",
                              ".webm", ".m2ts"}
 
-    def __init__(self, settings: QSettings, parent: QObject | None = None) -> None:
+    #: How often the claims' folder is tidied (rec_claims.Claims.sweep).
+    SWEEP_S = 3600.0
+
+    def __init__(self, settings: QSettings, parent: QObject | None = None,
+                 claims: Any = None) -> None:
         super().__init__(parent)
         self.settings = settings
         self.jobs: list[dict] = []
+        #: core/rec_claims.Claims: who records each scheduled job, the window
+        #: or the server; None - this recorder alone, as before.
+        self.claims = claims
+        self.who = str(getattr(claims, "who", "") or "")
+        #: (the server) True while a window runs: it takes no new job then.
+        self.defer: Callable[[], bool] | None = None
+        #: (the server) Whether it takes job *j* at all (one of the
+        #: household's sources); None: every one.
+        self.takes: Callable[[dict], bool] | None = None
+        #: (the server) Given a job due now with its address, a recording of
+        #: it read from a rewind buffer session - (its file, its recorder) -
+        #: or None for the recorder's own connection as before.
+        self.open_shared: Callable[[dict], tuple[str, Any] | None] | None = None
+        #: The ids the list of jobs held when it was last read or written.
+        self._stored: set[str] = set()
+        self._stamp = ""
+        self._swept = 0.0
+        #: The server records nothing without its claims; the window as before.
+        self._no_claims = ""
         self._load()
         self._timer = QTimer(self)
         self._timer.setInterval(5000)
@@ -319,6 +373,8 @@ class RecordingManager(QObject):
         self._remuxing: set[str] = set()
         self._closing = False
         self._remuxed.connect(self._remux_done, Qt.ConnectionType.QueuedConnection)
+        if claims is not None:
+            self._share_start()
         if rec_mp4.Journal(settings).items():
             QTimer.singleShot(self.REMUX_RESUME_MS, self._resume_remuxes)
 
@@ -469,17 +525,18 @@ class RecordingManager(QObject):
 
     # -- jobs ---------------------------------------------------------------
 
-    def _load(self) -> None:
+    def _stored_jobs(self) -> list[dict]:
+        """The scheduled jobs the settings hold, each with what the
+        scheduler reads - a hand-edited or damaged entry would raise in
+        tick() every five seconds for the rest of the session."""
         try:
             data = json.loads(
                 self.settings.value("recording_jobs", "") or "[]")
         except Exception:
             data = []
         now = time.time()
+        out = []
         for j in data if isinstance(data, list) else []:
-            # A hand-edited or damaged entry would raise in tick() every
-            # five seconds for the rest of the session: keep only jobs that
-            # have what the scheduler reads.
             if (not isinstance(j, dict)
                     or not (j.get("url") or self.address_later(j))
                     or not isinstance(j.get("start"), (int, float))
@@ -487,20 +544,388 @@ class RecordingManager(QObject):
                 continue
             if (j.get("status") == "scheduled"
                     and (j.get("stop") is None or j["stop"] > now)):
-                for key, default in (("id", uuid.uuid4().hex[:10]),
-                                     ("title", ""), ("folder", ""),
+                if not j.get("id"):
+                    # The same every time it is read: the other recorder's
+                    # merge must know it again.
+                    j["id"] = hashlib.sha256(json.dumps(
+                        j, sort_keys=True, default=str).encode()).hexdigest()[:10]
+                for key, default in (("title", ""), ("folder", ""),
                                      ("path", ""), ("error", ""),
                                      ("stream_icon", "")):
                     j.setdefault(key, default)
+                j["id"] = str(j["id"])
+                for key in _TRANSIENT:
+                    j.pop(key, None)
                 j["proc"] = None
-                self.jobs.append(j)
+                out.append(j)
+        return out
+
+    def _load(self) -> None:
+        self.jobs.extend(self._stored_jobs())
+        self._stored = {j["id"] for j in self.jobs}
+
+    @staticmethod
+    def _saved(j: dict) -> dict:
+        return {k: v for k, v in j.items() if k not in _TRANSIENT}
 
     def _save(self) -> None:
-        keep = [{k: v for k, v in j.items()
-                 if k not in ("proc", "recorder", "_asking", "_held", "_go_ahead",
-                              "_feed", "_classic", "_alias", "_listed")}
-                for j in self.jobs if j.get("status") == "scheduled"]
+        if self.claims is not None:
+            try:
+                with self.claims.jobs_lock():
+                    self._merge(write=True)
+                return
+            except OSError as e:
+                log.debug("record: the jobs not merged with the other recorder's: %s", e)
+        keep = [self._saved(j) for j in self.jobs
+                if j.get("status") == "scheduled" and not j.get("_elsewhere")]
         self.settings.setValue("recording_jobs", json.dumps(keep))
+
+    # -- the jobs shared with the other recorder (core/rec_claims.py) --------------------------
+
+    def _merge(self, write: bool) -> bool:
+        """This recorder's jobs and the list the other wrote, as one: a job
+        new there taken in here; a later edit of one taken in; one taken out
+        of the list there - cancelled, or started by the other - known as
+        that here (_gone_elsewhere). With *write*, the list as it is now
+        stored, and the other told (the stamp). Whether the jobs here
+        changed."""
+        try:
+            self.settings.sync()
+        except Exception as e:
+            log.debug("record: the settings not read again: %s", e)
+        theirs = self._stored_jobs()
+        t_ids = {s["id"] for s in theirs}
+        ours = {str(j["id"]): j for j in self.jobs}
+        out: list[dict] = []
+        changed = False
+        for s in theirs:
+            j = ours.get(s["id"])
+            if j is None:
+                if s["id"] in self._stored:
+                    continue                # taken out of the list here
+                self.jobs.append(s)
+                ours[s["id"]] = s
+                out.append(self._saved(s))
+                changed = True
+            elif j.get("_elsewhere"):
+                # The other's to say - but a later edit here of one it holds.
+                newer = j.get("status") == "scheduled" and _stamp_of(j) > _stamp_of(s)
+                out.append(self._saved(j if newer else s))
+            elif j.get("status") == "scheduled":
+                if _stamp_of(s) > _stamp_of(j):
+                    for k in _EDITABLE:
+                        if k in s:
+                            j[k] = s[k]
+                    j.pop("_held", None)
+                    changed = True
+                out.append(self._saved(j))
+            # Started, finished or cancelled here: out of the list.
+        for j in list(self.jobs):
+            if (j.get("status") != "scheduled" or j.get("_elsewhere")
+                    or str(j["id"]) in t_ids):
+                continue
+            if str(j["id"]) in self._stored:
+                self._gone_elsewhere(j)
+                changed = True
+            else:
+                out.append(self._saved(j))  # new here
+        if write:
+            self.settings.setValue("recording_jobs", json.dumps(out))
+            try:
+                self.settings.sync()
+                self._stamp = self.claims.touch_jobs()
+            except Exception as e:
+                log.debug("record: the other recorder not told of the jobs: %s", e)
+            self._stored = {str(s["id"]) for s in out}
+        else:
+            self._stored = t_ids
+        return changed
+
+    def _gone_elsewhere(self, j: dict) -> None:
+        """Scheduled job *j* left the list the other wrote: it started
+        there (its claim held), it ended there, or it was cancelled there."""
+        from . import rec_claims
+        c = None
+        mine = False
+        try:
+            mine = self.claims.mine(j["id"])
+            c = None if mine else self.claims.read(j["id"])
+        except OSError as e:
+            log.debug("record: a claim not read: %s", e)
+        if c is not None and c.live:
+            self._mark_elsewhere(j, c)
+            return
+        if c is not None and c.final:
+            self._ended_elsewhere(j, c)
+            return
+        j["status"] = "cancelled"
+        if mine:
+            try:
+                self.claims.finish(j["id"], rec_claims.CANCELLED, self._claim_info(j))
+            except OSError as e:
+                log.debug("record: a claim not finished: %s", e)
+        log.info("record: %s cancelled by the other recorder", for_log(j.get("title")))
+
+    def _mark_elsewhere(self, j: dict, c: Any) -> None:
+        """*j* is the other recorder's now: recording, or waiting there."""
+        from . import rec_claims
+        was = j.get("_elsewhere")
+        j["_was_elsewhere"] = True          # its ending is the other's to tell
+        j["_elsewhere"] = {"who": c.who, "state": c.state,
+                           "own": bool(c.info.get("own", True)),
+                           "private": bool(c.info.get("private", False))}
+        if c.state == rec_claims.RECORDING:
+            j["status"] = "recording"
+            j.pop("_held", None)
+            if c.info.get("path"):
+                j["path"] = c.info["path"]
+            if c.info.get("since"):
+                j["_since"] = c.info["since"]
+        else:
+            j["status"] = "scheduled"
+            j["_held"] = True
+        if was is None:
+            log.info("record: %s - %s by the %s", for_log(j.get("title")),
+                     "recorded" if c.state == rec_claims.RECORDING else "held",
+                     c.who or "other recorder")
+
+    def _ended_elsewhere(self, j: dict, c: Any) -> None:
+        j.pop("_elsewhere", None)
+        j.pop("_held", None)
+        j["status"] = c.state
+        j["error"] = str(c.info.get("error") or "")
+        if c.info.get("path"):
+            j["path"] = c.info["path"]
+
+    def _from_claim(self, c: Any) -> dict:
+        """A job known only from the other recorder's claim (it started
+        before this one ran): shown, and - should its recorder stop
+        running - taken over by its channel."""
+        info = c.info
+        j: dict[str, Any] = {
+            "id": c.job, "url": "", "title": str(info.get("title") or ""),
+            "start": float(info.get("start") or time.time()), "stop": info.get("stop"),
+            "folder": "", "status": "scheduled", "path": str(info.get("path") or ""),
+            "error": "", "proc": None, "stream_icon": str(info.get("stream_icon") or ""),
+            "channel": str(info.get("channel") or ""), "_from_claim": True}
+        source, sid = str(info.get("source") or ""), str(info.get("stream_key") or "")
+        if source:
+            j["source"] = source
+        if sid:
+            j["stream_key"] = sid
+            if source:
+                j[self.LATER] = {"source": source, "stream_id": sid}
+        return j
+
+    def _claim_info(self, j: dict) -> dict:
+        """What a claim says of *j* for the other recorder (no address)."""
+        from . import privacy
+        info: dict[str, Any] = {k: j.get(k) for k in ("title", "channel", "stream_icon",
+                                                      "source", "path", "error")}
+        info["start"], info["stop"] = j.get("start"), j.get("stop")
+        info["stream_key"] = str(j.get("stream_key")
+                                 or (j.get(self.LATER) or {}).get("stream_id") or "")
+        info["own"] = bool(j.get("_own"))
+        info["since"] = j.get("_since")
+        # What the player plays privately is no other's to name.
+        info["private"] = bool(j.get("inplayer")) and privacy.playing_private()
+        return info
+
+    def _claims_off(self, e: BaseException) -> None:
+        """The claims cannot be had: said once. The window records as it
+        always did; the server records nothing (it cannot know what the
+        window records)."""
+        if self._no_claims:
+            return
+        self._no_claims = str(e) or type(e).__name__
+        if self.who == "server":
+            log.warning("record: the recordings' claims cannot be kept (%s) - the server "
+                        "records nothing", self._no_claims)
+        else:
+            log.warning("record: the recordings' claims cannot be kept (%s) - recording as "
+                        "before; a `dopeiptv --server` records nothing meanwhile",
+                        self._no_claims)
+
+    def _share_start(self) -> None:
+        try:
+            self.claims.ensure()
+            if self.who == "window":
+                self.claims.hold_presence()
+            self.claims.sweep()
+            self._swept = time.monotonic()
+            self._stamp = self.claims.jobs_stamp()
+            self._share_look()
+        except OSError as e:
+            self._claims_off(e)
+
+    def _share_tick(self) -> bool:
+        """(each tick) The claims held touched, the list read again when
+        the other wrote it, a stop the other asked of a recording here, and
+        what the other records. Whether the jobs changed."""
+        if self.claims is None or self._no_claims:
+            return False
+        changed = False
+        try:
+            self.claims.beat()
+            stamp = self.claims.jobs_stamp()
+            if stamp != self._stamp:
+                with self.claims.jobs_lock():
+                    changed = self._merge(write=False)
+                self._stamp = stamp
+            changed = self.check_stops() or changed
+            changed = self._share_look() or changed
+            if time.monotonic() - self._swept > self.SWEEP_S:
+                self._swept = time.monotonic()
+                self.claims.sweep()
+        except OSError as e:
+            log.debug("record: the claims not looked at: %s", e)
+        return changed
+
+    def check_stops(self) -> bool:
+        """A stop the other recorder asked of a recording here (its Stop
+        recording): stopped. Whether one was."""
+        if self.claims is None or self._no_claims:
+            return False
+        stopped = False
+        for j in list(self.jobs):
+            try:
+                asked = (j.get("status") == "recording" and not j.get("_elsewhere")
+                         and self.claims.mine(j["id"]) and self.claims.stop_asked(j["id"]))
+            except OSError:
+                asked = False
+            if asked:
+                log.info("record: %s - the other recorder asked to stop it",
+                         for_log(j.get("title")))
+                self.cancel(j["id"])
+                stopped = True
+        return stopped
+
+    def _share_look(self) -> bool:
+        """What the other recorder records or holds, as its claims say:
+        each job of it marked so (or ended, or free again - its recorder
+        gone: then this one takes it), one known only from its claim added.
+        Whether the jobs changed."""
+        from . import rec_claims
+        # A recording's, not an MP4 being saved (_remux_ours).
+        others = {c.job: c for c in self.claims.others() if not c.job.startswith("mp4:")}
+        changed = False
+        for j in list(self.jobs):
+            el = j.get("_elsewhere")
+            if el is None:
+                continue
+            c = others.get(str(j["id"]))
+            if c is None:
+                c = self.claims.read(j["id"])
+            if c is not None and c.live and not self.claims.mine(j["id"]):
+                if c.state != el.get("state") or (c.info.get("path") and
+                                                  c.info["path"] != j.get("path")):
+                    self._mark_elsewhere(j, c)
+                    changed = True
+            elif c is not None and c.final:
+                self._ended_elsewhere(j, c)
+                changed = True
+            else:
+                # Let go there, or its recorder is gone: this one's to take
+                # as it comes due (the rest of it, from its channel).
+                j.pop("_elsewhere", None)
+                j.pop("_was_elsewhere", None)
+                j.pop("_held", None)
+                j["status"] = "scheduled"
+                if not (j.get("url") or self.address_later(j)):
+                    j["status"], j["error"] = "failed", "recorder stopped unexpectedly"
+                log.info("record: %s - %s", for_log(j.get("title")),
+                         f"the {el.get('who') or 'other recorder'} let it go" if c is None
+                         else f"the {el.get('who') or 'other recorder'} that recorded it no "
+                              "longer runs")
+                changed = True
+        known = {str(j["id"]) for j in self.jobs}
+        for job, c in others.items():
+            if job not in known and c.state in rec_claims.LIVE:
+                j = self._from_claim(c)
+                self.jobs.append(j)
+                self._mark_elsewhere(j, c)
+                changed = True
+        return changed
+
+    def _claim(self, j: dict) -> bool:
+        """Due job *j* claimed for this recorder: True when it may go on -
+        False when the other records it, holds it, or it ended."""
+        if self.claims is None:
+            return True
+        from . import rec_claims
+        if self._no_claims:
+            return self.who != "server"
+        try:
+            if self.claims.mine(j["id"]):
+                return True
+            got, c = self.claims.take(j["id"], self._claim_info(j), rec_claims.HELD)
+        except OSError as e:
+            self._claims_off(e)
+            return self.who != "server"
+        if got == rec_claims.TAKEN:
+            j["_claim_state"] = rec_claims.HELD
+            return True
+        if got == rec_claims.OTHER and c is not None:
+            self._mark_elsewhere(j, c)
+        elif c is not None:
+            self._ended_elsewhere(j, c)
+            self._save()
+        return False
+
+    def _claims_settle(self) -> None:
+        """Each claim of this recorder's says what its job does now: held,
+        recording, or - ended - finished (and let go). A job the server
+        holds for a free connection is let go meanwhile: the window, when it
+        runs, may record it from its player."""
+        if self.claims is None or self._no_claims:
+            return
+        from . import rec_claims
+        for j in self.jobs:
+            if j.get("_elsewhere") or "_claim_state" not in j:
+                continue
+            status = str(j.get("status") or "")
+            if status == "recording":
+                j.setdefault("_since", time.time())
+                want = rec_claims.RECORDING
+            elif status == "scheduled":
+                want = rec_claims.HELD
+            elif status in rec_claims.FINAL:
+                want = status
+            else:
+                continue
+            info = self._claim_info(j)
+            if want == j["_claim_state"] and info == j.get("_claim_info"):
+                continue
+            try:
+                if want == rec_claims.HELD and self.who == "server" and j.get("_held"):
+                    self.claims.free(j["id"])
+                    j.pop("_claim_state", None)
+                    j.pop("_claim_info", None)
+                    continue
+                if want in rec_claims.FINAL:
+                    self.claims.finish(j["id"], want, info)
+                else:
+                    self.claims.write(j["id"], want, info)
+                j["_claim_state"], j["_claim_info"] = want, info
+            except OSError as e:
+                log.debug("record: a claim not written: %s", e)
+
+    def refresh_shared(self) -> bool:
+        """The list of jobs read again now, the other recorder's changes
+        taken in (before a look through the guide schedules more)."""
+        if self.claims is None or self._no_claims:
+            return False
+        try:
+            with self.claims.jobs_lock():
+                changed = self._merge(write=False)
+            self._stamp = self.claims.jobs_stamp()
+            changed = self._share_look() or changed
+        except OSError as e:
+            log.debug("record: the jobs not read again: %s", e)
+            return False
+        if changed:
+            self.jobs_changed.emit()
+        return changed
 
     def add_job(self, url: str, title: str, start_ts: float,
                 stop_ts: float | None, folder: str = "",
@@ -513,7 +938,7 @@ class RecordingManager(QObject):
             "id": uuid.uuid4().hex[:10], "url": url, "title": title,
             "start": start_ts, "stop": stop_ts, "folder": folder or "",
             "status": "scheduled", "path": "", "error": "", "proc": None,
-            "stream_icon": icon or "", "channel": channel or ""}
+            "stream_icon": icon or "", "channel": channel or "", "edited": time.time()}
         for k, v in (extra or {}).items():
             job.setdefault(k, v)
         self.jobs.append(job)
@@ -531,6 +956,7 @@ class RecordingManager(QObject):
             if j["id"] == job_id and j["status"] == "scheduled":
                 j["start"] = start_ts
                 j["stop"] = stop_ts
+                j["edited"] = time.time()   # the newer edit wins (_merge)
                 j.pop("_held", None)        # looked at again when it is due
                 for k, v in (extra or {}).items():
                     if k not in ("id", "url", "start", "stop", "status",
@@ -567,25 +993,29 @@ class RecordingManager(QObject):
         return job
 
     def ride_player(self, j: dict, path: str, recorder: Any = None,
-                    url: str = "") -> None:
+                    url: str = "", player: bool = True) -> None:
         """Scheduled recording *j*, due now, made from what the player plays
         already - its rewind buffer through *recorder* (a BufferRecorder),
         else its own stream: from now on one in the player, as
         add_inplayer_job's, with no connection of its own. *url*: the
         address it keeps where it had none (a portal's, asked at the start).
+        *player* False: the buffer is no player's (the server's restream of
+        the channel) - the recording goes on as one in the background.
         The tick that asked (may_open) says the jobs changed."""
         j.pop("_held", None)
         j.pop("_go_ahead", None)
-        j.update(status="recording", inplayer=True, path=path, recorder=recorder,
-                 proc=None, error="")
+        j.update(status="recording", inplayer=player, path=path, recorder=recorder,
+                 proc=None, error="", _own=False)
+        if not player:
+            j["background"] = True
         if url and not j.get("url"):
             j["url"] = url
         if path and (j.get("stream_icon") or j.get("channel")):
             self.write_info(path, "", "", icon=j.get("stream_icon") or "",
                             channel=j.get("channel") or "", start=time.time())
-        log.info("record: %s from what the player plays (%s) - no connection of its own",
-                 for_log(j.get("title")), "its rewind buffer" if recorder is not None
-                 else "its stream")
+        log.info("record: %s from what the %s (%s) - no connection of its own",
+                 for_log(j.get("title")), "player plays" if player else "server streams",
+                 "its rewind buffer" if recorder is not None else "its stream")
 
     def finish_inplayer(self, job_id: str, reason: str = "") -> None:
         for j in self.jobs:
@@ -657,6 +1087,9 @@ class RecordingManager(QObject):
         for j in self.jobs:
             if j["id"] != job_id:
                 continue
+            if j.get("_elsewhere"):
+                self._stop_elsewhere(j)
+                return
             if j.get("inplayer") and j["status"] == "recording":
                 self.finish_inplayer(job_id)
             elif j["status"] == "recording" and j.get("recorder") is not None:
@@ -666,9 +1099,36 @@ class RecordingManager(QObject):
                 j["status"] = "done"
             elif j["status"] == "scheduled":
                 j["status"] = "cancelled"
+                self._cancel_claim(j)
+            self._claims_settle()
             self._save()
             self.jobs_changed.emit()
             return
+
+    def _stop_elsewhere(self, j: dict) -> None:
+        """A recording the other recorder makes, or holds: asked to stop
+        there (its claim tells when it did)."""
+        try:
+            self.claims.ask_stop(j["id"])
+            log.info("record: %s - the %s asked to stop it", for_log(j.get("title")),
+                     (j.get("_elsewhere") or {}).get("who") or "other recorder")
+        except OSError as e:
+            log.warning("record: the other recorder could not be asked to stop %s: %s",
+                        for_log(j.get("title")), e)
+
+    def _cancel_claim(self, j: dict) -> None:
+        """A scheduled job cancelled here: finished in its claim too, so the
+        other recorder never takes it - or, should it have taken it a moment
+        ago, asked to stop it."""
+        if self.claims is None or self._no_claims or "_claim_state" in j:
+            return                      # ours: _claims_settle finishes it
+        from . import rec_claims
+        try:
+            got = self.claims.finish(j["id"], rec_claims.CANCELLED, self._claim_info(j))
+            if got == rec_claims.OTHER:
+                self._stop_elsewhere(j)
+        except OSError as e:
+            log.debug("record: a cancel not kept in its claim: %s", e)
 
     def remove_job(self, job_id: str) -> None:
         self.jobs = [j for j in self.jobs
@@ -838,8 +1298,11 @@ class RecordingManager(QObject):
         rec_mp4.Journal(self.settings).add(path, title, channel)
         if self._closing or path in self._remuxing:
             return
+        if not self._remux_ours(path):
+            return
         ff = self.ffmpeg()
         if not ff:
+            self._remux_let_go(path)
             rec_mp4.Journal(self.settings).done(path)
             log.info("recording: kept as .ts - no ffmpeg to save it as MP4")
             if j is not None:
@@ -871,8 +1334,33 @@ class RecordingManager(QObject):
         except RuntimeError:            # the app closed meanwhile
             pass
 
+    def _remux_ours(self, path: str) -> bool:
+        """Whether this recorder saves *path* as MP4: the other recorder may
+        do it already (a remux the last run left, which each one does at its
+        start)."""
+        if self.claims is None or self._no_claims:
+            return True
+        from . import rec_claims
+        try:
+            got, _c = self.claims.take("mp4:" + path, {"path": path}, rec_claims.HELD)
+        except OSError as e:
+            log.debug("record: the MP4's claim not taken: %s", e)
+            return True
+        if got != rec_claims.TAKEN:
+            log.info("recording: the other recorder saves it as MP4")
+            return False
+        return True
+
+    def _remux_let_go(self, path: str) -> None:
+        if self.claims is not None and not self._no_claims:
+            try:
+                self.claims.free("mp4:" + path)
+            except OSError as e:
+                log.debug("record: the MP4's claim not let go: %s", e)
+
     def _remux_done(self, src: str, final: str, why: str) -> None:
         self._remuxing.discard(src)
+        self._remux_let_go(src)
         if self._closing:
             return                      # cut short: done at the next start
         journal = rec_mp4.Journal(self.settings)
@@ -1003,6 +1491,22 @@ class RecordingManager(QObject):
             log.warning("record: %s not started - %s (%s:)", for_log(j.get("title")),
                         NOT_A_STREAM, address_scheme(str(j.get("url") or ""))[:20])
             return
+        if self.open_shared is not None and not j.get("_classic"):
+            # The server: read from a buffer session of the channel, whose
+            # one connection every device watching it shares.
+            try:
+                shared = self.open_shared(j)
+            except Exception as e:
+                log.info("record: %s not from a buffer (%s)", for_log(j.get("title")), e)
+                shared = None
+            if shared is not None:
+                path, recorder = shared
+                j.update(status="recording", path=path, recorder=recorder, proc=None,
+                         error="", background=True, _own=True)
+                if j.get("stream_icon") or j.get("channel"):
+                    self.write_info(path, "", "", icon=j.get("stream_icon") or "",
+                                    channel=j.get("channel") or "", start=time.time())
+                return
         kind, exe = self.recorder()
         if not exe:
             j["status"] = "failed"
@@ -1113,6 +1617,7 @@ class RecordingManager(QObject):
                          for_log(j.get("title")), kind)
             j["path"] = path
             j["status"] = "recording"
+            j["_own"] = connections_network(url)
             if j.get("stream_icon") or j.get("channel"):
                 self.write_info(path, "", "", icon=j.get("stream_icon") or "",
                                 channel=j.get("channel") or "", start=time.time())
@@ -1349,18 +1854,46 @@ class RecordingManager(QObject):
             return "size limit reached"
         return DISK_FULL if self._disk_low(j) else ""
 
+    def _deferring(self) -> bool:
+        """(the server) A window runs, which records what comes due."""
+        if self.defer is None:
+            return False
+        try:
+            return bool(self.defer())
+        except Exception as e:
+            log.debug("record: whether a window runs not known: %s", e)
+            return True                 # not known: the window's, as it would be
+
+    def _takes(self, j: dict) -> bool:
+        if self.takes is None:
+            return True
+        try:
+            return bool(self.takes(j))
+        except Exception as e:
+            log.debug("record: whether to take a job not known: %s", e)
+            return False
+
     def tick(self) -> None:
         now = time.time()
         cap = self._max_bytes()
-        changed = False
+        changed = self._share_tick()
+        deferring = self._deferring()
         for j in self.jobs:
+            if j.get("_elsewhere"):
+                continue                # the other recorder's (_share_look)
             if j["status"] == "scheduled" and j.get("_asking") is not None:
                 # Its address is being asked for.
                 if time.monotonic() - j["_asking"] > self.ADDRESS_TIMEOUT_S:
                     self._no_address(j, "no answer in time")
+                    self._claims_settle()
                     self._save()
                     changed = True
             elif j["status"] == "scheduled" and j["start"] <= now:
+                if "_claim_state" not in j and (deferring or not self._takes(j)):
+                    continue            # a window runs: it records what comes due
+                if not self._claim(j):
+                    changed = True      # the other recorder's, or over
+                    continue
                 if j.get("stop") is not None and j["stop"] <= now:
                     j["status"] = "failed"
                     if j.pop("_held", None):
@@ -1385,6 +1918,7 @@ class RecordingManager(QObject):
                     else:
                         j.pop("_held", None)
                         self._spawn(j)
+                self._claims_settle()
                 self._save()
                 changed = True
             elif j["status"] == "recording" and j.get("inplayer"):
@@ -1402,6 +1936,17 @@ class RecordingManager(QObject):
                     changed = True
                 elif why:
                     self._finish_buffer(j, why)
+                    changed = True
+                elif not rec.alive and getattr(rec, "classic", "") and not j.get("_classic"):
+                    # What the server's buffer could not read (an HLS
+                    # playlist after all): the recorder reads it itself,
+                    # through the app's bridge under an alias.
+                    log.info("record: %s - %s; the recorder reads it itself, through the "
+                             "app's bridge", for_log(j.get("title")), rec.classic)
+                    self._drop_empty(j.get("path"))
+                    j.update(_classic=True, recorder=None)
+                    j.pop("background", None)
+                    self._spawn(j)
                     changed = True
                 elif not rec.alive:
                     # Its buffer went (the app's buffer turned off, ...).
@@ -1446,6 +1991,7 @@ class RecordingManager(QObject):
                         j["title"], "finished" if ok
                         else "recorder stopped unexpectedly")
                     changed = True
+        self._claims_settle()
         if changed:
             self.jobs_changed.emit()
 
@@ -1462,13 +2008,35 @@ class RecordingManager(QObject):
             log.info("recording: %d MP4(s) left for the next start", stopped)
         self.finish_all_inplayer("app closed")
         for j in self.jobs:
+            if j.get("_elsewhere"):
+                continue                # the other recorder's: it goes on
             if j["status"] == "recording" and j.get("recorder") is not None:
                 j["recorder"].stop()
                 j["status"] = "done"
             elif j["status"] == "recording" and not j.get("inplayer"):
                 self._stop_proc(j)
                 j["status"] = "done"
+        self._claims_settle()
         self._save()
+        self._share_end()
+
+    def _share_end(self) -> None:
+        """Closing: a job still waiting here let go for the other recorder
+        (a `dopeiptv --server` records it as it comes due), every lock let
+        go - this recorder no longer runs."""
+        if self.claims is None:
+            return
+        for j in self.jobs:
+            if j.get("status") == "scheduled" and "_claim_state" in j:
+                try:
+                    self.claims.free(j["id"])
+                except OSError as e:
+                    log.debug("record: a claim not let go: %s", e)
+                j.pop("_claim_state", None)
+        try:
+            self.claims.let_go_all()
+        except OSError as e:
+            log.debug("record: the claims not let go: %s", e)
 
     #: How long the app's closing waits, in all, for the rewind buffer's
     #: recordings to write their last bytes before their command runs.

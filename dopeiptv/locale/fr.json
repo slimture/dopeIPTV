@@ -1001,7 +1001,7 @@
   "series_where": "Chaîne",
   "series_where_this": "Uniquement {channel}",
   "series_where_any": "N'importe quelle chaîne",
-  "series_hint": "Chaque diffusion à venir dans le guide est programmée dès qu'elle apparaît, avec les marges de Paramètres → Enregistrement. L'application doit tourner au début d'un enregistrement.",
+  "series_hint": "Chaque diffusion à venir dans le guide est programmée dès qu'elle apparaît, avec les marges de Paramètres → Enregistrement. L'application doit tourner au début d'un enregistrement. Fenêtre fermée, l'application les enregistre en tant que serveur : dopeiptv --server.",
   "series_added": "Enregistrement de série ajouté : {title}",
   "series_scheduled_n": "Enregistrements de séries : {n} programmés",
   "set_card_series": "Enregistrements de séries",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Enregistrer quand même",
   "rec_started_to": "Enregistrement de {title} {length} → {folder}",
   "rec_folder_default": "(Dossier des enregistrements)",
-  "rec_schedule_hint": "Enregistré dans {folder} – changez l'emplacement dans Paramètres → Enregistrement. L'application doit tourner au début de l'enregistrement.",
+  "rec_schedule_hint": "Enregistré dans {folder} – changez l'emplacement dans Paramètres → Enregistrement. L'application doit tourner au début de l'enregistrement. Fenêtre fermée, l'application l'enregistre en tant que serveur : dopeiptv --server.",
   "rec_scheduled_for": "{title} sera enregistré à partir de {when}",
   "rec_delete_failed": "Suppression impossible : {error}",
   "ts_programme": "programme",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Cet ordinateur",
   "set_phone_hint": "Votre téléphone comme télécommande : scannez un code avec l'appareil photo et une page s'ouvre dans son navigateur. Rien à installer.",
   "set_phone_rec_ask": "Demander avant que le téléphone enregistre",
-  "set_phone_rec_ask_hint": "Enregistrer sur le téléphone demande d'abord. \"Ne plus afficher ceci\" là-bas le désactive, et ici vous le réactivez."
+  "set_phone_rec_ask_hint": "Enregistrer sur le téléphone demande d'abord. \"Ne plus afficher ceci\" là-bas le désactive, et ici vous le réactivez.",
+  "rec_by_server": "enregistré par le serveur",
+  "rec_by_other_app": "enregistré par dopeIPTV sur un autre ordinateur",
+  "srv_rec_by_app": "enregistré par la fenêtre de l'application"
 }

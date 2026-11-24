@@ -388,8 +388,12 @@ class _PlaceRecMixin:
         parts.append(until)
         if status == "cancelled":
             parts.insert(0, tr("rec_status_cancelled"))
-        if status == "scheduled" and (j.get("_held") or it.get("_held")):
+        if status == "scheduled" and (j.get("_held") or it.get("_held")) \
+                and not j.get("_elsewhere"):
             parts.append(tr("rec_waiting_room"))
+        if j.get("_elsewhere"):
+            from .mw_recording import rec_where
+            parts.append(rec_where(j))
         if status == "failed" and (j.get("error") or it.get("_error")):
             parts.append(rec_reason(str(j.get("error") or it.get("_error"))))
         if j.get("remux") == "running":
@@ -646,8 +650,11 @@ class _PlaceRecMixin:
             stop = j.get("stop")
             parts.append(tr("rec_until", time=format_when(float(stop), "HH:mm"))
                          if isinstance(stop, (int, float)) and stop else tr("rec_until_stopped"))
-        elif j.get("_held"):
+        elif j.get("_held") and not j.get("_elsewhere"):
             parts.append(tr("rec_waiting_room"))
+        if j.get("_elsewhere"):
+            from .mw_recording import rec_where
+            parts.append(rec_where(j))
         return line_of(parts)
 
     def _rp_now_refresh(self) -> None:

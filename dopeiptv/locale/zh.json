@@ -1001,7 +1001,7 @@
   "series_where": "频道",
   "series_where_this": "仅 {channel}",
   "series_where_any": "任意频道",
-  "series_hint": "节目指南中每次即将播出的节目一出现就会被预约，并使用“设置 → 录制”中的提前/延后时间。录制开始时应用必须正在运行。",
+  "series_hint": "节目指南中每次即将播出的节目一出现就会被预约，并使用“设置 → 录制”中的提前/延后时间。录制开始时应用必须正在运行。窗口关闭时，应用会以服务器方式录制：dopeiptv --server。",
   "series_added": "已添加系列录制：{title}",
   "series_scheduled_n": "系列录制：已预约 {n} 个",
   "set_card_series": "系列录制",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "仍然录制",
   "rec_started_to": "正在录制 {title}（{length}）→ {folder}",
   "rec_folder_default": "（录制文件夹）",
-  "rec_schedule_hint": "保存在 {folder} 下 — 可在“设置 → 录制”中更改位置。录制开始时应用必须正在运行。",
+  "rec_schedule_hint": "保存在 {folder} 下 — 可在“设置 → 录制”中更改位置。录制开始时应用必须正在运行。窗口关闭时，应用会以服务器方式录制：dopeiptv --server。",
   "rec_scheduled_for": "{title} 将从 {when} 开始录制",
   "rec_delete_failed": "无法删除：{error}",
   "ts_programme": "节目",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "这台电脑",
   "set_phone_hint": "把手机当遥控器：用相机扫描二维码，浏览器中就会打开一个页面。无需安装任何东西。",
   "set_phone_rec_ask": "手机录制前先询问",
-  "set_phone_rec_ask_hint": "手机上的录制会先询问。在那里选择“不再显示”会关闭此项，在这里可以重新打开。"
+  "set_phone_rec_ask_hint": "手机上的录制会先询问。在那里选择“不再显示”会关闭此项，在这里可以重新打开。",
+  "rec_by_server": "由服务器录制",
+  "rec_by_other_app": "由另一台电脑上的 dopeIPTV 录制",
+  "srv_rec_by_app": "由应用窗口录制"
 }

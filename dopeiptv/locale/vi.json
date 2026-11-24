@@ -1001,7 +1001,7 @@
   "series_where": "Kênh",
   "series_where_this": "Chỉ {channel}",
   "series_where_any": "Bất kỳ kênh nào",
-  "series_hint": "Mỗi lần phát sắp tới trong lịch phát sẽ được lên lịch ngay khi xuất hiện, với thời gian dự phòng trong Cài đặt → Ghi hình. Ứng dụng phải đang chạy khi bắt đầu ghi.",
+  "series_hint": "Mỗi lần phát sắp tới trong lịch phát sẽ được lên lịch ngay khi xuất hiện, với thời gian dự phòng trong Cài đặt → Ghi hình. Ứng dụng phải đang chạy khi bắt đầu ghi. Khi cửa sổ đóng, ứng dụng ghi chúng ở chế độ máy chủ: dopeiptv --server.",
   "series_added": "Đã thêm ghi hình loạt: {title}",
   "series_scheduled_n": "Ghi hình loạt: đã lên lịch {n}",
   "set_card_series": "Ghi hình theo loạt",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Vẫn ghi hình",
   "rec_started_to": "Đang ghi {title} {length} → {folder}",
   "rec_folder_default": "(Thư mục bản ghi)",
-  "rec_schedule_hint": "Được lưu trong {folder} — đổi vị trí trong Cài đặt → Ghi hình. Ứng dụng phải đang chạy khi bắt đầu ghi.",
+  "rec_schedule_hint": "Được lưu trong {folder} — đổi vị trí trong Cài đặt → Ghi hình. Ứng dụng phải đang chạy khi bắt đầu ghi. Khi cửa sổ đóng, ứng dụng ghi nó ở chế độ máy chủ: dopeiptv --server.",
   "rec_scheduled_for": "{title} sẽ được ghi từ {when}",
   "rec_delete_failed": "Không thể xóa: {error}",
   "ts_programme": "chương trình",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Máy tính này",
   "set_phone_hint": "Điện thoại làm điều khiển: quét mã bằng camera và một trang mở ra trong trình duyệt. Không cần cài đặt gì.",
   "set_phone_rec_ask": "Hỏi trước khi điện thoại ghi hình",
-  "set_phone_rec_ask_hint": "Ghi hình trên điện thoại sẽ hỏi trước. \"Không hiển thị lại điều này\" ở đó tắt mục này, và bạn bật lại ở đây."
+  "set_phone_rec_ask_hint": "Ghi hình trên điện thoại sẽ hỏi trước. \"Không hiển thị lại điều này\" ở đó tắt mục này, và bạn bật lại ở đây.",
+  "rec_by_server": "do máy chủ ghi",
+  "rec_by_other_app": "do dopeIPTV trên máy tính khác ghi",
+  "srv_rec_by_app": "do cửa sổ ứng dụng ghi"
 }

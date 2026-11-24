@@ -1001,7 +1001,7 @@
   "series_where": "Canale",
   "series_where_this": "Solo {channel}",
   "series_where_any": "Qualsiasi canale",
-  "series_hint": "Ogni messa in onda futura nella guida viene programmata appena compare, con i margini di Impostazioni → Registrazione. L'app deve essere aperta quando inizia una registrazione.",
+  "series_hint": "Ogni messa in onda futura nella guida viene programmata appena compare, con i margini di Impostazioni → Registrazione. L'app deve essere aperta quando inizia una registrazione. A finestra chiusa, l'app le registra come server: dopeiptv --server.",
   "series_added": "Registrazione della serie aggiunta: {title}",
   "series_scheduled_n": "Registrazioni di serie: {n} programmate",
   "set_card_series": "Registrazioni di serie",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Registra comunque",
   "rec_started_to": "Registrazione di {title} {length} → {folder}",
   "rec_folder_default": "(Cartella delle registrazioni)",
-  "rec_schedule_hint": "Salvata in {folder}: cambia la posizione in Impostazioni → Registrazione. L'app deve essere aperta quando inizia la registrazione.",
+  "rec_schedule_hint": "Salvata in {folder}: cambia la posizione in Impostazioni → Registrazione. L'app deve essere aperta quando inizia la registrazione. A finestra chiusa, l'app la registra come server: dopeiptv --server.",
   "rec_scheduled_for": "{title} verrà registrato da {when}",
   "rec_delete_failed": "Impossibile eliminare: {error}",
   "ts_programme": "programma",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Questo computer",
   "set_phone_hint": "Il telefono come telecomando: inquadra un codice con la fotocamera e si apre una pagina nel browser. Niente da installare.",
   "set_phone_rec_ask": "Chiedi prima che il telefono registri",
-  "set_phone_rec_ask_hint": "Registra sul telefono chiede prima. \"Non mostrare più\" lì lo disattiva, e qui lo riattivi."
+  "set_phone_rec_ask_hint": "Registra sul telefono chiede prima. \"Non mostrare più\" lì lo disattiva, e qui lo riattivi.",
+  "rec_by_server": "registrata dal server",
+  "rec_by_other_app": "registrata da dopeIPTV su un altro computer",
+  "srv_rec_by_app": "registrata dalla finestra dell'app"
 }

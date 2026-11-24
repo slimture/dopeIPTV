@@ -1001,7 +1001,7 @@
   "series_where": "Saluran",
   "series_where_this": "Hanya {channel}",
   "series_where_any": "Saluran mana saja",
-  "series_hint": "Setiap penayangan mendatang di panduan dijadwalkan begitu muncul, dengan waktu tambahan dari Pengaturan → Perekaman. Aplikasi harus berjalan saat perekaman dimulai.",
+  "series_hint": "Setiap penayangan mendatang di panduan dijadwalkan begitu muncul, dengan waktu tambahan dari Pengaturan → Perekaman. Aplikasi harus berjalan saat perekaman dimulai. Saat jendela ditutup, aplikasi merekamnya sebagai server: dopeiptv --server.",
   "series_added": "Rekaman serial ditambahkan: {title}",
   "series_scheduled_n": "Rekaman serial: {n} dijadwalkan",
   "set_card_series": "Rekaman serial",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "Tetap rekam",
   "rec_started_to": "Merekam {title} {length} → {folder}",
   "rec_folder_default": "(Folder rekaman)",
-  "rec_schedule_hint": "Disimpan di {folder} — ubah lokasinya di Pengaturan → Perekaman. Aplikasi harus berjalan saat perekaman dimulai.",
+  "rec_schedule_hint": "Disimpan di {folder} — ubah lokasinya di Pengaturan → Perekaman. Aplikasi harus berjalan saat perekaman dimulai. Saat jendela ditutup, aplikasi merekamnya sebagai server: dopeiptv --server.",
   "rec_scheduled_for": "{title} akan direkam mulai {when}",
   "rec_delete_failed": "Tidak dapat menghapus: {error}",
   "ts_programme": "acara",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "Komputer ini",
   "set_phone_hint": "Ponsel sebagai remote: pindai kode dengan kameranya dan sebuah halaman terbuka di peramban. Tidak ada yang perlu dipasang.",
   "set_phone_rec_ask": "Tanya sebelum ponsel merekam",
-  "set_phone_rec_ask_hint": "Rekam di ponsel bertanya dulu. \"Jangan tampilkan ini lagi\" di sana mematikan ini, dan di sini Anda menyalakannya kembali."
+  "set_phone_rec_ask_hint": "Rekam di ponsel bertanya dulu. \"Jangan tampilkan ini lagi\" di sana mematikan ini, dan di sini Anda menyalakannya kembali.",
+  "rec_by_server": "direkam oleh server",
+  "rec_by_other_app": "direkam oleh dopeIPTV di komputer lain",
+  "srv_rec_by_app": "direkam oleh jendela aplikasi"
 }

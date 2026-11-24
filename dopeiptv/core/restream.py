@@ -273,6 +273,12 @@ class Restreamer:
         with self._lock:
             return len(self._own(source))
 
+    def urls(self, source: str) -> list[str]:
+        """The provider addresses the server's own connections to *source*
+        read (a box's tuners are asked about them)."""
+        with self._lock:
+            return [ch.url for ch in self._own(source)]
+
     def session_of(self, source: str, stream: str) -> DvrSession | None:
         """The session the server streams *stream* of *source* from, while
         it streams: the person tuning to it takes no connection of its own."""
@@ -427,11 +433,14 @@ class Restreamer:
 
     # -- the app's own use wins ------------------------------------------------------
 
-    def make_room(self, source: str, own: int, keep: str | None = None) -> int:
+    def make_room(self, source: str, own: int, keep: str | None = None,
+                  idle_only: bool = False) -> int:
         """The app is about to hold *own* connections to *source* (the new
         one counted): let go of as many of the server's channels on it as
         that needs - those nobody watches first, then the fewest viewers,
-        then the newest. *keep*: a stream id not to let go. How many went."""
+        then the newest. *keep*: a stream id not to let go. *idle_only*:
+        only channels nobody watches (a scheduled recording of the server's
+        own never cuts a device off). How many went."""
         with self._lock:
             self._epoch += 1
             mine = self._own(source)
@@ -439,7 +448,8 @@ class Restreamer:
             if over <= 0:
                 return 0
             keep_key = channel_key(source, keep) if keep is not None else None
-            order = sorted((ch for ch in mine if ch.key != keep_key),
+            order = sorted((ch for ch in mine if ch.key != keep_key
+                            and not (idle_only and ch.viewers)),
                            key=lambda c: (len(c.viewers), -c.opened))
             gone = 0
             for ch in order[:over]:

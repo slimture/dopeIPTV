@@ -1001,7 +1001,7 @@
   "series_where": "채널",
   "series_where_this": "{channel}만",
   "series_where_any": "모든 채널",
-  "series_hint": "가이드에 앞으로의 방송이 나타나면 바로 예약되며, 설정 → 녹화의 여유 시간이 적용됩니다. 녹화가 시작될 때 앱이 실행 중이어야 합니다.",
+  "series_hint": "가이드에 앞으로의 방송이 나타나면 바로 예약되며, 설정 → 녹화의 여유 시간이 적용됩니다. 녹화가 시작될 때 앱이 실행 중이어야 합니다. 창을 닫아 두면 앱이 서버로 녹화합니다: dopeiptv --server.",
   "series_added": "시리즈 녹화 추가됨: {title}",
   "series_scheduled_n": "시리즈 녹화: {n}개 예약됨",
   "set_card_series": "시리즈 녹화",
@@ -1042,7 +1042,7 @@
   "rec_private_go": "그래도 녹화",
   "rec_started_to": "{title} 녹화 중 ({length}) → {folder}",
   "rec_folder_default": "(녹화 폴더)",
-  "rec_schedule_hint": "{folder}에 저장됩니다 — 위치는 설정 → 녹화에서 변경하세요. 녹화가 시작될 때 앱이 실행 중이어야 합니다.",
+  "rec_schedule_hint": "{folder}에 저장됩니다 — 위치는 설정 → 녹화에서 변경하세요. 녹화가 시작될 때 앱이 실행 중이어야 합니다. 창을 닫아 두면 앱이 서버로 녹화합니다: dopeiptv --server.",
   "rec_scheduled_for": "{title}: {when}부터 녹화 예약됨",
   "rec_delete_failed": "삭제할 수 없습니다: {error}",
   "ts_programme": "프로그램",
@@ -3209,5 +3209,8 @@
   "set_card_this_computer": "이 컴퓨터",
   "set_phone_hint": "휴대폰을 리모컨으로: 카메라로 코드를 스캔하면 브라우저에 페이지가 열립니다. 설치할 것은 없습니다.",
   "set_phone_rec_ask": "휴대폰이 녹화하기 전에 묻기",
-  "set_phone_rec_ask_hint": "휴대폰의 녹화는 먼저 묻습니다. 그곳의 \"다시 표시하지 않기\"는 이 설정을 끄고, 여기서 다시 켤 수 있습니다."
+  "set_phone_rec_ask_hint": "휴대폰의 녹화는 먼저 묻습니다. 그곳의 \"다시 표시하지 않기\"는 이 설정을 끄고, 여기서 다시 켤 수 있습니다.",
+  "rec_by_server": "서버가 녹화 중",
+  "rec_by_other_app": "다른 컴퓨터의 dopeIPTV가 녹화 중",
+  "srv_rec_by_app": "앱 창이 녹화 중"
 }

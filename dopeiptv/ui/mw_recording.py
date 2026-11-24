@@ -67,6 +67,16 @@ def rec_reason(reason: str) -> str:
     return reason or ""
 
 
+def rec_where(j: dict) -> str:
+    """Who records a job the other recorder has (core/rec_claims.py) - a
+    `dopeiptv --server`, or dopeIPTV on another computer that shares the
+    settings - in the user's words; "" for this window's own."""
+    el = j.get("_elsewhere")
+    if not el:
+        return ""
+    return tr("rec_by_server" if el.get("who") == "server" else "rec_by_other_app")
+
+
 def _live_address(client, stream_id) -> str:
     """(the recorder's thread) A channel's address from the source playing."""
     return client.live_url(stream_id, "ts") or ""
@@ -101,8 +111,13 @@ class _RecordingMixin(_TimeshiftMixin):
         if j["status"] == "failed" and j.get("error"):
             name += f"  —  {rec_reason(j['error'])}"
         # Due, and waiting for room on the account (_rec_may_open).
-        if j["status"] == "scheduled" and j.get("_held"):
+        held = bool(j.get("_held")) and not j.get("_elsewhere")
+        if j["status"] == "scheduled" and held:
             name += f"  —  {tr('rec_waiting_room')}"
+        # The server's (or another computer's): it records it, not this window.
+        where = rec_where(j)
+        if where:
+            name += f"  —  {where}"
         # Saved as MP4 (Settings > Recording): while it is copied, and when
         # the .ts had to be kept.
         if j.get("remux") == "running":
@@ -115,7 +130,9 @@ class _RecordingMixin(_TimeshiftMixin):
         return {"name": name,
                 "_job": j["id"], "_key": f"job:{j['id']}",
                 "_kind": "recjob", "_status": j["status"],
-                "_held": bool(j.get("_held")),
+                # Record anyway only for what this window holds itself.
+                "_held": held,
+                "_elsewhere": bool(j.get("_elsewhere")),
                 "_error": j.get("error") or "",
                 "_path": j.get("path") or "",
                 # The recorded channel's logo, so the row isn't iconless.
