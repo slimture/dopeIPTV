@@ -810,7 +810,9 @@ class _DownloadsMixin:
         self.d_dl_label = QLabel("", objectName="DetailMeta")
         self.d_dl_label.setTextFormat(Qt.TextFormat.PlainText)
         self.d_dl_label.setWordWrap(True)
-        self.d_dl_btn = QPushButton()
+        # Its words from the start (a screen reader never meets it nameless);
+        # what it does is said again as the row changes (_dl_detail_show).
+        self.d_dl_btn = QPushButton(tr("dl_download"))
         self.d_dl_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.d_dl_btn.clicked.connect(self._dl_detail_clicked)
         lay.addWidget(self.d_dl_label, 1)

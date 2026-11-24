@@ -835,6 +835,16 @@ assert hub.unread() == 0 and bell.badge() == 0
 bell.click()
 pump(5)
 assert panel.isHidden()
+# The ✕ in its corner closes it too, the focus back on the bell.
+bell.click()
+pump(5)
+assert panel.isVisible() and panel.close_btn.isVisible()
+assert panel.close_btn.accessibleName() == tr("common_close")
+cb = rect(panel.close_btn)
+assert cb.right() <= rect(panel).right() and cb.top() - rect(panel).top() < 40, (cb, rect(panel))
+panel.close_btn.click()
+pump(5)
+assert panel.isHidden()
 assert w.count_lbl.text() == line_words and card.isHidden()
 # A stream error is said on the video, never as a message.
 w._show_stream_error("HTTP 404")

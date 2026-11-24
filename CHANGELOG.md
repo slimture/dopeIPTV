@@ -16,7 +16,8 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
   History tab: everything the app said and the work you started that
   finished or was cancelled since it started, filtered by errors,
   warnings, notes and done, with Copy (scrubbed of your logins) and
-  Clear. Kept in memory only, and nothing while viewing privately.
+  Clear. Kept in memory only, and nothing while viewing privately. A ✕ in
+  the panel's corner closes it, beside Esc and a click elsewhere.
 
 ### Fixed
 
