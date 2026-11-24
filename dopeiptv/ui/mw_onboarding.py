@@ -82,11 +82,17 @@ class _OnboardingMixin:
             self._welcome.sync_cancelled.connect(self._wizard_sync_cancel)
             self._welcome.restore_asked.connect(self._wizard_restore)
             self._welcome.quit_asked.connect(self._wizard_quit)
+            watch = getattr(self, "_notices_watch", None)
+            if watch is not None:
+                watch(self._welcome)
         else:
             self._welcome.reset()
         # If Trakt was linked in an earlier visit, show it as connected.
         self._welcome.set_trakt_connected(self.trakt.is_connected())
         self._welcome.cover()
+        follow = getattr(self, "_notice_follow", None)
+        if follow is not None:
+            follow.poke()           # the notices held while it covers the window
         self._update_provider_hint()
 
     def _wizard_connect_trakt(self) -> None:
