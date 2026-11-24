@@ -595,6 +595,11 @@ class _DownloadsMixin:
                 self._show_toast(tr("profile_kids_not_here"), 4000)
             return []
         self._dl_ask_room(made)
+        if kind == "episode":
+            # The series' episodes kept for its page offline (mw_offline).
+            keep = getattr(self, "_offline_keep_page_episodes", None)
+            if callable(keep):
+                keep(series)
         self._dl_tick()                 # the beat back to every second
         if len(made) == 1:
             self._show_toast(tr("dl_queued", title=made[0].title), 3000)

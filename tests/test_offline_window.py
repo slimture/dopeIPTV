@@ -300,6 +300,24 @@ out["hand_stays"] = offline.mode()
 act.trigger()
 pump(20)
 out["hand_off"] = [offline.on(), type(w.client).__name__, w._off_strip.isVisible()]
+# -- online, an episode queued from its series' page: the page's episodes kept ----------
+from types import SimpleNamespace
+
+
+def kept_ids(sid):
+    return sorted(str(k.get("id")) for k in dl.known_episodes(w._off_episodes, "a1b2c3d4", sid))
+
+
+w._sp_ctx, w._sp_local = {"series_id": "77", "name": "Serien"}, None
+w._sp_seasons = [SimpleNamespace(episodes=[
+    {"id": "601", "season": 2, "episode_num": 1, "title": "Tre"},
+    {"id": "602", "season": 2, "episode_num": 2, "title": "Fyra"}])]
+w._offline_keep_page_episodes({"series_id": "88"})      # another series than the page's
+pump(10)
+before_queue = kept_ids("88")
+w._offline_keep_page_episodes({"series_id": "77"})
+until(lambda: "601" in kept_ids("77"), 10)
+out["kept_on_queue"] = {"other": before_queue, "page": kept_ids("77")}
 print("RESULT" + json.dumps(out), flush=True)
 os._exit(0)
 """
@@ -547,6 +565,12 @@ def test_the_switch_by_hand_from_the_menu_and_the_palette(seen):
     assert seen["hand_stays"] == "hand"                 # the network's word changes nothing
     on, client, strip = seen["hand_off"]
     assert on is False and client == "Back" and strip is False
+
+
+def test_an_episode_queued_online_keeps_its_series_pages_episodes(seen):
+    kept = seen["kept_on_queue"]
+    assert kept["other"] == []                          # not the series on the page: nothing
+    assert kept["page"] == ["601", "602"]
 
 
 def test_a_kids_profile_offline_sees_only_what_its_sidecars_prove(tmp_path_factory):

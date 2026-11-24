@@ -7,9 +7,9 @@ the lists it shows).
   anyone; ``DOPEIPTV_NETWORK`` instead where it says so. No backend, no
   detection: the window opens as ever. Settled by core/offline.Watch, a
   QTimer for what is still to settle (``_off_said``, ``_off_tick``).
-* **By hand**: View's... no - File's "Work offline" (a checkable action, so
-  the command palette lists it too) and the strip's "Go online"
-  (``set_offline``). It lasts the session.
+* **By hand**: File's "Work offline" (a checkable action, so the command
+  palette lists it too) and the strip's "Go online" (``set_offline``). It
+  lasts the session.
 * **Going offline** (``_off_enter``): the source's client steps aside for
   its downloads (``DownloadedClient``: the Movies and Series places, a
   series' page, Mine, Search, a kids profile's lists and the phone's read
@@ -35,7 +35,6 @@ the lists it shows).
 
 from __future__ import annotations
 
-import os
 import time
 from functools import partial
 from typing import Any
@@ -573,10 +572,6 @@ class _OfflineMixin:
         covered = bool(held()) if callable(held) else False
         strip.setVisible(offline.on() and not covered)
 
-    def offline_held_changed(self) -> None:
-        """The video left full screen, the welcome went...: the strip again."""
-        self._off_strip_sync()
-
     # -- TV and Radio need the network -----------------------------------------------------
 
     def _off_note_sync(self) -> None:
@@ -680,9 +675,13 @@ class _OfflineMixin:
         run_async(self.pool, lambda: dl.keep_episodes(folder, pid, sid, rows), lambda _r: None,
                   lambda _m: None)
 
-    # -- what the window says of a path ---------------------------------------------------
-
-    @staticmethod
-    def _offline_file(path: Any) -> bool:
-        text = str(path or "")
-        return bool(text) and "://" not in text and os.path.isabs(text)
+    def _offline_keep_page_episodes(self, series: Any) -> None:
+        """An episode of the series on its page queued for download: the
+        page's whole list of episodes kept, as on its next opening."""
+        ctx = getattr(self, "_sp_ctx", None) or {}
+        if not isinstance(series, dict) or str(ctx.get("series_id")) != str(
+                series.get("series_id")) or getattr(self, "_sp_local", None) is not None:
+            return
+        eps = [e for s in (getattr(self, "_sp_seasons", None) or []) for e in s.episodes]
+        if eps:
+            self._offline_keep_episodes(ctx, eps)
