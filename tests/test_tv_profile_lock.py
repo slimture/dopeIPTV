@@ -8,9 +8,21 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest  # noqa: E402
+
 from dopeiptv.ui.mw_tv import _Before, _TvMixin  # noqa: E402
 
 _APP = None
+
+
+@pytest.fixture(autouse=True)
+def _this_window_in_front(monkeypatch):
+    """The window these keys come to is the one in front: a window another
+    test left active in this process would take them instead (the remote's
+    key goes to the window in front - mw_tv._tv_input), and the test would
+    say nothing about the profile lock."""
+    from PyQt6.QtWidgets import QApplication
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
 
 
 def _app():
