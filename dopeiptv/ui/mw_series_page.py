@@ -787,6 +787,11 @@ class _SeriesPageMixin:
         has none of, asked for once, off the window's thread."""
         if self.tmdb is None or not 0 <= i < len(self._sp_seasons):
             return
+        if privacy.title_private(self._sp_title()):
+            # The series plays privately: the stills TMDB gave its episodes
+            # before shown from the disk's copy alone (core/privacy).
+            privacy.hold_pictures(*(ep.get("_sp_still") for s in self._sp_seasons
+                                    for ep in s.episodes if isinstance(ep, dict)))
         season = self._sp_seasons[i]
         if season.number is None or not any(not sv.still_of(e) for e in season.episodes):
             return

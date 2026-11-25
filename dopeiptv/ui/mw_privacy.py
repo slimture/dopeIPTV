@@ -128,6 +128,14 @@ class _PrivacyMixin:
         jobs = [j["id"] for j in (getattr(rec, "jobs", None) or [])
                 if j.get("status") == "recording" and j.get("recorder") in recorders]
         casting = bool(s.held and getattr(self, "_cast_device", None))
+        if not jobs and not casting:
+            # Held only by a device at home watching the channel through
+            # server mode: that is its viewing, not this window's, and the
+            # card would offer a Stop that stops nothing. Said in the log;
+            # the buffer moves off the disk once the device lets go.
+            log.info("private viewing: a device watching through server mode keeps the "
+                     "channel's buffer on the disk until it stops")
+            return
         log.info("private viewing: a %s keeps the channel's buffer on the disk - asked",
                  "recording and a cast" if jobs and casting else "cast" if casting else "recording")
 

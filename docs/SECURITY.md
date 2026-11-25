@@ -285,7 +285,9 @@ is.
   or id the app makes up and keeps. A sync slot and its
   credential come from the sync code (`auth_of`); feedback's answers are
   asked for by the hash of a random code kept on the computer
-  (`report.new_code`).
+  (`report.new_code`) - every report's in one request, so the site can
+  tell that those reports came from one computer, never whose
+  (`report.fetch_replies`).
 - Use the Trakt code: without the PKCE verifier, which stays in the app,
   it cannot be exchanged for a token.
 
@@ -707,7 +709,11 @@ With the built-in key - the default - a film's or a series' title and year
 go to The Movie Database for its poster and details, and with them this
 computer's address, as to any service; never a login or the provider's
 address (`providers/metadata.py`). Nothing is asked about what plays
-privately (`privacy.title_private`). **Provider artwork, TMDB off**
+privately (`privacy.title_private`), and the pictures TMDB named for it
+before - its poster, backdrop, cast and episode stills - come from the
+copy on disk alone while it plays, none fetched from image.tmdb.org
+(`privacy.hold_pictures`, `picture_held`; `core/workers.LogoLoader`).
+**Provider artwork, TMDB off**
 (Settings → Posters & info: `services/coverart.OFF`) asks TMDB nothing at
 all: no title search, no ids for Trakt or Simkl, no chart of the week, no
 picture of the provider's moved onto image.tmdb.org. A picture the
@@ -1089,7 +1095,10 @@ app does not count on it.
 *What is left.* The player's own memory - mpv's demuxer cache, the decoded
 picture - is the process's memory, which the system may swap like any
 other; that is protected only as the system's swap is. A hibernation image
-is the same.
+or a crash dump the system writes is the same. A media server the person
+watches from (Jellyfin, Emby, Plex) is told, as private viewing begins,
+that what played before has stopped and where it got to, as Stop would
+tell it (`ui/mw_media._ms_leave`); nothing of what then plays privately.
 
 ### Any program on the session bus can drive the app
 

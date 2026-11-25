@@ -513,3 +513,33 @@ weakness; it did not score casting (part 16) or the first-run guide (part
 | Backups | A backup's password is as strong as the password | low | Answered: at least 10 characters (`backup.PASSWORD_MIN`) and 600 000 PBKDF2 rounds; written down (docs/SECURITY.md, "A backup's password is as strong as the password") |
 | PINs | A four-digit PIN | low | Answered: a PIN keeps a family member out, slowed after two wrong tries, and the app says six digits or more are much harder to guess; written down (docs/SECURITY.md, "A PIN can be short") |
 | Builds | The build key signs in jobs that run other people's code | low | Answered: whoever took the build key could make a modified build call itself official, never sign an update - the update key signs only in its own step; written down (docs/SECURITY.md, "The build key signs in jobs that run other people's code") |
+
+A third independent AI assistant read the kit at the released 1.7.0 (a
+static review of the supplied excerpts; part 11 not supplied). It scored
+the whole 8.5/10 and found no critical or high weakness, no way a
+provider's login reaches dopeiptv.org, no plaintext access to synced
+settings or Watch together messages, and no way for the website alone to
+install an unsigned update. Fixed on testing; the rest answered:
+
+| Area | Finding | Severity (theirs) | Done |
+|------|---------|-------------------|------|
+| Logins | The check against dopeiptv.org still swallowed some settings-read errors: keys that could not be listed, a Kodi list or a list of sources that is no JSON counted as no logins | low | Fixed: each counts as settings that could not be read - nothing is sent (`site_out.account_logins`, `_fresh`, `UNCHECKED`). tests/test_site_out.py |
+| Logins | The app's own headers' values are not inspected; a short login only as a word of its own | low | Answered: those headers carry the app's fixed words (user agent, build kind), never a person's text; a login of five characters or fewer is matched as a word so ordinary words in feedback are not refused - written on the transparency page |
+| Logins | Windows' permissions are not checked | low, conditional | Answered as before: the registry and the user's profile, which Windows keeps to that user (docs/SECURITY.md) |
+| TMDB | A lookup under way could make its second and third request after its title began to play privately | low | Fixed: asked again before each request (`TmdbClient.fetch_details`' *go_on*). tests/test_privacy_playback.py |
+| TMDB | A provider's title reaches TMDB as the provider wrote it | low | Answered as before: what the lookup needs; artwork from the provider alone or TMDB off asks nothing |
+| TMDB | Cached artwork might be fetched during private viewing | unverified | Fixed - it could: details TMDB gave before were shown and their pictures not yet on disk fetched from image.tmdb.org. Now the poster, backdrop, cast and episode stills of what plays privately come from the disk's copy alone, none fetched while it plays (`privacy.hold_pictures`, `picture_held`, `LogoLoader`). tests/test_cover_flow.py, tests/test_privacy_playback.py |
+| Updates | A compromised update server could redirect the download to another https host | low | Answered: the file is checked against the signed list wherever it comes from; that host learns an address and a user agent, which the update server already had; a fixed list of hosts would stop updates the day GitHub moves its downloads |
+| Updates | A compromised site could withhold updates | low | Answered: written down; the update check asks GitHub when the site does not answer, and the signed list names the version |
+| Updates | The file could be changed between its check and its start | unverified | Answered: checked again right before it runs or is put in place, and no AppImage update in a folder another account may change (`verify_again`, `shared_folder` - its group too since the second round) |
+| Builds | The signing step is a trust boundary | low | Answered: the update key is in an environment that waits for the maintainer's approval at every release, used only by the checksum step |
+| Private viewing | Its card offered a Stop that stopped nothing when only a device watching through server mode held the buffer | low, conditional | Fixed: no card then, said in the log; the buffer moves off the disk once the device lets go (`mw_privacy._private_ask_kept`). tests/test_privacy_buffer.py |
+| Private viewing | A media server is told the playback before stopped as private viewing begins | low, conditional | Answered and written down: that is the end of a playback that was not private, as Stop tells it; nothing of the private one (docs/SECURITY.md, the transparency page) |
+| Private viewing | Hibernation and crash dumps | info | Written down beside swap (docs/SECURITY.md) |
+| Reports | A known title of one or two characters is not masked by name | low | Answered: the whole report is shown, editable, before Send |
+| Reports | The reply hash works as a bearer value; asking for answers in one request links the reports | low | Answered: the hash only fetches answers the site already holds; the link between reports asked for together is written down (docs/SECURITY.md, the transparency page) |
+| Crypto | The app's own ChaCha20-Poly1305 | assurance | Answered as before: RFC 8439's own vectors in the tests, fuzzed |
+| Website | Unknown swap status still collects; encrypted swap need not mean a forgotten key | low | Answered: the server's swap is a one-time-key `.eli` device, which FreeBSD gives a new key at every boot; the statistics stop on plain swap |
+| Website | Old marks without a tag are still read | low | Answered: read only until the visits sealed before the tag are gone (7 days), then removed |
+| Website | A deletion that fails keeps a record longer | low | Answered: logged and tried again, shown on the admin page |
+

@@ -103,10 +103,11 @@ def playback_started(kind: str, key: Any) -> None:
     else chosen after it ended is not. While keep_nothing is on, kept
     nowhere whatever private viewing says (the demo's), but of a kind
     spared."""
-    global _private_playback, _private_titles, _passing_playback
+    global _private_playback, _private_titles, _passing_playback, _held_pictures
     ident = (str(kind or ""), _key(key))
     if _private_playback != ident:
         _private_titles = frozenset()
+        _held_pictures = frozenset()
     if private():
         _private_playback = ident
     elif _private_playback != ident:
@@ -116,11 +117,12 @@ def playback_started(kind: str, key: Any) -> None:
 
 def playback_stopped() -> None:
     """Stop: what is played next is a new playback."""
-    global _private_playback, _private_titles, _passing_playback
+    global _private_playback, _private_titles, _passing_playback, _held_pictures
     _passing_playback = None
     if not private():
         _private_playback = None
         _private_titles = frozenset()
+        _held_pictures = frozenset()
 
 
 def playback_private(kind: str, key: Any) -> bool:
@@ -156,10 +158,12 @@ def playback_titles(*names: Any) -> None:
     """The names the playback just started goes by - its title, its series,
     a file's cleaned name. Kept only for a private one, and only to answer
     title_private()."""
-    global _private_titles
+    global _private_titles, _held_pictures
     _private_titles = (frozenset(f for f in map(_fold, names) if f)
                        if _private_playback is not None or _passing_playback is not None
                        else frozenset())
+    if not _private_titles:
+        _held_pictures = frozenset()
 
 
 def title_private(title: Any) -> bool:
@@ -167,6 +171,40 @@ def title_private(title: Any) -> bool:
     about it elsewhere (TMDB), though the lists around it still fetch
     their posters."""
     return bool(_private_titles) and _fold(title) in _private_titles
+
+
+#: How many pictures of what plays privately are held back at most - a
+#: title's poster, backdrop and cast, a series' episode stills; past it the
+#: newest title's alone.
+PICTURES_HELD_MAX = 1024
+# The pictures TMDB named for what plays privately (hold_pictures): shown
+# from a copy kept here alone while it plays. Gone with its titles.
+_held_pictures: frozenset[str] = frozenset()
+
+
+def hold_pictures(*urls: Any) -> None:
+    """Pictures TMDB named for what plays privately now - its poster, its
+    backdrop, its cast's photos, its episodes' stills: while it plays they
+    are shown only from a copy kept here, never fetched (core/workers'
+    LogoLoader, picture_held) - fetching one would say which title is on.
+    Nothing while nothing plays privately; gone with the playback."""
+    global _held_pictures
+    if not _private_titles:
+        return
+    new = frozenset(u for u in urls
+                    if isinstance(u, str) and u.lower().startswith(("http://", "https://")))
+    if not new or new <= _held_pictures:
+        return
+    held = _held_pictures | new
+    if len(held) > PICTURES_HELD_MAX:
+        held = frozenset(sorted(new)[:PICTURES_HELD_MAX])
+    _held_pictures = held
+
+
+def picture_held(url: Any) -> bool:
+    """Whether the picture *url* is one of what plays privately's
+    (hold_pictures): its copy here may be shown, nothing fetched."""
+    return bool(_held_pictures) and url in _held_pictures
 
 
 def for_log(text: Any) -> Any:

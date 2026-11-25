@@ -191,6 +191,36 @@ def test_settings_that_cannot_be_read_send_nothing_to_the_site():
     assert site_out.refusal("https://api.themoviedb.org/3/search/movie") is None
 
 
+def test_settings_read_only_in_part_send_nothing_to_the_site():
+    """Not only a file that went away: keys that cannot be listed, a list of
+    sources or a Kodi list that is no JSON - each could hide a login added
+    since, so the check fails closed for them too (the third outside review
+    of 1.7.0)."""
+    class Settings:
+        def __init__(self, values, keys_fail=False):
+            self.values, self.keys_fail = values, keys_fail
+
+        def value(self, key, default=""):
+            return self.values.get(key, default)
+
+        def allKeys(self):
+            if self.keys_fail:
+                raise RuntimeError("the registry would not list its keys")
+            return list(self.values)
+
+    good = json.dumps([_playlist()])
+    for keep in (Settings({"playlists": "[{not json"}),
+                 Settings({"playlists": json.dumps({"not": "a list"})}),
+                 Settings({"playlists": good}, keys_fail=True),
+                 Settings({"playlists": good, "kodi_devices": "[{broken"})):
+        site_out.learn([_playlist()], settings=keep)
+        assert site_out.refusal("https://dopeiptv.org/api/report", {}, b"{}") == site_out.UNCHECKED, keep.values
+    fine = Settings({"playlists": good, "kodi_devices": json.dumps([{"host": "k", "password": "kodi-secret-77"}])})
+    site_out.learn([_playlist()], settings=fine)
+    assert site_out.refusal("https://dopeiptv.org/api/report", {}, b"{}") is None
+    assert site_out.refusal("https://dopeiptv.org/api/report", {}, b"kodi-secret-77")
+
+
 def test_the_codes_that_open_a_copy_or_a_room_never_go():
     site_out.never("ABCD-EFGH-JKLM")
     assert site_out.refusal("https://dopeiptv.org/x", {}, b"code ABCD-EFGH-JKLM")

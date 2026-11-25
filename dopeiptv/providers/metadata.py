@@ -69,6 +69,18 @@ def bundled_tmdb_key() -> str:
 #: request went: nothing was asked.
 _PRIVATE: dict = {"private": True}
 
+
+def picture_urls(details: Any) -> list[str]:
+    """The pictures TMDB named in a title's *details*: its poster, its
+    backdrop, its cast's photos."""
+    if not isinstance(details, dict):
+        return []
+    urls = [details.get("poster_url"), details.get("backdrop_url")]
+    cast = details.get("cast")
+    if isinstance(cast, list):
+        urls += [c.get("profile_url") for c in cast if isinstance(c, dict)]
+    return [u for u in urls if isinstance(u, str) and u]
+
 class TmdbClient:
     """Thin wrapper around the TMDB v3 search/details endpoints."""
 
@@ -122,11 +134,13 @@ class TmdbClient:
             return with_poster[0]
         return results[0]
 
-    def fetch_details(self, title: str, kind: str,
-                      year: int | None = None) -> dict | None:
+    def fetch_details(self, title: str, kind: str, year: int | None = None,
+                      go_on: Callable[[], bool] | None = None) -> dict | None:
         """Search by title (optionally narrowed by year), then fetch
         poster/rating/IMDb id/cast in one combined request
-        (append_to_response) for the best match."""
+        (append_to_response) for the best match. *go_on* is asked before
+        each request after the first - a title that began to play
+        privately meanwhile: nothing more is asked, ``_PRIVATE`` back."""
         endpoint = "movie" if kind == "vod" else "tv"
         params: dict[str, Any] = {"api_key": self.api_key, "query": title,
                                   "include_adult": "false"}
@@ -141,6 +155,8 @@ class TmdbClient:
         # provider's year can be wrong/missing and a title-only hit
         # still beats no cover.
         if not results and year is not None:
+            if go_on is not None and not go_on():
+                return _PRIVATE
             params.pop("year", None)
             params.pop("first_air_date_year", None)
             r = requests.get(
@@ -153,6 +169,8 @@ class TmdbClient:
         tid = best.get("id")
         if tid is None:
             return None
+        if go_on is not None and not go_on():
+            return _PRIVATE
         r2 = requests.get(
             f"{self.BASE}/{endpoint}/{tid}",
             params={"api_key": self.api_key,
@@ -738,12 +756,15 @@ class PosterResolver(QObject):
         search_query = cleaned or title
 
         def fetch(t=search_query, k=kind, y=year, raw=title):
-            # Asked again on the worker, just before the request: a title
-            # that began to play privately while this one waited in the
-            # pool is not sent (privacy.title_private).
-            if privacy.title_private(raw) or offline.on():
+            # Asked again on the worker, just before the request - and
+            # before each one after it: a title that began to play
+            # privately while this one waited in the pool, or while its
+            # first answer came, is not sent (privacy.title_private).
+            def go_on() -> bool:
+                return not (privacy.title_private(raw) or offline.on())
+            if not go_on():
                 return _PRIVATE
-            return self.client.fetch_details(t, k, y)
+            return self.client.fetch_details(t, k, y, go_on=go_on)
 
         def done(details, key=key, raw=title, q=search_query):
             if details is _PRIVATE:
@@ -761,7 +782,7 @@ class PosterResolver(QObject):
             existing = self._cache.get(key) or {}
             if existing.get("manual"):
                 self._pending.discard(key)
-                self._on_resolved(key)
+                self._on_resolved(key, raw)
                 return
             if details:
                 _tmdb_dbg(f"MATCH  q={q!r} raw={raw!r} "
@@ -772,7 +793,7 @@ class PosterResolver(QObject):
             self._failed.discard(key)
             self._save()
             self._pending.discard(key)
-            self._on_resolved(key)
+            self._on_resolved(key, raw)
 
         def fail(msg, key=key, raw=title, q=search_query):
             # A TMDB request that timed out / hit a 5xx counts as
@@ -881,6 +902,8 @@ class PosterResolver(QObject):
             d["backdrop_url"] = (details or {}).get("backdrop_url")
             self._cache[key] = d
             self._save()
+            if privacy.title_private(title):
+                privacy.hold_pictures(d["backdrop_url"])
             try:
                 callback(d)
             except RuntimeError:
@@ -898,7 +921,11 @@ class PosterResolver(QObject):
             del self._cache[key]
             self._save()
 
-    def _on_resolved(self, key: str) -> None:
+    def _on_resolved(self, key: str, title: str = "") -> None:
+        if title and privacy.title_private(title):
+            # An answer asked for before the title began to play privately:
+            # what it names is shown from a copy kept here alone.
+            privacy.hold_pictures(*picture_urls(self._cache.get(key)))
         for cb in self._waiting.pop(key, []):
             try:
                 cb(self._cache.get(key) or {})
@@ -946,7 +973,12 @@ class PosterResolver(QObject):
             return None
         key = self._key(title, kind)
         if key in self._cache:
-            return self._cache[key]
+            details = self._cache[key]
+            if privacy.title_private(title):
+                # Shown from what is kept here, its pictures from the
+                # disk's copy alone: none fetched while it plays privately.
+                privacy.hold_pictures(*picture_urls(details))
+            return details
         if key in self._failed:
             return {}
         if privacy.title_private(title) or offline.on():

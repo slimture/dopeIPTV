@@ -208,32 +208,24 @@ def account_logins(settings: Any) -> set[str]:
     watch-history and subtitle accounts' tokens and passwords, the sync
     code, Home Assistant's and a webhook's, Nerd's proxy and headers, a
     Kodi's password (core/backup.py's LOGIN_SETTINGS and the settings that
-    hold one only sometimes)."""
+    hold one only sometimes). Settings that cannot be read - their keys, a
+    value, a Kodi list that is no JSON - raise: the caller sends nothing."""
     from .backup import _LOGIN_IN, LOGIN_SETTINGS
     plain = set(LOGIN_SETTINGS) - {"simkl_token_expires"}
     raw = settings.raw() if hasattr(settings, "raw") else settings
-    try:
-        keys = [str(k) for k in raw.allKeys()]
-    except Exception:
-        keys = []
+    keys = [str(k) for k in raw.allKeys()]
     out: set[str] = set()
     for key in keys:
         name = key.rsplit("/", 1)[-1]
         if name not in plain and name not in _LOGIN_IN:
             continue
-        try:
-            value = raw.value(key, "")
-        except Exception:
-            continue
+        value = raw.value(key, "")
         if name == "nerd_proxy":
             out |= _address_logins(str(value or ""))
         elif name == "nerd_headers":
             out |= _header_logins(value)
         elif name == "kodi_devices":
-            try:
-                devices = json.loads(value) if isinstance(value, str) else value
-            except ValueError:
-                devices = []
+            devices = json.loads(value) if isinstance(value, str) and value.strip() else value
             for d in devices if isinstance(devices, list) else []:
                 if isinstance(d, Mapping) and d.get("password"):
                     out.add(str(d.get("password")))
@@ -251,7 +243,8 @@ def _fresh() -> bool:
     """The sources and accounts as the settings hold them now: one added,
     signed in or synced since the last ``learn`` is known before anything
     is sent. False when the settings handed to ``learn`` could not be read -
-    the request is then not sent (``UNCHECKED``)."""
+    or hold a list of sources or a setting that is no JSON of ours - the
+    request is then not sent (``UNCHECKED``)."""
     global _seen_raw, _learnt
     ref = _settings
     s = ref() if ref is not None else None
@@ -266,10 +259,12 @@ def _fresh() -> bool:
     if stamp == _seen_raw:
         return True
     try:
-        rows = json.loads(raw) if raw else []
+        rows = json.loads(raw) if raw.strip() else []
     except ValueError:
-        rows = []
-    learn(rows if isinstance(rows, list) else [])
+        return False
+    if not isinstance(rows, list):
+        return False
+    learn(rows)
     with _lock:
         if accounts - _learnt:
             _learnt = _learnt | accounts

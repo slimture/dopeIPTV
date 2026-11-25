@@ -5,6 +5,26 @@ All notable changes to dopeIPTV, newest first. This project loosely follows
 [Semantic Versioning](https://semver.org/). Each release is also published, with
 downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/releases).
 
+## [Unreleased]
+
+### Changed
+
+- The check that keeps every login of yours from dopeiptv.org fails closed
+  in more cases: settings whose keys cannot be listed, a list of sources or
+  a Kodi list that is no JSON now send nothing to the site, as unreadable
+  settings already did. From the third independent review of 1.7.0.
+- A TMDB lookup asks before each of its requests - not only the first -
+  whether its title began to play privately meanwhile; if it did, nothing
+  more is asked.
+- The poster, backdrop, cast photos and episode stills TMDB gave before for
+  what plays privately are shown only from the copy on disk while it plays;
+  one not there is not fetched from image.tmdb.org until the playback is
+  over.
+- Private viewing turned on while only a device at home watches the same
+  channel through server mode no longer shows a card whose Stop stops
+  nothing: that buffer is the device's viewing, and it moves off the disk
+  once the device lets go (said in the log).
+
 ## [1.7.0]
 
 ### Added

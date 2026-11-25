@@ -374,3 +374,12 @@ def test_a_buffer_a_recording_or_cast_keeps_on_the_disk_is_asked_about_not_stopp
     quiet = Window(None)
     quiet._private_ask_kept()
     assert quiet.notices.decisions() == []
+    # Held only by a device watching through server mode: no card whose
+    # Stop would stop nothing (an outside review of 1.7.0).
+    class ServerOnly:
+        recorders: list = []
+        held = True
+    tv = Window(ServerOnly())
+    tv._cast_device = None
+    tv._private_ask_kept()
+    assert tv.notices.decisions() == [] and tv.rec.cancelled == []

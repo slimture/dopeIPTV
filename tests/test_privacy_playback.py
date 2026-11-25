@@ -428,6 +428,42 @@ def test_a_lookup_queued_before_a_title_turned_private_is_not_sent(tmp_path):
         metadata.run_async = orig
 
 
+def test_a_lookup_under_way_asks_again_before_each_further_request(monkeypatch):
+    """A lookup is up to three requests: a title that begins to play
+    privately after the first is asked about no more (an outside review of
+    1.7.0) - and one that stays in the open goes on as ever."""
+    from dopeiptv.providers import metadata
+    calls: list = []
+
+    class Answer:
+        def __init__(self, data):
+            self.data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self.data
+
+    def get(url, params=None, timeout=None):
+        calls.append(url)
+        if "/search/" in url:
+            return Answer({"results": [] if params.get("year") else [{"id": 5, "poster_path": "/p.jpg"}]})
+        return Answer({"title": "Late Film"})
+
+    monkeypatch.setattr(metadata.requests, "get", get)
+    client = metadata.TmdbClient("key")
+    turns = iter([False])
+    assert client.fetch_details("Late Film", "vod", 2020, go_on=lambda: next(turns, False)) is metadata._PRIVATE
+    assert len(calls) == 1, calls
+    calls.clear()
+    assert client.fetch_details("Late Film", "vod", None, go_on=lambda: False) is metadata._PRIVATE
+    assert len(calls) == 1 and "/search/" in calls[0], calls
+    calls.clear()
+    got = client.fetch_details("Late Film", "vod", 2020, go_on=lambda: True)
+    assert got and got["tmdb_id"] == 5 and len(calls) == 3
+
+
 def test_the_series_page_keeps_no_season_for_a_series_played_privately():
     from dopeiptv.ui.mw_series_page import _SeriesPageMixin
     f = SimpleNamespace(_sp_ctx={"series_id": 7})
@@ -703,3 +739,26 @@ def test_a_failed_private_recording_is_not_named_either():
     assert event == "recording_failed" and fields["private"] is True
     m = events.payload(event, {k: v for k, v in fields.items() if k != "private"}, True)
     assert m["private"] is True and "title" not in m and "error" not in m
+
+
+def test_pictures_are_held_only_for_what_plays_privately_and_go_with_it():
+    """hold_pictures: nothing while nothing plays privately, only web
+    addresses, bounded, and gone with the playback - a new one or its
+    stop."""
+    privacy.hold_pictures("https://image.tmdb.org/a.jpg")
+    assert not privacy.picture_held("https://image.tmdb.org/a.jpg")
+    _began_private("movie", 7, "Secret Film")
+    privacy.hold_pictures("https://image.tmdb.org/a.jpg", "file:///etc/passwd", None, 5)
+    assert privacy.picture_held("https://image.tmdb.org/a.jpg")
+    assert not privacy.picture_held("file:///etc/passwd")
+    privacy.playback_titles("Secret Film", "Its Series")        # the same playback named again
+    assert privacy.picture_held("https://image.tmdb.org/a.jpg")
+    many = [f"https://image.tmdb.org/{i}.jpg" for i in range(privacy.PICTURES_HELD_MAX + 5)]
+    privacy.hold_pictures(*many)
+    assert len(privacy._held_pictures) <= privacy.PICTURES_HELD_MAX
+    privacy.playback_started("movie", 8)                       # another, in the open
+    assert not privacy.picture_held("https://image.tmdb.org/a.jpg")
+    _began_private("movie", 7, "Secret Film")
+    privacy.hold_pictures("https://image.tmdb.org/a.jpg")
+    privacy.playback_stopped()
+    assert not privacy.picture_held("https://image.tmdb.org/a.jpg")

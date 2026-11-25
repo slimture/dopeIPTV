@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from . import drawn_art, picture_files
+from . import drawn_art, picture_files, privacy
 from .log import log
 
 # A browser-style User-Agent for image fetches. python-requests'
@@ -709,7 +709,7 @@ class LogoLoader(QObject):
             return None
         if dp.is_file():
             return dp
-        if self.is_dead(url) or _offline_skips(url):
+        if self.is_dead(url) or _offline_skips(url) or privacy.picture_held(url):
             return None
         try:
             r = _image_get(url)(url, headers=_IMG_HEADERS, stream=True,
@@ -867,6 +867,12 @@ class LogoLoader(QObject):
             # never marked dead, so it comes once the network is back.
             if _offline_skips(u):
                 _img_dbg(f"offline skip {u}")
+                return u, None
+            # What plays privately: TMDB's pictures of it from the disk's
+            # copy alone (core/privacy.hold_pictures) - fetching one would
+            # say which title is on. It comes once the playback is over.
+            if privacy.picture_held(u):
+                _img_dbg("private skip")
                 return u, None
             # Short connect timeout: a host that's down should cost a
             # worker ~3 s, not the full read timeout - with hundreds

@@ -1369,3 +1369,95 @@ def test_delegate_falls_back_when_tmdb_url_is_dead(qapp, settings):
     d = FakeDelegate(win)
     it = {"name": "Movie", "stream_icon": "https://provider/x.jpg"}
     assert d.pick_url(it, "vod") == "https://provider/x.jpg"
+
+
+def test_tmdbs_pictures_of_what_plays_privately_come_from_the_disk_alone(qapp, tmp_path,
+                                                                        monkeypatch, settings):
+    """A title playing privately whose details TMDB gave before: its poster,
+    backdrop and cast's photos are shown from the copy on disk, and one not
+    there is not fetched - which picture is asked for says which title is
+    on (an outside review of 1.7.0). Another title's are fetched as ever,
+    and once the playback is over its own too."""
+    from dopeiptv.core import privacy
+    from dopeiptv.core.workers import LogoLoader
+    from dopeiptv.providers.metadata import PosterResolver
+
+    asked: list[str] = []
+
+    class FakeResp(_Body):
+        status_code = 200
+        content = _valid_png_bytes()
+
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, headers=None, timeout=None, stream=False):
+        asked.append(url)
+        return FakeResp()
+
+    monkeypatch.setattr("dopeiptv.core.workers.requests.get", fake_get)
+    poster, backdrop, face = ("https://image.tmdb.org/t/p/w342/p.jpg",
+                              "https://image.tmdb.org/t/p/w780/b.jpg",
+                              "https://image.tmdb.org/t/p/w185/c.jpg")
+    other = "https://image.tmdb.org/t/p/w342/other.jpg"
+    r = PosterResolver(_pool(), settings, MagicMock())
+    r._cache[r._key("Secret Film", "vod")] = {
+        "tmdb_id": 3, "poster_url": poster, "backdrop_url": backdrop,
+        "cast": [{"name": "A", "profile_url": face}, {"name": "B", "profile_url": None}]}
+    r._cache[r._key("Open Film", "vod")] = {"tmdb_id": 4, "poster_url": other}
+    pool = _pool()
+    loader = LogoLoader(pool, max_size=16, cache_dir=tmp_path)
+    kept = loader._disk_path(poster)
+    kept.parent.mkdir(parents=True, exist_ok=True)
+    kept.write_bytes(_valid_png_bytes())
+    try:
+        privacy.set_private(True)
+        privacy.playback_started("movie", 7)
+        privacy.playback_titles("Secret Film")
+        privacy.set_private(False)
+        assert r.get_full("Secret Film", "vod", lambda d: None)["tmdb_id"] == 3
+        assert r.get_full("Open Film", "vod", lambda d: None)["tmdb_id"] == 4
+        assert all(privacy.picture_held(u) for u in (poster, backdrop, face))
+        assert not privacy.picture_held(other)
+        got: dict[str, list] = {poster: [], backdrop: [], face: [], other: []}
+        for url in got:
+            loader.get(url, got[url].append)
+        _drain_pool(pool, qapp)
+        assert len(got[poster]) == 1 and not got[poster][0].isNull()   # its copy on disk
+        assert got[backdrop] == [] and got[face] == []
+        assert loader.fetch_file(backdrop) is None
+        assert asked == [other]
+        privacy.playback_stopped()
+        assert not privacy.picture_held(backdrop)
+        loader.dead.clear()
+        loader.get(backdrop, got[backdrop].append)
+        _drain_pool(pool, qapp)
+        assert asked == [other, backdrop] and len(got[backdrop]) == 1
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()
+
+
+def test_an_answer_that_comes_once_the_title_plays_privately_holds_its_pictures(qapp,
+                                                                                settings):
+    """Asked before the title began to play privately, answered after: the
+    pictures it names are held back too."""
+    from dopeiptv.core import privacy
+    from dopeiptv.providers.metadata import PosterResolver
+    def answer(*_a, **_k):
+        privacy.set_private(True)               # began to play as the answer came
+        privacy.playback_started("movie", 9)
+        privacy.playback_titles("Late Film")
+        return {"tmdb_id": 9, "backdrop_url": "https://image.tmdb.org/b9.jpg"}
+
+    client = MagicMock()
+    client.fetch_details.side_effect = answer
+    r = PosterResolver(_pool(), settings, client)
+    try:
+        assert r.get_full("Late Film", "vod", lambda d: None) is None
+        _drain_pool(r.pool, qapp)
+        assert client.fetch_details.call_count == 1
+        assert privacy.picture_held("https://image.tmdb.org/b9.jpg")
+    finally:
+        privacy.set_private(False)
+        privacy.playback_stopped()
