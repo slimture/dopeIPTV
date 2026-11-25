@@ -283,12 +283,14 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <h3 id="private-limits">Det här skyddar det inte mot</h3>
 <ul class="tp-limits">
 <li>Din tv-leverantör ser fortfarande vad du spelar – den skickar strömmen till dig – och det kan alla som ser din nätverkstrafik också. Privat läge handlar om vad din egen dator sparar och berättar, inte om att vara osynlig.</li>
-<li>En inspelning är fortfarande en fil – appen frågar först, och sparar den om du säger ja. Läser en inspelning, en cast eller en annan enhet genom servermoden redan kanalens buffert på disken när du slår på privat läge, fortsätter den att skrivas där tills den sista av dem släpper den – från 1.6.12 säger appen det och erbjuder att stoppa den –; sedan öppnas kanalen igen på det privata sättet.</li>
+<li>En inspelning är fortfarande en fil – appen frågar först, och sparar den om du säger ja. Läser en inspelning, en cast eller en annan enhet genom servermoden redan kanalens buffert på disken när du slår på privat läge, fortsätter den att skrivas där tills den sista av dem släpper den – från 1.6.12 säger appen det om en inspelning eller en cast och erbjuder att stoppa den –; sedan öppnas kanalen igen på det privata sättet.</li>
 <li>Med krypterad swap kan bufferten flyttas till disken, krypterad. Får swapen en ny nyckel vid varje start går den inte att läsa efteråt; följer nyckeln med diskens egen kryptering kan den läsas av den som kan låsa upp disken.</li>
 <li>Privat läge verkar inte bakåt i tiden: det som sparades eller berättades innan du slog på det – en scrobble som redan har börjat, en rad i historiken – finns kvar. Rensa senaste historiken tar bort det som finns på datorn, men inte det en tjänst redan har fått.</li>
 <li>Spelarens eget minne – bilden den avkodar, det den läser i förväg – är programmets minne, som systemet kan flytta till swap som allt annat: det är bara så skyddat som din swap är.</li>
 <li>En cast som konverteras på disken när du slår på privat läge fortsätter i upp till en sekund innan den stannar; det den skrev raderas då.</li>
 <li>På macOS och Windows finns inget sådant minne för appen: där har en privat kanal ingen buffert, och en cast som behöver konverteras konverteras inte.</li>
+<li>I 1.7.0 kan en affisch, en bakgrundsbild eller ett skådespelarfoto som TMDB tidigare har gett för det du tittar på privat, och som inte finns på datorn än, fortfarande hämtas från TMDB:s bildserver medan det spelas. Från nästa version visas bara kopian som redan finns på datorn.</li>
+<li>En mediaserver du tittar från (Jellyfin, Emby, Plex) får veta, när privat visning börjar, att det som spelades innan har stoppats och hur långt det kom – som när du trycker Stopp. Inget om det som sedan spelas privat.</li>
 </ul>
 <details class="tp-proof">
 <summary><span class="tp-fold-t">Koden bakom, och hur du kontrollerar det</span></summary>
@@ -342,6 +344,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>Rensningen känner till mönster och det appen vet är ditt. Ord du själv skriver i en feedback, eller ett namn den aldrig har sett – ett filnamn, en kanal ur en lista du har tagit bort – blir kvar som de är. Därför ser du hela rapporten innan något skickas.</li>
 <li>Vår servers andra rensning är enklare än appens: den letar efter samma mönster, men känner inte till dina namn. Den finns för en gammal app eller ett handgjort anrop; det är appens rensning som räknas.</li>
 <li>Som alla anrop på internet kommer rapporten från din IP-adress. Vår server använder den bara i minnet, i ungefär tio minuter, för att begränsa hur många rapporter en adress kan skicka, och sparar den aldrig.</li>
+<li>När appen frågar efter svar frågar den om alla dina rapporter i samma anrop – så vår server kan se att de rapporterna kom från samma dator, men inte vems den är.</li>
 </ul>
 <details class="tp-proof">
 <summary><span class="tp-fold-t">Koden bakom, och hur du kontrollerar det</span></summary>

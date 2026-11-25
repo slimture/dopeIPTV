@@ -283,12 +283,14 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <h3 id="private-limits">What it does not protect against</h3>
 <ul class="tp-limits">
 <li>Your TV provider still sees what you play – it sends you the stream – and so can anyone who can see your network traffic. Private viewing is about what your own computer keeps and tells, not about being invisible.</li>
-<li>A recording is still a file – the app asks first, and keeps it if you say yes. If a recording, a cast or another device through server mode already reads the channel's buffer on the disk when you turn private viewing on, it goes on being written there until the last of them lets go of it – from 1.6.12 the app tells you so and offers to stop it –; then the channel is opened again the private way.</li>
+<li>A recording is still a file – the app asks first, and keeps it if you say yes. If a recording, a cast or another device through server mode already reads the channel's buffer on the disk when you turn private viewing on, it goes on being written there until the last of them lets go of it – from 1.6.12 the app tells you so of a recording or a cast and offers to stop it –; then the channel is opened again the private way.</li>
 <li>With encrypted swap the buffer may be moved to the disk, encrypted. If the swap gets a new key at every start it cannot be read afterwards; if its key comes with the disk's own encryption, whoever can unlock the disk can read it.</li>
 <li>Private viewing does not work backwards: what was kept or told before you turned it on – a scrobble already begun, a line in the history – stays. Clear recent history removes what is on the computer, not what a service has already been told.</li>
 <li>The player's own memory – the picture it decodes, what it reads ahead – is the program's memory, which your system may move to swap like any other: it is protected only as your swap is.</li>
 <li>A cast being converted on the disk when you turn private viewing on goes on for up to a second before it stops; what it wrote is deleted then.</li>
 <li>On macOS and Windows there is no such memory for the app: a private channel has no rewind buffer there, and a cast that needs converting is not converted.</li>
+<li>In 1.7.0 a poster, backdrop or cast photo that TMDB named earlier for what you watch privately, and that is not on your computer yet, can still be fetched from TMDB's picture server while it plays. From the next version only the copy already on your computer is shown.</li>
+<li>A media server you watch from (Jellyfin, Emby, Plex) is told, as private viewing begins, that what played before has stopped and where it got to – as Stop would tell it. Nothing of what then plays privately.</li>
 </ul>
 <details class="tp-proof">
 <summary><span class="tp-fold-t">The code behind it, and how to check it yourself</span></summary>
@@ -342,6 +344,7 @@ QT_QPA_PLATFORM=offscreen python3 -m pytest tests/test_report.py</code></pre>
 <li>The cleaning knows patterns and what the app knows is yours. Words you type yourself in a piece of feedback, or a name it has never seen – a file name, a channel from a list you have since removed – stay as they are. That is why you see the whole report before anything is sent.</li>
 <li>Our server's second cleaning is simpler than the app's: it looks for the same patterns, but it does not know your names. It is there for an old app or a hand-made request; the app's cleaning is the one that counts.</li>
 <li>Like every request on the internet, the report arrives from your IP address. Our server uses it only in memory, for about ten minutes, to limit how many reports one address can send, and never stores it.</li>
+<li>When the app asks for answers, it asks about all your reports in one request – so our server can tell that those reports came from the same computer, though not whose it is.</li>
 </ul>
 <details class="tp-proof">
 <summary><span class="tp-fold-t">The code behind it, and how to check it yourself</span></summary>
