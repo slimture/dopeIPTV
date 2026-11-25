@@ -2369,23 +2369,6 @@ section.legal-main { padding: 18px 0 84px; }
 /* -- Audit us: each part's icon -----------------------------------------------
    Drawn by mask in the accent colour, so they follow the theme; how a part
    is laid out is in "The legal pages" at the end. */
-.tp-i-user { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c0-4 4-6 8-6s8 2 8 6'/%3E%3Cpath d='M3 3l18 18'/%3E%3C/svg%3E"); }
-.tp-i-eye { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6'/%3E%3Cpath d='M9.9 9.9a3 3 0 0 0 4.2 4.2'/%3E%3C/svg%3E"); }
-.tp-i-code { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16'/%3E%3C/svg%3E"); }
-.tp-i-logins { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E"); }
-.tp-i-watching { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E"); }
-.tp-i-updates { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21c0-4 4-6 8-6s8 2 8 6'/%3E%3C/svg%3E"); }
-.tp-i-hosts { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z'/%3E%3C/svg%3E"); }
-.tp-i-builds { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'/%3E%3Cpath d='M8.5 12l2.5 2.5 4.5-5'/%3E%3C/svg%3E"); }
-.tp-i-private { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6'/%3E%3Cpath d='M9.9 9.9a3 3 0 0 0 4.2 4.2'/%3E%3C/svg%3E"); }
-.tp-i-reports { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5M9 13h6M9 17h6'/%3E%3C/svg%3E"); }
-.tp-i-sync { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4'/%3E%3C/svg%3E"); }
-.tp-i-together { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20c0-3.6 3-5.5 6.5-5.5s6.5 1.9 6.5 5.5'/%3E%3Cpath d='M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2.2.6 3.5 2.4 3.5 5.3'/%3E%3C/svg%3E"); }
-.tp-i-website { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V11M10 20V4M16 20v-6M2 20h20'/%3E%3C/svg%3E"); }
-.tp-i-webservers { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='7' rx='2'/%3E%3Crect x='3' y='13' width='18' height='7' rx='2'/%3E%3Cpath d='M7 7.5h.01M7 16.5h.01'/%3E%3C/svg%3E"); }
-.legal .tp-promise-ico { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.7 2.7L16 9.8'/%3E%3C/svg%3E"); }
-.legal .tp-know-ico { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E"); }
-.legal .tp-limits-ico { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4 2.5 20h19z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E"); }
 .legal .tp-ai-ico { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z'/%3E%3Cpath d='M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z'/%3E%3C/svg%3E"); }
 .legal .tp-part > h2::before { content: ""; position: absolute; border-radius: 13px;
   background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 24%, transparent), color-mix(in srgb, var(--accent) 9%, transparent)); }
@@ -2422,8 +2405,8 @@ section.legal-main { padding: 18px 0 84px; }
 .legal .tp-part > h3 { margin: 22px 0 10px; color: var(--muted); font-size: 13px; font-weight: 600;
   letter-spacing: .06em; text-transform: uppercase; }
 
-.legal .tp-part .tp-promise, .legal .tp-part .tp-know, .legal .tp-limits-box { position: relative; }
-.legal .tp-part .tp-promise::before, .legal .tp-part .tp-know::before, .legal .tp-limits-box::before { content: "";
+.legal .tp-part .tp-promise, .legal .tp-part .tp-know { position: relative; }
+.legal .tp-part .tp-promise::before, .legal .tp-part .tp-know::before { content: "";
   position: absolute; inset-inline-start: 20px; width: 22px; height: 22px;
   -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
 .legal .tp-part .tp-promise { margin: 0 0 12px; padding: 18px 20px; padding-inline-start: 56px; border: 0; border-radius: 16px;
@@ -2442,12 +2425,6 @@ section.legal-main { padding: 18px 0 84px; }
   width: 8px; height: 8px; border-top: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
   border-right: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); transform: rotate(45deg); }
 [dir="rtl"] .legal .tp-part .tp-flow li:not(:last-child)::after { transform: rotate(-135deg); }
-
-.legal .tp-limits-box { margin: 8px 0 6px; padding: 16px 20px 6px; padding-inline-start: 56px; border-radius: 16px;
-  background: color-mix(in srgb, #e8a33d 9%, var(--surface)); }
-.legal .tp-limits-box::before { top: 17px; background: #d08a1e; }
-.legal .tp-limits-box > h3 { margin: 0 0 8px; font-size: 16px; }
-.legal .tp-limits-box > ul { margin: 0 0 10px; padding-inline-start: 18px; font-size: 15.5px; line-height: 1.6; }
 
 @media (max-width: 760px) {
   .legal .tp-part > h2 { font-size: 21px; min-height: 46px; padding-inline-start: 58px; }
@@ -2617,27 +2594,6 @@ section.legal-main { padding: 18px 0 84px; }
   .legal .callout.tp-ai::before { top: 18px; inset-inline-start: 16px; }
 }
 
-/* Audit us: the overview - every question, its answer led by its word,
-   the number of its limits small under it; two columns where there is room,
-   one on a phone. A list, not a table: nothing to read across. */
-.legal .tp-ov-h { margin: 0 0 6px; padding: 0; border: 0; font-size: 21px; }
-.legal ul.tp-overview { list-style: none; margin: 0 0 18px; padding: 0;
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 36px; }
-.legal .tp-overview li { margin: 0; padding: 16px 0 15px; border-top: 1px solid var(--line); }
-.legal .tp-ov-q { display: block; color: var(--text); font-size: 16.5px; font-weight: 600; line-height: 1.4; text-decoration: none; }
-.legal .tp-ov-q:hover { text-decoration: underline; text-underline-offset: 3px; }
-.legal .tp-ov-a { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
-.legal .tp-verdict { font-weight: 700; color: var(--text); }
-.legal .tp-verdict.is-good { color: color-mix(in srgb, var(--ok) 80%, var(--text)); }
-.legal .tp-verdict::after { content: "."; }
-.legal .tp-ov-l { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13.5px; font-weight: 600;
-  color: color-mix(in srgb, var(--warn) 85%, var(--text)); text-decoration: none; }
-.legal .tp-ov-l::before { content: ""; width: 14px; height: 14px; background: currentColor;
-  -webkit-mask: var(--i-warn) center / contain no-repeat; mask: var(--i-warn) center / contain no-repeat; }
-.legal .tp-ov-l:hover { text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 700px) {
-  .legal ul.tp-overview { grid-template-columns: minmax(0, 1fr); }
-}
 .legal .tp-howto { margin: 0 0 30px; }
 
 /* Audit us: each part - its question, its answer, what we can know. */
@@ -2702,18 +2658,6 @@ section.legal-main { padding: 18px 0 84px; }
   font-size: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
 .legal .tp-part .tp-flow li::after, .legal .tp-part ol.tp-flow:has(> li:nth-child(4)) > li:nth-child(2)::after { display: none; }
 
-/* A part's own button for an AI: quiet, at the part's end. */
-.legal .tp-tools { margin: 16px 0 0; }
-.legal button.tp-copy-mini { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 11px;
-  border: 0; border-radius: 999px; cursor: pointer; font: 600 14px/1.3 var(--sans);
-  color: color-mix(in srgb, var(--proof) 80%, var(--text)); background: color-mix(in srgb, var(--proof) 12%, transparent);
-  transition: background .2s ease; }
-.legal button.tp-copy-mini::before { content: ""; width: 16px; height: 16px; background: currentColor;
-  -webkit-mask: var(--i-spark) center / contain no-repeat; mask: var(--i-spark) center / contain no-repeat; }
-.legal button.tp-copy-mini:hover { background: color-mix(in srgb, var(--proof) 20%, transparent); }
-.legal button.tp-copy-mini:focus-visible { outline: 2px solid var(--proof); outline-offset: 3px; }
-.legal button.tp-copy-mini.is-done { color: #fff; background: var(--ok); }
-@media (prefers-reduced-motion: reduce) { .legal button.tp-copy-mini { transition: none; } }
 
 /* The legal pages' tabs stay in view under the site's bar while you read
    (on a phone as one row that scrolls sideways); at rest they sit in the
@@ -2796,4 +2740,58 @@ html:has(.legal-tabbar) { scroll-padding-top: 0; }
    screen's edges by as much, never past them. */
 @media (max-width: 720px) {
   .legal-side { margin-left: -18px; margin-right: -18px; padding-left: 18px; padding-right: 18px; }
+}
+
+/* Audit us, calm (November 2026): each part is its question and its answer
+   in a line, with everything else behind one Read more - the promise, what
+   we can know, how it works, the limits it names, and the code folded once
+   more inside. No icons, no part numbers, no counts: the page reads as a
+   list of eleven answers. The AI's box and how to read the page at its end. */
+.legal .tp-part { padding: 22px 0 20px; border-top: 1px solid var(--line); }
+.legal .tp-part:first-child { padding-top: 2px; border-top: 0; }
+.legal .tp-part > h2 { position: static; display: block; min-height: 0; margin: 0 0 6px; padding: 0;
+  font-size: 20px; line-height: 1.35; }
+.legal .tp-part > h2::after { display: none; }
+/* Its number, faint before it - what the words' "part 7" points to. */
+.legal.tp-doc { counter-reset: tp-part; }
+.legal .tp-part > h2 { position: relative; padding-inline-start: 34px; counter-increment: tp-part; }
+.legal .tp-part > h2::before { content: counter(tp-part); display: block; position: absolute; top: 0; inset-inline-start: 0;
+  width: 22px; height: auto; border-radius: 0; background: none; -webkit-mask: none; mask: none;
+  color: var(--faint); font-weight: 600; font-variant-numeric: tabular-nums; text-align: end; }
+.legal .tp-part > :is(.tp-answer, .tp-read) { margin-inline-start: 34px; }
+.legal .tp-answer { margin: 0 0 10px; color: var(--muted); font-size: 16px; line-height: 1.55; }
+.legal .tp-verdict { font-weight: 700; color: var(--text); }
+.legal .tp-verdict.is-good { color: color-mix(in srgb, var(--ok) 80%, var(--text)); }
+.legal .tp-verdict::after { content: "."; }
+.legal .tp-read > summary { display: inline-flex; align-items: center; gap: 8px; padding: 2px 0; cursor: pointer;
+  list-style: none; color: var(--accent); font: 600 15px/1.4 var(--sans); }
+.legal .tp-read > summary::-webkit-details-marker { display: none; }
+.legal .tp-read > summary::after { content: ""; width: 7px; height: 7px; margin-top: -3px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg);
+  transition: transform .2s ease, margin .2s ease; }
+.legal .tp-read[open] > summary::after { margin-top: 3px; transform: rotate(-135deg); }
+.legal .tp-read > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.legal .tp-read > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.legal .tp-read-body { padding: 14px 0 2px; animation: tp-rise .3s ease both; }
+.legal .tp-read-body > .tp-promise { margin: 0 0 8px; padding: 0; border: 0; border-radius: 0; background: none;
+  color: var(--text); font-size: 17px; line-height: 1.5; font-weight: 600; }
+.legal .tp-read-body > .tp-know { margin: 0 0 16px; padding: 0; border: 0; border-radius: 0; background: none;
+  color: var(--muted); font-size: 15.5px; line-height: 1.55; }
+.legal .tp-read-body > :is(.tp-promise, .tp-know)::before { display: none; }
+.legal .tp-read-body h3 { margin: 22px 0 8px; color: var(--text); font-size: 16px; font-weight: 650;
+  letter-spacing: normal; text-transform: none; }
+.legal .tp-read-body ul.tp-limits { margin: 0 0 6px; padding-inline-start: 18px; font-size: 15.5px; line-height: 1.6; }
+.legal .tp-read-body ul.tp-limits li { margin: 0 0 6px; }
+.legal .tp-read-body > .tp-proof { margin: 22px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: none; }
+.legal.tp-doc > .callout.tp-ai { margin: 34px 0 22px; }
+@media (max-width: 760px) {
+  .legal .tp-part > h2 { font-size: 18.5px; padding-inline-start: 28px; }
+  .legal .tp-part > h2::before { width: 18px; }
+  .legal .tp-part > :is(.tp-answer, .tp-read) { margin-inline-start: 28px; }
+  .legal .tp-read-body { margin-inline-start: -28px; }
+  .legal .tp-answer { font-size: 15.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legal .tp-read > summary::after { transition: none; }
+  .legal .tp-read-body { animation: none; }
 }

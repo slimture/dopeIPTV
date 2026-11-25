@@ -1,39 +1,30 @@
-/* Audit us (/transparency/): each part's button copies its
-   question, the page's own words for it - its promise, what we can know, the
-   hosts it lists and the limits it names, with the rule for judging those -
-   and its code together, ready to paste into any AI assistant. The
+/* Audit us (/transparency/): each part's button (under its code, in its
+   Read more) copies its question, the page's own words for it - its
+   promise, what we can know, the hosts it lists and the limits it names,
+   with the rule for judging those - and its code together, ready to paste
+   into any AI assistant. The
    code is the page's own (.tp-src, each block headed with the address of its
    lines on GitHub); nothing is fetched. Where the page may not write the
    clipboard, the text is put in a box, selected, to be copied by hand. */
 (function () {
   "use strict";
-  // Each part's own button, in view: at the part's end, under its folded
-  // rows, a copy of the one inside its proof (same words, same part), so
-  // nobody has to open the code to hand it to an AI. A sibling of the
-  // heading's, never inside it: the copy reads a part's heading and what
-  // follows it.
-  [].forEach.call(document.querySelectorAll(".tp-part"), function (sec) {
-    var h = sec.querySelector("h2[id]");
-    var own = h && document.querySelector('.tp-copy[data-for="' + h.id + '"]');
-    if (!own) { return; }
-    var row = document.createElement("p"), mini = own.cloneNode(true);
-    row.className = "tp-copy-row tp-tools";
-    mini.classList.remove("btn", "primary");
-    mini.classList.add("tp-copy-mini");
-    row.appendChild(mini);
-    sec.appendChild(row);
-  });
-  // A link to a folded row (the overview's limits) opens it.
+  // A link to something folded - a part's limits, inside its Read more -
+  // opens every fold around it.
+  function openAround(t) {
+    for (var el = t; el; el = el.parentElement) {
+      if (el.tagName === "DETAILS") { el.open = true; }
+    }
+  }
   function openTarget() {
     var t = location.hash && document.getElementById(location.hash.slice(1));
-    if (t && t.tagName === "DETAILS") { t.open = true; }
+    if (t) { openAround(t); }
   }
   window.addEventListener("hashchange", openTarget);
   openTarget();
   [].forEach.call(document.querySelectorAll('a[href^="#"]'), function (a) {
     a.addEventListener("click", function () {
       var t = document.getElementById(a.getAttribute("href").slice(1));
-      if (t && t.tagName === "DETAILS") { t.open = true; }
+      if (t) { openAround(t); }
     });
   });
   var buttons = document.querySelectorAll(".tp-copy[data-for]");
@@ -51,13 +42,8 @@
   // lists, the limits it names - and every block of code shown there or
   // named for it.
   // The heading a list or table stands under: the h3 just before it, or the
-  // one before its line of introduction - or, for the limits folded in a
-  // row of their own, that row's words.
+  // one before its line of introduction.
   function headOf(el) {
-    var fold = el.parentNode && el.parentNode.parentNode;
-    if (fold && fold.matches && fold.matches("details.tp-lim")) {
-      return clean(fold.querySelector(".tp-fold-t")) + ":\n";
-    }
     var prev = el.previousElementSibling;
     if (prev && prev.tagName === "P") { prev = prev.previousElementSibling; }
     return prev && prev.tagName === "H3" ? clean(prev) + ":\n" : "";
@@ -116,14 +102,14 @@
   function everything() {
     var all = document.querySelector('.tp-ask[data-for="all"]');
     var out = [all ? clean(all) : ""];
+    // "1. Can you see…": the parts numbered in the page's order, as the
+    // page's own words count them ("part 11").
+    var order = [].map.call(document.querySelectorAll(".tp-part > h2[id]"), function (h) { return h.id; });
     [].forEach.call(document.querySelectorAll(".tp-ask[data-for]"), function (ask) {
       var part = ask.getAttribute("data-for");
       if (part === "all") { return; }
-      var h = document.getElementById(part);
-      // "1. Can you see…": the number is a span of its own on the page.
-      var num = h && h.querySelector(".lnum"), title = h ? clean(h) : part;
-      if (num) { title = clean(num) + ". " + title.slice(clean(num).length).trim(); }
-      out.push("## " + title + "\n\n" + textFor(part, false));
+      var h = document.getElementById(part), n = order.indexOf(part) + 1;
+      out.push("## " + (n ? n + ". " : "") + (h ? clean(h) : part) + "\n\n" + textFor(part, false));
     });
     return out.join("\n\n\n");
   }

@@ -6,8 +6,9 @@ against the code they show (site/transparency.json, tools/transparency.py).
 - each language has the same placeholders as the English, so no language
   leaves out a proof;
 - each part's copy button has its question, and its proof is folded;
-- the overview at the top names every part, in order, with the number of
-  limits the part itself lists - and every part lists its own;
+- every part is its question, its answer in a line and one Read more that
+  holds the rest - its promise, how it works, the limits it lists (every
+  part lists its own) and its code; no overview or count beside it;
 - every address on the page points at the version it names - a tag or a
   commit, never a branch that moves;
 - what the page shows of this site's own files is still there to be shown
@@ -90,20 +91,23 @@ def test_each_copy_button_has_its_question_and_each_proof_is_folded():
             assert "<!--tp:copy " in proof.split("</details>\n")[-2] or "<!--tp:copy " in proof, lang
 
 
-def test_the_overview_names_every_part_with_its_own_count_of_limits():
+def test_every_part_is_its_question_its_answer_and_one_read_more():
     for lang, text in _words().items():
-        listing = text[text.index('<ul class="tp-overview">'):]
-        listing = listing[:listing.index("</ul>")]
-        rows = re.findall(r'<li><a class="tp-ov-q" href="#([a-z]+)">.*?<a class="tp-ov-l" href="#([a-z]+)-limits"[^>]*>(\d+) ',
-                          listing, re.S)
-        assert [r[0] for r in rows] == re.findall(r'<h2 id="([a-z]+)">\d+\.', text), lang
-        for pid, target, count in rows:
-            assert target == pid, f"{lang}: {pid}"
-            fold = re.search(r'<details class="tp-fold tp-lim" id="%s-limits">.*?<span class="tp-n">(\d+)</span>'
-                             r'.*?(<ul class="tp-limits">.*?</ul>)' % pid, text, re.S)
-            assert fold, f"{lang}: {pid} names no limits of its own"
-            n = fold.group(2).count("<li>")
-            assert int(fold.group(1)) == n == int(count), f"{lang}: {pid}"
+        parts = re.findall(r'<section class="tp-part">\n(.*?)\n</section>', text, re.S)
+        assert len(parts) == len(re.findall(r'<h2 id="', text)) == 11, lang
+        for part in parts:
+            m = re.match(r'<h2 id="([a-z]+)">([^<]+)</h2>\n<p class="tp-answer"><strong class="tp-verdict[^"]*">[^<]+</strong> '
+                         r'[^\n]+</p>\n<details class="tp-read">\n<summary>[^<]+</summary>\n<div class="tp-read-body">\n'
+                         r'<p class="tp-promise">', part)
+            assert m, f"{lang}: {part[:80]}"
+            pid = m.group(1)
+            assert not re.match(r"\d", m.group(2)), f"{lang}: {pid} is numbered by the page, not its words"
+            limits = re.search(r'<h3 id="%s-limits">[^<]+</h3>\n<ul class="tp-limits">(.*?)</ul>' % pid, part, re.S)
+            assert limits and limits.group(1).count("<li>") >= 1, f"{lang}: {pid} names no limits of its own"
+            assert part.rstrip().endswith("</div>\n</details>"), f"{lang}: {pid} has something outside its Read more"
+        # Nothing left of the overview, its counts or the icons it had.
+        for gone in ("tp-overview", "tp-ov-", "class=\"tp-n\"", "tp-lim\"", "tp-promise-ico", "tp-i-", "legal-toc"):
+            assert gone not in text, f"{lang}: {gone}"
 
 
 def test_every_address_names_its_version():
