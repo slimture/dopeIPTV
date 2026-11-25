@@ -965,6 +965,12 @@ section.fl-main { padding: 0 0 80px; }
 .fl-index .n { margin-inline-start: auto; padding-inline-start: 8px; color: var(--faint); font-size: 13px;
   font-weight: 500; font-variant-numeric: tabular-nums; }
 .fl-index a[aria-current] .n { color: inherit; }
+/* While every group shows, the one being read is marked as the page
+   scrolls (features.js); All gives the mark up meanwhile. */
+.fl-index a.is-here { color: var(--accent); background: var(--surface-2); font-weight: 600; }
+.fl-index a.is-here .n { color: inherit; }
+.fl-index.is-following a[aria-current]:not(.is-here) { color: var(--muted); background: none; font-weight: 400; }
+.fl-index.is-following a[aria-current]:not(.is-here) .n { color: var(--faint); }
 .fl-body { min-width: 0; }
 .fl-group { padding: 0; margin: 0 0 46px; scroll-margin-top: 80px; }
 .fl-group[hidden] { display: none; }
@@ -997,6 +1003,9 @@ body.searching .fl-group { margin-bottom: 30px; }
   .fl-index a { flex: none; padding: 9px 15px; border-radius: 999px; background: var(--surface); }
   .fl-index a[aria-current] { background: var(--text); color: var(--bg); }
   .fl-index a[aria-current] .n { color: inherit; opacity: .7; }
+  .fl-index a.is-here { background: var(--text); color: var(--bg); }
+  .fl-index a.is-here .n { color: inherit; opacity: .7; }
+  .fl-index.is-following a[aria-current]:not(.is-here) { background: var(--surface); }
   .fl-index .ic { width: 16px; height: 16px; }
   .fl-group { margin-bottom: 36px; scroll-margin-top: 130px; }
   .fl-group:first-of-type { margin-top: 12px; }

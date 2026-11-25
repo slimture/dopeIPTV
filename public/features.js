@@ -5,7 +5,9 @@
  * the page is the whole list and the groups are links down it. With it a
  * group shows that group alone (its address, /features/#cast, opens it so),
  * every word typed has to appear in a feature for it to stay, and the
- * groups' counts follow the search. Motion is a short fade, and none where
+ * groups' counts follow the search. While every group shows, the group
+ * being read is marked in the list as the page scrolls (on a phone its pill
+ * is brought into the row's view). Motion is a short fade, and none where
  * the reader asks for less.
  */
 (function () {
@@ -69,7 +71,43 @@
     if (none) none.hidden = shown > 0;
     if (clear) clear.hidden = !q;
     document.body.classList.toggle('searching', !!q);
+    follow();
   }
+
+  // The group being read, while every group shows: the last one whose
+  // heading has passed a line near the window's middle - the last one at the
+  // page's end, however short it is. At the page's top All stays marked;
+  // a group picked, or a search, marks nothing more.
+  var here = null, ticking = false;
+  function follow() {
+    var cur = '';
+    if (!group && !box.value.trim() && window.scrollY > 40) {
+      var line = window.innerHeight * 0.45;
+      var atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      groups.forEach(function (s) {
+        if (!s.hidden && (atEnd || s.getBoundingClientRect().top <= line)) cur = s.dataset.g;
+      });
+    }
+    if (cur === here) return;
+    here = cur;
+    index.classList.toggle('is-following', !!cur);
+    links.forEach(function (a) {
+      var on = !!cur && a.dataset.g === cur;
+      a.classList.toggle('is-here', on);
+      // On a phone the row scrolls sideways: the pill marked comes into
+      // its view, the page itself not moved.
+      if (on && index.scrollWidth > index.clientWidth) {
+        var left = a.offsetLeft - (index.clientWidth - a.offsetWidth) / 2;
+        index.scrollTo({ left: left, behavior: calm ? 'auto' : 'smooth' });
+      }
+    });
+  }
+  window.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(function () { ticking = false; follow(); });
+  }, { passive: true });
+  window.addEventListener('resize', follow);
 
   function pick(g, scroll) {
     group = g;
