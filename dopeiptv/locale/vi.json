@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Nội dung này đang phát riêng tư, nên không hỏi gì OpenSubtitles cho đến khi bạn nhấn Tìm kiếm – khi đó các từ trong ô mới được gửi đi.",
   "set_card_app_icon": "Biểu tượng ứng dụng",
   "set_app_icon_hint": "Trên Dock, thanh tác vụ và trình chuyển ứng dụng khi dopeIPTV đang chạy; biểu tượng của chính chương trình đã cài vẫn là màu xanh.",
+  "set_app_icon_hint_mac": "Trên Dock, Finder và trình chuyển ứng dụng – và vẫn giữ nguyên khi dopeIPTV đã đóng.",
   "icon_classic": "Xanh dương",
   "icon_heart": "Trái tim",
   "icon_accent": "Màu nhấn của bạn",

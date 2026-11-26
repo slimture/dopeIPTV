@@ -3162,6 +3162,7 @@
   "subs_private_ask": "当前为私密播放，因此在你按下“搜索”之前不会向 OpenSubtitles 发出任何请求——按下后，框中的文字才会发送过去。",
   "set_card_app_icon": "应用图标",
   "set_app_icon_hint": "dopeIPTV 运行时显示在程序坞、任务栏和应用切换器中；已安装程序本身的图标仍是蓝色那个。",
+  "set_app_icon_hint_mac": "显示在程序坞、访达和应用切换器中，dopeIPTV 关闭后也会保留。",
   "icon_classic": "蓝色",
   "icon_heart": "爱心",
   "icon_accent": "你的强调色",

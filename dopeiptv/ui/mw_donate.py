@@ -22,6 +22,7 @@ Every key is the household's (core/donate_rhythm.py), none a profile's own.
 
 from __future__ import annotations
 
+import sys
 import time
 
 from PyQt6.QtCore import QTimer
@@ -34,6 +35,8 @@ from .theme import HEART, P
 
 # The support page: why, a tip, GitHub Sponsors. Nothing is paid in the app.
 DONATE_URL = "https://dopeiptv.org/support/?ref={ref}"
+#: How long after the icon is shown (or picked) it is kept on the Mac app.
+BUNDLE_ICON_MS = 2000
 #: How long the seconds watched are taken as known (the household's logs
 #: are read again only after this, and only while a period could begin).
 WATCH_MEMO_S = 600.0
@@ -204,6 +207,24 @@ class _DonateMixin:
             app_icon.show(app_icon.chosen(self.settings))
         except Exception as e:
             log.warning("app icon: %s", e)
+        if sys.platform == "darwin":
+            # Kept on the Mac app as well, for the Dock and Finder once it is
+            # closed - a moment later, after the window shows and after the
+            # last of several quick picks (app_icon.keep_on_bundle).
+            timer = getattr(self, "_bundle_icon_timer", None)
+            if timer is None:
+                timer = self._bundle_icon_timer = QTimer(self)
+                timer.setSingleShot(True)
+                timer.setInterval(BUNDLE_ICON_MS)
+                timer.timeout.connect(self._app_icon_keep)
+            timer.start()
+
+    def _app_icon_keep(self) -> None:
+        from . import app_icon
+        try:
+            app_icon.keep_on_bundle(self.settings, app_icon.chosen(self.settings))
+        except Exception as e:
+            log.warning("app icon: not kept on the Mac app: %s", e)
 
     # -- the answers -------------------------------------------------------------
     def donated(self) -> None:

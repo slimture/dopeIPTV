@@ -233,3 +233,201 @@ def test_1_6_10s_heart_switch_is_kept_as_the_pickers_heart():
         def value(self, *_a, **_k):
             raise RuntimeError("unreadable")
     app_icon.carry_over(Broken())                    # never raises
+
+
+# -- the Mac app's own icon (app_icon.keep_on_bundle) ---------------------------
+
+_APP = []
+
+
+def _qapp():
+    """A QApplication kept for the module (one let go at once ends Qt)."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtWidgets import QApplication
+    if not _APP:
+        _APP.append(QApplication.instance() or QApplication([]))
+    return _APP[0]
+
+
+def _fake_mac(monkeypatch, tmp_path, works=True):
+    """A built app at a path of its own; set_bundle_icon as Get Info does it:
+    an Icon\\r file at the bundle's root, or none."""
+    from dopeiptv.core import platform_macos
+    from dopeiptv.ui import app_icon
+    app = tmp_path / "dopeIPTV.app"
+    (app / "Contents").mkdir(parents=True)
+    calls = []
+
+    def set_icon(bundle, png):
+        calls.append((bundle, png))
+        if not works:
+            return False
+        icon = os.path.join(bundle, platform_macos.CUSTOM_ICON)
+        if png is None:
+            if os.path.exists(icon):
+                os.remove(icon)
+        else:
+            with open(icon, "wb") as fh:
+                fh.write(png)
+        return True
+
+    monkeypatch.setattr(app_icon, "_bundle", lambda: app)
+    monkeypatch.setattr(platform_macos, "set_bundle_icon", set_icon)
+    return app, calls
+
+
+def test_the_icon_picked_is_kept_on_the_mac_app(monkeypatch, tmp_path):
+    """The Dock and Finder show a closed app's own icon: the one picked is put
+    on the bundle once, again only when it changes or a new bundle (an update)
+    came without it, and the blue one takes it away."""
+    _qapp()
+    from dopeiptv.core import platform_macos
+    from dopeiptv.ui import app_icon
+    app, calls = _fake_mac(monkeypatch, tmp_path)
+    s = _Settings()
+    assert app_icon.keep_on_bundle(s, "heart") == "set"
+    assert calls[-1][0] == str(app) and calls[-1][1].startswith(b"\x89PNG")
+    assert (app / platform_macos.CUSTOM_ICON).exists()
+    assert s[app_icon.BUNDLE_KEY] == f"heart||{app}"
+    assert app_icon.keep_on_bundle(s, "heart") == "" and len(calls) == 1
+    # An update's new bundle has the blue icon: the next start puts it back.
+    (app / platform_macos.CUSTOM_ICON).unlink()
+    assert app_icon.keep_on_bundle(s, "heart") == "set" and len(calls) == 2
+    assert app_icon.keep_on_bundle(s, "forest") == "set" and len(calls) == 3
+    # "accent" follows the accent.
+    monkeypatch.setattr(theme, "ACCENT", "#11aa55")
+    assert app_icon.keep_on_bundle(s, "accent") == "set"
+    monkeypatch.setattr(theme, "ACCENT", "#aa1155")
+    assert app_icon.keep_on_bundle(s, "accent") == "set" and len(calls) == 5
+    # The blue one: the bundle's own icon again, nothing kept of it.
+    assert app_icon.keep_on_bundle(s, app_icon.DEFAULT) == "removed"
+    assert calls[-1] == (str(app), None)
+    assert not (app / platform_macos.CUSTOM_ICON).exists()
+    assert app_icon.BUNDLE_KEY not in s
+    assert app_icon.keep_on_bundle(s, app_icon.DEFAULT) == "" and len(calls) == 6
+    # One not known is the blue one.
+    assert app_icon.keep_on_bundle(s, "no-such-look") == ""
+
+
+def test_an_icon_the_person_gave_the_app_in_finder_stays(monkeypatch, tmp_path):
+    """Never picked here, the app leaves a custom icon of Finder's Get Info
+    alone; and a bundle that refuses one keeps nothing said of it."""
+    _qapp()
+    from dopeiptv.core import platform_macos
+    from dopeiptv.ui import app_icon
+    app, calls = _fake_mac(monkeypatch, tmp_path)
+    (app / platform_macos.CUSTOM_ICON).write_bytes(b"theirs")
+    s = _Settings()
+    assert app_icon.keep_on_bundle(s, app_icon.DEFAULT) == ""
+    assert calls == [] and (app / platform_macos.CUSTOM_ICON).read_bytes() == b"theirs"
+    app2, calls2 = _fake_mac(monkeypatch, tmp_path / "other", works=False)
+    s2 = _Settings()
+    assert app_icon.keep_on_bundle(s2, "heart") == "" and len(calls2) == 1
+    assert app_icon.BUNDLE_KEY not in s2
+
+
+def test_only_a_built_mac_app_of_its_own_is_changed(monkeypatch, tmp_path):
+    """A checkout, Linux and Windows, an app macOS moved aside or one this
+    user may not change: nothing is written anywhere."""
+    from dopeiptv.core import macupdate
+    from dopeiptv.ui import app_icon
+    monkeypatch.setattr(macupdate, "app_bundle", lambda: None)
+    assert app_icon._bundle() is None
+    assert app_icon.keep_on_bundle(_Settings(), "heart") == ""
+    moved = tmp_path / "AppTranslocation" / "x" / "dopeIPTV.app"
+    moved.mkdir(parents=True)
+    monkeypatch.setattr(macupdate, "app_bundle", lambda: moved)
+    assert app_icon._bundle() is None
+    mine = tmp_path / "Applications" / "dopeIPTV.app"
+    mine.mkdir(parents=True)
+    monkeypatch.setattr(macupdate, "app_bundle", lambda: mine)
+    assert app_icon._bundle() == mine
+    monkeypatch.setattr(os, "access", lambda *_a, **_k: False)
+    assert app_icon._bundle() is None
+
+
+def test_what_was_put_on_the_bundle_is_this_computers_alone():
+    """The note of the icon on the bundle is never in a backup nor synced:
+    another computer's app has its own."""
+    from dopeiptv.core import backup, sync
+    from dopeiptv.ui import app_icon
+    assert not backup.covered("main", app_icon.BUNDLE_KEY)
+    assert not sync.syncable(app_icon.BUNDLE_KEY)
+
+
+def test_set_bundle_icon_asks_nsworkspace(monkeypatch, tmp_path):
+    """Apple's own setIcon:forFile:options: on the bundle (Get Info's way),
+    None to take it away; AppKit missing or failing is False, never raised."""
+    import types
+    from dopeiptv.core import platform_macos
+    seen = []
+
+    class Space:
+        def setIcon_forFile_options_(self, image, path, opts):
+            seen.append((image, path, opts))
+            return True
+
+        def noteFileSystemChanged_(self, path):
+            seen.append(("noted", path))
+
+    class Image:
+        @staticmethod
+        def alloc():
+            return Image()
+
+        def initWithData_(self, data):
+            self.data = data
+            return self
+
+    kit = types.SimpleNamespace(
+        NSData=types.SimpleNamespace(dataWithBytes_length_=lambda b, n: (b, n)),
+        NSImage=Image,
+        NSWorkspace=types.SimpleNamespace(sharedWorkspace=lambda: Space()))
+    monkeypatch.setitem(sys.modules, "AppKit", kit)
+    app = tmp_path / "dopeIPTV.app"
+    app.mkdir()
+    assert platform_macos.set_bundle_icon(str(app), b"\x89PNG..")
+    image, path, opts = seen[0]
+    assert image.data == (b"\x89PNG..", 6) and path == str(app) and opts == 0
+    assert ("noted", str(app)) in seen
+    seen.clear()
+    assert platform_macos.set_bundle_icon(str(app), None)
+    assert seen[0] == (None, str(app), 0)
+    kit.NSWorkspace = types.SimpleNamespace(sharedWorkspace=lambda: 1 / 0)
+    assert platform_macos.set_bundle_icon(str(app), None) is False
+    monkeypatch.setitem(sys.modules, "AppKit", None)
+    assert platform_macos.set_bundle_icon(str(app), b"x") is False
+
+
+def test_the_window_keeps_the_icon_on_the_mac_app_a_moment_later(monkeypatch):
+    """Only on a Mac, after the window shows and after the last of quick picks;
+    Reset all takes away what this app put there."""
+    _qapp()
+    from PyQt6.QtCore import QObject
+    from dopeiptv.ui import app_icon, mw_donate
+
+    class Win(mw_donate._DonateMixin, QObject):
+        def __init__(self):
+            QObject.__init__(self)
+            self.settings = _Settings({"app_icon": "grape"})
+
+    kept = []
+    monkeypatch.setattr(app_icon, "show", lambda *_a, **_k: True)
+    monkeypatch.setattr(app_icon, "keep_on_bundle", lambda s, look: kept.append(look))
+    monkeypatch.setattr(mw_donate.sys, "platform", "linux")
+    w = Win()
+    w._app_icon_refresh()
+    assert getattr(w, "_bundle_icon_timer", None) is None
+    monkeypatch.setattr(mw_donate.sys, "platform", "darwin")
+    w._app_icon_refresh()
+    w._app_icon_refresh()
+    timer = w._bundle_icon_timer
+    assert timer.isActive() and timer.isSingleShot()
+    assert timer.interval() == mw_donate.BUNDLE_ICON_MS and kept == []
+    timer.stop()
+    w._app_icon_keep()
+    assert kept == ["grape"]
+    src = open(os.path.join(_REPO_ROOT, "dopeiptv", "ui", "mw_settings.py"),
+               encoding="utf-8").read()
+    reset = src[src.index("def _reset_all_settings"):]
+    assert reset.index("keep_on_bundle(self.settings, app_icon.DEFAULT)") < reset.index("st.clear()")

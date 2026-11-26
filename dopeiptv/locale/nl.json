@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Dit speelt privé af, dus er wordt niets aan OpenSubtitles gevraagd tot je op Zoeken drukt – dan gaan de woorden in het vak ernaartoe.",
   "set_card_app_icon": "App-pictogram",
   "set_app_icon_hint": "In het Dock, de taakbalk en de app-wisselaar zolang dopeIPTV draait; het pictogram van het geïnstalleerde programma zelf blijft het blauwe.",
+  "set_app_icon_hint_mac": "In het Dock, de Finder en de app-wisselaar – en het blijft als dopeIPTV gesloten is.",
   "icon_classic": "Blauw",
   "icon_heart": "Hart",
   "icon_accent": "Je accentkleur",

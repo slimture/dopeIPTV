@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Ovo se reprodukuje privatno, pa se OpenSubtitles ništa ne pita dok ne pritisnete Pretraga – tada mu idu reči iz polja.",
   "set_card_app_icon": "Ikona aplikacije",
   "set_app_icon_hint": "U Docku, na traci zadataka i u izmenjivaču aplikacija dok dopeIPTV radi; ikona samog instaliranog programa ostaje plava.",
+  "set_app_icon_hint_mac": "U Docku, Finderu i izmenjivaču aplikacija – i ostaje kad je dopeIPTV zatvoren.",
   "icon_classic": "Plava",
   "icon_heart": "Srce",
   "icon_accent": "Vaša boja naglaska",

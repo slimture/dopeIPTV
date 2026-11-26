@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Det här spelas privat, så ingenting frågas av OpenSubtitles förrän du trycker på Sök – då skickas orden i rutan dit.",
   "set_card_app_icon": "Appikon",
   "set_app_icon_hint": "I Dock, aktivitetsfältet och programväxlaren medan dopeIPTV körs; det installerade programmets egen ikon förblir den blå.",
+  "set_app_icon_hint_mac": "I Dock, Finder och programväxlaren – och den ligger kvar när dopeIPTV är stängt.",
   "icon_classic": "Blå",
   "icon_heart": "Hjärta",
   "icon_accent": "Din accentfärg",

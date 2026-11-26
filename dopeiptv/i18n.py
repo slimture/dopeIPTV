@@ -1403,6 +1403,7 @@ _STRINGS: dict[str, dict[str, str]] = {
     "set_card_theme": {"en": "Theme"},
     "set_card_app_icon": {"en": "App icon"},
     "set_app_icon_hint": {"en": "In the Dock, the taskbar and the app switcher while dopeIPTV runs; the installed program's own icon stays the blue one."},
+    "set_app_icon_hint_mac": {"en": "In the Dock, Finder and the app switcher - and it stays when dopeIPTV is closed."},
     "icon_classic": {"en": "Blue"},
     "icon_heart": {"en": "Heart"},
     "icon_accent": {"en": "Your accent"},

@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Bu gizli olarak oynatılıyor, bu yüzden siz Ara'ya basana kadar OpenSubtitles'a hiçbir şey sorulmaz – o zaman kutudaki sözcükler ona gider.",
   "set_card_app_icon": "Uygulama simgesi",
   "set_app_icon_hint": "dopeIPTV çalışırken Dock'ta, görev çubuğunda ve uygulama değiştiricide; kurulu programın kendi simgesi mavi olan olarak kalır.",
+  "set_app_icon_hint_mac": "Dock'ta, Finder'da ve uygulama değiştiricide; dopeIPTV kapalıyken de kalır.",
   "icon_classic": "Mavi",
   "icon_heart": "Kalp",
   "icon_accent": "Vurgu renginiz",

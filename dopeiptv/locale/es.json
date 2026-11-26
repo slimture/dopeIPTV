@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Esto se reproduce en privado, así que no se pregunta nada a OpenSubtitles hasta que pulses Buscar; entonces se le envían las palabras del cuadro.",
   "set_card_app_icon": "Icono de la app",
   "set_app_icon_hint": "En el Dock, la barra de tareas y el selector de apps mientras dopeIPTV está abierto; el icono del programa instalado sigue siendo el azul.",
+  "set_app_icon_hint_mac": "En el Dock, el Finder y el selector de apps, y se mantiene cuando dopeIPTV está cerrado.",
   "icon_classic": "Azul",
   "icon_heart": "Corazón",
   "icon_accent": "Tu color de acento",

@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Hiki kinachezwa kwa faragha, kwa hiyo OpenSubtitles haiulizwi chochote hadi ubonyeze Tafuta – kisha maneno yaliyo kwenye kisanduku yanatumwa kwake.",
   "set_card_app_icon": "Aikoni ya programu",
   "set_app_icon_hint": "Kwenye Dock, upau wa kazi na kibadilishaji programu wakati dopeIPTV inaendelea; aikoni ya programu iliyosakinishwa yenyewe inabaki ile ya bluu.",
+  "set_app_icon_hint_mac": "Kwenye Dock, Finder na kibadilishaji programu – na inabaki hata dopeIPTV ikiwa imefungwa.",
   "icon_classic": "Bluu",
   "icon_heart": "Moyo",
   "icon_accent": "Rangi yako ya msisitizo",

@@ -3162,6 +3162,7 @@
   "subs_private_ask": "यह निजी रूप से चल रहा है, इसलिए जब तक आप खोजें नहीं दबाते, OpenSubtitles से कुछ नहीं पूछा जाता – तब बॉक्स के शब्द उसे भेजे जाते हैं।",
   "set_card_app_icon": "ऐप आइकन",
   "set_app_icon_hint": "dopeIPTV चलते समय Dock, टास्कबार और ऐप स्विचर में; इंस्टॉल किए गए प्रोग्राम का अपना आइकन नीला ही रहता है।",
+  "set_app_icon_hint_mac": "Dock, Finder और ऐप स्विचर में — और dopeIPTV बंद होने पर भी बना रहता है।",
   "icon_classic": "नीला",
   "icon_heart": "दिल",
   "icon_accent": "आपका एक्सेंट रंग",

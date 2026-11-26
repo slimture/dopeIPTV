@@ -218,7 +218,8 @@ by `core/places.retire_home` - "Open Home at startup" became `start_place`
   `theme_light` (these four this profile's), `corner_style`, `ui_scale`
   (the theme tiles folded: five in a row, the one chosen first, "All themes (N)" under them)
 - App icon: `app_icon` (one of `ui/app_icon.LOOKS`; the household's, the
-  blue one when never picked)
+  blue one when never picked; on a Mac kept on the app itself too - what was
+  put there noted in `_bundle_icon`, this computer's)
 - Lists: `view_density`, `sort_order`, `list_channel_numbers` (Show channel numbers, off by default)
 - What the places show (all of it this profile's; core/places.py,
   ui/mw_place_look.py): `just_the_list` (Just the list: no rows over TV,

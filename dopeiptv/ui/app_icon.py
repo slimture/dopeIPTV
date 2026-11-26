@@ -9,10 +9,12 @@ file: a frozen build has nothing extra to bundle or to lose. It is the
 window icon - the taskbar on Windows and X11, the Dock while the app runs
 on macOS - and on Linux it is also written into the user's icon theme,
 where a Wayland shell takes the icon of the window's entry from
-(core/desktop_entry.py). The entry itself is never touched. What a
-package ships - the .deb's and the AppImage's theme icons, the Flatpak's
-exported ones, the .icns, the .ico - is the plain icon, fixed when it was
-built.
+(core/desktop_entry.py). The entry itself is never touched. On macOS the
+one picked is also kept on the app itself as Finder's custom icon, so the
+Dock and Finder show it while the app is closed (`keep_on_bundle`; nothing
+in Contents changes). What a package ships - the .deb's and the AppImage's
+theme icons, the Flatpak's exported ones, the .icns, the .ico - is the
+plain icon, fixed when it was built.
 """
 
 from __future__ import annotations
@@ -278,6 +280,64 @@ def show(look: str, theme_icons: bool | None = None) -> bool:
     if _theme_icons:
         install_icon(icon)
     return True
+
+
+#: What this app last put on its bundle as the Mac app's own icon
+#: ("look|accent|bundle"); none while the bundle has its own. A key with a
+#: leading "_": this computer's, never in a backup or synced.
+BUNDLE_KEY = "_bundle_icon"
+
+
+def _bundle() -> Path | None:
+    """The running dopeIPTV.app, when its icon may be changed: a built app,
+    not moved aside by macOS nor run from the read-only .dmg, and this
+    user's to change."""
+    from ..core import macupdate
+    app = macupdate.app_bundle()
+    if app is None or "/AppTranslocation/" in str(app):
+        return None
+    return app if os.access(app, os.W_OK) else None
+
+
+def keep_on_bundle(settings, look: str) -> str:
+    """The icon picked kept on the Mac app itself, so the Dock, Finder and
+    Launchpad show it while the app is closed too - setWindowIcon lasts only
+    while it runs (core/platform_macos.set_bundle_icon). The blue one takes
+    away only a custom icon this app put there: one the person gave the app
+    in Finder's Get Info stays. An update brings a new bundle with the blue
+    icon; the next start puts the picked one back. "set", "removed", or ""
+    when nothing was done."""
+    app = _bundle()
+    if app is None:
+        return ""
+    from ..core import platform_macos
+    if look not in LOOKS:
+        look = DEFAULT
+    from . import theme
+    accent = theme.ACCENT if look == "accent" else ""
+    try:
+        had = str(settings.value(BUNDLE_KEY, "") or "")
+    except Exception:
+        had = ""
+    custom = (app / platform_macos.CUSTOM_ICON).exists()
+    if look == DEFAULT:
+        if not had:
+            return ""
+        if custom and not platform_macos.set_bundle_icon(str(app), None):
+            return ""
+        settings.remove(BUNDLE_KEY)
+        log.info("app icon: the Mac app's own icon again")
+        return "removed"
+    want = f"{look}|{accent}|{app}"
+    if had == want and custom:
+        return ""
+    png = _png_bytes(make_app_icon(inset=ICON_SAFE_INSET, sizes=(1024,),
+                                   look=look, accent=accent), 1024)
+    if not png or not platform_macos.set_bundle_icon(str(app), png):
+        return ""
+    settings.setValue(BUNDLE_KEY, want)
+    log.info("app icon: %s kept on the Mac app", look)
+    return "set"
 
 
 def install_icon(icon: QIcon) -> bool:

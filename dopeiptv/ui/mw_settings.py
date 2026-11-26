@@ -622,6 +622,14 @@ class _SettingsMixin:
         # reset empties - read before the setting that names it goes.
         rec = getattr(self, "rec", None)
         keep = [rec.directory()] if rec is not None else []
+        # An icon this app put on the Mac app goes with the rest, while the
+        # setting that says so is still there (ui/app_icon.keep_on_bundle).
+        if sys.platform == "darwin":
+            from . import app_icon
+            try:
+                app_icon.keep_on_bundle(self.settings, app_icon.DEFAULT)
+            except Exception as e:
+                log.warning("reset: the Mac app's icon not put back: %s", e)
         # Clear() drops every key from a QSettings scope - every profile's
         # (core/profiles.py) - and sync() flushes it to disk before we tell
         # the user to restart. Watched and Watch Later live in the cache

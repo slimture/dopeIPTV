@@ -17,6 +17,13 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Fixed
 
+- On a Mac the app icon you pick under Settings → Appearance stays when
+  dopeIPTV is closed: it is kept on the app itself, as Finder's Get Info
+  does it, so the Dock and Finder show it too. Picking the blue one again
+  gives the app its own icon back, and an icon you gave the app in Finder
+  is left alone. Before, the Dock went back to the blue icon the moment the
+  app quit.
+
 - The demo plays all six channels again: Akamai's live test stream and
   Bitmovin's copy of Sintel stopped answering. The first live channel is now
   Unified Streaming's second live demo, and Sintel comes from the Shaka

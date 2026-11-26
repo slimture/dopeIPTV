@@ -3162,6 +3162,7 @@
   "subs_private_ask": "비공개로 재생 중이라 검색을 누르기 전에는 OpenSubtitles에 아무것도 묻지 않습니다. 누르면 입력란의 단어가 전송됩니다.",
   "set_card_app_icon": "앱 아이콘",
   "set_app_icon_hint": "dopeIPTV가 실행되는 동안 Dock, 작업 표시줄, 앱 전환기에 표시됩니다. 설치된 프로그램 자체의 아이콘은 파란색 그대로입니다.",
+  "set_app_icon_hint_mac": "Dock, Finder, 앱 전환기에 표시되며 dopeIPTV를 닫아도 그대로 유지됩니다.",
   "icon_classic": "파랑",
   "icon_heart": "하트",
   "icon_accent": "나의 강조 색상",

@@ -457,7 +457,10 @@ def build_appearance(ctx: SettingsContext) -> None:
     c = look.card(tr("set_card_app_icon"))
     c.widget(icons, " ".join([tr("set_card_app_icon"), "icon ikon logo dock taskbar"]
                              + [t.text() for t in icons.tiles]))
-    c.note(tr("set_app_icon_hint"))
+    # On a Mac it is kept on the app itself, for the Dock and Finder once it
+    # is closed (app_icon.keep_on_bundle).
+    c.note(tr("set_app_icon_hint_mac" if sys.platform == "darwin"
+              else "set_app_icon_hint"))
     c = look.card(tr("set_card_lists"))
     c.row(tr("setting_list_size"), density_box)
     c.row(tr("setting_sort_by"), sort_box)

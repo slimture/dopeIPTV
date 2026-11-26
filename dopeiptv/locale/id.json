@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Ini diputar secara pribadi, jadi OpenSubtitles tidak ditanya apa pun sampai Anda menekan Cari – lalu kata-kata di kotak dikirim ke sana.",
   "set_card_app_icon": "Ikon aplikasi",
   "set_app_icon_hint": "Di Dock, taskbar, dan pengalih aplikasi selama dopeIPTV berjalan; ikon program yang terpasang itu sendiri tetap yang biru.",
+  "set_app_icon_hint_mac": "Di Dock, Finder, dan pengalih aplikasi – dan tetap ada saat dopeIPTV ditutup.",
   "icon_classic": "Biru",
   "icon_heart": "Hati",
   "icon_accent": "Warna aksen Anda",

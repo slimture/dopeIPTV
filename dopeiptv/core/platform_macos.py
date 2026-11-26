@@ -164,6 +164,44 @@ def fix_app_name(name: str) -> None:
         pass
 
 
+#: The file a custom icon of a folder (and so of an app bundle) is kept in,
+#: at the bundle's root beside Contents - written by Finder's Get Info and
+#: by NSWorkspace's setIcon:forFile:options: alike.
+CUSTOM_ICON = "Icon\r"
+
+
+def set_bundle_icon(bundle: str, png: bytes | None) -> bool:
+    """Give the app bundle at *bundle* the icon *png* (PNG bytes) as its own
+    custom icon, the one Finder, the Dock and Launchpad show while the app is
+    not running - or, with None, take a custom icon away so the bundle's own
+    .icns shows again. Apple's NSWorkspace setIcon:forFile:options:, as Get
+    Info does it: an ``Icon\\r`` file at the bundle's root and the folder's
+    custom-icon flag; nothing in Contents changes, so the signed code and
+    resources stay as they were. True when it took."""
+    from .log import log
+    try:
+        import AppKit
+        if png is None:
+            image = None
+        else:
+            data = AppKit.NSData.dataWithBytes_length_(png, len(png))
+            image = AppKit.NSImage.alloc().initWithData_(data)
+            if image is None:
+                return False
+        space = AppKit.NSWorkspace.sharedWorkspace()
+        done = bool(space.setIcon_forFile_options_(image, bundle, 0))
+        if done:
+            try:
+                os.utime(bundle, None)          # the Dock and Finder look again
+                space.noteFileSystemChanged_(bundle)
+            except Exception:
+                pass
+        return done
+    except Exception as e:
+        log.warning("macOS: the app's icon not kept on the bundle: %s", e)
+        return False
+
+
 def libmpv_install_hint(say=None) -> str:
     """Installation hint shown when libmpv is missing on macOS; *say* turns
     a string key into text (English for the log, translated for Settings)."""

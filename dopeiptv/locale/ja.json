@@ -3162,6 +3162,7 @@
   "subs_private_ask": "これはプライベートで再生中のため、「検索」を押すまで OpenSubtitles には何も問い合わせません。押すと、欄の語句が送られます。",
   "set_card_app_icon": "アプリのアイコン",
   "set_app_icon_hint": "dopeIPTV の実行中に Dock、タスクバー、アプリ切り替えに表示されます。インストールされたプログラム自体のアイコンは青のままです。",
+  "set_app_icon_hint_mac": "Dock、Finder、アプリ切り替えに表示され、dopeIPTV を閉じてもそのまま残ります。",
   "icon_classic": "ブルー",
   "icon_heart": "ハート",
   "icon_accent": "アクセントカラー",

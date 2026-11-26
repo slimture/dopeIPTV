@@ -3162,6 +3162,7 @@
   "subs_private_ask": "זה מתנגן בפרטיות, ולכן לא נשאל דבר את OpenSubtitles עד שתלחצו על חפש – אז המילים שבתיבה נשלחות אליו.",
   "set_card_app_icon": "סמל האפליקציה",
   "set_app_icon_hint": "ב-Dock, בשורת המשימות ובמחליף האפליקציות כל עוד dopeIPTV פועלת; הסמל של התוכנה המותקנת עצמה נשאר הכחול.",
+  "set_app_icon_hint_mac": "ב-Dock, ב-Finder ובמחליף האפליקציות – והוא נשאר גם כש-dopeIPTV סגורה.",
   "icon_classic": "כחול",
   "icon_heart": "לב",
   "icon_accent": "צבע ההדגשה שלך",

@@ -3162,6 +3162,7 @@
   "subs_private_ask": "Isto está tocando no modo privado, então nada é pedido ao OpenSubtitles até você tocar em Pesquisar – aí as palavras da caixa vão para ele.",
   "set_card_app_icon": "Ícone do app",
   "set_app_icon_hint": "No Dock, na barra de tarefas e no alternador de apps enquanto o dopeIPTV está aberto; o ícone do programa instalado continua o azul.",
+  "set_app_icon_hint_mac": "No Dock, no Finder e no alternador de apps — e continua quando o dopeIPTV está fechado.",
   "icon_classic": "Azul",
   "icon_heart": "Coração",
   "icon_accent": "Sua cor de destaque",

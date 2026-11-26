@@ -3162,6 +3162,7 @@
   "subs_private_ask": "รายการนี้เล่นแบบส่วนตัว จึงไม่มีการถาม OpenSubtitles จนกว่าคุณจะกดค้นหา – แล้วคำในช่องจะถูกส่งไป",
   "set_card_app_icon": "ไอคอนแอป",
   "set_app_icon_hint": "ใน Dock แถบงาน และตัวสลับแอปขณะ dopeIPTV ทำงาน ไอคอนของโปรแกรมที่ติดตั้งเองยังคงเป็นสีน้ำเงิน",
+  "set_app_icon_hint_mac": "ใน Dock, Finder และตัวสลับแอป และยังคงอยู่แม้ปิด dopeIPTV แล้ว",
   "icon_classic": "น้ำเงิน",
   "icon_heart": "หัวใจ",
   "icon_accent": "สีเน้นของคุณ",
