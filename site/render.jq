@@ -63,7 +63,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 | "https://solecraft.se" as $PAYEE_URL
 # dopeIPTV for iPhone, iPad and Apple TV: an app of its own, apart from the
 # computer's (site/apple.json). While its App Store address is empty the
-# site says it is coming - the front page's band under the downloads, its
+# site says it is coming - the front page's line over the headline, its
 # page /apple/, the menu's row; set it there and the same places point to
 # the App Store, and nothing else changes. Only an address on Apple's own
 # store is taken.
@@ -226,24 +226,14 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   # store's own button instead (its name, the same in every language).
   def apple_soon:
     if $APPLE_STORE == "" then "<span class=\"ap-soon\">\(t("apple_soon") | h)</span>" else "" end;
-  # The front page's band under the downloads: the three devices, what the
-  # app is in a line, and the way to its page - or, once it is there, to
-  # the App Store. On a phone it stays when the downloads fold away, and on
-  # an iPhone or iPad it comes first (app.js).
-  def apple_band:
-    "      <aside class=\"apb\" id=\"apple\" aria-labelledby=\"apb-h\">\n"
-    + "        <span class=\"apb-ico\" aria-hidden=\"true\">\(apple_svg("phone"; "i-phone"))\(apple_svg("tablet"; "i-tablet"))\(apple_svg("tv"; "i-tv"))</span>\n"
-    + "        <div class=\"apb-text\">\n"
-    + (if $APPLE_STORE == "" then "          \(apple_soon)\n" else "" end)
-    + "          <h3 id=\"apb-h\">\(t("apple_h") | h)</h3>\n"
-    + "          <p>\(t("apple_band_p") | h)</p>\n"
-    + "        </div>\n"
-    + (if $APPLE_STORE == "" then
-         "        <a class=\"btn ghost apb-go\" href=\"/apple/\">\(t("apple_more") | h)<svg class=\"arr\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12h13M13 7l5 5-5 5\"/></svg></a>\n"
-       else
-         "        <a class=\"btn primary apb-go\" href=\"\($APPLE_STORE | h)\" rel=\"noopener\">App Store</a>\n"
-       end)
-    + "      </aside>\n";
+  # The front page's line over the headline: "Coming soon" - or, once it
+  # is there, "App Store" - and the devices' names, to the Apple app's page.
+  # Small, one line, high up: a phone shows it too.
+  def apple_news:
+    "        <a class=\"hero-news\" href=\"/apple/\">"
+    + "<span class=\"hn-tag\">\(if $APPLE_STORE == "" then t("apple_soon") else "App Store" end | h)</span>"
+    + "<span class=\"hn-t\">\(apple_svg("devices"; "hn-ico")) \(t("apple_short") | h)</span>"
+    + "<svg class=\"hn-arr\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12h13M13 7l5 5-5 5\"/></svg></a>\n";
   def nav($current):
     ($current == "home") as $home
     | (if $home then "" else "/" end) as $base
@@ -678,7 +668,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            + (if $notes == "" then "" else
                 " · <a class=\"wn-link\" href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\" data-wn>\(t("wn_h2") | h)</a>" end)),
          downloads: downloads($version; $reldate),
-         apple: apple_band,
+         apple: apple_news,
          support: (if $SUPPORT_ON then support_band else "" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
          # What's new: the notes in a <template>, opened in a dialog from the

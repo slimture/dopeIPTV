@@ -39,7 +39,9 @@
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
-        <h1><span class="h1-brand">dopeIPTV</span> <span id="heroH1" data-linux="{{h:hero_h1_linux}}" data-macos="{{h:hero_h1_macos}}" data-windows="{{h:hero_h1_windows}}">{{t:hero_h1}}</span></h1>
+        <!-- dopeIPTV for iPhone, iPad and Apple TV, an app of its own: a
+             small line over the headline to its page (render.jq apple_news). -->
+{{b:apple}}        <h1><span class="h1-brand">dopeIPTV</span> <span id="heroH1" data-linux="{{h:hero_h1_linux}}" data-macos="{{h:hero_h1_macos}}" data-windows="{{h:hero_h1_windows}}">{{t:hero_h1}}</span></h1>
         <p class="lede">{{t:hero_lede}}</p>
         <div class="cta-row">
           <a class="btn primary" id="heroDownload" href="#download" data-os-label="{{h:hero_cta_os}}">{{h:hero_cta}}</a>
@@ -147,10 +149,7 @@
           <button type="button" class="btn ghost" id="dlShow" hidden aria-expanded="false" aria-controls="download">{{h:dl_phone_show}}</button>
         </div>
       </div>
-{{b:downloads}}{{b:verify}}      <!-- dopeIPTV for iPhone, iPad and Apple TV: an app of its own, coming
-           (render.jq apple_band; its page /apple/). It stays on a phone
-           while the downloads are folded away. -->
-{{b:apple}}    </div>
+{{b:downloads}}{{b:verify}}    </div>
   </section>
 
 {{b:whatsnew}}

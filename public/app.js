@@ -69,14 +69,6 @@
 
   function phonePage() {
     document.documentElement.classList.add("is-phone");
-    // An iPhone or iPad: the app of its own coming for it goes first, before
-    // the note about the computer app.
-    var apple = document.getElementById("apple");
-    var note = document.querySelector(".dl-phone");
-    if (apple && note && (/iPhone|iPad|iPod/.test(ua) ||
-        (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1))) {
-      note.parentNode.insertBefore(apple, note);
-    }
     var share = document.getElementById("dlShare");
     var show = document.getElementById("dlShow");
     var sec = document.getElementById("download");

@@ -2806,8 +2806,8 @@ html:has(.legal-tabbar) { scroll-padding-top: 0; }
 }
 
 /* -- dopeIPTV for iPhone, iPad and Apple TV (November 2026) -----------------
-   An app of its own, apart from the computer app: the front page's band
-   under the downloads (render.jq apple_band) and its page /apple/
+   An app of its own, apart from the computer app: the front page's line
+   over the headline (render.jq apple_news) and its page /apple/
    (page_apple). "Coming soon" is the accent's light wash with a dot; the
    devices are the menu's line icons; the page's picture is drawn in the
    theme's own colours. */
@@ -2818,37 +2818,32 @@ html:has(.legal-tabbar) { scroll-padding-top: 0; }
   animation: ap-beat 2.4s ease-in-out infinite; }
 @keyframes ap-beat { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
-.apb { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center; gap: 24px; margin-top: 28px; padding: 22px 26px; overflow: hidden;
-  border-radius: var(--radius); background: var(--surface); }
-.apb::before { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(60% 140% at 0% 50%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
-[dir="rtl"] .apb::before { background: radial-gradient(60% 140% at 100% 50%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
-.apb > * { position: relative; }
-.apb-ico { display: flex; align-items: flex-end; gap: 4px; color: var(--accent); }
-.apb-ico svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.apb-ico .i-phone { width: 26px; height: 26px; }
-.apb-ico .i-tablet { width: 34px; height: 34px; }
-.apb-ico .i-tv { width: 46px; height: 46px; }
-.apb-text h3 { margin: 10px 0 0; font-family: var(--display); font-size: 19px; font-weight: 600;
-  letter-spacing: -.02em; line-height: 1.25; }
-.apb-text h3:first-child { margin-top: 0; }
-.apb-text p { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
-.apb-go { white-space: nowrap; }
-.apb-go .arr { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2;
+/* The front page's line over the headline (render.jq apple_news): a pill
+   with the tag in the accent's wash, the devices' names and an arrow. */
+.hero-news { display: inline-flex; align-items: center; gap: 10px; max-width: 100%;
+  margin: 0 0 22px; padding: 4px 12px 4px 4px; border: 1px solid var(--line); border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent); color: var(--text);
+  font-size: 14px; line-height: 1.3; text-decoration: none;
+  transition: border-color .2s ease, background .2s ease; }
+.hero-news:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.hero-news:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.hn-tag { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 4px 10px 4px 9px;
+  border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.hn-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  animation: ap-beat 2.4s ease-in-out infinite; }
+.hn-t { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: var(--muted);
+  font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-news:hover .hn-t { color: var(--text); }
+.hn-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+.hn-arr { width: 15px; height: 15px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
-.apb-go:hover .arr { transform: translateX(3px); }
-[dir="rtl"] .apb-go .arr { transform: scaleX(-1); }
-[dir="rtl"] .apb-go:hover .arr { transform: scaleX(-1) translateX(3px); }
-@media (max-width: 760px) {
-  .apb { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center;
-    gap: 14px; padding: 26px 20px 22px; }
-  .apb::before { background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
-  .apb-go { justify-content: center; min-width: 200px; }
-}
-/* A phone: the band right under the note, with the downloads folded away -
-   and on an iPhone or iPad before it (app.js). */
-.is-phone #download .apb { margin-top: 0; margin-bottom: 16px; }
+.hero-news:hover .hn-arr { transform: translateX(2px); stroke: var(--accent); }
+[dir="rtl"] .hn-arr { transform: scaleX(-1); }
+[dir="rtl"] .hero-news:hover .hn-arr { transform: scaleX(-1) translateX(2px); }
+@media (max-width: 380px) { .hn-ico { display: none; } }
 
 .ap-hero { padding: 84px 0 8px; text-align: center; }
 .ap-hero h1 { max-width: 15ch; margin: 18px auto 0; font-size: clamp(2.1rem, 5.4vw, 3.6rem);
@@ -2902,6 +2897,6 @@ html:has(.legal-tabbar) { scroll-padding-top: 0; }
   .ap-until .btn { justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ap-soon::before { animation: none; }
-  .apb-go .arr { transition: none; }
+  .ap-soon::before, .hn-tag::before { animation: none; }
+  .hero-news, .hn-arr { transition: none; }
 }

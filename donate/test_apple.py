@@ -1,7 +1,8 @@
 """dopeIPTV for iPhone, iPad and Apple TV on the site (render.jq apple_*,
-site/apple.json, templates/apple.html, style.css .apb / .ap-*): an app of
-its own beside the computer app. Until its App Store address is set the
-front page's band, its page /apple/ and the menu's row say it is coming;
+site/apple.json, templates/apple.html, style.css .hero-news / .ap-*): an app of
+its own beside the computer app. Until its App Store address is set a
+line over the front page's headline, its page /apple/ and the menu's row
+say it is coming;
 with the address the same places point to the App Store - and only an
 address on Apple's own store is taken. Every language has its words."""
 import json
@@ -18,7 +19,7 @@ SITE = os.path.join(ROOT, "site")
 
 pytestmark = pytest.mark.skipif(shutil.which("jq") is None, reason="no jq")
 
-KEYS = ["apple_soon", "apple_h", "apple_short", "apple_band_p", "apple_more",
+KEYS = ["apple_soon", "apple_h", "apple_short",
         "apple_meta_title", "apple_desc", "apple_lede", "apple_iphone_p", "apple_ipad_p",
         "apple_tv_p", "apple_until_h", "apple_until_p", "apple_until_btn", "apple_store_note"]
 
@@ -78,11 +79,11 @@ def test_coming_soon_on_the_front_page_its_page_and_the_menu(release, tmp_path):
     en = json.load(open(_f("lang", "en.json"), encoding="utf-8"))
     for apple in (None, {"app_store": ""}):
         front = _render(release, "index", apple=apple, tmp=str(tmp_path))
-        band = re.search(r'<aside class="apb" id="apple".*?</aside>', front, re.S).group(0)
-        assert en["apple_soon"] in band and 'href="/apple/"' in band
-        assert "apps.apple.com" not in band
-        # The band sits in the download section, after the downloads.
-        assert front.index('id="download"') < front.index('class="apb"') < front.index("</section>", front.index('id="download"'))
+        news = re.search(r'<a class="hero-news" href="/apple/">.*?</a>', front, re.S).group(0)
+        assert f'<span class="hn-tag">{en["apple_soon"]}</span>' in news
+        assert en["apple_short"].replace("&", "&amp;") in news
+        # High up: over the headline, not down by the downloads.
+        assert front.index('class="hero-news"') < front.index("<h1>") < front.index('id="download"')
         assert 'class="navmenu-item" href="/apple/"' in front
         page = _render(release, "apple", apple=apple, tmp=str(tmp_path))
         assert f"<h1>{en['apple_h']}</h1>" in page
@@ -94,8 +95,8 @@ def test_coming_soon_on_the_front_page_its_page_and_the_menu(release, tmp_path):
 def test_with_its_store_address_the_same_places_point_there(release, tmp_path):
     store = "https://apps.apple.com/app/dopeiptv/id1234567890"
     front = _render(release, "index", apple={"app_store": store}, tmp=str(tmp_path))
-    band = re.search(r'<aside class="apb".*?</aside>', front, re.S).group(0)
-    assert f'href="{store}"' in band and "ap-soon" not in band
+    news = re.search(r'<a class="hero-news".*?</a>', front, re.S).group(0)
+    assert '<span class="hn-tag">App Store</span>' in news
     page = _render(release, "apple", apple={"app_store": store}, tmp=str(tmp_path))
     assert f'href="{store}"' in page and "ap-soon" not in page and "ap-note" not in page
 

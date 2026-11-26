@@ -38,7 +38,7 @@ website/
 │   ├── legal.json          the legal pages: their titles, the date, the languages
 │   ├── legal/{sv,en}/      their texts - Swedish governs, English is a translation
 │   ├── apple.json          dopeIPTV for iPhone, iPad and Apple TV, an app of its own: empty, the site says
-│                           it is coming (the front page's band, /apple/, the menu's row); its App Store
+│                           it is coming (a line over the front page's headline, /apple/, the menu's row); its App Store
 │                           address there, and the same places point to the store
 │   ├── formats.json        dates and numbers per language, as ICU 76.1 writes them
 │   ├── spots.json          where each feature picture shows its feature, per language (the same tool)
