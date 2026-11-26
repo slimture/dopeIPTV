@@ -158,13 +158,19 @@ def _paths(stats_dir: str) -> tuple[str, str]:
 
 def signature(kind: str, text: str) -> str:
     """What makes two reports the same problem: the exception line (with
-    numbers and addresses set aside) and, for a crash, the first frame."""
+    numbers and addresses set aside) and, for a crash, the first frame of
+    the thread that crashed - or, when Python names none, that it was a
+    thread outside Python (libmpv, Qt, a driver): the first frame then is
+    only another thread's, whichever started last."""
     if kind == "feedback":
         return ""
     lines = [ln.strip() for ln in (text or "").splitlines()]
     if kind == "crash":
         head = next((ln for ln in lines if ln.startswith("Fatal Python error")), "Crash")
-        frame = next((ln for ln in lines if ln.startswith('File "')), "")
+        current = next((i for i, ln in enumerate(lines) if ln.startswith("Current thread")), -1)
+        if current < 0 and any(ln.startswith("Thread 0x") for ln in lines):
+            return f"{head} | a thread outside Python"[:300]
+        frame = next((ln for ln in lines[current + 1:] if ln.startswith('File "')), "")
         # The folder before the file's name set aside: what the pattern
         # File ".*[\\/] took, found in one look each way - the pattern took
         # time with the line's square (48 000 characters of File " held

@@ -100,6 +100,29 @@ def test_a_crashs_first_frame_is_found_in_time_and_as_before():
         assert feedback.signature("crash", text) == before("crash", text), text
 
 
+
+def test_a_crash_in_a_thread_outside_python_blames_no_python_thread():
+    """faulthandler names the thread that crashed "Current thread"; with
+    none named the crash was in libmpv, Qt or a driver, and the first frame
+    listed is only the thread that started last (a real 1.7.0 report named
+    selectors.py for a crash that was elsewhere)."""
+    native = ("Fatal Python error: Segmentation fault\n\n"
+              "Thread 0x00007f7fa27fc6c0 (most recent call first):\n"
+              '  File "selectors.py", line 468 in select\n'
+              '  File "dopeiptv/core/net_bridge.py", line 664 in pipe\n\n'
+              "Thread 0x00007f803f6ec100 (most recent call first):\n"
+              '  File "dopeiptv/app.py", line 891 in main\n')
+    assert feedback.signature("crash", native) == \
+        "Fatal Python error: Segmentation fault | a thread outside Python"
+    named = ("Fatal Python error: Segmentation fault\n\n"
+             "Thread 0x00007f7fa27fc6c0 (most recent call first):\n"
+             '  File "selectors.py", line 468 in select\n\n'
+             "Current thread 0x00007f7f927fc6c0 (most recent call first):\n"
+             '  File "dopeiptv/media/video_thread.py", line 975 in _loop\n')
+    assert feedback.signature("crash", named) == \
+        'Fatal Python error: Segmentation fault | File "video_thread.py", line 975 in _loop'
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     for name, fn in tests:
