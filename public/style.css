@@ -2843,7 +2843,14 @@ html:has(.legal-tabbar) { scroll-padding-top: 0; }
 .hero-news:hover .hn-arr { transform: translateX(2px); stroke: var(--accent); }
 [dir="rtl"] .hn-arr { transform: scaleX(-1); }
 [dir="rtl"] .hero-news:hover .hn-arr { transform: scaleX(-1) translateX(2px); }
-@media (max-width: 380px) { .hn-ico { display: none; } }
+/* A phone: smaller still, and the devices' icon left out - one short line. */
+@media (max-width: 600px) {
+  .hero-news { gap: 7px; margin-bottom: 14px; padding: 3px 9px 3px 3px; font-size: 12.5px; }
+  .hn-tag { padding: 2px 8px 2px 7px; font-size: 11px; gap: 5px; }
+  .hn-tag::before { width: 5px; height: 5px; }
+  .hn-ico { display: none; }
+  .hn-arr { width: 13px; height: 13px; }
+}
 
 .ap-hero { padding: 84px 0 8px; text-align: center; }
 .ap-hero h1 { max-width: 15ch; margin: 18px auto 0; font-size: clamp(2.1rem, 5.4vw, 3.6rem);
