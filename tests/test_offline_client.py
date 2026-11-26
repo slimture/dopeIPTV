@@ -93,7 +93,7 @@ def test_the_demo_serves_channels_a_guide_and_films_of_its_own():
         now = g.listings_for(r, limit=2)
         assert len(now) == 2 and now[0]["start_timestamp"] <= time.time() < now[0]["stop_timestamp"]
     assert demo.guide(1_800_000_000) == demo.guide(1_800_000_000 + 59)     # the same for the hour
-    # The retired Bitmovin host is gone; these are the hosts it reaches.
-    assert demo_streams.hosts() == ["cdn.bitmovin.com", "cph-p2p-msl.akamaized.net",
-                                    "demo.unified-streaming.com", "devstreaming-cdn.apple.com",
-                                    "test-streams.mux.dev"]
+    # Akamai's and Bitmovin's hosts are gone (their streams stopped
+    # answering); these are the hosts it reaches.
+    assert demo_streams.hosts() == ["demo.unified-streaming.com", "devstreaming-cdn.apple.com",
+                                    "storage.googleapis.com", "test-streams.mux.dev"]

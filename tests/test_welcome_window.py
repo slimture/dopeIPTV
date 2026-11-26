@@ -318,7 +318,7 @@ elif SCENARIO == "demo":
     idle(0.3)
     assert w.history.items() == []
     shown = written()
-    for name in ("Sintel", "Akamai", "Big Buck Bunny", "demo-live", "drawn:"):
+    for name in ("Sintel", "Unified Live", "Big Buck Bunny", "demo-live", "drawn:"):
         assert name not in shown, name
     # Left for a source of one's own through the strip: the guide on what
     # to watch, the panel typed in.
@@ -345,7 +345,7 @@ elif SCENARIO == "demo":
     assert w.history.items() == []
     assert w._last_playback is None and not (w.player is not None and w.player.current_url)
     shown = written()
-    for name in ("Sintel", "Akamai", "Big Buck Bunny", "demo-live", "drawn:"):
+    for name in ("Sintel", "Unified Live", "Big Buck Bunny", "demo-live", "drawn:"):
         assert name not in shown, name
     # What plays now is kept as ever.
     ch1 = w.client.live_streams(None)[0]

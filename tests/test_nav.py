@@ -1,6 +1,6 @@
 """The sidebar's navigation - the app's places (core/places.py,
-ui/mw_places.py): Mine, TV, Movies, Series, Guide, Search, a hairline, then
-Local files, Radio, Recordings; no Home. The source's avatar and Settings
+ui/mw_places.py): Home (the code's Mine, mitt), TV, Movies, Series, Guide,
+Search, a hairline, then Local files, Radio, Recordings. The source's avatar and Settings
 at the foot (tests/test_sidebar_foot.py has the foot itself). Mine holds
 Favorites, Watch later and History as tabs in the place's header; the Guide
 is a place too, its page in the middle pane; Watched is History's second
@@ -177,7 +177,7 @@ def y(widget):
 ys = [y(w.nav_btns[k]) for k in upper] + [y(w._places_rule)] + [y(w.nav_btns[k]) for k in lower]
 assert ys == sorted(ys) and len(set(ys)) == len(ys), ys
 assert all(b.property("primary") == "true" for b in w.nav_btns.values())
-assert w.nav_btns["mitt"].text() == tr("nav_mine") == "Mitt"
+assert w.nav_btns["mitt"].text() == tr("nav_mine") == "Hem"
 assert w.nav_btns["guide"].text() == tr("nav_guide")
 assert not hasattr(w, "_lib_header") and not hasattr(w, "_home_page")
 # Settings at the foot, under its hairline: an icon, its name in the tooltip.
@@ -343,11 +343,11 @@ assert w._settings_btn.toolTip() == tr("btn_settings")
 # -- a language switch renames all of it ---------------------------------------
 w._set_language("en")
 pump()
-assert w.nav_btns["guide"].text() == "Guide" and w.nav_btns["mitt"].text() == "Mine"
+assert w.nav_btns["guide"].text() == "Guide" and w.nav_btns["mitt"].text() == "Home"
 assert w._settings_btn.toolTip() == "Settings" and chips["watched"].text() == "Watched"
 w.nav_btns["mitt"].click()
 pump()
-assert w._place_header.title_text() == "Mine"
+assert w._place_header.title_text() == "Home"
 assert [b.text() for b in w._place_header.switch.buttons][0] == "Favorites"
 print("NAV_OK", flush=True)
 os._exit(0)

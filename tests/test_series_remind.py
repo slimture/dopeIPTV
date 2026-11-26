@@ -197,7 +197,7 @@ g._by_id = {
                  ("Evening News", base + 86400, base + 86400 + 1800)),
     "bip": sched(("Evening News", base, base + 1800), ("Late News", base + 3 * H, base + 3 * H + 1200)),
 }
-g._by_name = {normalize_name("Akamai Live"): "bbb", normalize_name("Unified Live"): "bip"}
+g._by_name = {normalize_name("Unified Live"): "bbb", normalize_name("Unified Live 2"): "bip"}
 g._loaded = True
 w.xmltv = g
 bbb = w.client.live_streams(None)[0]
@@ -230,9 +230,9 @@ assert rule and sr.action(rule) == sr.REMIND and rule["scope"] == sr.ANY, rule
 wait(lambda: len(rule_reminders()) == 3)
 idle()
 assert rule_reminders() == [
-    (base, "Akamai Live", "Evening News"),
-    (base + 3 * H, "Unified Live", "Late News"),
-    (base + 86400, "Akamai Live", "Evening News")], rule_reminders()
+    (base, "Unified Live", "Evening News"),
+    (base + 3 * H, "Unified Live 2", "Late News"),
+    (base + 86400, "Unified Live", "Evening News")], rule_reminders()
 assert not [j for j in w.rec.jobs if j.get("rule")], w.rec.jobs     # nothing recorded
 
 # 2. Looked through again: nothing twice.
@@ -264,7 +264,7 @@ def settings(self):
     lst = self.findChild(QListWidget, "SeriesRuleList")
     rows = [lst.item(i).text() for i in range(lst.count())]
     assert tr("series_row_remind", rule=tr("series_row_word_any", word="news")) in rows, rows
-    assert tr("series_row_title_on", title="Evening News", channel="Akamai Live") in rows, rows
+    assert tr("series_row_title_on", title="Evening News", channel="Unified Live") in rows, rows
     lst.setCurrentRow(rows.index(tr("series_row_remind", rule=tr("series_row_word_any", word="news"))))
     [b for b in self.findChildren(QPushButton) if b.text() == tr("ctx_delete")][0].click()
     return 1

@@ -29,8 +29,8 @@ from .client import OfflineClient
 #: The live channels: (stream id, name, its logo's letters, accent, category,
 #: stream, what its guide shows). Their guide ids are "demo.<stream>".
 CHANNELS: tuple[tuple[int, str, str, str, str, str, str], ...] = (
-    (1, "Akamai Live", "AK", "blue", "live", "akamai", "live"),
-    (2, "Unified Live", "UL", "teal", "live", "unified", "live"),
+    (1, "Unified Live", "UL", "teal", "live", "unified", "live"),
+    (2, "Unified Live 2", "U2", "blue", "live", "scte35", "live"),
     (3, "Big Buck Bunny 24/7", "BB", "green", "loop", "bbb", "bbb"),
     (4, "Sintel 24/7", "SI", "orange", "loop", "sintel", "sintel"),
     (5, "Tears of Steel 24/7", "TS", "indigo", "loop", "tos", "tos"),

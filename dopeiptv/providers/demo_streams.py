@@ -15,18 +15,21 @@ from urllib.parse import urlsplit
 
 #: Live test streams, on the air around the clock.
 LIVE: dict[str, str] = {
-    # Akamai's 24/7 live test stream.
-    "akamai": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
     # Unified Streaming's live demo.
     "unified": "https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8",
+    # Unified Streaming's second live demo, with SCTE-35 markers in it
+    # (Akamai's 24/7 test stream answered 404 from November 2026).
+    "scte35": "https://demo.unified-streaming.com/k8s/live/stable/scte35.isml/.m3u8",
 }
 
 #: The Blender Foundation's open films (CC BY 3.0), as test streams.
 FILMS: dict[str, str] = {
     # Big Buck Bunny (2008), Mux's test copy.
     "bbb": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-    # Sintel (2010), Bitmovin's test copy.
-    "sintel": "https://cdn.bitmovin.com/content/assets/sintel/hls/playlist.m3u8",
+    # Sintel (2010), the Shaka Player project's test copy on Google Cloud
+    # Storage: fMP4 under AES-128, its key beside it (Bitmovin's copies
+    # answered 403 from November 2026).
+    "sintel": "https://storage.googleapis.com/shaka-demo-assets/sintel-fmp4-aes/master.m3u8",
     # Tears of Steel (2012), Unified Streaming's test copy.
     "tos": ("https://demo.unified-streaming.com/k8s/features/stable/video/"
             "tears-of-steel/tears-of-steel.ism/.m3u8"),

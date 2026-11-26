@@ -9,6 +9,19 @@ downloads, on the [GitHub releases page](https://github.com/slimture/dopeIPTV/re
 
 ### Changed
 
+- Mine is called Home - the place first in the sidebar, with Continue,
+  your favourites, Watch later, new episodes and History, in every
+  language (Hem, Start, Accueil, Inicio...). Its settings page and
+  "Always on Home" under Settings → General follow; nothing else changes,
+  and every setting stays where it was.
+
+### Fixed
+
+- The demo plays all six channels again: Akamai's live test stream and
+  Bitmovin's copy of Sintel stopped answering. The first live channel is now
+  Unified Streaming's second live demo, and Sintel comes from the Shaka
+  Player project's test copy on Google Cloud Storage
+  (`storage.googleapis.com`).
 - The check that keeps every login of yours from dopeiptv.org fails closed
   in more cases: settings whose keys cannot be listed, a list of sources or
   a Kodi list that is no JSON now send nothing to the site, as unreadable

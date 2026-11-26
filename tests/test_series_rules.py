@@ -418,7 +418,7 @@ g._by_id = {
                  ("Late News", base + H, base + H + 1200)),
     "sin": sched(("Other", base, base + H)),
 }
-g._by_name = {normalize_name("Akamai Live"): "bbb", normalize_name("Unified Live"): "bip",
+g._by_name = {normalize_name("Unified Live"): "bbb", normalize_name("Unified Live 2"): "bip",
               normalize_name("Big Buck Bunny 24/7"): "sin"}
 g._loaded = True
 w.xmltv = g
@@ -455,7 +455,7 @@ assert rule_jobs() == [
     (url[1], base, base - 120, base + 1800 + 600, "The Show"),
     (url[1], base + 86400, base + 86400 - 120, base + 86400 + 1800 + 600, "The Show")], rule_jobs()
 j = next(j for j in w.rec.jobs if j.get("rule"))
-assert j["stream_key"] == "1" and j["prog_stop"] == base + 1800 and j["channel"] == "Akamai Live"
+assert j["stream_key"] == "1" and j["prog_stop"] == base + 1800 and j["channel"] == "Unified Live"
 
 # 2. Looked through again: nothing twice.
 w._check_series_rules()
@@ -507,7 +507,7 @@ def settings(self):
     lst = self.findChild(QListWidget, "SeriesRuleList")
     rows = [lst.item(i).text() for i in range(lst.count())]
     assert rows == [tr("series_row_word_any", word="news"),
-                    tr("series_row_title_on", title="The Show", channel="Akamai Live"),
+                    tr("series_row_title_on", title="The Show", channel="Unified Live"),
                     tr("series_row_title_any", title="The Show")], rows
     delete = [b for b in self.findChildren(QPushButton) if b.text() == tr("ctx_delete")][0]
     lst.setCurrentRow(0)

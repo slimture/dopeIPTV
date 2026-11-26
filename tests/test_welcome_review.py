@@ -975,7 +975,7 @@ elif SCENARIO == "demo":
     assert s.value("last_place", "") == before_place
     assert s.value("tv_density", "") == before_density
     text = written()
-    assert "Big Buck" not in text and "Akamai" not in text
+    assert "Big Buck" not in text and "Unified Live" not in text
     # One's own file played meanwhile is kept as ever.
     assert not privacy.playback_private("local", "/m/other.mkv")
     w.history.add("/m/other.mkv", "other.mkv", None, "/m/other.mkv", "local")
