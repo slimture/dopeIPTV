@@ -280,6 +280,7 @@ HOSTS: dict[str, tuple[str, str]] = {
     "demo.unified-streaming.com": ("talks", "demo"),
     "test-streams.mux.dev": ("talks", "demo"),
     "cdn.bitmovin.com": ("talks", "demo"),
+    "storage.googleapis.com": ("talks", "demo"),
     "devstreaming-cdn.apple.com": ("talks", "demo"),
     "1.1.1.1": ("talks", "dns"),
     "1.0.0.1": ("talks", "dns"),
