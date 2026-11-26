@@ -690,5 +690,20 @@
     "fl_every_h": "כל המקורות ברשימה אחת",
     "fl_every_p": "הערוצים החיים של כל המקורות שלכם ברשימה אחת, כל אחד מתנגן מהמקור שלו.",
     "fl_lastch_h": "להתחיל בערוץ האחרון",
-    "fl_lastch_p": "היישום נפתח בערוץ שבו צפיתם לאחרונה, כמו טלוויזיה שמדליקים."
+    "fl_lastch_p": "היישום נפתח בערוץ שבו צפיתם לאחרונה, כמו טלוויזיה שמדליקים.",
+    "apple_soon": "בקרוב",
+    "apple_h": "dopeIPTV ל-iPhone, ‏iPad ו-Apple TV",
+    "apple_short": "iPhone, ‏iPad ו-Apple TV",
+    "apple_band_p": "אפליקציה נפרדת, שנבנתה למגע ולשלט של Apple TV.",
+    "apple_more": "קראו עוד",
+    "apple_meta_title": "dopeIPTV ל-iPhone, ‏iPad ו-Apple TV — בקרוב",
+    "apple_desc": "dopeIPTV מגיעה ל-iPhone, ‏iPad ו-Apple TV, כאפליקציה נפרדת שנבנתה למגע ולשלט.",
+    "apple_lede": "אפליקציה נפרדת למכשירי Apple – בנויה למגע ב-iPhone וב-iPad, ולשלט ב-Apple TV. האפליקציה למחשב נשארת כפי שהיא.",
+    "apple_iphone_p": "בכיס.",
+    "apple_ipad_p": "על הספה.",
+    "apple_tv_p": "על המסך הגדול.",
+    "apple_until_h": "עד אז",
+    "apple_until_p": "dopeIPTV ל-Linux, ‏macOS ו-Windows כבר כאן – בחינם.",
+    "apple_until_btn": "הורדה למחשב",
+    "apple_store_note": "היא תהיה ב-App Store. הדף הזה יודיע על כך באותו יום."
 }

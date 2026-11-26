@@ -2804,3 +2804,104 @@ html:has(.legal-tabbar) { scroll-padding-top: 0; }
   .legal .tp-read > summary::after { transition: none; }
   .legal .tp-read-body { animation: none; }
 }
+
+/* -- dopeIPTV for iPhone, iPad and Apple TV (November 2026) -----------------
+   An app of its own, apart from the computer app: the front page's band
+   under the downloads (render.jq apple_band) and its page /apple/
+   (page_apple). "Coming soon" is the accent's light wash with a dot; the
+   devices are the menu's line icons; the page's picture is drawn in the
+   theme's own colours. */
+.ap-soon { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 10px;
+  border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: -.005em; }
+.ap-soon::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+  animation: ap-beat 2.4s ease-in-out infinite; }
+@keyframes ap-beat { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.apb { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 24px; margin-top: 28px; padding: 22px 26px; overflow: hidden;
+  border-radius: var(--radius); background: var(--surface); }
+.apb::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 140% at 0% 50%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
+[dir="rtl"] .apb::before { background: radial-gradient(60% 140% at 100% 50%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
+.apb > * { position: relative; }
+.apb-ico { display: flex; align-items: flex-end; gap: 4px; color: var(--accent); }
+.apb-ico svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.apb-ico .i-phone { width: 26px; height: 26px; }
+.apb-ico .i-tablet { width: 34px; height: 34px; }
+.apb-ico .i-tv { width: 46px; height: 46px; }
+.apb-text h3 { margin: 10px 0 0; font-family: var(--display); font-size: 19px; font-weight: 600;
+  letter-spacing: -.02em; line-height: 1.25; }
+.apb-text h3:first-child { margin-top: 0; }
+.apb-text p { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.apb-go { white-space: nowrap; }
+.apb-go .arr { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+.apb-go:hover .arr { transform: translateX(3px); }
+[dir="rtl"] .apb-go .arr { transform: scaleX(-1); }
+[dir="rtl"] .apb-go:hover .arr { transform: scaleX(-1) translateX(3px); }
+@media (max-width: 760px) {
+  .apb { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center;
+    gap: 14px; padding: 26px 20px 22px; }
+  .apb::before { background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
+  .apb-go { justify-content: center; min-width: 200px; }
+}
+/* A phone: the band right under the note, with the downloads folded away -
+   and on an iPhone or iPad before it (app.js). */
+.is-phone #download .apb { margin-top: 0; margin-bottom: 16px; }
+
+.ap-hero { padding: 84px 0 8px; text-align: center; }
+.ap-hero h1 { max-width: 15ch; margin: 18px auto 0; font-size: clamp(2.1rem, 5.4vw, 3.6rem);
+  font-weight: 700; letter-spacing: -.035em; line-height: 1.06; text-wrap: balance; }
+.ap-hero .lede { max-width: 34em; }
+.ap-hero .cta-row { justify-content: center; margin-top: 26px; }
+.ap-art { max-width: 760px; margin: 40px auto 0; }
+.ap-art-svg { display: block; width: 100%; height: auto; }
+.ap-art .ap-body { fill: var(--surface); stroke: var(--line-2); stroke-width: 1.5; }
+.ap-art .ap-front { fill: var(--surface-2); }
+.ap-art .ap-gap { fill: var(--bg); }
+.ap-art .ap-scr { fill: var(--bg); }
+.ap-art .ap-g1 { stop-color: var(--brand); }
+.ap-art .ap-g2 { stop-color: var(--btn); }
+.ap-art .ap-play { fill: #fff; }
+.ap-art .ap-row { fill: var(--line); }
+.ap-art .ap-row-1 { fill: var(--line-2); }
+.ap-art .ap-live { fill: color-mix(in srgb, var(--live) 85%, transparent); }
+.ap-art .ap-tile { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; }
+.ap-art .ap-tile-on { fill: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); stroke: var(--accent); stroke-width: 1.5; }
+
+.ap-more { padding: 44px 0 96px; }
+.ap-devices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
+  margin: 0; padding: 0; list-style: none; }
+.ap-devices li { padding: 26px 22px 24px; border-radius: var(--radius); background: var(--surface); text-align: center; }
+.ap-ic { display: inline-grid; place-items: center; width: 48px; height: 48px; margin-bottom: 12px;
+  border-radius: 14px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.ap-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+.ap-devices h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.ap-devices p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+.ap-until { display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  margin-top: 14px; padding: 24px 26px; border: 1px solid var(--line); border-radius: var(--radius); }
+.ap-until h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.02em; }
+.ap-until p { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.ap-until .btn { flex: none; }
+.ap-until .btn-ico { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ap-note { margin: 22px 0 0; color: var(--faint); font-size: 14px; text-align: center; }
+@media (max-width: 760px) {
+  .ap-hero { padding-top: 56px; }
+  .ap-art { margin-top: 30px; }
+  .ap-more { padding: 30px 0 64px; }
+  .ap-devices { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .ap-devices li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+    column-gap: 14px; padding: 16px 18px; text-align: start; }
+  .ap-devices .ap-ic { grid-row: span 2; margin: 0; }
+  .ap-devices h2 { font-size: 17px; }
+  .ap-devices p { margin: 0; }
+  .ap-until { flex-direction: column; align-items: stretch; text-align: center; padding: 22px 20px; }
+  .ap-until .btn { justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap-soon::before { animation: none; }
+  .apb-go .arr { transition: none; }
+}

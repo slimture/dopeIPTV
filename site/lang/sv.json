@@ -701,5 +701,20 @@
     "fl_every_h": "Alla källor i en lista",
     "fl_every_p": "Livekanalerna från alla dina källor i en lista, var och en spelad från sin egen källa.",
     "fl_lastch_h": "Starta på senaste kanalen",
-    "fl_lastch_p": "Appen öppnar på kanalen du såg senast, som en tv som slås på."
+    "fl_lastch_p": "Appen öppnar på kanalen du såg senast, som en tv som slås på.",
+    "apple_soon": "Kommer snart",
+    "apple_h": "dopeIPTV för iPhone, iPad och Apple TV",
+    "apple_short": "iPhone, iPad och Apple TV",
+    "apple_band_p": "En egen app, gjord för pekskärm och för Apple TV:s fjärrkontroll.",
+    "apple_more": "Läs mer",
+    "apple_meta_title": "dopeIPTV för iPhone, iPad och Apple TV — kommer snart",
+    "apple_desc": "dopeIPTV kommer till iPhone, iPad och Apple TV, som en egen app gjord för pekskärm och fjärrkontroll.",
+    "apple_lede": "En egen app för Apples enheter – gjord för pekskärmen på iPhone och iPad och för fjärrkontrollen på Apple TV. Appen för datorn är kvar som den är.",
+    "apple_iphone_p": "I fickan.",
+    "apple_ipad_p": "I soffan.",
+    "apple_tv_p": "På storbildsskärmen.",
+    "apple_until_h": "Tills dess",
+    "apple_until_p": "dopeIPTV för Linux, macOS och Windows finns redan – gratis.",
+    "apple_until_btn": "Ladda ner till datorn",
+    "apple_store_note": "Den kommer att finnas i App Store. Den här sidan säger till samma dag."
 }

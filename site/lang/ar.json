@@ -690,5 +690,20 @@
     "fl_every_h": "كل المصادر في قائمة واحدة",
     "fl_every_p": "القنوات المباشرة لكل مصادرك في قائمة واحدة، وكل منها يُشغَّل من مصدره.",
     "fl_lastch_h": "البدء على آخر قناة",
-    "fl_lastch_p": "يُفتح التطبيق على القناة التي شاهدتها آخر مرة، مثل تلفاز يُشغَّل."
+    "fl_lastch_p": "يُفتح التطبيق على القناة التي شاهدتها آخر مرة، مثل تلفاز يُشغَّل.",
+    "apple_soon": "قريبًا",
+    "apple_h": "dopeIPTV لـ iPhone وiPad وApple TV",
+    "apple_short": "iPhone وiPad وApple TV",
+    "apple_band_p": "تطبيق مستقل، مصمَّم للمس ولجهاز التحكم في Apple TV.",
+    "apple_more": "اقرأ المزيد",
+    "apple_meta_title": "dopeIPTV لـ iPhone وiPad وApple TV — قريبًا",
+    "apple_desc": "dopeIPTV قادم إلى iPhone وiPad وApple TV، كتطبيق مستقل مصمَّم للمس ولجهاز التحكم.",
+    "apple_lede": "تطبيق مستقل لأجهزة Apple – مصمَّم للمس على iPhone وiPad، ولجهاز التحكم على Apple TV. أما تطبيق الحاسوب فيبقى كما هو.",
+    "apple_iphone_p": "في جيبك.",
+    "apple_ipad_p": "على الأريكة.",
+    "apple_tv_p": "على الشاشة الكبيرة.",
+    "apple_until_h": "حتى ذلك الحين",
+    "apple_until_p": "dopeIPTV لأنظمة Linux وmacOS وWindows متوفر الآن – مجانًا.",
+    "apple_until_btn": "نزّله لحاسوبك",
+    "apple_store_note": "سيكون متوفرًا في App Store، وستخبرك هذه الصفحة بذلك في اليوم نفسه."
 }

@@ -29,7 +29,7 @@ website/
 │   └── screenshots/        the app's pictures, <lang>/<name>.webp (from the app's tools/site_screenshots.py):
 │                           hero-1..5 (the first picture's slideshow), feat-<key> (the feature explorer)
 ├── site/                   what the pages are made from - not web-served
-│   ├── templates/          index.html, help.html, features.html, legal.html, 404.html and nav.html
+│   ├── templates/          index.html, help.html, features.html, apple.html, legal.html, 404.html and nav.html
 │   ├── lang/*.json         the texts, one file per language (en.json is the source)
 │   ├── i18n.json           language names, which are right-to-left, ICU locales
 │   ├── help.json           the help page's sections and topics
@@ -37,6 +37,9 @@ website/
 │                           its groups and their features in order, each with the help answer it links to
 │   ├── legal.json          the legal pages: their titles, the date, the languages
 │   ├── legal/{sv,en}/      their texts - Swedish governs, English is a translation
+│   ├── apple.json          dopeIPTV for iPhone, iPad and Apple TV, an app of its own: empty, the site says
+│                           it is coming (the front page's band, /apple/, the menu's row); its App Store
+│                           address there, and the same places point to the store
 │   ├── formats.json        dates and numbers per language, as ICU 76.1 writes them
 │   ├── spots.json          where each feature picture shows its feature, per language (the same tool)
 │   └── render.jq           the renderer

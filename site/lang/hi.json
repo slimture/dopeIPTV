@@ -690,5 +690,20 @@
     "fl_every_h": "सभी स्रोत एक सूची में",
     "fl_every_p": "आपके सभी स्रोतों के लाइव चैनल एक सूची में, हर एक अपने ही स्रोत से चलता है।",
     "fl_lastch_h": "पिछले चैनल पर शुरू करें",
-    "fl_lastch_p": "ऐप उस चैनल पर खुलता है जो आपने आख़िरी बार देखा था, जैसे चालू किया गया टीवी।"
+    "fl_lastch_p": "ऐप उस चैनल पर खुलता है जो आपने आख़िरी बार देखा था, जैसे चालू किया गया टीवी।",
+    "apple_soon": "जल्द आ रहा है",
+    "apple_h": "iPhone, iPad और Apple TV के लिए dopeIPTV",
+    "apple_short": "iPhone, iPad और Apple TV",
+    "apple_band_p": "एक अलग ऐप, जो टच और Apple TV के रिमोट के लिए बनाया गया है।",
+    "apple_more": "और पढ़ें",
+    "apple_meta_title": "iPhone, iPad और Apple TV के लिए dopeIPTV — जल्द आ रहा है",
+    "apple_desc": "dopeIPTV iPhone, iPad और Apple TV पर आ रहा है, एक अलग ऐप के रूप में जो टच और रिमोट के लिए बनाया गया है।",
+    "apple_lede": "Apple के डिवाइस के लिए एक अलग ऐप – iPhone और iPad पर टच के लिए, और Apple TV पर रिमोट के लिए बनाया गया। कंप्यूटर वाला ऐप जैसा है वैसा ही रहेगा।",
+    "apple_iphone_p": "आपकी जेब में।",
+    "apple_ipad_p": "सोफ़े पर।",
+    "apple_tv_p": "बड़ी स्क्रीन पर।",
+    "apple_until_h": "तब तक",
+    "apple_until_p": "Linux, macOS और Windows के लिए dopeIPTV अभी उपलब्ध है – मुफ़्त।",
+    "apple_until_btn": "अपने कंप्यूटर के लिए डाउनलोड करें",
+    "apple_store_note": "यह App Store पर आएगा। उसी दिन यह पेज बता देगा।"
 }

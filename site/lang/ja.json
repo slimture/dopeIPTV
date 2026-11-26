@@ -690,5 +690,20 @@
     "fl_every_h": "すべてのソースを一つのリストに",
     "fl_every_p": "すべてのソースのライブチャンネルを一つのリストに。それぞれ自分のソースから再生されます。",
     "fl_lastch_h": "最後のチャンネルで起動",
-    "fl_lastch_p": "電源を入れたテレビのように、最後に観ていたチャンネルでアプリが開きます。"
+    "fl_lastch_p": "電源を入れたテレビのように、最後に観ていたチャンネルでアプリが開きます。",
+    "apple_soon": "近日公開",
+    "apple_h": "iPhone、iPad、Apple TV 向け dopeIPTV",
+    "apple_short": "iPhone、iPad、Apple TV",
+    "apple_band_p": "タッチ操作と Apple TV のリモコンのために作った、独立したアプリです。",
+    "apple_more": "詳しく見る",
+    "apple_meta_title": "iPhone、iPad、Apple TV 向け dopeIPTV — 近日公開",
+    "apple_desc": "dopeIPTV が iPhone、iPad、Apple TV に登場します。タッチ操作とリモコンのために作った独立したアプリです。",
+    "apple_lede": "Apple のデバイスのための独立したアプリ。iPhone と iPad ではタッチ操作に、Apple TV ではリモコンに合わせて作っています。パソコン向けのアプリはこれまでどおりです。",
+    "apple_iphone_p": "ポケットに。",
+    "apple_ipad_p": "ソファで。",
+    "apple_tv_p": "大きな画面で。",
+    "apple_until_h": "それまでは",
+    "apple_until_p": "Linux、macOS、Windows 向けの dopeIPTV はすでに使えます。無料です。",
+    "apple_until_btn": "パソコン向けにダウンロード",
+    "apple_store_note": "App Store で公開予定です。公開の日にこのページでお知らせします。"
 }

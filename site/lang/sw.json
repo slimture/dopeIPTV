@@ -690,5 +690,20 @@
     "fl_every_h": "Vyanzo vyote kwenye orodha moja",
     "fl_every_p": "Chaneli za moja kwa moja za vyanzo vyako vyote kwenye orodha moja, kila moja ikicheza kutoka chanzo chake.",
     "fl_lastch_h": "Anza kwenye chaneli ya mwisho",
-    "fl_lastch_p": "Programu hufunguka kwenye chaneli uliyotazama mwisho, kama TV inayowashwa."
+    "fl_lastch_p": "Programu hufunguka kwenye chaneli uliyotazama mwisho, kama TV inayowashwa.",
+    "apple_soon": "Inakuja hivi karibuni",
+    "apple_h": "dopeIPTV kwa iPhone, iPad na Apple TV",
+    "apple_short": "iPhone, iPad na Apple TV",
+    "apple_band_p": "Programu yake yenyewe, iliyotengenezwa kwa skrini ya kugusa na rimoti ya Apple TV.",
+    "apple_more": "Soma zaidi",
+    "apple_meta_title": "dopeIPTV kwa iPhone, iPad na Apple TV — inakuja hivi karibuni",
+    "apple_desc": "dopeIPTV inakuja kwenye iPhone, iPad na Apple TV, kama programu yake yenyewe iliyotengenezwa kwa skrini ya kugusa na rimoti.",
+    "apple_lede": "Programu yake yenyewe kwa vifaa vya Apple – iliyotengenezwa kwa skrini ya kugusa kwenye iPhone na iPad, na kwa rimoti kwenye Apple TV. Programu ya kompyuta inabaki kama ilivyo.",
+    "apple_iphone_p": "Mfukoni mwako.",
+    "apple_ipad_p": "Kwenye sofa.",
+    "apple_tv_p": "Kwenye skrini kubwa.",
+    "apple_until_h": "Hadi wakati huo",
+    "apple_until_p": "dopeIPTV kwa Linux, macOS na Windows ipo tayari – bila malipo.",
+    "apple_until_btn": "Pakua kwa kompyuta yako",
+    "apple_store_note": "Itapatikana kwenye App Store. Ukurasa huu utasema hivyo siku hiyo hiyo."
 }

@@ -690,5 +690,20 @@
     "fl_every_h": "Svi izvori na jednom popisu",
     "fl_every_p": "Kanali uživo svih vaših izvora na jednom popisu, svaki se pušta iz svog izvora.",
     "fl_lastch_h": "Pokretanje na zadnjem kanalu",
-    "fl_lastch_p": "Aplikacija se otvara na kanalu koji ste zadnji gledali, kao televizor koji se uključi."
+    "fl_lastch_p": "Aplikacija se otvara na kanalu koji ste zadnji gledali, kao televizor koji se uključi.",
+    "apple_soon": "Uskoro",
+    "apple_h": "dopeIPTV za iPhone, iPad i Apple TV",
+    "apple_short": "iPhone, iPad i Apple TV",
+    "apple_band_p": "Zasebna aplikacija, napravljena za dodir i za daljinski upravljač za Apple TV.",
+    "apple_more": "Saznajte više",
+    "apple_meta_title": "dopeIPTV za iPhone, iPad i Apple TV — uskoro",
+    "apple_desc": "dopeIPTV stiže na iPhone, iPad i Apple TV, kao zasebna aplikacija napravljena za dodir i daljinski upravljač.",
+    "apple_lede": "Zasebna aplikacija za Appleove uređaje – napravljena za dodir na iPhoneu i iPadu te za daljinski upravljač na Apple TV-u. Aplikacija za računalo ostaje kakva jest.",
+    "apple_iphone_p": "U džepu.",
+    "apple_ipad_p": "Na kauču.",
+    "apple_tv_p": "Na velikom ekranu.",
+    "apple_until_h": "Do tada",
+    "apple_until_p": "dopeIPTV za Linux, macOS i Windows već je tu – besplatno.",
+    "apple_until_btn": "Preuzmi za računalo",
+    "apple_store_note": "Bit će u App Storeu. Ova će stranica to reći istog dana."
 }

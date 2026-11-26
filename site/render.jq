@@ -61,6 +61,14 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 # whom to write to for more than its largest amount.
 | "/solecraft-logo.svg" as $PAYEE_LOGO
 | "https://solecraft.se" as $PAYEE_URL
+# dopeIPTV for iPhone, iPad and Apple TV: an app of its own, apart from the
+# computer's (site/apple.json). While its App Store address is empty the
+# site says it is coming - the front page's band under the downloads, its
+# page /apple/, the menu's row; set it there and the same places point to
+# the App Store, and nothing else changes. Only an address on Apple's own
+# store is taken.
+| ((($ARGS.named.apple // [{}])[0] // {}) | .app_store // "" | tostring
+   | if test("^https://apps\\.apple\\.com/[A-Za-z0-9/._~?=&%-]+$") then . else "" end) as $APPLE_STORE
 
 # -- the PHP helpers ---------------------------------------------------------
 
@@ -205,12 +213,44 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
          ["failed", "fbs_failed"], ["wait", "fbs_wait"], ["privacy", "fbs_privacy"], ["close", "tip_close"]][]
         | . as [$k, $key] | " data-\($k)=\"\(t($key) | h)\""] | add)
     + "></div>\n";
+  # The Apple app's devices as the menu's icons are drawn: 24 units, a 1.8
+  # line, round ends (README, "One look everywhere").
+  def apple_icon($k):
+    {phone: "<rect x=\"7\" y=\"2.5\" width=\"10\" height=\"19\" rx=\"2.6\"/><path d=\"M10.8 18.6h2.4\"/>",
+     tablet: "<rect x=\"4\" y=\"3\" width=\"16\" height=\"18\" rx=\"2.6\"/><path d=\"M10.9 18.2h2.2\"/>",
+     tv: "<rect x=\"2.5\" y=\"4.5\" width=\"19\" height=\"12.5\" rx=\"2.2\"/><path d=\"M8.5 20.5h7\"/>",
+     devices: "<rect x=\"2.5\" y=\"4.5\" width=\"13\" height=\"10\" rx=\"1.8\"/><path d=\"M5.5 18.5h7\"/><rect x=\"16.5\" y=\"8.5\" width=\"5\" height=\"11\" rx=\"1.4\"/>"}[$k];
+  def apple_svg($k; $cls):
+    "<svg class=\"\($cls)\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\">\(apple_icon($k))</svg>";
+  # "Coming soon" while the app is not in the App Store; once it is, the
+  # store's own button instead (its name, the same in every language).
+  def apple_soon:
+    if $APPLE_STORE == "" then "<span class=\"ap-soon\">\(t("apple_soon") | h)</span>" else "" end;
+  # The front page's band under the downloads: the three devices, what the
+  # app is in a line, and the way to its page - or, once it is there, to
+  # the App Store. On a phone it stays when the downloads fold away, and on
+  # an iPhone or iPad it comes first (app.js).
+  def apple_band:
+    "      <aside class=\"apb\" id=\"apple\" aria-labelledby=\"apb-h\">\n"
+    + "        <span class=\"apb-ico\" aria-hidden=\"true\">\(apple_svg("phone"; "i-phone"))\(apple_svg("tablet"; "i-tablet"))\(apple_svg("tv"; "i-tv"))</span>\n"
+    + "        <div class=\"apb-text\">\n"
+    + (if $APPLE_STORE == "" then "          \(apple_soon)\n" else "" end)
+    + "          <h3 id=\"apb-h\">\(t("apple_h") | h)</h3>\n"
+    + "          <p>\(t("apple_band_p") | h)</p>\n"
+    + "        </div>\n"
+    + (if $APPLE_STORE == "" then
+         "        <a class=\"btn ghost apb-go\" href=\"/apple/\">\(t("apple_more") | h)<svg class=\"arr\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12h13M13 7l5 5-5 5\"/></svg></a>\n"
+       else
+         "        <a class=\"btn primary apb-go\" href=\"\($APPLE_STORE | h)\" rel=\"noopener\">App Store</a>\n"
+       end)
+    + "      </aside>\n";
   def nav($current):
     ($current == "home") as $home
     | (if $home then "" else "/" end) as $base
     | (if $current == "help" then "/help/"
        elif $current == "features" then "/features/"
        elif $current == "transparency" then "/transparency/"
+       elif $current == "apple" then "/apple/"
        elif ($L.pages | index($current)) != null then "/\($current)/"
        else "/" end) as $self
     | [[$base + "#features", t("nav_features"), "features"],
@@ -238,14 +278,17 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
      download: "<path d=\"M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14\"/>",
      send: "<path d=\"M20.5 3.5 10 14M20.5 3.5l-6.6 17-3.9-6.5-6.5-3.9z\"/>",
      help: "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7M12 17.2h.01\"/>",
-     heart: "<path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/>"} as $ICON
+     heart: "<path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/>",
+     apple: apple_icon("devices")} as $ICON
     | def mcur($key): if cur($key) then " is-current" else "" end;
     def macur($key): if cur($key) then " aria-current=\"page\"" else "" end;
     (mrow(mcur("features"); $base + "#features"; t("nav_features"); $ICON.features; macur("features"))
      + mrow(" menu-desk"; $base + "#download"; t("nav_download"); $ICON.download; "")
      + mrow(" menu-phone"; "/#download"; t("menu_send_link"); $ICON.send;
             " data-send-link data-copied=\"\(t("dl_phone_copied") | h)\"")
-     + mrow(mcur("help"); "/help/"; t("nav_help"); $ICON.help; macur("help"))) as $menuitems
+     + mrow(mcur("help"); "/help/"; t("nav_help"); $ICON.help; macur("help"))
+     # The Apple app's page, as long as the app is apart from this one.
+     + mrow(mcur("apple"); "/apple/"; t("apple_short"); $ICON.apple; macur("apple"))) as $menuitems
     # Support: a quiet link beside the others, to the support page.
     | "      <a class=\"navlink navsupport\" href=\"/support/\"\(if $current == "support" then " aria-current=\"page\"" else "" end)><svg class=\"heart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.9 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z\"/></svg>\(t("support_nav") | h)</a>\n" as $navsupport
     | mrow(" navsupport" + mcur("support"); "/support/"; t("support_nav"); $ICON.heart; macur("support")) as $menusupport
@@ -301,6 +344,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
     + "      <nav class=\"foot-cols\">\n"
     + foot_group(t("foot_h_app");
         [["/#features", t("nav_features")], ["/#download", t("nav_download")], ["/help/", t("nav_help")],
+         ["/apple/", t("apple_short")],
          ["https://github.com/slimture/dopeIPTV/releases", t("footer_releases")],
          ["https://github.com/slimture/dopeIPTV", "GitHub"]])
     + foot_group(t("foot_h_contact");
@@ -634,6 +678,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
            + (if $notes == "" then "" else
                 " · <a class=\"wn-link\" href=\"\($REPO | h)/releases/tag/v\($version | h)\" rel=\"nofollow\" data-wn>\(t("wn_h2") | h)</a>" end)),
          downloads: downloads($version; $reldate),
+         apple: apple_band,
          support: (if $SUPPORT_ON then support_band else "" end),
          verify: (if $sums == "1" then "      <p class=\"autonote\">\(t("note_verify"))</p>\n" else "" end),
          # What's new: the notes in a <template>, opened in a dialog from the
@@ -744,6 +789,52 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
                    + "</li>\n"] | add // "")
              + "            </ul>\n"
              + "          </section>\n"] | add // "")});
+
+# -- apple/index.php: dopeIPTV for iPhone, iPad and Apple TV ----------------
+# The Apple app's own page, apart from the computer app's: what it is, its
+# three devices, and the computer app meanwhile. Its words are apple_* in
+# site/lang/; whether it is in the App Store yet, site/apple.json.
+
+  # The three devices drawn in the site's own colours (style.css .ap-art):
+  # a TV with the app's start on it, an iPad of posters before it on the
+  # left and an iPhone playing on the right - no picture of Apple's, only
+  # shapes.
+  def apple_art:
+    "<svg class=\"ap-art-svg\" viewBox=\"0 0 640 360\" role=\"img\" aria-label=\"iPhone, iPad, Apple TV\" focusable=\"false\">"
+    + "<defs><linearGradient id=\"apGlow\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" class=\"ap-g1\"/><stop offset=\"1\" class=\"ap-g2\"/></linearGradient></defs>"
+    # The TV and the box under it.
+    + "<rect class=\"ap-body\" x=\"110\" y=\"10\" width=\"420\" height=\"250\" rx=\"16\"/>"
+    + "<rect class=\"ap-scr\" x=\"122\" y=\"22\" width=\"396\" height=\"226\" rx=\"8\"/>"
+    + "<rect fill=\"url(#apGlow)\" x=\"140\" y=\"40\" width=\"176\" height=\"100\" rx=\"9\"/>"
+    + "<path class=\"ap-play\" d=\"M220 74v32l26-16z\"/>"
+    + "<rect class=\"ap-row ap-row-1\" x=\"332\" y=\"48\" width=\"150\" height=\"11\" rx=\"5.5\"/>"
+    + "<rect class=\"ap-row\" x=\"332\" y=\"72\" width=\"168\" height=\"8\" rx=\"4\"/>"
+    + "<rect class=\"ap-row\" x=\"332\" y=\"90\" width=\"130\" height=\"8\" rx=\"4\"/>"
+    + "<rect class=\"ap-live\" x=\"332\" y=\"114\" width=\"38\" height=\"16\" rx=\"8\"/>"
+    + ([range(5) as $i | "<rect class=\"ap-tile\(if $i == 1 then " ap-tile-on" else "" end)\" x=\"\(140 + $i * 74)\" y=\"156\" width=\"64\" height=\"76\" rx=\"8\"/>"] | add)
+    + "<rect class=\"ap-body\" x=\"284\" y=\"272\" width=\"72\" height=\"18\" rx=\"6\"/>"
+    # The iPad, in front on the left: posters.
+    + "<rect class=\"ap-gap\" x=\"20\" y=\"126\" width=\"204\" height=\"156\" rx=\"18\"/>"
+    + "<rect class=\"ap-body ap-front\" x=\"22\" y=\"128\" width=\"200\" height=\"152\" rx=\"16\"/>"
+    + "<rect class=\"ap-scr\" x=\"32\" y=\"138\" width=\"180\" height=\"132\" rx=\"8\"/>"
+    + ([range(6) as $i | "<rect class=\"ap-tile\(if $i == 4 then " ap-tile-on" else "" end)\" x=\"\(42 + ($i % 3) * 56)\" y=\"\(148 + (($i / 3) | floor) * 60)\" width=\"48\" height=\"52\" rx=\"6\"/>"] | add)
+    # The iPhone, in front on the right: what plays, and the list under it.
+    + "<rect class=\"ap-gap\" x=\"466\" y=\"146\" width=\"112\" height=\"208\" rx=\"24\"/>"
+    + "<rect class=\"ap-body ap-front\" x=\"468\" y=\"148\" width=\"108\" height=\"204\" rx=\"22\"/>"
+    + "<rect class=\"ap-scr\" x=\"477\" y=\"157\" width=\"90\" height=\"186\" rx=\"15\"/>"
+    + "<rect fill=\"url(#apGlow)\" x=\"486\" y=\"176\" width=\"72\" height=\"46\" rx=\"7\"/>"
+    + "<path class=\"ap-play\" d=\"M517 191v16l13-8z\"/>"
+    + ([range(4) as $i | "<rect class=\"ap-row\" x=\"486\" y=\"\(236 + $i * 22)\" width=\"\([64, 52, 58, 46][$i])\" height=\"8\" rx=\"4\"/>"] | add)
+    + "</svg>";
+  def page_apple:
+    "/apple/" as $path
+    | $tpl
+    | expand(common + {canonical: (url($path; $lang) | h)};
+        {hreflang: hreflang($path), nav: nav("apple"), soon: apple_soon, art: apple_art,
+         icon_phone: apple_svg("phone"; ""), icon_tablet: apple_svg("tablet"; ""), icon_tv: apple_svg("tv"; ""),
+         store: (if $APPLE_STORE == "" then "" else
+           "      <div class=\"cta-row\"><a class=\"btn primary\" href=\"\($APPLE_STORE | h)\" rel=\"noopener\">App Store</a></div>\n" end),
+         note: (if $APPLE_STORE == "" then "      <p class=\"ap-note\">\(t("apple_store_note") | h)</p>\n" else "" end)});
 
 # -- 404.php --------------------------------------------------------------------
 
@@ -915,7 +1006,7 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
 
   def page_sitemap:
     [["/", (if ($R.published_at | truthy) then (try ($R.published_at | tostring | fromdateiso8601) catch null) else null end)],
-     ["/help/", $help_mtime], ["/features/", $help_mtime]] as $pages
+     ["/help/", $help_mtime], ["/features/", $help_mtime], ["/apple/", $help_mtime]] as $pages
     | "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
       + "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n"
       + ([$pages[] as [$path, $ts] | $avail[] as $code
@@ -955,5 +1046,6 @@ $site[0] as $S | $en[0] as $E | $tr[0] as $T | $fmt[0] as $F
   elif $page == "404" then page_404
   elif $page == "sitemap" then page_sitemap
   elif $page == "transparency" then page_transparency
+  elif $page == "apple" then page_apple
   elif ($L.pages | index($page)) != null then page_legal
   else error("render.jq: unknown page \($page)") end

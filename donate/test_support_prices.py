@@ -172,13 +172,15 @@ def test_the_menu_has_a_computers_row_and_a_phones():
     # The narrow-window menu (render.jq, nav): rows with icons; Download for
     # a computer, "Send the link to your computer" for a phone (nav.js
     # shares or copies it) - the row a phone app of dopeIPTV's takes over
-    # once there is one; feedback and the rules small under them.
+    # once there is one; the Apple app's own page (test_apple.py); feedback
+    # and the rules small under them.
     import glob
     for f in glob.glob(os.path.join(SITE, "lang", "*.json")):
         assert json.load(open(f, encoding="utf-8")).get("menu_send_link"), f
     en = _support("", "", "en", page="terms")
     menu = en.split('class="navmenu-panel"', 1)[1].split("</details>", 1)[0]
-    assert menu.count('class="mi-ico"') == 5
+    assert menu.count('class="mi-ico"') == 6
+    assert 'class="navmenu-item" href="/apple/"' in menu
     assert 'class="navmenu-item menu-desk" href="/#download"' in menu
     assert 'class="navmenu-item menu-phone" href="/#download" data-send-link' in menu
     assert ">Send the link to your computer<" in menu and 'data-copied="Link copied"' in menu

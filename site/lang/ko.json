@@ -690,5 +690,20 @@
     "fl_every_h": "모든 소스를 한 목록에",
     "fl_every_p": "모든 소스의 라이브 채널을 한 목록에. 각 채널은 자기 소스에서 재생됩니다.",
     "fl_lastch_h": "마지막 채널로 시작",
-    "fl_lastch_p": "켜는 TV처럼, 앱이 마지막으로 본 채널로 열립니다."
+    "fl_lastch_p": "켜는 TV처럼, 앱이 마지막으로 본 채널로 열립니다.",
+    "apple_soon": "출시 예정",
+    "apple_h": "iPhone, iPad 및 Apple TV용 dopeIPTV",
+    "apple_short": "iPhone, iPad 및 Apple TV",
+    "apple_band_p": "터치와 Apple TV 리모컨에 맞춰 만든 별도의 앱입니다.",
+    "apple_more": "자세히 보기",
+    "apple_meta_title": "iPhone, iPad 및 Apple TV용 dopeIPTV — 출시 예정",
+    "apple_desc": "dopeIPTV가 터치와 리모컨에 맞춘 별도의 앱으로 iPhone, iPad 및 Apple TV에 찾아옵니다.",
+    "apple_lede": "Apple 기기를 위한 별도의 앱 – iPhone과 iPad에서는 터치에, Apple TV에서는 리모컨에 맞춰 만들었습니다. 컴퓨터용 앱은 그대로 유지됩니다.",
+    "apple_iphone_p": "주머니 속에서.",
+    "apple_ipad_p": "소파에서.",
+    "apple_tv_p": "큰 화면에서.",
+    "apple_until_h": "그때까지는",
+    "apple_until_p": "Linux, macOS 및 Windows용 dopeIPTV는 지금 바로 무료로 쓸 수 있습니다.",
+    "apple_until_btn": "컴퓨터용 다운로드",
+    "apple_store_note": "App Store에 올라갑니다. 출시하는 날 이 페이지에서 알려 드립니다."
 }

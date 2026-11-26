@@ -594,6 +594,7 @@ render() {  # render PAGE LANG TEMPLATE OUTFILE [BODY [BODY_LANG]]
         --slurpfile en "$SITE/lang/en.json" --slurpfile tr "$tr" \
         --slurpfile rel "$rel" --slurpfile dl "$counts" --slurpfile spots "$spots" \
         --slurpfile tpfile "$tpfile" --argjson tplangs "$tplangs" --arg blang "${6:-}" \
+        --slurpfile apple "$SITE/apple.json" \
         --rawfile tpl "$3" --rawfile navtpl "$SITE/templates/nav.html" \
         --rawfile body "${5:-/dev/null}" > "$4"
 }
@@ -606,6 +607,8 @@ for c in $codes; do
     render index "$c" "$SITE/templates/index.html" "$OUT/i18n/$c/index.html"
     render help "$c" "$SITE/templates/help.html" "$OUT/i18n/$c/help/index.html"
     render features "$c" "$SITE/templates/features.html" "$OUT/i18n/$c/features/index.html"
+    # dopeIPTV for iPhone, iPad and Apple TV, apart from the computer app.
+    render apple "$c" "$SITE/templates/apple.html" "$OUT/i18n/$c/apple/index.html"
     render 404 "$c" "$SITE/templates/404.html" "$OUT/i18n/$c/404.html"
     if [ "$tpfile" != /dev/null ] && [ -f "$SITE/transparency/en.html" ]; then
         b=en

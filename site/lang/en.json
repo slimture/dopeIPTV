@@ -701,5 +701,20 @@
     "fl_every_h": "Every source in one list",
     "fl_every_p": "The live channels of all your sources in one list, each playing from its own source.",
     "fl_lastch_h": "Start on the last channel",
-    "fl_lastch_p": "The app opens on the channel you watched last, like a TV that is switched on."
+    "fl_lastch_p": "The app opens on the channel you watched last, like a TV that is switched on.",
+    "apple_soon": "Coming soon",
+    "apple_h": "dopeIPTV for iPhone, iPad and Apple TV",
+    "apple_short": "iPhone, iPad & Apple TV",
+    "apple_band_p": "A separate app, made for touch and for the Apple TV remote.",
+    "apple_more": "Read more",
+    "apple_meta_title": "dopeIPTV for iPhone, iPad and Apple TV — coming soon",
+    "apple_desc": "dopeIPTV is coming to iPhone, iPad and Apple TV, as an app of its own made for touch and the remote.",
+    "apple_lede": "An app of its own for Apple's devices – made for touch on iPhone and iPad, and for the remote on Apple TV. The computer app stays as it is.",
+    "apple_iphone_p": "In your pocket.",
+    "apple_ipad_p": "On the sofa.",
+    "apple_tv_p": "On the big screen.",
+    "apple_until_h": "Until then",
+    "apple_until_p": "dopeIPTV for Linux, macOS and Windows is here now – free.",
+    "apple_until_btn": "Download for your computer",
+    "apple_store_note": "It will be in the App Store. This page will say so the day it is."
 }
